@@ -1,4 +1,3 @@
-<Route path="/rpp" element={<RPP />} />
 import { useEffect, useState } from 'react'
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib'
 import { supabase } from '../lib/supabaseClient'
@@ -44,7 +43,7 @@ export default function RPP() {
     setLoading(true)
     const { data } = await supabase
       .from('rpp')
-      .select('*, guru(nama)')
+      .select('*, guru(nama_lengkap)')
       .order('dibuat_pada', { ascending: false })
     setItems(data || [])
     setLoading(false)
@@ -125,7 +124,7 @@ export default function RPP() {
 
     draw('LEMBAR PERSETUJUAN RPP', { bold: true, size: 16, gap: 36 })
     draw(`Judul RPP     : ${item.judul}`)
-    draw(`Guru          : ${item.guru?.nama || '-'}`)
+    draw(`Guru          : ${item.guru?.nama_lengkap || '-'}`)
     draw(`Mata Pelajaran: ${item.mata_pelajaran || '-'}`)
     draw(`Kelas         : ${item.kelas || '-'}`)
     draw(`Semester      : ${item.semester || '-'} / ${item.tahun_ajaran || '-'}`, { gap: 48 })
@@ -282,7 +281,7 @@ export default function RPP() {
                     <span className="text-sm font-medium text-ink-900 truncate">{item.judul}</span>
                   </div>
                   <p className="text-xs text-ink-700/50 mt-1">
-                    {isAdmin && <>{item.guru?.nama || 'Guru'} · </>}
+                    {isAdmin && <>{item.guru?.nama_lengkap || 'Guru'} · </>}
                     {item.mata_pelajaran} · Kelas {item.kelas} · {item.semester} {item.tahun_ajaran}
                   </p>
                   {item.status === 'ditolak' && item.catatan_admin && (
