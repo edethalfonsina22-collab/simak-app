@@ -21,6 +21,7 @@ import PPDBPublik from './pages/PPDBPublik'
 import PPDBAdmin from './pages/PPDBAdmin'
 import Perpustakaan from './pages/Perpustakaan'
 import RPP from './pages/RPP'
+import ProfilSaya from './pages/ProfilSaya'
 function ProtectedRoute({ children, adminOnly }) {
   const { session, loading, isAdmin } = useAuth()
   if (loading) {
@@ -61,6 +62,7 @@ export default function App() {
       <Route path="/perpustakaan" element={<ProtectedRoute><Perpustakaan /></ProtectedRoute>} />
       <Route path="/pengumuman" element={<ProtectedRoute><Pengumuman /></ProtectedRoute>} />
       <Route path="/rpp" element={<ProtectedRoute><RPP /></ProtectedRoute>} />
+      <Route path="/profil-saya" element={<ProtectedRoute><ProfilSaya /></ProtectedRoute>} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )
