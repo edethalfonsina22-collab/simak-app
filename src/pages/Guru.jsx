@@ -1,0 +1,213 @@
+import { useEffect, useState } from 'react'
+import { supabase } from '../lib/supabaseClient'
+import Layout from '../components/Layout'
+import BulkImportModal from '../components/BulkImportModal'
+import { Plus, UploadCloud, Pencil, Trash2, Search, X, Loader2 } from 'lucide-react'
+
+const emptyForm = {
+  nip: '',
+  nama_lengkap: '',
+  jenis_kelamin: 'L',
+  mata_pelajaran: '',
+  no_hp: '',
+  email: '',
+  status: 'aktif',
+}
+
+export default function Guru() {
+  const [data, setData] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [search, setSearch] = useState('')
+  const [showForm, setShowForm] = useState(false)
+  const [showImport, setShowImport] = useState(false)
+  const [editingId, setEditingId] = useState(null)
+  const [form, setForm] = useState(emptyForm)
+  const [saving, setSaving] = useState(false)
+
+  async function loadData() {
+    setLoading(true)
+    const { data: guru } = await supabase.from('guru').select('*').order('nama_lengkap')
+    setData(guru || [])
+    setLoading(false)
+  }
+
+  useEffect(() => { loadData() }, [])
+
+  function openAdd() {
+    setForm(emptyForm)
+    setEditingId(null)
+    setShowForm(true)
+  }
+
+  function openEdit(row) {
+    setForm({ ...emptyForm, ...row })
+    setEditingId(row.id)
+    setShowForm(true)
+  }
+
+  async function handleSubmit(e) {
+    e.preventDefault()
+    setSaving(true)
+    const { error } = editingId
+      ? await supabase.from('guru').update(form).eq('id', editingId)
+      : await supabase.from('guru').insert(form)
+    setSaving(false)
+    if (!error) { setShowForm(false); loadData() }
+    else alert('Gagal menyimpan: ' + error.message)
+  }
+
+  async function handleDelete(id) {
+    if (!confirm('Hapus data guru ini?')) return
+    const { error } = await supabase.from('guru').delete().eq('id', id)
+    if (!error) loadData()
+    else alert('Gagal menghapus: ' + error.message)
+  }
+
+  const filtered = data.filter((g) =>
+    `${g.nama_lengkap} ${g.nip} ${g.mata_pelajaran}`.toLowerCase().includes(search.toLowerCase())
+  )
+
+  return (
+    <Layout
+      title="Data Guru"
+      subtitle={`${data.length} guru & staf terdaftar`}
+      actions={
+        <>
+          <button className="btn-secondary" onClick={() => setShowImport(true)}>
+            <UploadCloud size={16} /> Impor Massal
+          </button>
+          <button className="btn-primary" onClick={openAdd}>
+            <Plus size={16} /> Tambah Guru
+          </button>
+        </>
+      }
+    >
+      <div className="card p-4 mb-4">
+        <div className="relative max-w-sm">
+          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-700/40" />
+          <input className="input-field pl-9" placeholder="Cari nama, NIP, atau mapel..."
+            value={search} onChange={(e) => setSearch(e.target.value)} />
+        </div>
+      </div>
+
+      <div className="card overflow-x-auto">
+        <table className="table-shell">
+          <thead>
+            <tr>
+              <th>Nama Lengkap</th>
+              <th>NIP</th>
+              <th>Mata Pelajaran</th>
+              <th>No. HP</th>
+              <th>Email</th>
+              <th>Status</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {loading && <tr><td colSpan={7} className="text-center py-8 text-ink-700/50">Memuat data...</td></tr>}
+            {!loading && filtered.length === 0 && (
+              <tr><td colSpan={7} className="text-center py-8 text-ink-700/50">Belum ada data guru.</td></tr>
+            )}
+            {filtered.map((g) => (
+              <tr key={g.id}>
+                <td className="font-medium">{g.nama_lengkap}</td>
+                <td className="font-mono text-xs">{g.nip}</td>
+                <td>{g.mata_pelajaran}</td>
+                <td>{g.no_hp}</td>
+                <td>{g.email}</td>
+                <td>
+                  <span className={`badge ${g.status === 'aktif' ? 'bg-sage-500/15 text-sage-500' : 'bg-ink-900/10 text-ink-700'}`}>
+                    {g.status}
+                  </span>
+                </td>
+                <td>
+                  <div className="flex items-center gap-1 justify-end">
+                    <button onClick={() => openEdit(g)} className="p-2 hover:bg-ink-900/5 rounded-lg text-ink-700/60"><Pencil size={15} /></button>
+                    <button onClick={() => handleDelete(g.id)} className="p-2 hover:bg-red-50 rounded-lg text-red-600/70"><Trash2 size={15} /></button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {showForm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink-950/50 backdrop-blur-sm p-4">
+          <form onSubmit={handleSubmit} className="card w-full max-w-lg p-6 relative max-h-[90vh] overflow-y-auto">
+            <button type="button" onClick={() => setShowForm(false)} className="absolute top-4 right-4 text-ink-700/40 hover:text-ink-900"><X size={20} /></button>
+            <h2 className="font-display text-xl font-semibold mb-4">{editingId ? 'Ubah Data Guru' : 'Tambah Guru'}</h2>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Nama Lengkap" full>
+                <input required className="input-field" value={form.nama_lengkap} onChange={(e) => setForm({ ...form, nama_lengkap: e.target.value })} />
+              </Field>
+              <Field label="NIP">
+                <input className="input-field" value={form.nip} onChange={(e) => setForm({ ...form, nip: e.target.value })} />
+              </Field>
+              <Field label="Jenis Kelamin">
+                <select className="input-field" value={form.jenis_kelamin} onChange={(e) => setForm({ ...form, jenis_kelamin: e.target.value })}>
+                  <option value="L">Laki-laki</option>
+                  <option value="P">Perempuan</option>
+                </select>
+              </Field>
+              <Field label="Mata Pelajaran" full>
+                <input className="input-field" value={form.mata_pelajaran} onChange={(e) => setForm({ ...form, mata_pelajaran: e.target.value })} />
+              </Field>
+              <Field label="No. HP">
+                <input className="input-field" value={form.no_hp} onChange={(e) => setForm({ ...form, no_hp: e.target.value })} />
+              </Field>
+              <Field label="Email">
+                <input type="email" className="input-field" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+              </Field>
+              <Field label="Status" full>
+                <select className="input-field" value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>
+                  <option value="aktif">Aktif</option>
+                  <option value="nonaktif">Nonaktif</option>
+                </select>
+              </Field>
+            </div>
+            <div className="mt-5 flex justify-end gap-3">
+              <button type="button" className="btn-secondary" onClick={() => setShowForm(false)}>Batal</button>
+              <button type="submit" disabled={saving} className="btn-primary">
+                {saving && <Loader2 size={16} className="animate-spin" />} Simpan
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      <BulkImportModal
+        open={showImport}
+        onClose={() => { setShowImport(false); loadData() }}
+        title="Impor Data Guru"
+        templateHeaders={['nama_lengkap', 'nip', 'jenis_kelamin(L/P)', 'mata_pelajaran', 'no_hp', 'email']}
+        mapRow={(row) => {
+          if (!row.nama_lengkap) return null
+          return {
+            nama_lengkap: String(row.nama_lengkap).trim(),
+            nip: String(row.nip || '').trim(),
+            jenis_kelamin: String(row['jenis_kelamin(L/P)'] || row.jenis_kelamin || 'L').trim().toUpperCase(),
+            mata_pelajaran: String(row.mata_pelajaran || '').trim(),
+            no_hp: String(row.no_hp || '').trim(),
+            email: String(row.email || '').trim(),
+            status: 'aktif',
+          }
+        }}
+        onImport={async (rows) => {
+          const { error } = await supabase.from('guru').insert(rows)
+          if (error) throw error
+          return { count: rows.length }
+        }}
+      />
+    </Layout>
+  )
+}
+
+function Field({ label, children, full }) {
+  return (
+    <div className={full ? 'col-span-2' : ''}>
+      <label className="eyebrow mb-1.5 block">{label}</label>
+      {children}
+    </div>
+  )
+}
