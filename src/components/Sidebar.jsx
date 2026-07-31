@@ -20,6 +20,7 @@ import {
   Landmark,
   Library,
   NotebookPen,
+  UserCircle,
 } from 'lucide-react'
 import { useAuth } from '../lib/AuthContext'
 
@@ -29,6 +30,7 @@ const groupsAdmin = [
     label: null, // tanpa judul grup — selalu di atas
     links: [
       { to: '/', label: 'Dasbor', icon: LayoutDashboard, end: true },
+      { to: '/profil-saya', label: 'Profil Saya', icon: UserCircle },
       { to: '/pengumuman', label: 'Pengumuman', icon: Megaphone },
     ],
   },
@@ -69,6 +71,7 @@ const groupsAdmin = [
 // Menu GURU: tetap ringkas, tidak perlu dikelompokkan
 const linksGuru = [
   { to: '/', label: 'Dasbor', icon: LayoutDashboard, end: true },
+  { to: '/profil-saya', label: 'Profil Saya', icon: UserCircle },
   { to: '/presensi', label: 'Presensi', icon: ClipboardCheck },
   { to: '/nilai', label: 'Nilai Siswa', icon: BookOpenCheck },
   { to: '/rapor', label: 'Rapor Siswa', icon: FileBadge },
