@@ -112,18 +112,23 @@ export default function ProfilSaya() {
   return (
     <Layout title="Profil Saya" subtitle="Data diri dan foto profil Anda">
       <form onSubmit={handleSave} className="max-w-2xl space-y-5">
-        <div className="card p-6 flex items-center gap-5">
+        {/* Kartu identitas — background biru tua (navy), kontras elegan dengan aksen emas */}
+        <div className="relative overflow-hidden rounded-xl p-6 flex items-center gap-5 bg-gradient-to-br from-blue-900 to-blue-950">
+          {/* Dekorasi lingkaran samar di background, senada dengan aksen bulat di identitas guru */}
+          <div className="absolute -top-10 -right-10 w-40 h-40 rounded-full bg-white/5 pointer-events-none" />
+          <div className="absolute -bottom-14 -left-6 w-32 h-32 rounded-full bg-white/5 pointer-events-none" />
+
           <div className="relative shrink-0">
-            <div className="w-20 h-20 rounded-full bg-ink-900/[0.06] overflow-hidden flex items-center justify-center">
+            <div className="w-20 h-20 rounded-full bg-white/10 ring-2 ring-white/20 overflow-hidden flex items-center justify-center">
               {fotoUrl() ? (
                 <img src={fotoUrl()} alt="Foto profil" className="w-full h-full object-cover" />
               ) : (
-                <span className="text-2xl font-display font-semibold text-ink-700/40">
+                <span className="text-2xl font-display font-semibold text-white/70">
                   {data.nama_lengkap?.[0] || '?'}
                 </span>
               )}
             </div>
-            <label className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full bg-brass-400 flex items-center justify-center cursor-pointer">
+            <label className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full bg-brass-400 flex items-center justify-center cursor-pointer shadow-md">
               {uploadingFoto ? (
                 <Loader2 size={13} className="animate-spin text-ink-950" />
               ) : (
@@ -132,13 +137,14 @@ export default function ProfilSaya() {
               <input type="file" accept="image/*" className="hidden" onChange={handleFotoChange} disabled={uploadingFoto} />
             </label>
           </div>
-          <div>
-            <p className="font-display font-semibold text-lg text-ink-950">{data.nama_lengkap}</p>
-            <p className="text-sm text-ink-700/50">{data.nip ? `NIP ${data.nip}` : 'NIP belum diisi'}</p>
+          <div className="relative">
+            <p className="font-display font-semibold text-lg text-white">{data.nama_lengkap}</p>
+            <p className="text-sm text-blue-200/70">{data.nip ? `NIP ${data.nip}` : 'NIP belum diisi'}</p>
           </div>
         </div>
 
-        <div className="card p-6 space-y-4">
+        <div className="card relative overflow-hidden p-6 space-y-4">
+          <span className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-900 to-brass-400" />
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="text-xs text-ink-700/60 mb-1 block">Nama Lengkap</label>
