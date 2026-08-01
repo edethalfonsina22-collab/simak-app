@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import * as XLSX from 'xlsx';
-import { supabase } from '../supabaseClient'; // sesuaikan path dengan project Anda
+import { supabase } from '../lib/supabaseClient'; // sesuaikan kalau nama/lokasi file berbeda
+import { useAuth } from '../lib/AuthContext';
 
 // Membuat kode ujian acak 6 karakter, misal: X7K2QP
 function buatKodeUjian() {
@@ -12,15 +13,32 @@ function buatKodeUjian() {
   return kode;
 }
 
-export default function BuatUjian({ guruId, daftarKelas = [] }) {
+export default function BuatUjian() {
+  const { session } = useAuth();
+  const guruId = session?.user?.id;
+
+  const [daftarKelas, setDaftarKelas] = useState([]);
   const [judul, setJudul] = useState('');
   const [mapel, setMapel] = useState('');
-  const [kelas, setKelas] = useState(daftarKelas[0] || '');
+  const [kelas, setKelas] = useState('');
   const [fileExcel, setFileExcel] = useState(null);
   const [soalPreview, setSoalPreview] = useState([]);
   const [status, setStatus] = useState('idle'); // idle | membaca | menyimpan | selesai | error
   const [pesanError, setPesanError] = useState('');
   const [ujianDibuat, setUjianDibuat] = useState(null);
+
+  // Ambil daftar kelas dari tabel "kelas" yang sudah ada di SIMAK
+  useEffect(() => {
+    async function ambilKelas() {
+      const { data, error } = await supabase.from('kelas').select('nama_kelas');
+      if (!error && data) {
+        const daftar = data.map((k) => k.nama_kelas);
+        setDaftarKelas(daftar);
+        if (daftar.length > 0) setKelas(daftar[0]);
+      }
+    }
+    ambilKelas();
+  }, []);
 
   function bacaFileExcel(e) {
     const file = e.target.files[0];
