@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabaseClient'
 import Layout from '../components/Layout'
-import { Loader2, Save } from 'lucide-react'
+import { Loader2, Save, BookOpenCheck } from 'lucide-react'
 
 const JENIS_OPTS = ['Tugas', 'UH', 'UTS', 'UAS']
 
@@ -67,8 +67,26 @@ export default function Nilai() {
     else alert('Gagal menyimpan nilai: ' + error.message)
   }
 
+  const kelasAktif = kelasList.find((k) => k.id === kelasId)
+
   return (
     <Layout title="Nilai Siswa" subtitle="Input nilai per kelas dan mata pelajaran">
+      {/* Banner sambutan — senada dengan gaya kartu Kelas */}
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#4a0e0e] to-[#7a1515] p-6 mb-6">
+        <div className="relative z-10 flex items-center gap-4">
+          <div className="w-11 h-11 rounded-full bg-white/15 flex items-center justify-center shrink-0">
+            <BookOpenCheck size={20} className="text-paper" />
+          </div>
+          <div>
+            <p className="font-display font-semibold text-lg text-paper">Nilai Siswa</p>
+            <p className="text-sm text-paper/70 mt-0.5">
+              {kelasAktif ? `Kelas ${kelasAktif.nama_kelas} · ${siswaList.length} siswa aktif` : 'Pilih kelas untuk mulai input nilai'}
+            </p>
+          </div>
+        </div>
+        <BookOpenCheck size={120} className="absolute -right-4 -bottom-6 text-white/5 rotate-12" />
+      </div>
+
       <div className="card p-5 mb-5 grid grid-cols-2 md:grid-cols-5 gap-3">
         <div>
           <label className="eyebrow mb-1.5 block">Kelas</label>
