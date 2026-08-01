@@ -69,6 +69,7 @@ export default function App() {
       <Route path="/galeri" element={<ProtectedRoute><Galeri /></ProtectedRoute>} />
       <Route path="/dokumen" element={<ProtectedRoute><Dokumen /></ProtectedRoute>} />
       <Route path="/rpp" element={<ProtectedRoute><RPP /></ProtectedRoute>} />
+      <Route path="/buat-ujian" element={<ProtectedRoute><BuatUjian /></ProtectedRoute>} />
       <Route path="/profil-saya" element={<ProtectedRoute><ProfilSaya /></ProtectedRoute>} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
