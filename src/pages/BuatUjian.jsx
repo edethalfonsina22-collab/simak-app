@@ -157,97 +157,112 @@ export default function BuatUjian() {
   if (status === 'selesai' && ujianDibuat) {
     const namaKelasDibuat = daftarKelas.find((k) => k.id === ujianDibuat.kelas_id)?.nama_kelas;
     return (
-      <div className="p-6 rounded-xl border border-green-200 bg-green-50">
-        <h3 className="text-lg font-semibold text-green-800">Ujian berhasil dibuat 🎉</h3>
-        <p className="mt-2 text-sm text-gray-700">
-          Bagikan Kode Ujian ini ke siswa kelas <strong>{namaKelasDibuat}</strong>:
-        </p>
-        <div className="mt-3 text-3xl font-mono font-bold tracking-widest text-green-700">
-          {ujianDibuat.kode_ujian}
+      <div className="min-h-screen bg-gradient-to-b from-[#fdf3f1] to-[#f7e6e3] flex items-start justify-center p-6">
+        <div className="w-full max-w-xl p-6 rounded-xl border border-[#6b0f1a]/15 bg-white shadow-sm">
+          <h3 className="text-lg font-semibold text-[#3b0a0a] flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-[#d4a017]"></span>
+            Ujian berhasil dibuat 🎉
+          </h3>
+          <p className="mt-2 text-sm text-gray-700">
+            Bagikan Kode Ujian ini ke siswa kelas <strong>{namaKelasDibuat}</strong>:
+          </p>
+          <div className="mt-3 text-3xl font-mono font-bold tracking-widest text-[#6b0f1a] text-center bg-[#f7e6e3] rounded-lg py-3">
+            {ujianDibuat.kode_ujian}
+          </div>
+          <p className="mt-3 text-sm text-gray-600">
+            Status saat ini: <strong>{ujianDibuat.status}</strong>. Siswa baru bisa mengerjakan
+            setelah Anda klik Aktifkan.
+          </p>
+          {ujianDibuat.status !== 'aktif' && (
+            <button
+              onClick={aktifkanUjian}
+              className="mt-4 px-4 py-2 rounded-lg bg-[#6b0f1a] text-white font-medium hover:bg-[#7d1420] transition-colors"
+            >
+              Aktifkan Ujian
+            </button>
+          )}
         </div>
-        <p className="mt-3 text-sm text-gray-600">
-          Status saat ini: <strong>{ujianDibuat.status}</strong>. Siswa baru bisa mengerjakan
-          setelah Anda klik Aktifkan.
-        </p>
-        {ujianDibuat.status !== 'aktif' && (
-          <button
-            onClick={aktifkanUjian}
-            className="mt-4 px-4 py-2 rounded-lg bg-green-600 text-white font-medium hover:bg-green-700"
-          >
-            Aktifkan Ujian
-          </button>
-        )}
       </div>
     );
   }
 
   return (
-    <div className="max-w-xl space-y-4">
-      <h3 className="text-lg font-semibold">Buat Ujian Baru</h3>
+    <div className="min-h-screen bg-gradient-to-b from-[#fdf3f1] to-[#f7e6e3] flex items-start justify-center p-6">
+      <div className="w-full max-w-xl space-y-4 bg-white rounded-xl border border-[#6b0f1a]/15 shadow-sm p-6">
+        <h3 className="text-lg font-semibold text-[#3b0a0a] flex items-center gap-2">
+          <span className="w-1.5 h-5 rounded-full bg-[#d4a017]"></span>
+          Buat Ujian Baru
+        </h3>
 
-      <div>
-        <label className="block text-sm font-medium mb-1">Judul Ujian</label>
-        <input
-          value={judul}
-          onChange={(e) => setJudul(e.target.value)}
-          className="w-full border rounded-lg px-3 py-2"
-          placeholder="Ulangan Harian Bab 3"
-        />
-      </div>
+        <div>
+          <label className="block text-sm font-medium mb-1 text-[#6b0f1a]">Judul Ujian</label>
+          <input
+            value={judul}
+            onChange={(e) => setJudul(e.target.value)}
+            className="w-full rounded-lg px-3 py-2 border border-[#6b0f1a]/15 focus:border-[#6b0f1a] focus:ring-2 focus:ring-[#6b0f1a]/20 outline-none transition-colors"
+            placeholder="Ulangan Harian Bab 3"
+          />
+        </div>
 
-      <div>
-        <label className="block text-sm font-medium mb-1">Mata Pelajaran</label>
-        <input
-          value={mapel}
-          onChange={(e) => setMapel(e.target.value)}
-          className="w-full border rounded-lg px-3 py-2"
-          placeholder="Matematika"
-        />
-      </div>
+        <div>
+          <label className="block text-sm font-medium mb-1 text-[#6b0f1a]">Mata Pelajaran</label>
+          <input
+            value={mapel}
+            onChange={(e) => setMapel(e.target.value)}
+            className="w-full rounded-lg px-3 py-2 border border-[#6b0f1a]/15 focus:border-[#6b0f1a] focus:ring-2 focus:ring-[#6b0f1a]/20 outline-none transition-colors"
+            placeholder="Matematika"
+          />
+        </div>
 
-      <div>
-        <label className="block text-sm font-medium mb-1">Kelas</label>
-        <select
-          value={kelasId}
-          onChange={(e) => setKelasId(e.target.value)}
-          className="w-full border rounded-lg px-3 py-2"
+        <div>
+          <label className="block text-sm font-medium mb-1 text-[#6b0f1a]">Kelas</label>
+          <select
+            value={kelasId}
+            onChange={(e) => setKelasId(e.target.value)}
+            className="w-full rounded-lg px-3 py-2 border border-[#6b0f1a]/15 focus:border-[#6b0f1a] focus:ring-2 focus:ring-[#6b0f1a]/20 outline-none transition-colors"
+          >
+            {daftarKelas.length === 0 && <option value="">Belum ada data kelas</option>}
+            {daftarKelas.map((k) => (
+              <option key={k.id} value={k.id}>
+                Kelas {k.nama_kelas}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium mb-1 text-[#6b0f1a]">
+            Upload Soal (Excel — kolom: soal, pilihan_a, pilihan_b, pilihan_c, pilihan_d, jawaban_benar)
+          </label>
+          <input
+            type="file"
+            accept=".xlsx,.xls"
+            onChange={bacaFileExcel}
+            className="w-full text-sm text-[#6b0f1a]/80 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:bg-[#6b0f1a] file:text-white file:font-medium hover:file:bg-[#7d1420] file:cursor-pointer file:transition-colors"
+          />
+        </div>
+
+        {pesanError && (
+          <div className="text-sm text-[#8f1f22] bg-[#6b0f1a]/5 border border-[#6b0f1a]/20 rounded-lg p-3">
+            {pesanError}
+          </div>
+        )}
+
+        {soalPreview.length > 0 && (
+          <div className="text-sm text-[#3b0a0a] bg-[#d4a017]/10 border border-[#d4a017]/30 rounded-lg p-3">
+            ✅ {soalPreview.length} soal terbaca dari Excel. Contoh soal #1:{' '}
+            <em>{soalPreview[0].soal}</em>
+          </div>
+        )}
+
+        <button
+          onClick={simpanUjian}
+          disabled={status === 'menyimpan'}
+          className="px-4 py-2 rounded-lg bg-[#6b0f1a] text-white font-medium hover:bg-[#7d1420] transition-colors disabled:opacity-50"
         >
-          {daftarKelas.length === 0 && <option value="">Belum ada data kelas</option>}
-          {daftarKelas.map((k) => (
-            <option key={k.id} value={k.id}>
-              Kelas {k.nama_kelas}
-            </option>
-          ))}
-        </select>
+          {status === 'menyimpan' ? 'Menyimpan...' : 'Simpan Ujian'}
+        </button>
       </div>
-
-      <div>
-        <label className="block text-sm font-medium mb-1">
-          Upload Soal (Excel — kolom: soal, pilihan_a, pilihan_b, pilihan_c, pilihan_d, jawaban_benar)
-        </label>
-        <input type="file" accept=".xlsx,.xls" onChange={bacaFileExcel} className="w-full" />
-      </div>
-
-      {pesanError && (
-        <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg p-3">
-          {pesanError}
-        </div>
-      )}
-
-      {soalPreview.length > 0 && (
-        <div className="text-sm text-gray-700 bg-gray-50 border rounded-lg p-3">
-          ✅ {soalPreview.length} soal terbaca dari Excel. Contoh soal #1:{' '}
-          <em>{soalPreview[0].soal}</em>
-        </div>
-      )}
-
-      <button
-        onClick={simpanUjian}
-        disabled={status === 'menyimpan'}
-        className="px-4 py-2 rounded-lg bg-blue-600 text-white font-medium hover:bg-blue-700 disabled:opacity-50"
-      >
-        {status === 'menyimpan' ? 'Menyimpan...' : 'Simpan Ujian'}
-      </button>
     </div>
   );
 }
