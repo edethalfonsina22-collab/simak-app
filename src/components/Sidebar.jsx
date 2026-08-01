@@ -6,6 +6,7 @@ import {
   DoorOpen,
   CalendarClock,
   ClipboardCheck,
+  ClipboardList,
   BookOpenCheck,
   Megaphone,
   LogOut,
@@ -49,6 +50,7 @@ const groupsAdmin = [
       { to: '/nilai', label: 'Nilai Siswa', icon: BookOpenCheck },
       { to: '/rapor', label: 'Rapor Siswa', icon: FileBadge },
       { to: '/rpp', label: 'RPP', icon: NotebookPen },
+      { to: '/buat-ujian', label: 'Buat Ujian', icon: ClipboardList },
     ],
   },
   {
@@ -82,6 +84,7 @@ const linksGuru = [
   { to: '/nilai', label: 'Nilai Siswa', icon: BookOpenCheck },
   { to: '/rapor', label: 'Rapor Siswa', icon: FileBadge },
   { to: '/rpp', label: 'RPP', icon: NotebookPen },
+  { to: '/buat-ujian', label: 'Buat Ujian', icon: ClipboardList },
   { to: '/perpustakaan', label: 'Perpustakaan', icon: Library },
   { to: '/jadwal', label: 'Jadwal Pelajaran', icon: CalendarClock },
   { to: '/agenda', label: 'Agenda Sekolah', icon: CalendarDays },
