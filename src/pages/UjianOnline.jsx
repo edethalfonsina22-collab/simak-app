@@ -9,7 +9,8 @@ export default function UjianOnline() {
   const [kodeUjian, setKodeUjian] = useState('');
   const [ujian, setUjian] = useState(null);
   const [soalList, setSoalList] = useState([]);
-  const [daftarNama, setDaftarNama] = useState([]);
+  const [daftarSiswa, setDaftarSiswa] = useState([]); // [{nis, nama_lengkap}]
+  const [nisSiswa, setNisSiswa] = useState('');
   const [namaSiswa, setNamaSiswa] = useState('');
   const [jawaban, setJawaban] = useState({});
   const [error, setError] = useState('');
@@ -56,12 +57,12 @@ export default function UjianOnline() {
       return;
     }
 
-    // Ambil daftar nama siswa di kelas ini dari tabel "siswa" yang sudah ada di SIMAK
+    // Ambil daftar siswa di kelas ini dari tabel "siswa" (kelas_id, nama_lengkap, nis)
     const { data: siswaData, error: errSiswa } = await supabase
       .from('siswa')
-      .select('nama')
-      .eq('kelas', ujianData.kelas)
-      .order('nama', { ascending: true });
+      .select('nis, nama_lengkap')
+      .eq('kelas_id', ujianData.kelas_id)
+      .order('nama_lengkap', { ascending: true });
 
     if (errSiswa || !siswaData) {
       setError('Gagal mengambil daftar siswa kelas ini.');
@@ -71,7 +72,7 @@ export default function UjianOnline() {
 
     setUjian(ujianData);
     setSoalList(soalData);
-    setDaftarNama(siswaData.map((s) => s.nama));
+    setDaftarSiswa(siswaData);
     setMemuat(false);
     setTahap('pilih-nama');
   }
@@ -81,7 +82,7 @@ export default function UjianOnline() {
   }
 
   async function kirimJawaban() {
-    if (!namaSiswa) {
+    if (!nisSiswa) {
       setError('Pilih namamu dulu dari daftar.');
       return;
     }
@@ -96,6 +97,7 @@ export default function UjianOnline() {
 
     const { data, error: errSubmit } = await supabase.rpc('submit_ujian', {
       p_kode_ujian: ujian.kode_ujian,
+      p_nis_siswa: nisSiswa,
       p_nama_siswa: namaSiswa,
       p_jawaban: jawaban,
     });
@@ -141,24 +143,29 @@ export default function UjianOnline() {
       <div className="max-w-sm mx-auto mt-16 p-6 rounded-xl border shadow-sm text-center">
         <h1 className="text-xl font-semibold">{ujian.judul}</h1>
         <p className="text-sm text-gray-500 mb-4">
-          {ujian.mata_pelajaran} · Kelas {ujian.kelas}
+          {ujian.mata_pelajaran} · Kelas {ujian.nama_kelas}
         </p>
         <select
-          value={namaSiswa}
-          onChange={(e) => setNamaSiswa(e.target.value)}
+          value={nisSiswa}
+          onChange={(e) => {
+            const nis = e.target.value;
+            setNisSiswa(nis);
+            const siswa = daftarSiswa.find((s) => s.nis === nis);
+            setNamaSiswa(siswa?.nama_lengkap || '');
+          }}
           className="w-full border rounded-lg px-3 py-2"
         >
           <option value="">-- Pilih namamu --</option>
-          {daftarNama.map((n) => (
-            <option key={n} value={n}>
-              {n}
+          {daftarSiswa.map((s) => (
+            <option key={s.nis} value={s.nis}>
+              {s.nama_lengkap}
             </option>
           ))}
         </select>
         {error && <p className="text-sm text-red-600 mt-2">{error}</p>}
         <button
           onClick={() => {
-            if (!namaSiswa) {
+            if (!nisSiswa) {
               setError('Pilih namamu dulu.');
               return;
             }
