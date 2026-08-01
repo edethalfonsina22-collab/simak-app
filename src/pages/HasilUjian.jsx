@@ -98,98 +98,112 @@ export default function HasilUjian() {
   }
 
   if (memuat) {
-    return <div className="p-6 text-gray-500 text-sm">Memuat...</div>;
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-[#fdf3f1] to-[#f7e6e3] flex items-center justify-center p-6">
+        <div className="text-[#6b0f1a]/60 text-sm">Memuat...</div>
+      </div>
+    );
   }
 
   if (daftarUjian.length === 0) {
     return (
-      <div className="p-6">
-        <h3 className="text-lg font-semibold mb-2">Hasil Ujian</h3>
-        <p className="text-sm text-gray-500">
-          Anda belum membuat ujian apa pun. Buat ujian dulu di menu "Buat Ujian".
-        </p>
+      <div className="min-h-screen bg-gradient-to-b from-[#fdf3f1] to-[#f7e6e3] flex items-start justify-center p-6">
+        <div className="w-full max-w-3xl bg-white rounded-xl border border-[#6b0f1a]/15 shadow-sm p-6">
+          <h3 className="text-lg font-semibold mb-2 text-[#3b0a0a] flex items-center gap-2">
+            <span className="w-1.5 h-5 rounded-full bg-[#d4a017]"></span>
+            Hasil Ujian
+          </h3>
+          <p className="text-sm text-[#6b0f1a]/60">
+            Anda belum membuat ujian apa pun. Buat ujian dulu di menu "Buat Ujian".
+          </p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="max-w-3xl space-y-5">
-      <h3 className="text-lg font-semibold">Hasil Ujian</h3>
+    <div className="min-h-screen bg-gradient-to-b from-[#fdf3f1] to-[#f7e6e3] flex items-start justify-center p-6">
+      <div className="w-full max-w-3xl space-y-5 bg-white rounded-xl border border-[#6b0f1a]/15 shadow-sm p-6">
+        <h3 className="text-lg font-semibold text-[#3b0a0a] flex items-center gap-2">
+          <span className="w-1.5 h-5 rounded-full bg-[#d4a017]"></span>
+          Hasil Ujian
+        </h3>
 
-      <select
-        value={ujianDipilih}
-        onChange={(e) => setUjianDipilih(e.target.value)}
-        className="w-full border rounded-lg px-3 py-2"
-      >
-        {daftarUjian.map((u) => (
-          <option key={u.id} value={u.id}>
-            {u.judul} · {u.mata_pelajaran} · Kelas {u.kelas?.nama_kelas} · {u.kode_ujian} (
-            {u.status})
-          </option>
-        ))}
-      </select>
-
-      {ujianAktif && (
-        <div className="grid grid-cols-3 gap-3">
-          <div className="border rounded-xl p-4 text-center">
-            <div className="text-2xl font-bold">{hasil.length}</div>
-            <div className="text-xs text-gray-500">Siswa mengerjakan</div>
-          </div>
-          <div className="border rounded-xl p-4 text-center">
-            <div className="text-2xl font-bold">{jumlahSoal}</div>
-            <div className="text-xs text-gray-500">Jumlah soal</div>
-          </div>
-          <div className="border rounded-xl p-4 text-center">
-            <div className="text-2xl font-bold">{rataRata}</div>
-            <div className="text-xs text-gray-500">Rata-rata skor</div>
-          </div>
-        </div>
-      )}
-
-      <div className="flex items-center justify-between">
-        <p className="text-sm text-gray-500">
-          {ujianAktif?.status === 'aktif'
-            ? '🟢 Ujian aktif — hasil masuk otomatis secara real-time'
-            : 'Ujian tidak aktif'}
-        </p>
-        <button
-          onClick={unduhCSV}
-          disabled={hasil.length === 0}
-          className="text-sm px-3 py-1.5 rounded-lg border hover:bg-gray-50 disabled:opacity-40"
+        <select
+          value={ujianDipilih}
+          onChange={(e) => setUjianDipilih(e.target.value)}
+          className="w-full rounded-lg px-3 py-2 border border-[#6b0f1a]/15 focus:border-[#6b0f1a] focus:ring-2 focus:ring-[#6b0f1a]/20 outline-none transition-colors"
         >
-          Unduh CSV
-        </button>
-      </div>
-
-      <table className="w-full text-sm border rounded-xl overflow-hidden">
-        <thead className="bg-gray-50">
-          <tr>
-            <th className="text-left px-4 py-2">#</th>
-            <th className="text-left px-4 py-2">Nama Siswa</th>
-            <th className="text-left px-4 py-2">Skor</th>
-            <th className="text-left px-4 py-2">Waktu Selesai</th>
-          </tr>
-        </thead>
-        <tbody>
-          {hasil.length === 0 && (
-            <tr>
-              <td colSpan={4} className="text-center px-4 py-6 text-gray-400">
-                Belum ada siswa yang mengerjakan.
-              </td>
-            </tr>
-          )}
-          {hasil.map((h, i) => (
-            <tr key={h.id} className="border-t">
-              <td className="px-4 py-2">{i + 1}</td>
-              <td className="px-4 py-2">{h.nama_siswa}</td>
-              <td className="px-4 py-2 font-semibold">{h.skor}</td>
-              <td className="px-4 py-2 text-gray-500">
-                {new Date(h.waktu_selesai).toLocaleString('id-ID')}
-              </td>
-            </tr>
+          {daftarUjian.map((u) => (
+            <option key={u.id} value={u.id}>
+              {u.judul} · {u.mata_pelajaran} · Kelas {u.kelas?.nama_kelas} · {u.kode_ujian} (
+              {u.status})
+            </option>
           ))}
-        </tbody>
-      </table>
+        </select>
+
+        {ujianAktif && (
+          <div className="grid grid-cols-3 gap-3">
+            <div className="rounded-xl p-4 text-center border border-[#6b0f1a]/15 bg-[#f7e6e3]/40">
+              <div className="text-2xl font-bold text-[#6b0f1a]">{hasil.length}</div>
+              <div className="text-xs text-[#6b0f1a]/60">Siswa mengerjakan</div>
+            </div>
+            <div className="rounded-xl p-4 text-center border border-[#6b0f1a]/15 bg-[#f7e6e3]/40">
+              <div className="text-2xl font-bold text-[#6b0f1a]">{jumlahSoal}</div>
+              <div className="text-xs text-[#6b0f1a]/60">Jumlah soal</div>
+            </div>
+            <div className="rounded-xl p-4 text-center border border-[#d4a017]/40 bg-[#d4a017]/10">
+              <div className="text-2xl font-bold text-[#8a6a0d]">{rataRata}</div>
+              <div className="text-xs text-[#6b0f1a]/60">Rata-rata skor</div>
+            </div>
+          </div>
+        )}
+
+        <div className="flex items-center justify-between">
+          <p className="text-sm text-[#6b0f1a]/60">
+            {ujianAktif?.status === 'aktif'
+              ? '🟢 Ujian aktif — hasil masuk otomatis secara real-time'
+              : 'Ujian tidak aktif'}
+          </p>
+          <button
+            onClick={unduhCSV}
+            disabled={hasil.length === 0}
+            className="text-sm px-3 py-1.5 rounded-lg border border-[#6b0f1a]/20 text-[#6b0f1a] hover:bg-[#6b0f1a]/5 transition-colors disabled:opacity-40"
+          >
+            Unduh CSV
+          </button>
+        </div>
+
+        <table className="w-full text-sm rounded-xl overflow-hidden border border-[#6b0f1a]/10">
+          <thead>
+            <tr className="bg-[#6b0f1a] text-white">
+              <th className="text-left px-4 py-2.5 font-medium">#</th>
+              <th className="text-left px-4 py-2.5 font-medium">Nama Siswa</th>
+              <th className="text-left px-4 py-2.5 font-medium">Skor</th>
+              <th className="text-left px-4 py-2.5 font-medium">Waktu Selesai</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-[#6b0f1a]/8">
+            {hasil.length === 0 && (
+              <tr>
+                <td colSpan={4} className="text-center px-4 py-6 text-[#6b0f1a]/40">
+                  Belum ada siswa yang mengerjakan.
+                </td>
+              </tr>
+            )}
+            {hasil.map((h, i) => (
+              <tr key={h.id} className="hover:bg-[#6b0f1a]/5 transition-colors">
+                <td className="px-4 py-2 text-[#6b0f1a]/70">{i + 1}</td>
+                <td className="px-4 py-2 font-medium text-[#3b0a0a]">{h.nama_siswa}</td>
+                <td className="px-4 py-2 font-semibold text-[#6b0f1a]">{h.skor}</td>
+                <td className="px-4 py-2 text-[#6b0f1a]/50">
+                  {new Date(h.waktu_selesai).toLocaleString('id-ID')}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
