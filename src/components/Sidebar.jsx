@@ -22,6 +22,7 @@ import {
   NotebookPen,
   UserCircle,
   Images,
+  HardDrive,
 } from 'lucide-react'
 import { useAuth } from '../lib/AuthContext'
 
@@ -33,6 +34,7 @@ const groupsAdmin = [
       { to: '/', label: 'Dasbor', icon: LayoutDashboard, end: true },
       { to: '/profil-saya', label: 'Profil Saya', icon: UserCircle },
       { to: '/galeri', label: 'Galeri Kegiatan', icon: Images },
+      { to: '/dokumen', label: 'Dokumen Penting', icon: HardDrive },
       { to: '/pengumuman', label: 'Pengumuman', icon: Megaphone },
     ],
   },
@@ -75,6 +77,7 @@ const linksGuru = [
   { to: '/', label: 'Dasbor', icon: LayoutDashboard, end: true },
   { to: '/profil-saya', label: 'Profil Saya', icon: UserCircle },
   { to: '/galeri', label: 'Galeri Kegiatan', icon: Images },
+  { to: '/dokumen', label: 'Dokumen Penting', icon: HardDrive },
   { to: '/presensi', label: 'Presensi', icon: ClipboardCheck },
   { to: '/nilai', label: 'Nilai Siswa', icon: BookOpenCheck },
   { to: '/rapor', label: 'Rapor Siswa', icon: FileBadge },
