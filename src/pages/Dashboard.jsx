@@ -23,6 +23,30 @@ const KATEGORI_STYLE = {
   Akademik: 'bg-sage-500/15 text-sage-500',
 }
 
+// Palet kartu ringkasan — 4 warna berbeda dari tema yang sudah ada (brass, sage, ink, terracotta)
+const CARD_THEME = {
+  brass: {
+    badge: 'bg-gradient-to-br from-brass-400/25 to-brass-600/10 text-brass-600',
+    watermark: 'text-brass-500',
+    ring: 'hover:ring-brass-400/30',
+  },
+  sage: {
+    badge: 'bg-gradient-to-br from-sage-400/25 to-sage-600/10 text-sage-600',
+    watermark: 'text-sage-500',
+    ring: 'hover:ring-sage-400/30',
+  },
+  ink: {
+    badge: 'bg-gradient-to-br from-ink-600/20 to-ink-800/10 text-ink-700',
+    watermark: 'text-ink-700',
+    ring: 'hover:ring-ink-700/25',
+  },
+  terracotta: {
+    badge: 'bg-gradient-to-br from-[#C1614F]/25 to-[#B4453A]/10 text-[#B4453A]',
+    watermark: 'text-[#B4453A]',
+    ring: 'hover:ring-[#B4453A]/25',
+  },
+}
+
 function formatRelativeDate(iso) {
   const date = new Date(iso)
   const today = new Date()
@@ -118,29 +142,51 @@ export default function Dashboard() {
   }, [])
 
   const cards = [
-    { label: 'Total Siswa', value: stats.siswa, icon: Users, color: 'bg-brass-400/15 text-brass-600' },
-    { label: 'Total Guru', value: stats.guru, icon: GraduationCap, color: 'bg-sage-500/15 text-sage-500' },
-    { label: 'Jumlah Kelas', value: stats.kelas, icon: DoorOpen, color: 'bg-ink-700/10 text-ink-700' },
-    { label: 'Pengumuman', value: stats.pengumuman, icon: Megaphone, color: 'bg-brass-400/15 text-brass-600' },
+    { label: 'Total Siswa', value: stats.siswa, icon: Users, theme: 'brass' },
+    { label: 'Total Guru', value: stats.guru, icon: GraduationCap, theme: 'sage' },
+    { label: 'Jumlah Kelas', value: stats.kelas, icon: DoorOpen, theme: 'ink' },
+    { label: 'Pengumuman', value: stats.pengumuman, icon: Megaphone, theme: 'terracotta' },
   ]
 
   return (
     <Layout title="Dasbor" subtitle="Ringkasan data sekolah Anda hari ini">
+      {/* Keyframe animasi muncul bertahap, senada dengan halaman Login */}
+      <style>{`
+        @keyframes dashFadeInUp {
+          from { opacity: 0; transform: translateY(10px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        .dash-fade-in {
+          animation: dashFadeInUp 0.5s ease-out forwards;
+        }
+      `}</style>
+
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        {cards.map(({ label, value, icon: Icon, color }) => (
-          <div
-            key={label}
-            className="card p-5 transition-shadow hover:shadow-sm"
-          >
-            <div className={`w-10 h-10 rounded-lg flex items-center justify-center mb-3 ${color}`}>
-              <Icon size={19} />
+        {cards.map(({ label, value, icon: Icon, theme }, i) => {
+          const t = CARD_THEME[theme]
+          return (
+            <div
+              key={label}
+              className={`dash-fade-in opacity-0 card relative p-5 overflow-hidden ring-1 ring-transparent transition-all duration-300 ease-out hover:-translate-y-1 hover:shadow-lg ${t.ring}`}
+              style={{ animationDelay: `${i * 90}ms` }}
+            >
+              {/* Watermark ikon samar di pojok kartu */}
+              <Icon
+                size={88}
+                strokeWidth={1.5}
+                className={`absolute -right-4 -bottom-4 opacity-[0.07] pointer-events-none ${t.watermark}`}
+              />
+
+              <div className={`relative w-10 h-10 rounded-lg flex items-center justify-center mb-3 shadow-sm ${t.badge}`}>
+                <Icon size={19} />
+              </div>
+              <p className="relative text-2xl font-display font-semibold text-ink-950">
+                {loading ? '—' : value}
+              </p>
+              <p className="relative text-sm text-ink-700/60 mt-0.5">{label}</p>
             </div>
-            <p className="text-2xl font-display font-semibold text-ink-950">
-              {loading ? '—' : value}
-            </p>
-            <p className="text-sm text-ink-700/60 mt-0.5">{label}</p>
-          </div>
-        ))}
+          )
+        })}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-5">
