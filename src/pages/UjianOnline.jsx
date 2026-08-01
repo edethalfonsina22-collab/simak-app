@@ -1,14 +1,15 @@
 import { useState } from 'react';
-import { supabase } from '../supabaseClient'; // sesuaikan path dengan project Anda
+import { supabase } from '../lib/supabaseClient'; // sesuaikan kalau nama/lokasi file berbeda
 
 // Halaman ini dipasang terpisah, contoh route: /ujian-online
-// TIDAK perlu login siswa sama sekali.
+// TIDAK perlu login siswa sama sekali — dan HARUS di luar <ProtectedRoute> di App.jsx.
 
-export default function UjianOnline({ daftarSiswaPerKelas = {} }) {
-  const [tahap, setTahap] = useState('masuk'); // masuk | kerjakan | selesai
+export default function UjianOnline() {
+  const [tahap, setTahap] = useState('masuk'); // masuk | pilih-nama | kerjakan | selesai
   const [kodeUjian, setKodeUjian] = useState('');
   const [ujian, setUjian] = useState(null);
   const [soalList, setSoalList] = useState([]);
+  const [daftarNama, setDaftarNama] = useState([]);
   const [namaSiswa, setNamaSiswa] = useState('');
   const [jawaban, setJawaban] = useState({});
   const [error, setError] = useState('');
@@ -55,8 +56,22 @@ export default function UjianOnline({ daftarSiswaPerKelas = {} }) {
       return;
     }
 
+    // Ambil daftar nama siswa di kelas ini dari tabel "siswa" yang sudah ada di SIMAK
+    const { data: siswaData, error: errSiswa } = await supabase
+      .from('siswa')
+      .select('nama')
+      .eq('kelas', ujianData.kelas)
+      .order('nama', { ascending: true });
+
+    if (errSiswa || !siswaData) {
+      setError('Gagal mengambil daftar siswa kelas ini.');
+      setMemuat(false);
+      return;
+    }
+
     setUjian(ujianData);
     setSoalList(soalData);
+    setDaftarNama(siswaData.map((s) => s.nama));
     setMemuat(false);
     setTahap('pilih-nama');
   }
@@ -95,8 +110,6 @@ export default function UjianOnline({ daftarSiswaPerKelas = {} }) {
     setSkorAkhir(data);
     setTahap('selesai');
   }
-
-  const daftarNama = daftarSiswaPerKelas[ujian?.kelas] || [];
 
   // ---------- TAHAP 1: MASUKKAN KODE UJIAN ----------
   if (tahap === 'masuk') {
