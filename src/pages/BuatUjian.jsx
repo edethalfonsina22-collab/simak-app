@@ -17,10 +17,10 @@ export default function BuatUjian() {
   const { session } = useAuth();
   const guruId = session?.user?.id;
 
-  const [daftarKelas, setDaftarKelas] = useState([]);
+  const [daftarKelas, setDaftarKelas] = useState([]); // [{id, nama_kelas}]
   const [judul, setJudul] = useState('');
   const [mapel, setMapel] = useState('');
-  const [kelas, setKelas] = useState('');
+  const [kelasId, setKelasId] = useState('');
   const [fileExcel, setFileExcel] = useState(null);
   const [soalPreview, setSoalPreview] = useState([]);
   const [status, setStatus] = useState('idle'); // idle | membaca | menyimpan | selesai | error
@@ -30,11 +30,10 @@ export default function BuatUjian() {
   // Ambil daftar kelas dari tabel "kelas" yang sudah ada di SIMAK
   useEffect(() => {
     async function ambilKelas() {
-      const { data, error } = await supabase.from('kelas').select('nama_kelas');
+      const { data, error } = await supabase.from('kelas').select('id, nama_kelas');
       if (!error && data) {
-        const daftar = data.map((k) => k.nama_kelas);
-        setDaftarKelas(daftar);
-        if (daftar.length > 0) setKelas(daftar[0]);
+        setDaftarKelas(data);
+        if (data.length > 0) setKelasId(data[0].id);
       }
     }
     ambilKelas();
@@ -98,7 +97,7 @@ export default function BuatUjian() {
   }
 
   async function simpanUjian() {
-    if (!judul || !mapel || !kelas) {
+    if (!judul || !mapel || !kelasId) {
       setPesanError('Judul, mata pelajaran, dan kelas wajib diisi.');
       return;
     }
@@ -117,7 +116,7 @@ export default function BuatUjian() {
       .insert({
         judul,
         mata_pelajaran: mapel,
-        kelas,
+        kelas_id: kelasId,
         kode_ujian: kodeUjian,
         guru_id: guruId,
         status: 'draft',
@@ -156,11 +155,12 @@ export default function BuatUjian() {
   }
 
   if (status === 'selesai' && ujianDibuat) {
+    const namaKelasDibuat = daftarKelas.find((k) => k.id === ujianDibuat.kelas_id)?.nama_kelas;
     return (
       <div className="p-6 rounded-xl border border-green-200 bg-green-50">
         <h3 className="text-lg font-semibold text-green-800">Ujian berhasil dibuat 🎉</h3>
         <p className="mt-2 text-sm text-gray-700">
-          Bagikan Kode Ujian ini ke siswa kelas <strong>{ujianDibuat.kelas}</strong>:
+          Bagikan Kode Ujian ini ke siswa kelas <strong>{namaKelasDibuat}</strong>:
         </p>
         <div className="mt-3 text-3xl font-mono font-bold tracking-widest text-green-700">
           {ujianDibuat.kode_ujian}
@@ -208,14 +208,14 @@ export default function BuatUjian() {
       <div>
         <label className="block text-sm font-medium mb-1">Kelas</label>
         <select
-          value={kelas}
-          onChange={(e) => setKelas(e.target.value)}
+          value={kelasId}
+          onChange={(e) => setKelasId(e.target.value)}
           className="w-full border rounded-lg px-3 py-2"
         >
           {daftarKelas.length === 0 && <option value="">Belum ada data kelas</option>}
           {daftarKelas.map((k) => (
-            <option key={k} value={k}>
-              {k}
+            <option key={k.id} value={k.id}>
+              Kelas {k.nama_kelas}
             </option>
           ))}
         </select>
