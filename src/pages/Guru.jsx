@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabaseClient'
 import Layout from '../components/Layout'
 import BulkImportModal from '../components/BulkImportModal'
-import { Plus, UploadCloud, Pencil, Trash2, Search, X, Loader2 } from 'lucide-react'
+import { Plus, UploadCloud, Pencil, Trash2, Search, X, Loader2, GraduationCap } from 'lucide-react'
 
 const emptyForm = {
   nip: '',
@@ -82,18 +82,25 @@ export default function Guru() {
         </>
       }
     >
-      <div className="card p-4 mb-4">
-        <div className="relative max-w-sm">
-          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-700/40" />
-          <input className="input-field pl-9" placeholder="Cari nama, NIP, atau mapel..."
-            value={search} onChange={(e) => setSearch(e.target.value)} />
+      {/* Kartu pencarian — aksen garis biru→maroon di tepi atas sebagai identitas modul Guru */}
+      <div className="card relative overflow-hidden p-4 mb-4">
+        <span className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-600 to-red-900" />
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-full bg-blue-600/10 text-blue-700 flex items-center justify-center shrink-0">
+            <GraduationCap size={18} />
+          </div>
+          <div className="relative max-w-sm w-full">
+            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-700/40" />
+            <input className="input-field pl-9" placeholder="Cari nama, NIP, atau mapel..."
+              value={search} onChange={(e) => setSearch(e.target.value)} />
+          </div>
         </div>
       </div>
 
       <div className="card overflow-x-auto">
         <table className="table-shell">
           <thead>
-            <tr>
+            <tr className="border-b-2 border-blue-600/20">
               <th>Nama Lengkap</th>
               <th>NIP</th>
               <th>Mata Pelajaran</th>
@@ -109,21 +116,21 @@ export default function Guru() {
               <tr><td colSpan={7} className="text-center py-8 text-ink-700/50">Belum ada data guru.</td></tr>
             )}
             {filtered.map((g) => (
-              <tr key={g.id}>
+              <tr key={g.id} className="hover:bg-blue-600/[0.03] transition-colors">
                 <td className="font-medium">{g.nama_lengkap}</td>
                 <td className="font-mono text-xs">{g.nip}</td>
                 <td>{g.mata_pelajaran}</td>
                 <td>{g.no_hp}</td>
                 <td>{g.email}</td>
                 <td>
-                  <span className={`badge ${g.status === 'aktif' ? 'bg-sage-500/15 text-sage-500' : 'bg-ink-900/10 text-ink-700'}`}>
+                  <span className={`badge ${g.status === 'aktif' ? 'bg-blue-600/15 text-blue-700' : 'bg-red-900/10 text-red-900'}`}>
                     {g.status}
                   </span>
                 </td>
                 <td>
                   <div className="flex items-center gap-1 justify-end">
-                    <button onClick={() => openEdit(g)} className="p-2 hover:bg-ink-900/5 rounded-lg text-ink-700/60"><Pencil size={15} /></button>
-                    <button onClick={() => handleDelete(g.id)} className="p-2 hover:bg-red-50 rounded-lg text-red-600/70"><Trash2 size={15} /></button>
+                    <button onClick={() => openEdit(g)} className="p-2 hover:bg-blue-600/10 rounded-lg text-blue-700/70"><Pencil size={15} /></button>
+                    <button onClick={() => handleDelete(g.id)} className="p-2 hover:bg-red-900/10 rounded-lg text-red-900/70"><Trash2 size={15} /></button>
                   </div>
                 </td>
               </tr>
@@ -134,9 +141,15 @@ export default function Guru() {
 
       {showForm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink-950/50 backdrop-blur-sm p-4">
-          <form onSubmit={handleSubmit} className="card w-full max-w-lg p-6 relative max-h-[90vh] overflow-y-auto">
+          <form onSubmit={handleSubmit} className="card relative overflow-hidden w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto">
+            <span className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-600 to-red-900" />
             <button type="button" onClick={() => setShowForm(false)} className="absolute top-4 right-4 text-ink-700/40 hover:text-ink-900"><X size={20} /></button>
-            <h2 className="font-display text-xl font-semibold mb-4">{editingId ? 'Ubah Data Guru' : 'Tambah Guru'}</h2>
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-full bg-blue-600/10 text-blue-700 flex items-center justify-center shrink-0">
+                <GraduationCap size={19} />
+              </div>
+              <h2 className="font-display text-xl font-semibold">{editingId ? 'Ubah Data Guru' : 'Tambah Guru'}</h2>
+            </div>
             <div className="grid grid-cols-2 gap-3">
               <Field label="Nama Lengkap" full>
                 <input required className="input-field" value={form.nama_lengkap} onChange={(e) => setForm({ ...form, nama_lengkap: e.target.value })} />
