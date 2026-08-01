@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabaseClient'
 import Layout from '../components/Layout'
-import { Users, GraduationCap, DoorOpen, Megaphone } from 'lucide-react'
+import { Users, GraduationCap, DoorOpen, Megaphone, LayoutDashboard } from 'lucide-react'
 import {
   PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend,
   LineChart, Line, XAxis, YAxis, CartesianGrid,
@@ -203,6 +203,19 @@ export default function Dashboard() {
           </defs>
           <rect width="100%" height="100%" fill="url(#batikKawung)" />
         </svg>
+
+      {/* Banner navy — background biru tua sama seperti kartu identitas di Profil Saya */}
+      <div className="dash-fade-in opacity-0 relative overflow-hidden rounded-xl p-6 mb-6 flex items-center gap-4 bg-gradient-to-br from-blue-900 to-blue-950">
+        <div className="absolute -top-10 -right-10 w-40 h-40 rounded-full bg-white/5 pointer-events-none" />
+        <div className="absolute -bottom-14 -left-6 w-32 h-32 rounded-full bg-white/5 pointer-events-none" />
+        <div className="relative w-12 h-12 rounded-full bg-white/10 ring-2 ring-white/20 text-white flex items-center justify-center shrink-0">
+          <LayoutDashboard size={22} />
+        </div>
+        <div className="relative">
+          <p className="font-display font-semibold text-lg text-white">Selamat datang kembali di SIMAK</p>
+          <p className="text-sm text-blue-200/70">Semua ringkasan data sekolah ada di bawah ini.</p>
+        </div>
+      </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         {cards.map(({ label, value, icon: Icon, theme }, i) => {
