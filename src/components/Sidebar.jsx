@@ -6,8 +6,6 @@ import {
   DoorOpen,
   CalendarClock,
   ClipboardCheck,
-  ClipboardList,
-  BarChart3,
   BookOpenCheck,
   Megaphone,
   LogOut,
@@ -25,6 +23,9 @@ import {
   UserCircle,
   Images,
   HardDrive,
+  ClipboardList,
+  Database,
+  IdCard,
 } from 'lucide-react'
 import { useAuth } from '../lib/AuthContext'
 
@@ -51,8 +52,8 @@ const groupsAdmin = [
       { to: '/nilai', label: 'Nilai Siswa', icon: BookOpenCheck },
       { to: '/rapor', label: 'Rapor Siswa', icon: FileBadge },
       { to: '/rpp', label: 'RPP', icon: NotebookPen },
-      { to: '/buat-ujian', label: 'Buat Ujian', icon: ClipboardList },
-      { to: '/hasil-ujian', label: 'Hasil Ujian', icon: BarChart3 },
+      { to: '/ujian', label: 'Ujian Online', icon: ClipboardList },
+      { to: '/bank-soal', label: 'Bank Soal', icon: Database },
     ],
   },
   {
@@ -72,6 +73,7 @@ const groupsAdmin = [
       { to: '/laporan', label: 'Laporan Bulanan', icon: FileText },
       { to: '/backup', label: 'Backup Data', icon: DatabaseBackup },
       { to: '/profil-sekolah', label: 'Profil Sekolah', icon: Landmark },
+      { to: '/kartu', label: 'Cetak Kartu', icon: IdCard },
     ],
   },
 ]
@@ -86,8 +88,8 @@ const linksGuru = [
   { to: '/nilai', label: 'Nilai Siswa', icon: BookOpenCheck },
   { to: '/rapor', label: 'Rapor Siswa', icon: FileBadge },
   { to: '/rpp', label: 'RPP', icon: NotebookPen },
-  { to: '/buat-ujian', label: 'Buat Ujian', icon: ClipboardList },
-  { to: '/hasil-ujian', label: 'Hasil Ujian', icon: BarChart3 },
+  { to: '/ujian', label: 'Ujian Online', icon: ClipboardList },
+  { to: '/bank-soal', label: 'Bank Soal', icon: Database },
   { to: '/perpustakaan', label: 'Perpustakaan', icon: Library },
   { to: '/jadwal', label: 'Jadwal Pelajaran', icon: CalendarClock },
   { to: '/agenda', label: 'Agenda Sekolah', icon: CalendarDays },
