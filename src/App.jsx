@@ -23,6 +23,8 @@ import PPDBPublik from './pages/PPDBPublik'
 import PPDBAdmin from './pages/PPDBAdmin'
 import Perpustakaan from './pages/Perpustakaan'
 import RPP from './pages/RPP'
+import BuatUjian from './pages/BuatUjian'
+import UjianOnline from './pages/UjianOnline'
 import ProfilSaya from './pages/ProfilSaya'
 function ProtectedRoute({ children, adminOnly }) {
   const { session, loading, isAdmin } = useAuth()
