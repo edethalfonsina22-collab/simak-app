@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabaseClient'
 import Layout from '../components/Layout'
-import { Loader2, Save } from 'lucide-react'
+import { Loader2, Save, ClipboardCheck } from 'lucide-react'
 
 const STATUS_OPTS = [
   { value: 'hadir', label: 'Hadir', color: 'bg-sage-500/15 text-sage-500' },
@@ -75,9 +75,28 @@ export default function Presensi() {
   }
 
   const list = tab === 'siswa' ? siswaList : guruList
+  const kelasAktif = kelasList.find((k) => k.id === kelasId)
+  const tanggalLabel = new Date(tanggal).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })
 
   return (
     <Layout title="Presensi" subtitle="Catat kehadiran siswa dan guru harian">
+      {/* Banner biru — senada dengan halaman Dokumen/Profil */}
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-ink-950 to-[#22315B] p-6 mb-6">
+        <div className="relative z-10 flex items-center gap-4">
+          <div className="w-11 h-11 rounded-full bg-white/15 flex items-center justify-center shrink-0">
+            <ClipboardCheck size={20} className="text-paper" />
+          </div>
+          <div>
+            <p className="font-display font-semibold text-lg text-paper">Presensi</p>
+            <p className="text-sm text-paper/70 mt-0.5">
+              {tab === 'siswa' && kelasAktif ? `Kelas ${kelasAktif.nama_kelas} · ` : tab === 'guru' ? 'Presensi guru · ' : ''}
+              {tanggalLabel}
+            </p>
+          </div>
+        </div>
+        <ClipboardCheck size={120} className="absolute -right-4 -bottom-6 text-white/5 rotate-12" />
+      </div>
+
       <div className="flex items-center gap-4 mb-5">
         <div className="inline-flex rounded-lg bg-white border border-ink-900/10 p-1">
           {['siswa', 'guru'].map((t) => (
