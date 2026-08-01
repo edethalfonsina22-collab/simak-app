@@ -161,6 +161,40 @@ export default function Dashboard() {
         }
       `}</style>
 
+      <div className="relative">
+        {/* Motif batik (gaya kawung) sebagai lapisan background samar, tidak mengganggu keterbacaan konten */}
+        <svg
+          className="absolute inset-0 -z-10 w-full h-full opacity-[0.05] pointer-events-none"
+          preserveAspectRatio="xMidYMid slice"
+          aria-hidden="true"
+        >
+          <defs>
+            <pattern
+              id="batikKawung"
+              width="76"
+              height="76"
+              patternUnits="userSpaceOnUse"
+              patternTransform="rotate(12)"
+            >
+              <g fill="none" stroke="#22315B" strokeWidth="1.1">
+                <circle cx="38" cy="38" r="11" />
+                <circle cx="0" cy="0" r="11" />
+                <circle cx="76" cy="0" r="11" />
+                <circle cx="0" cy="76" r="11" />
+                <circle cx="76" cy="76" r="11" />
+                <path d="M38 24 C46 30 46 46 38 52 C30 46 30 30 38 24 Z" />
+                <path d="M24 38 C30 30 46 30 52 38 C46 46 30 46 24 38 Z" />
+              </g>
+              <circle cx="38" cy="38" r="2.5" fill="#D9A441" />
+              <circle cx="0" cy="38" r="2" fill="#D9A441" />
+              <circle cx="76" cy="38" r="2" fill="#D9A441" />
+              <circle cx="38" cy="0" r="2" fill="#D9A441" />
+              <circle cx="38" cy="76" r="2" fill="#D9A441" />
+            </pattern>
+          </defs>
+          <rect width="100%" height="100%" fill="url(#batikKawung)" />
+        </svg>
+
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         {cards.map(({ label, value, icon: Icon, theme }, i) => {
           const t = CARD_THEME[theme]
@@ -304,6 +338,7 @@ export default function Dashboard() {
             </ResponsiveContainer>
           )}
         </div>
+      </div>
       </div>
     </Layout>
   )
