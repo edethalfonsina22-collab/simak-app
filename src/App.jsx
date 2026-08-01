@@ -1,3 +1,5 @@
+import BankSoal from './pages/BankSoal'
+import KartuSiswa from './pages/KartuSiswa'
 import Galeri from './pages/Galeri'
 import Dokumen from './pages/Dokumen'
 import { Routes, Route, Navigate } from 'react-router-dom'
