@@ -51,6 +51,7 @@ export default function App() {
       <Route path="/login" element={<Login />} />
       <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
       <Route path="/siswa" element={<ProtectedRoute adminOnly><Siswa /></ProtectedRoute>} />
+      <Route path="/hasil-ujian" element={<ProtectedRoute><HasilUjian /></ProtectedRoute>} />
       <Route path="/guru" element={<ProtectedRoute adminOnly><Guru /></ProtectedRoute>} />
       <Route path="/kelas" element={<ProtectedRoute adminOnly><Kelas /></ProtectedRoute>} />
       <Route path="/jadwal" element={<ProtectedRoute><Jadwal /></ProtectedRoute>} />
