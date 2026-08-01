@@ -27,24 +27,32 @@ const KATEGORI_STYLE = {
 // terinspirasi dari referensi desain, dipetakan ke tema brass/sage/ink/terracotta yang sudah ada
 const CARD_THEME = {
   brass: {
-    badge: 'bg-brass-400/15 text-brass-600',
+    tint: 'bg-brass-400/[0.06]',
+    accent: 'bg-brass-400',
+    badge: 'bg-brass-400/20 text-brass-600',
     watermark: 'text-brass-500',
-    hover: 'hover:border-brass-400/50 hover:shadow-[0_20px_25px_-8px_rgba(217,164,65,0.20)]',
+    hover: 'hover:border-brass-400/50 hover:shadow-[0_20px_25px_-8px_rgba(217,164,65,0.25)]',
   },
   sage: {
-    badge: 'bg-sage-500/15 text-sage-600',
+    tint: 'bg-sage-500/[0.06]',
+    accent: 'bg-sage-500',
+    badge: 'bg-sage-500/20 text-sage-600',
     watermark: 'text-sage-500',
-    hover: 'hover:border-sage-500/50 hover:shadow-[0_20px_25px_-8px_rgba(76,122,110,0.20)]',
+    hover: 'hover:border-sage-500/50 hover:shadow-[0_20px_25px_-8px_rgba(76,122,110,0.25)]',
   },
   ink: {
-    badge: 'bg-ink-700/10 text-ink-700',
+    tint: 'bg-ink-700/[0.05]',
+    accent: 'bg-ink-700',
+    badge: 'bg-ink-700/15 text-ink-700',
     watermark: 'text-ink-700',
-    hover: 'hover:border-ink-700/40 hover:shadow-[0_20px_25px_-8px_rgba(34,49,91,0.18)]',
+    hover: 'hover:border-ink-700/40 hover:shadow-[0_20px_25px_-8px_rgba(34,49,91,0.22)]',
   },
   terracotta: {
-    badge: 'bg-[#B4453A]/15 text-[#B4453A]',
+    tint: 'bg-[#B4453A]/[0.06]',
+    accent: 'bg-[#B4453A]',
+    badge: 'bg-[#B4453A]/20 text-[#B4453A]',
     watermark: 'text-[#B4453A]',
-    hover: 'hover:border-[#B4453A]/40 hover:shadow-[0_20px_25px_-8px_rgba(180,69,58,0.18)]',
+    hover: 'hover:border-[#B4453A]/40 hover:shadow-[0_20px_25px_-8px_rgba(180,69,58,0.22)]',
   },
 }
 
@@ -165,7 +173,7 @@ export default function Dashboard() {
       <div className="relative">
         {/* Motif batik (gaya kawung) sebagai lapisan background samar, tidak mengganggu keterbacaan konten */}
         <svg
-          className="absolute inset-0 -z-10 w-full h-full opacity-[0.05] pointer-events-none"
+          className="absolute inset-0 -z-10 w-full h-full opacity-[0.08] pointer-events-none"
           preserveAspectRatio="xMidYMid slice"
           aria-hidden="true"
         >
@@ -202,14 +210,17 @@ export default function Dashboard() {
           return (
             <div
               key={label}
-              className={`dash-fade-in opacity-0 group card relative overflow-hidden border border-transparent p-5 transition-all duration-300 ease-out hover:-translate-y-1 ${t.hover}`}
+              className={`dash-fade-in opacity-0 group card relative overflow-hidden border border-transparent p-5 transition-all duration-300 ease-out hover:-translate-y-1 ${t.tint} ${t.hover}`}
               style={{ animationDelay: `${i * 90}ms` }}
             >
+              {/* Garis aksen warna di tepi atas kartu — pembeda visual langsung tanpa perlu hover */}
+              <span className={`absolute top-0 left-0 w-full h-1 ${t.accent}`} />
+
               {/* Watermark ikon besar di pojok, membesar & miring halus saat hover */}
               <Icon
                 size={112}
                 strokeWidth={1.3}
-                className={`absolute -right-6 -bottom-6 opacity-[0.05] pointer-events-none transition-all duration-300 ease-out group-hover:opacity-[0.09] group-hover:scale-110 group-hover:-rotate-6 ${t.watermark}`}
+                className={`absolute -right-6 -bottom-6 opacity-[0.10] pointer-events-none transition-all duration-300 ease-out group-hover:opacity-[0.16] group-hover:scale-110 group-hover:-rotate-6 ${t.watermark}`}
               />
 
               <div className="relative z-10">
