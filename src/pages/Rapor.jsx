@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabaseClient'
 import Layout from '../components/Layout'
 import { eksporPDF } from '../lib/exportUtils'
-import { FileDown, Loader2 } from 'lucide-react'
+import { FileDown, Loader2, FileBadge } from 'lucide-react'
 
 export default function Rapor() {
   const [siswaList, setSiswaList] = useState([])
@@ -77,6 +77,24 @@ export default function Rapor() {
 
   return (
     <Layout title="Rapor Siswa" subtitle="Rekap nilai & kehadiran otomatis, siap dicetak ke PDF">
+      {/* Banner merah marun — senada dengan Kelas & Nilai Siswa */}
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#4a0e0e] to-[#7a1515] p-6 mb-6">
+        <div className="relative z-10 flex items-center gap-4">
+          <div className="w-11 h-11 rounded-full bg-white/15 flex items-center justify-center shrink-0">
+            <FileBadge size={20} className="text-paper" />
+          </div>
+          <div>
+            <p className="font-display font-semibold text-lg text-paper">Rapor Siswa</p>
+            <p className="text-sm text-paper/70 mt-0.5">
+              {siswaTerpilih
+                ? `${siswaTerpilih.nama_lengkap} · ${siswaTerpilih.kelas?.nama_kelas || '-'} · Semester ${semester} ${tahunAjaran}`
+                : 'Pilih siswa untuk lihat rekap rapor'}
+            </p>
+          </div>
+        </div>
+        <FileBadge size={120} className="absolute -right-4 -bottom-6 text-white/5 rotate-12" />
+      </div>
+
       <div className="card p-5 mb-5">
         <div className="grid sm:grid-cols-4 gap-3">
           <div className="sm:col-span-2">
