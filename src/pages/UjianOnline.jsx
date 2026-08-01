@@ -1,0 +1,226 @@
+import { useState } from 'react';
+import { supabase } from '../supabaseClient'; // sesuaikan path dengan project Anda
+
+// Halaman ini dipasang terpisah, contoh route: /ujian-online
+// TIDAK perlu login siswa sama sekali.
+
+export default function UjianOnline({ daftarSiswaPerKelas = {} }) {
+  const [tahap, setTahap] = useState('masuk'); // masuk | kerjakan | selesai
+  const [kodeUjian, setKodeUjian] = useState('');
+  const [ujian, setUjian] = useState(null);
+  const [soalList, setSoalList] = useState([]);
+  const [namaSiswa, setNamaSiswa] = useState('');
+  const [jawaban, setJawaban] = useState({});
+  const [error, setError] = useState('');
+  const [memuat, setMemuat] = useState(false);
+  const [skorAkhir, setSkorAkhir] = useState(null);
+
+  async function cariUjian() {
+    setError('');
+    if (!kodeUjian.trim()) {
+      setError('Masukkan kode ujian dulu.');
+      return;
+    }
+    setMemuat(true);
+
+    const kode = kodeUjian.trim().toUpperCase();
+
+    const { data: ujianData, error: errUjian } = await supabase
+      .from('ujian_publik')
+      .select('*')
+      .eq('kode_ujian', kode)
+      .single();
+
+    if (errUjian || !ujianData) {
+      setError('Kode ujian tidak ditemukan. Cek lagi kode dari gurumu.');
+      setMemuat(false);
+      return;
+    }
+
+    if (ujianData.status !== 'aktif') {
+      setError('Ujian ini belum diaktifkan oleh guru. Tanyakan ke gurumu.');
+      setMemuat(false);
+      return;
+    }
+
+    const { data: soalData, error: errSoal } = await supabase
+      .from('soal_ujian_publik')
+      .select('*')
+      .eq('ujian_id', ujianData.id)
+      .order('urutan', { ascending: true });
+
+    if (errSoal || !soalData || soalData.length === 0) {
+      setError('Soal untuk ujian ini belum tersedia.');
+      setMemuat(false);
+      return;
+    }
+
+    setUjian(ujianData);
+    setSoalList(soalData);
+    setMemuat(false);
+    setTahap('pilih-nama');
+  }
+
+  function pilihJawaban(soalId, pilihan) {
+    setJawaban({ ...jawaban, [soalId]: pilihan });
+  }
+
+  async function kirimJawaban() {
+    if (!namaSiswa) {
+      setError('Pilih namamu dulu dari daftar.');
+      return;
+    }
+    const belumDijawab = soalList.filter((s) => !jawaban[s.id]);
+    if (belumDijawab.length > 0) {
+      setError(`Masih ada ${belumDijawab.length} soal yang belum dijawab.`);
+      return;
+    }
+
+    setMemuat(true);
+    setError('');
+
+    const { data, error: errSubmit } = await supabase.rpc('submit_ujian', {
+      p_kode_ujian: ujian.kode_ujian,
+      p_nama_siswa: namaSiswa,
+      p_jawaban: jawaban,
+    });
+
+    setMemuat(false);
+
+    if (errSubmit) {
+      setError(errSubmit.message || 'Gagal mengirim jawaban.');
+      return;
+    }
+
+    setSkorAkhir(data);
+    setTahap('selesai');
+  }
+
+  const daftarNama = daftarSiswaPerKelas[ujian?.kelas] || [];
+
+  // ---------- TAHAP 1: MASUKKAN KODE UJIAN ----------
+  if (tahap === 'masuk') {
+    return (
+      <div className="max-w-sm mx-auto mt-16 p-6 rounded-xl border shadow-sm text-center">
+        <h1 className="text-xl font-semibold mb-4">Ujian Online</h1>
+        <input
+          value={kodeUjian}
+          onChange={(e) => setKodeUjian(e.target.value)}
+          placeholder="Masukkan Kode Ujian"
+          className="w-full border rounded-lg px-3 py-2 text-center text-lg font-mono tracking-widest uppercase"
+          maxLength={6}
+        />
+        {error && <p className="text-sm text-red-600 mt-2">{error}</p>}
+        <button
+          onClick={cariUjian}
+          disabled={memuat}
+          className="mt-4 w-full py-2 rounded-lg bg-blue-600 text-white font-medium hover:bg-blue-700 disabled:opacity-50"
+        >
+          {memuat ? 'Mencari...' : 'Lanjut'}
+        </button>
+      </div>
+    );
+  }
+
+  // ---------- TAHAP 2: PILIH NAMA ----------
+  if (tahap === 'pilih-nama') {
+    return (
+      <div className="max-w-sm mx-auto mt-16 p-6 rounded-xl border shadow-sm text-center">
+        <h1 className="text-xl font-semibold">{ujian.judul}</h1>
+        <p className="text-sm text-gray-500 mb-4">
+          {ujian.mata_pelajaran} · Kelas {ujian.kelas}
+        </p>
+        <select
+          value={namaSiswa}
+          onChange={(e) => setNamaSiswa(e.target.value)}
+          className="w-full border rounded-lg px-3 py-2"
+        >
+          <option value="">-- Pilih namamu --</option>
+          {daftarNama.map((n) => (
+            <option key={n} value={n}>
+              {n}
+            </option>
+          ))}
+        </select>
+        {error && <p className="text-sm text-red-600 mt-2">{error}</p>}
+        <button
+          onClick={() => {
+            if (!namaSiswa) {
+              setError('Pilih namamu dulu.');
+              return;
+            }
+            setError('');
+            setTahap('kerjakan');
+          }}
+          className="mt-4 w-full py-2 rounded-lg bg-blue-600 text-white font-medium hover:bg-blue-700"
+        >
+          Mulai Kerjakan
+        </button>
+      </div>
+    );
+  }
+
+  // ---------- TAHAP 3: KERJAKAN SOAL ----------
+  if (tahap === 'kerjakan') {
+    return (
+      <div className="max-w-2xl mx-auto mt-8 p-6 space-y-6">
+        <div className="text-center">
+          <h1 className="text-lg font-semibold">{ujian.judul}</h1>
+          <p className="text-sm text-gray-500">
+            {namaSiswa} · {Object.keys(jawaban).length}/{soalList.length} terjawab
+          </p>
+        </div>
+
+        {soalList.map((s, i) => (
+          <div key={s.id} className="border rounded-xl p-4">
+            <p className="font-medium mb-3">
+              {i + 1}. {s.soal}
+            </p>
+            {['a', 'b', 'c', 'd'].map((huruf) => (
+              <label
+                key={huruf}
+                className={`flex items-center gap-2 p-2 rounded-lg cursor-pointer mb-1 ${
+                  jawaban[s.id] === huruf.toUpperCase() ? 'bg-blue-50 border border-blue-300' : ''
+                }`}
+              >
+                <input
+                  type="radio"
+                  name={`soal-${s.id}`}
+                  checked={jawaban[s.id] === huruf.toUpperCase()}
+                  onChange={() => pilihJawaban(s.id, huruf.toUpperCase())}
+                />
+                <span>
+                  {huruf.toUpperCase()}. {s[`pilihan_${huruf}`]}
+                </span>
+              </label>
+            ))}
+          </div>
+        ))}
+
+        {error && <p className="text-sm text-red-600">{error}</p>}
+
+        <button
+          onClick={kirimJawaban}
+          disabled={memuat}
+          className="w-full py-3 rounded-lg bg-green-600 text-white font-semibold hover:bg-green-700 disabled:opacity-50"
+        >
+          {memuat ? 'Mengirim...' : 'Selesai & Kumpulkan'}
+        </button>
+      </div>
+    );
+  }
+
+  // ---------- TAHAP 4: SELESAI ----------
+  if (tahap === 'selesai') {
+    return (
+      <div className="max-w-sm mx-auto mt-16 p-6 rounded-xl border shadow-sm text-center">
+        <h1 className="text-xl font-semibold mb-2">Selesai! 🎉</h1>
+        <p className="text-gray-600 mb-4">Terima kasih, {namaSiswa}.</p>
+        <div className="text-4xl font-bold text-green-600">{skorAkhir}</div>
+        <p className="text-sm text-gray-500 mt-1">Skor kamu</p>
+      </div>
+    );
+  }
+
+  return null;
+}
