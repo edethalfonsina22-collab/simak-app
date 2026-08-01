@@ -86,94 +86,96 @@ export default function Galeri() {
 
   return (
     <Layout title="Galeri Kegiatan" subtitle="Dokumentasi foto kegiatan sekolah">
-      <div className="flex items-center justify-between mb-6">
-        <p className="text-sm text-ink-700/50">{kegiatan.length} album kegiatan</p>
-        <button
-          onClick={() => setShowForm(!showForm)}
-          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-brass-400 text-ink-950 text-sm font-medium"
-        >
-          <ImagePlus size={16} />
-          Album Baru
-        </button>
-      </div>
-
-      {showForm && (
-        <form onSubmit={handleUpload} className="card p-6 mb-6 space-y-3">
-          <input
-            className="input w-full"
-            placeholder="Judul kegiatan (mis. Perayaan Hari Kemerdekaan)"
-            value={form.judul}
-            onChange={(e) => setForm({ ...form, judul: e.target.value })}
-            required
-          />
-          <textarea
-            className="input w-full"
-            rows={2}
-            placeholder="Deskripsi singkat (opsional)"
-            value={form.deskripsi}
-            onChange={(e) => setForm({ ...form, deskripsi: e.target.value })}
-          />
-          <input
-            className="input w-full"
-            type="file"
-            accept="image/*"
-            multiple
-            onChange={(e) => setForm({ ...form, files: Array.from(e.target.files || []) })}
-            required
-          />
-          {form.files.length > 0 && (
-            <p className="text-xs text-ink-700/50">{form.files.length} foto dipilih</p>
-          )}
+      <div className="bg-sage-500/10 rounded-2xl p-5 -m-1">
+        <div className="flex items-center justify-between mb-6">
+          <p className="text-sm text-ink-700/50">{kegiatan.length} album kegiatan</p>
           <button
-            type="submit"
-            disabled={uploading}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-brass-400 text-ink-950 text-sm font-medium disabled:opacity-50"
+            onClick={() => setShowForm(!showForm)}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-brass-400 text-ink-950 text-sm font-medium"
           >
-            {uploading ? <Loader2 size={16} className="animate-spin" /> : <ImagePlus size={16} />}
-            {uploading ? 'Mengunggah...' : 'Upload Album'}
+            <ImagePlus size={16} />
+            Album Baru
           </button>
-        </form>
-      )}
+        </div>
 
-      {loading ? (
-        <p className="text-sm text-ink-700/50">Memuat...</p>
-      ) : kegiatan.length === 0 ? (
-        <div className="card p-6">
-          <p className="text-sm text-ink-700/50">Belum ada album kegiatan. Klik "Album Baru" untuk mulai.</p>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-          {kegiatan.map((item) => {
-            const foto = item.galeri_foto || []
-            return (
-              <button
-                key={item.id}
-                onClick={() => setOpenAlbum(item)}
-                className="card overflow-hidden text-left hover:shadow-sm transition-shadow"
-              >
-                <div className="aspect-video bg-ink-900/[0.06] relative">
-                  {foto[0] ? (
-                    <img src={fotoUrl(foto[0].foto_path)} alt={item.judul} className="w-full h-full object-cover" />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center text-ink-700/30">
-                      <Images size={28} />
-                    </div>
-                  )}
-                  <span className="absolute bottom-2 right-2 text-[11px] font-medium px-2 py-0.5 rounded-md bg-ink-950/70 text-paper">
-                    {foto.length} foto
-                  </span>
-                </div>
-                <div className="p-4">
-                  <p className="font-medium text-sm text-ink-950 truncate">{item.judul}</p>
-                  <p className="text-xs text-ink-700/50 mt-0.5">
-                    {item.guru?.nama_lengkap || 'Admin'} · {new Date(item.dibuat_pada).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}
-                  </p>
-                </div>
-              </button>
-            )
-          })}
-        </div>
-      )}
+        {showForm && (
+          <form onSubmit={handleUpload} className="card p-6 mb-6 space-y-3">
+            <input
+              className="input w-full"
+              placeholder="Judul kegiatan (mis. Perayaan Hari Kemerdekaan)"
+              value={form.judul}
+              onChange={(e) => setForm({ ...form, judul: e.target.value })}
+              required
+            />
+            <textarea
+              className="input w-full"
+              rows={2}
+              placeholder="Deskripsi singkat (opsional)"
+              value={form.deskripsi}
+              onChange={(e) => setForm({ ...form, deskripsi: e.target.value })}
+            />
+            <input
+              className="input w-full"
+              type="file"
+              accept="image/*"
+              multiple
+              onChange={(e) => setForm({ ...form, files: Array.from(e.target.files || []) })}
+              required
+            />
+            {form.files.length > 0 && (
+              <p className="text-xs text-ink-700/50">{form.files.length} foto dipilih</p>
+            )}
+            <button
+              type="submit"
+              disabled={uploading}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-brass-400 text-ink-950 text-sm font-medium disabled:opacity-50"
+            >
+              {uploading ? <Loader2 size={16} className="animate-spin" /> : <ImagePlus size={16} />}
+              {uploading ? 'Mengunggah...' : 'Upload Album'}
+            </button>
+          </form>
+        )}
+
+        {loading ? (
+          <p className="text-sm text-ink-700/50">Memuat...</p>
+        ) : kegiatan.length === 0 ? (
+          <div className="card p-6">
+            <p className="text-sm text-ink-700/50">Belum ada album kegiatan. Klik "Album Baru" untuk mulai.</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+            {kegiatan.map((item) => {
+              const foto = item.galeri_foto || []
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => setOpenAlbum(item)}
+                  className="card overflow-hidden text-left hover:shadow-sm transition-shadow"
+                >
+                  <div className="aspect-video bg-ink-900/[0.06] relative">
+                    {foto[0] ? (
+                      <img src={fotoUrl(foto[0].foto_path)} alt={item.judul} className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-ink-700/30">
+                        <Images size={28} />
+                      </div>
+                    )}
+                    <span className="absolute bottom-2 right-2 text-[11px] font-medium px-2 py-0.5 rounded-md bg-ink-950/70 text-paper">
+                      {foto.length} foto
+                    </span>
+                  </div>
+                  <div className="p-4">
+                    <p className="font-medium text-sm text-ink-950 truncate">{item.judul}</p>
+                    <p className="text-xs text-ink-700/50 mt-0.5">
+                      {item.guru?.nama_lengkap || 'Admin'} · {new Date(item.dibuat_pada).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}
+                    </p>
+                  </div>
+                </button>
+              )
+            })}
+          </div>
+        )}
+      </div>
 
       {openAlbum && (
         <div className="fixed inset-0 bg-ink-950/70 flex items-center justify-center p-4 z-50" onClick={() => setOpenAlbum(null)}>
