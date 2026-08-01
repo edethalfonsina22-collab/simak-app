@@ -23,27 +23,28 @@ const KATEGORI_STYLE = {
   Akademik: 'bg-sage-500/15 text-sage-500',
 }
 
-// Palet kartu ringkasan — 4 warna berbeda dari tema yang sudah ada (brass, sage, ink, terracotta)
+// Palet kartu ringkasan — gaya bento (badge lingkaran + watermark + hover shadow berwarna)
+// terinspirasi dari referensi desain, dipetakan ke tema brass/sage/ink/terracotta yang sudah ada
 const CARD_THEME = {
   brass: {
-    badge: 'bg-gradient-to-br from-brass-400/25 to-brass-600/10 text-brass-600',
+    badge: 'bg-brass-400/15 text-brass-600',
     watermark: 'text-brass-500',
-    ring: 'hover:ring-brass-400/30',
+    hover: 'hover:border-brass-400/50 hover:shadow-[0_20px_25px_-8px_rgba(217,164,65,0.20)]',
   },
   sage: {
-    badge: 'bg-gradient-to-br from-sage-400/25 to-sage-600/10 text-sage-600',
+    badge: 'bg-sage-500/15 text-sage-600',
     watermark: 'text-sage-500',
-    ring: 'hover:ring-sage-400/30',
+    hover: 'hover:border-sage-500/50 hover:shadow-[0_20px_25px_-8px_rgba(76,122,110,0.20)]',
   },
   ink: {
-    badge: 'bg-gradient-to-br from-ink-600/20 to-ink-800/10 text-ink-700',
+    badge: 'bg-ink-700/10 text-ink-700',
     watermark: 'text-ink-700',
-    ring: 'hover:ring-ink-700/25',
+    hover: 'hover:border-ink-700/40 hover:shadow-[0_20px_25px_-8px_rgba(34,49,91,0.18)]',
   },
   terracotta: {
-    badge: 'bg-gradient-to-br from-[#C1614F]/25 to-[#B4453A]/10 text-[#B4453A]',
+    badge: 'bg-[#B4453A]/15 text-[#B4453A]',
     watermark: 'text-[#B4453A]',
-    ring: 'hover:ring-[#B4453A]/25',
+    hover: 'hover:border-[#B4453A]/40 hover:shadow-[0_20px_25px_-8px_rgba(180,69,58,0.18)]',
   },
 }
 
@@ -201,23 +202,25 @@ export default function Dashboard() {
           return (
             <div
               key={label}
-              className={`dash-fade-in opacity-0 card relative p-5 overflow-hidden ring-1 ring-transparent transition-all duration-300 ease-out hover:-translate-y-1 hover:shadow-lg ${t.ring}`}
+              className={`dash-fade-in opacity-0 group card relative overflow-hidden border border-transparent p-5 transition-all duration-300 ease-out hover:-translate-y-1 ${t.hover}`}
               style={{ animationDelay: `${i * 90}ms` }}
             >
-              {/* Watermark ikon samar di pojok kartu */}
+              {/* Watermark ikon besar di pojok, membesar & miring halus saat hover */}
               <Icon
-                size={88}
-                strokeWidth={1.5}
-                className={`absolute -right-4 -bottom-4 opacity-[0.07] pointer-events-none ${t.watermark}`}
+                size={112}
+                strokeWidth={1.3}
+                className={`absolute -right-6 -bottom-6 opacity-[0.05] pointer-events-none transition-all duration-300 ease-out group-hover:opacity-[0.09] group-hover:scale-110 group-hover:-rotate-6 ${t.watermark}`}
               />
 
-              <div className={`relative w-10 h-10 rounded-lg flex items-center justify-center mb-3 shadow-sm ${t.badge}`}>
-                <Icon size={19} />
+              <div className="relative z-10">
+                <div className={`w-12 h-12 rounded-full flex items-center justify-center mb-4 shadow-sm ${t.badge}`}>
+                  <Icon size={22} />
+                </div>
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-ink-700/50">{label}</p>
+                <p className="text-3xl font-display font-extrabold text-ink-950 mt-1">
+                  {loading ? '—' : value}
+                </p>
               </div>
-              <p className="relative text-2xl font-display font-semibold text-ink-950">
-                {loading ? '—' : value}
-              </p>
-              <p className="relative text-sm text-ink-700/60 mt-0.5">{label}</p>
             </div>
           )
         })}
