@@ -62,20 +62,27 @@ export default function Kelas() {
         {loading && <p className="text-ink-700/50 text-sm">Memuat data...</p>}
         {!loading && data.length === 0 && <p className="text-ink-700/50 text-sm">Belum ada kelas. Tambahkan kelas pertama Anda.</p>}
         {data.map((k) => (
-          <div key={k.id} className="card p-5">
-            <div className="flex items-start justify-between">
+          <div
+            key={k.id}
+            className="relative overflow-hidden rounded-xl p-5 bg-gradient-to-br from-red-900 to-red-950 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-lg"
+          >
+            {/* Dekorasi lingkaran samar, senada gaya kartu identitas Profil Saya */}
+            <div className="absolute -top-8 -right-8 w-32 h-32 rounded-full bg-white/5 pointer-events-none" />
+            <div className="absolute -bottom-10 -left-4 w-24 h-24 rounded-full bg-white/5 pointer-events-none" />
+
+            <div className="relative flex items-start justify-between">
               <div>
-                <p className="font-display text-lg font-semibold text-ink-950">{k.nama_kelas}</p>
-                <p className="text-xs text-ink-700/50 mt-0.5">Tingkat {k.tingkat} · {k.tahun_ajaran}</p>
+                <p className="font-display text-lg font-semibold text-white">{k.nama_kelas}</p>
+                <p className="text-xs text-red-200/70 mt-0.5">Tingkat {k.tingkat} · {k.tahun_ajaran}</p>
               </div>
               <div className="flex gap-1">
-                <button onClick={() => openEdit(k)} className="p-1.5 hover:bg-ink-900/5 rounded-lg text-ink-700/60"><Pencil size={14} /></button>
-                <button onClick={() => handleDelete(k.id)} className="p-1.5 hover:bg-red-50 rounded-lg text-red-600/70"><Trash2 size={14} /></button>
+                <button onClick={() => openEdit(k)} className="p-1.5 hover:bg-white/10 rounded-lg text-white/60"><Pencil size={14} /></button>
+                <button onClick={() => handleDelete(k.id)} className="p-1.5 hover:bg-white/10 rounded-lg text-red-200/80"><Trash2 size={14} /></button>
               </div>
             </div>
-            <div className="mt-4 pt-4 border-t border-ink-900/[0.06] flex items-center justify-between text-sm">
-              <span className="text-ink-700/60">Wali: {k.guru?.nama_lengkap || '—'}</span>
-              <span className="badge bg-brass-400/15 text-brass-600">{k.jumlah_siswa} siswa</span>
+            <div className="relative mt-4 pt-4 border-t border-white/10 flex items-center justify-between text-sm">
+              <span className="text-red-100/70">Wali: {k.guru?.nama_lengkap || '—'}</span>
+              <span className="badge bg-brass-400/20 text-brass-300">{k.jumlah_siswa} siswa</span>
             </div>
           </div>
         ))}
