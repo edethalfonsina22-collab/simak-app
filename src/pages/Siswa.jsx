@@ -101,11 +101,17 @@ export default function Siswa() {
         </>
       }
     >
-      <div className="card p-4 mb-4">
-        <div className="relative max-w-sm">
-          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-700/40" />
+      {/* Kartu pencarian — background biru tua (navy), sama seperti kartu identitas di Profil Saya */}
+      <div className="relative overflow-hidden rounded-xl p-6 mb-4 flex items-center gap-4 bg-gradient-to-br from-blue-900 to-blue-950">
+        <div className="absolute -top-10 -right-10 w-40 h-40 rounded-full bg-white/5 pointer-events-none" />
+        <div className="absolute -bottom-14 -left-6 w-32 h-32 rounded-full bg-white/5 pointer-events-none" />
+
+        <div className="relative w-10 h-10 rounded-full bg-white/10 ring-2 ring-white/20 text-white flex items-center justify-center shrink-0">
+          <Search size={18} />
+        </div>
+        <div className="relative max-w-sm w-full">
           <input
-            className="input-field pl-9"
+            className="input-field w-full"
             placeholder="Cari nama, NIS, atau NISN..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -113,7 +119,8 @@ export default function Siswa() {
         </div>
       </div>
 
-      <div className="card overflow-x-auto">
+      <div className="card relative overflow-hidden overflow-x-auto">
+        <span className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-900 to-brass-400" />
         <table className="table-shell">
           <thead>
             <tr>
