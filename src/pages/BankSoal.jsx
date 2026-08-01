@@ -1,0 +1,201 @@
+import { useEffect, useState } from 'react'
+import * as XLSX from 'xlsx'
+import { supabase } from '../lib/supabaseClient'
+import { useAuth } from '../lib/AuthContext'
+import Layout from '../components/Layout'
+import { Upload, Loader2, Trash2, Database, ChevronDown, ChevronUp } from 'lucide-react'
+
+export default function BankSoal() {
+  const { profil, isAdmin } = useAuth()
+  const [items, setItems] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [uploading, setUploading] = useState(false)
+  const [mapelUpload, setMapelUpload] = useState('')
+  const [mapelFilter, setMapelFilter] = useState('')
+  const [expanded, setExpanded] = useState({})
+
+  async function load() {
+    setLoading(true)
+    const { data } = await supabase.from('bank_soal').select('*').order('mata_pelajaran').order('dibuat_pada', { ascending: false })
+    setItems(data || [])
+    setLoading(false)
+  }
+
+  useEffect(() => {
+    load()
+  }, [])
+
+  async function handleUpload(file) {
+    if (!mapelUpload) {
+      alert('Isi nama mata pelajaran dulu sebelum upload.')
+      return
+    }
+    setUploading(true)
+    try {
+      const buffer = await file.arrayBuffer()
+      const wb = XLSX.read(buffer, { type: 'array' })
+      const sheet = wb.Sheets[wb.SheetNames[0]]
+      const rows = XLSX.utils.sheet_to_json(sheet)
+
+      const soalRows = rows
+        .map((r) => ({
+          mata_pelajaran: mapelUpload,
+          soal: r.soal || r.Soal || '',
+          pilihan_a: r.pilihan_a || r['Pilihan A'] || r.pilihan_A || '',
+          pilihan_b: r.pilihan_b || r['Pilihan B'] || r.pilihan_B || '',
+          pilihan_c: r.pilihan_c || r['Pilihan C'] || r.pilihan_C || '',
+          pilihan_d: r.pilihan_d || r['Pilihan D'] || r.pilihan_D || '',
+          jawaban_benar: String(r.jawaban_benar || r['Jawaban Benar'] || r.jawaban || '').trim().toUpperCase(),
+          guru_id: profil.guru_id,
+        }))
+        .filter((r) => r.soal && ['A', 'B', 'C', 'D'].includes(r.jawaban_benar))
+
+      if (soalRows.length === 0) {
+        alert('Tidak ada soal valid ditemukan. Pastikan kolom Excel: soal, pilihan_a, pilihan_b, pilihan_c, pilihan_d, jawaban_benar (isi A/B/C/D).')
+        setUploading(false)
+        return
+      }
+
+      const { error } = await supabase.from('bank_soal').insert(soalRows)
+      if (error) {
+        alert('Gagal menyimpan soal: ' + error.message)
+      } else {
+        alert(`${soalRows.length} soal berhasil ditambahkan ke Bank Soal ${mapelUpload}.`)
+        setMapelUpload('')
+        await load()
+      }
+    } catch (err) {
+      alert('Gagal membaca file Excel: ' + err.message)
+    }
+    setUploading(false)
+  }
+
+  async function handleDelete(item) {
+    if (!confirm('Hapus soal ini dari Bank Soal?')) return
+    const { error } = await supabase.from('bank_soal').delete().eq('id', item.id)
+    if (error) alert('Gagal menghapus: ' + error.message)
+    await load()
+  }
+
+  const canDelete = (item) => isAdmin || item.guru_id === profil?.guru_id
+
+  const grouped = items.reduce((acc, item) => {
+    if (!acc[item.mata_pelajaran]) acc[item.mata_pelajaran] = []
+    acc[item.mata_pelajaran].push(item)
+    return acc
+  }, {})
+
+  const mapelList = Object.keys(grouped).sort()
+  const mapelTampil = mapelFilter ? mapelList.filter((m) => m === mapelFilter) : mapelList
+
+  return (
+    <Layout title="Bank Soal" subtitle="Kumpulan soal tersimpan, siap dipakai ulang untuk Ujian Online">
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-ink-950 to-[#22315B] p-6 mb-6">
+        <div className="relative z-10 flex items-center gap-4">
+          <div className="w-11 h-11 rounded-full bg-white/15 flex items-center justify-center shrink-0">
+            <Database size={20} className="text-paper" />
+          </div>
+          <div>
+            <p className="font-display font-semibold text-lg text-paper">Bank Soal</p>
+            <p className="text-sm text-paper/70 mt-0.5">{items.length} soal tersimpan · {mapelList.length} mata pelajaran</p>
+          </div>
+        </div>
+        <Database size={120} className="absolute -right-4 -bottom-6 text-white/5 rotate-12" />
+      </div>
+
+      <div className="card p-6 mb-6 space-y-3">
+        <h3 className="font-display text-lg font-semibold mb-1">Upload Soal Baru</h3>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label className="eyebrow mb-1.5 block">Mata Pelajaran</label>
+            <input
+              className="input-field"
+              placeholder="Matematika"
+              value={mapelUpload}
+              onChange={(e) => setMapelUpload(e.target.value)}
+            />
+          </div>
+          <div>
+            <label className="eyebrow mb-1.5 block">File Excel</label>
+            <input
+              className="input-field"
+              type="file"
+              accept=".xlsx,.xls"
+              disabled={uploading}
+              onChange={(e) => e.target.files?.[0] && handleUpload(e.target.files[0])}
+            />
+          </div>
+        </div>
+        {uploading && <p className="text-xs text-ink-700/50 flex items-center gap-1.5"><Loader2 size={12} className="animate-spin" /> Mengunggah...</p>}
+        <p className="text-xs text-ink-700/40">
+          Kolom Excel: <code>soal</code>, <code>pilihan_a</code>, <code>pilihan_b</code>, <code>pilihan_c</code>, <code>pilihan_d</code>, <code>jawaban_benar</code> (isi A/B/C/D). Semua soal dalam 1 file akan masuk ke mata pelajaran yang diisi di atas.
+        </p>
+      </div>
+
+      {mapelList.length > 0 && (
+        <div className="flex items-center gap-2 mb-4 flex-wrap">
+          <button
+            onClick={() => setMapelFilter('')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium ${!mapelFilter ? 'bg-brass-400 text-ink-950' : 'bg-ink-900/[0.06] text-ink-700'}`}
+          >
+            Semua
+          </button>
+          {mapelList.map((m) => (
+            <button
+              key={m}
+              onClick={() => setMapelFilter(m)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium ${mapelFilter === m ? 'bg-brass-400 text-ink-950' : 'bg-ink-900/[0.06] text-ink-700'}`}
+            >
+              {m} ({grouped[m].length})
+            </button>
+          ))}
+        </div>
+      )}
+
+      {loading ? (
+        <p className="text-sm text-ink-700/50">Memuat...</p>
+      ) : items.length === 0 ? (
+        <div className="card p-6">
+          <p className="text-sm text-ink-700/50">Belum ada soal di Bank Soal. Upload lewat form di atas.</p>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {mapelTampil.map((mapel) => {
+            const isOpen = expanded[mapel]
+            return (
+              <div key={mapel} className="card overflow-hidden">
+                <button
+                  onClick={() => setExpanded({ ...expanded, [mapel]: !isOpen })}
+                  className="w-full flex items-center justify-between p-4"
+                >
+                  <p className="text-sm font-medium text-ink-950">{mapel} <span className="text-ink-700/40 font-normal">({grouped[mapel].length} soal)</span></p>
+                  {isOpen ? <ChevronUp size={16} className="text-ink-700/50" /> : <ChevronDown size={16} className="text-ink-700/50" />}
+                </button>
+                {isOpen && (
+                  <ul className="divide-y divide-ink-900/[0.06] border-t border-ink-900/[0.06]">
+                    {grouped[mapel].map((item, i) => (
+                      <li key={item.id} className="p-4 flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="text-sm text-ink-900">{i + 1}. {item.soal}</p>
+                          <p className="text-xs text-ink-700/40 mt-1">Jawaban benar: {item.jawaban_benar}</p>
+                        </div>
+                        {canDelete(item) && (
+                          <button
+                            onClick={() => handleDelete(item)}
+                            className="w-7 h-7 rounded-lg flex items-center justify-center text-red-600 hover:bg-red-50 shrink-0"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </Layout>
+  )
+}
