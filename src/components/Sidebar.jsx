@@ -7,6 +7,7 @@ import {
   CalendarClock,
   ClipboardCheck,
   ClipboardList,
+  BarChart3,
   BookOpenCheck,
   Megaphone,
   LogOut,
@@ -51,6 +52,7 @@ const groupsAdmin = [
       { to: '/rapor', label: 'Rapor Siswa', icon: FileBadge },
       { to: '/rpp', label: 'RPP', icon: NotebookPen },
       { to: '/buat-ujian', label: 'Buat Ujian', icon: ClipboardList },
+      { to: '/hasil-ujian', label: 'Hasil Ujian', icon: BarChart3 },
     ],
   },
   {
@@ -85,6 +87,7 @@ const linksGuru = [
   { to: '/rapor', label: 'Rapor Siswa', icon: FileBadge },
   { to: '/rpp', label: 'RPP', icon: NotebookPen },
   { to: '/buat-ujian', label: 'Buat Ujian', icon: ClipboardList },
+  { to: '/hasil-ujian', label: 'Hasil Ujian', icon: BarChart3 },
   { to: '/perpustakaan', label: 'Perpustakaan', icon: Library },
   { to: '/jadwal', label: 'Jadwal Pelajaran', icon: CalendarClock },
   { to: '/agenda', label: 'Agenda Sekolah', icon: CalendarDays },
