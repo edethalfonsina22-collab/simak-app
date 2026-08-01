@@ -166,21 +166,22 @@ export default function Perpustakaan() {
       actions={
         isAdmin && (
           tab === 'buku'
-            ? <button className="btn-primary" onClick={openAddBuku}><Plus size={16} /> Tambah Buku</button>
-            : <button className="btn-primary" onClick={openPinjam}><Plus size={16} /> Catat Peminjaman</button>
+            ? <button className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-[#6b0f1a] text-white hover:bg-[#7d1420] transition-colors shadow-sm shadow-[#6b0f1a]/30" onClick={openAddBuku}><Plus size={16} /> Tambah Buku</button>
+            : <button className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-[#6b0f1a] text-white hover:bg-[#7d1420] transition-colors shadow-sm shadow-[#6b0f1a]/30" onClick={openPinjam}><Plus size={16} /> Catat Peminjaman</button>
         )
       }
     >
+      <div className="min-h-screen bg-gradient-to-b from-[#fdf3f1] to-[#f7e6e3] -m-4 p-4 rounded-xl">
       <div className="flex gap-2 mb-4">
         <button
           onClick={() => setTab('buku')}
-          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${tab === 'buku' ? 'bg-ink-950 text-paper' : 'bg-white text-ink-700/60 hover:bg-ink-900/5'}`}
+          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${tab === 'buku' ? 'bg-[#6b0f1a] text-white shadow-sm shadow-[#6b0f1a]/30' : 'bg-white text-[#6b0f1a]/60 hover:bg-[#6b0f1a]/5'}`}
         >
           Katalog Buku
         </button>
         <button
           onClick={() => setTab('peminjaman')}
-          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${tab === 'peminjaman' ? 'bg-ink-950 text-paper' : 'bg-white text-ink-700/60 hover:bg-ink-900/5'}`}
+          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${tab === 'peminjaman' ? 'bg-[#6b0f1a] text-white shadow-sm shadow-[#6b0f1a]/30' : 'bg-white text-[#6b0f1a]/60 hover:bg-[#6b0f1a]/5'}`}
         >
           Peminjaman
         </button>
@@ -188,47 +189,52 @@ export default function Perpustakaan() {
 
       {tab === 'buku' && (
         <>
-          <div className="card p-4 mb-4">
+          <div className="bg-white rounded-xl border border-[#6b0f1a]/10 shadow-sm p-4 mb-4">
             <div className="relative max-w-sm">
-              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-700/40" />
+              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#6b0f1a]/40" />
               <input
-                className="input-field pl-9"
+                className="w-full pl-9 pr-3 py-2 rounded-lg border border-[#6b0f1a]/15 focus:border-[#6b0f1a] focus:ring-2 focus:ring-[#6b0f1a]/20 outline-none transition-colors"
                 placeholder="Cari judul, penulis, atau kategori..."
                 value={searchBuku}
                 onChange={(e) => setSearchBuku(e.target.value)}
               />
             </div>
           </div>
-          <div className="card overflow-x-auto">
-            <table className="table-shell">
+          <div className="bg-white rounded-xl border border-[#6b0f1a]/10 shadow-sm overflow-x-auto">
+            <table className="w-full text-sm">
               <thead>
-                <tr>
-                  <th>Judul</th><th>Penulis</th><th>Kategori</th><th>Rak</th><th>Stok Tersedia</th>{isAdmin && <th></th>}
+                <tr className="bg-[#6b0f1a] text-white">
+                  <th className="text-left px-4 py-3 font-medium">Judul</th>
+                  <th className="text-left px-4 py-3 font-medium">Penulis</th>
+                  <th className="text-left px-4 py-3 font-medium">Kategori</th>
+                  <th className="text-left px-4 py-3 font-medium">Rak</th>
+                  <th className="text-left px-4 py-3 font-medium">Stok Tersedia</th>
+                  {isAdmin && <th className="px-4 py-3"></th>}
                 </tr>
               </thead>
-              <tbody>
-                {loadingBuku && <tr><td colSpan={6} className="text-center py-8 text-ink-700/50">Memuat data...</td></tr>}
+              <tbody className="divide-y divide-[#6b0f1a]/8">
+                {loadingBuku && <tr><td colSpan={6} className="text-center py-8 text-[#6b0f1a]/50">Memuat data...</td></tr>}
                 {!loadingBuku && bukuTerfilter.length === 0 && (
-                  <tr><td colSpan={6} className="text-center py-8 text-ink-700/50">Belum ada buku.</td></tr>
+                  <tr><td colSpan={6} className="text-center py-8 text-[#6b0f1a]/50">Belum ada buku.</td></tr>
                 )}
                 {bukuTerfilter.map((b) => (
-                  <tr key={b.id}>
-                    <td className="font-medium">{b.judul}</td>
-                    <td>{b.penulis || '-'}</td>
-                    <td>{b.kategori || '-'}</td>
-                    <td>{b.rak || '-'}</td>
-                    <td>
+                  <tr key={b.id} className="hover:bg-[#6b0f1a]/5 transition-colors">
+                    <td className="px-4 py-3 font-medium text-[#3b0a0a]">{b.judul}</td>
+                    <td className="px-4 py-3">{b.penulis || '-'}</td>
+                    <td className="px-4 py-3">{b.kategori || '-'}</td>
+                    <td className="px-4 py-3">{b.rak || '-'}</td>
+                    <td className="px-4 py-3">
                       <span className={`text-xs px-2 py-1 rounded-full font-medium ${
-                        b.jumlah_tersedia > 0 ? 'bg-sage-500/10 text-sage-500' : 'bg-red-50 text-red-700'
+                        b.jumlah_tersedia > 0 ? 'bg-[#d4a017]/15 text-[#8a6a0d]' : 'bg-[#6b0f1a]/10 text-[#6b0f1a]'
                       }`}>
                         {b.jumlah_tersedia} / {b.jumlah_total}
                       </span>
                     </td>
                     {isAdmin && (
-                      <td>
+                      <td className="px-4 py-3">
                         <div className="flex items-center gap-1 justify-end">
-                          <button className="icon-btn" onClick={() => openEditBuku(b)}><Pencil size={15} /></button>
-                          <button className="icon-btn text-red-600" onClick={() => hapusBuku(b.id)}><Trash2 size={15} /></button>
+                          <button className="p-1.5 rounded-md hover:bg-[#6b0f1a]/10 text-[#6b0f1a] transition-colors" onClick={() => openEditBuku(b)}><Pencil size={15} /></button>
+                          <button className="p-1.5 rounded-md hover:bg-[#6b0f1a]/10 text-[#8f1f22]" onClick={() => hapusBuku(b.id)}><Trash2 size={15} /></button>
                         </div>
                       </td>
                     )}
@@ -247,47 +253,52 @@ export default function Perpustakaan() {
               <button
                 key={v}
                 onClick={() => setFilterPinjam(v)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${filterPinjam === v ? 'bg-brass-400 text-ink-950' : 'bg-white text-ink-700/60 hover:bg-ink-900/5'}`}
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${filterPinjam === v ? 'bg-[#d4a017] text-[#3b0a0a]' : 'bg-white text-[#6b0f1a]/60 hover:bg-[#6b0f1a]/5'}`}
               >
                 {l}
               </button>
             ))}
           </div>
-          <div className="card overflow-x-auto">
-            <table className="table-shell">
+          <div className="bg-white rounded-xl border border-[#6b0f1a]/10 shadow-sm overflow-x-auto">
+            <table className="w-full text-sm">
               <thead>
-                <tr>
-                  <th>Judul Buku</th><th>Peminjam</th><th>Tgl Pinjam</th><th>Wajib Kembali</th><th>Status</th>{isAdmin && <th></th>}
+                <tr className="bg-[#6b0f1a] text-white">
+                  <th className="text-left px-4 py-3 font-medium">Judul Buku</th>
+                  <th className="text-left px-4 py-3 font-medium">Peminjam</th>
+                  <th className="text-left px-4 py-3 font-medium">Tgl Pinjam</th>
+                  <th className="text-left px-4 py-3 font-medium">Wajib Kembali</th>
+                  <th className="text-left px-4 py-3 font-medium">Status</th>
+                  {isAdmin && <th className="px-4 py-3"></th>}
                 </tr>
               </thead>
-              <tbody>
-                {loadingPinjam && <tr><td colSpan={6} className="text-center py-8 text-ink-700/50">Memuat data...</td></tr>}
+              <tbody className="divide-y divide-[#6b0f1a]/8">
+                {loadingPinjam && <tr><td colSpan={6} className="text-center py-8 text-[#6b0f1a]/50">Memuat data...</td></tr>}
                 {!loadingPinjam && pinjamList.length === 0 && (
-                  <tr><td colSpan={6} className="text-center py-8 text-ink-700/50">Tidak ada data.</td></tr>
+                  <tr><td colSpan={6} className="text-center py-8 text-[#6b0f1a]/50">Tidak ada data.</td></tr>
                 )}
                 {pinjamList.map((p) => {
                   const terlambat = !p.tanggal_kembali && p.tanggal_wajib_kembali < hariIni
                   return (
-                    <tr key={p.id}>
-                      <td className="font-medium">{p.buku?.judul || '-'}</td>
-                      <td>{p.nama_peminjam} <span className="text-xs text-ink-700/40">({p.jenis_peminjam})</span></td>
-                      <td>{p.tanggal_pinjam}</td>
-                      <td>{p.tanggal_wajib_kembali}</td>
-                      <td>
+                    <tr key={p.id} className="hover:bg-[#6b0f1a]/5 transition-colors">
+                      <td className="px-4 py-3 font-medium text-[#3b0a0a]">{p.buku?.judul || '-'}</td>
+                      <td className="px-4 py-3">{p.nama_peminjam} <span className="text-xs text-[#6b0f1a]/40">({p.jenis_peminjam})</span></td>
+                      <td className="px-4 py-3">{p.tanggal_pinjam}</td>
+                      <td className="px-4 py-3">{p.tanggal_wajib_kembali}</td>
+                      <td className="px-4 py-3">
                         {p.tanggal_kembali ? (
-                          <span className="text-xs px-2 py-1 rounded-full font-medium bg-sage-500/10 text-sage-500">Dikembalikan</span>
+                          <span className="text-xs px-2 py-1 rounded-full font-medium bg-[#d4a017]/15 text-[#8a6a0d]">Dikembalikan</span>
                         ) : terlambat ? (
-                          <span className="text-xs px-2 py-1 rounded-full font-medium bg-red-50 text-red-700 flex items-center gap-1 w-fit">
+                          <span className="text-xs px-2 py-1 rounded-full font-medium bg-[#6b0f1a]/10 text-[#6b0f1a] flex items-center gap-1 w-fit">
                             <AlertCircle size={12} /> Terlambat
                           </span>
                         ) : (
-                          <span className="text-xs px-2 py-1 rounded-full font-medium bg-amber-500/10 text-amber-600">Dipinjam</span>
+                          <span className="text-xs px-2 py-1 rounded-full font-medium bg-[#b02e35]/10 text-[#8f1f22]">Dipinjam</span>
                         )}
                       </td>
                       {isAdmin && (
-                        <td>
+                        <td className="px-4 py-3">
                           {!p.tanggal_kembali && (
-                            <button className="icon-btn text-sage-500" onClick={() => tandaiKembali(p)} title="Tandai kembali">
+                            <button className="p-1.5 rounded-md hover:bg-[#6b0f1a]/10 text-[#d4a017]" onClick={() => tandaiKembali(p)} title="Tandai kembali">
                               <Undo2 size={15} />
                             </button>
                           )}
@@ -304,51 +315,51 @@ export default function Perpustakaan() {
 
       {/* Modal Tambah/Edit Buku */}
       {showFormBuku && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-lg p-6">
+        <div className="fixed inset-0 bg-[#3b0a0a]/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-lg p-6 border-t-4 border-[#6b0f1a]">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="font-display text-lg font-semibold">{editingBukuId ? 'Ubah Buku' : 'Tambah Buku'}</h2>
-              <button className="icon-btn" onClick={() => setShowFormBuku(false)}><X size={18} /></button>
+              <h2 className="font-display text-lg font-semibold text-[#3b0a0a]">{editingBukuId ? 'Ubah Buku' : 'Tambah Buku'}</h2>
+              <button className="p-1.5 rounded-md hover:bg-[#6b0f1a]/10 text-[#6b0f1a]" onClick={() => setShowFormBuku(false)}><X size={18} /></button>
             </div>
             <form onSubmit={handleSubmitBuku} className="space-y-3">
               <div>
-                <label className="label-field">Judul Buku *</label>
-                <input required className="input-field" value={formBuku.judul} onChange={(e) => setFormBuku({ ...formBuku, judul: e.target.value })} />
+                <label className="block text-xs font-medium text-[#6b0f1a]/70 mb-1">Judul Buku *</label>
+                <input required className="w-full px-3 py-2 rounded-lg border border-[#6b0f1a]/15 focus:border-[#6b0f1a] focus:ring-2 focus:ring-[#6b0f1a]/20 outline-none transition-colors" value={formBuku.judul} onChange={(e) => setFormBuku({ ...formBuku, judul: e.target.value })} />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="label-field">Penulis</label>
-                  <input className="input-field" value={formBuku.penulis} onChange={(e) => setFormBuku({ ...formBuku, penulis: e.target.value })} />
+                  <label className="block text-xs font-medium text-[#6b0f1a]/70 mb-1">Penulis</label>
+                  <input className="w-full px-3 py-2 rounded-lg border border-[#6b0f1a]/15 focus:border-[#6b0f1a] focus:ring-2 focus:ring-[#6b0f1a]/20 outline-none transition-colors" value={formBuku.penulis} onChange={(e) => setFormBuku({ ...formBuku, penulis: e.target.value })} />
                 </div>
                 <div>
-                  <label className="label-field">Penerbit</label>
-                  <input className="input-field" value={formBuku.penerbit} onChange={(e) => setFormBuku({ ...formBuku, penerbit: e.target.value })} />
+                  <label className="block text-xs font-medium text-[#6b0f1a]/70 mb-1">Penerbit</label>
+                  <input className="w-full px-3 py-2 rounded-lg border border-[#6b0f1a]/15 focus:border-[#6b0f1a] focus:ring-2 focus:ring-[#6b0f1a]/20 outline-none transition-colors" value={formBuku.penerbit} onChange={(e) => setFormBuku({ ...formBuku, penerbit: e.target.value })} />
                 </div>
               </div>
               <div className="grid grid-cols-3 gap-3">
                 <div>
-                  <label className="label-field">Tahun Terbit</label>
-                  <input className="input-field" value={formBuku.tahun_terbit} onChange={(e) => setFormBuku({ ...formBuku, tahun_terbit: e.target.value })} />
+                  <label className="block text-xs font-medium text-[#6b0f1a]/70 mb-1">Tahun Terbit</label>
+                  <input className="w-full px-3 py-2 rounded-lg border border-[#6b0f1a]/15 focus:border-[#6b0f1a] focus:ring-2 focus:ring-[#6b0f1a]/20 outline-none transition-colors" value={formBuku.tahun_terbit} onChange={(e) => setFormBuku({ ...formBuku, tahun_terbit: e.target.value })} />
                 </div>
                 <div>
-                  <label className="label-field">Kategori</label>
-                  <input className="input-field" value={formBuku.kategori} onChange={(e) => setFormBuku({ ...formBuku, kategori: e.target.value })} />
+                  <label className="block text-xs font-medium text-[#6b0f1a]/70 mb-1">Kategori</label>
+                  <input className="w-full px-3 py-2 rounded-lg border border-[#6b0f1a]/15 focus:border-[#6b0f1a] focus:ring-2 focus:ring-[#6b0f1a]/20 outline-none transition-colors" value={formBuku.kategori} onChange={(e) => setFormBuku({ ...formBuku, kategori: e.target.value })} />
                 </div>
                 <div>
-                  <label className="label-field">Rak</label>
-                  <input className="input-field" value={formBuku.rak} onChange={(e) => setFormBuku({ ...formBuku, rak: e.target.value })} />
+                  <label className="block text-xs font-medium text-[#6b0f1a]/70 mb-1">Rak</label>
+                  <input className="w-full px-3 py-2 rounded-lg border border-[#6b0f1a]/15 focus:border-[#6b0f1a] focus:ring-2 focus:ring-[#6b0f1a]/20 outline-none transition-colors" value={formBuku.rak} onChange={(e) => setFormBuku({ ...formBuku, rak: e.target.value })} />
                 </div>
               </div>
               <div>
-                <label className="label-field">Jumlah Eksemplar</label>
-                <input type="number" min="1" className="input-field" value={formBuku.jumlah_total} onChange={(e) => setFormBuku({ ...formBuku, jumlah_total: e.target.value })} />
+                <label className="block text-xs font-medium text-[#6b0f1a]/70 mb-1">Jumlah Eksemplar</label>
+                <input type="number" min="1" className="w-full px-3 py-2 rounded-lg border border-[#6b0f1a]/15 focus:border-[#6b0f1a] focus:ring-2 focus:ring-[#6b0f1a]/20 outline-none transition-colors" value={formBuku.jumlah_total} onChange={(e) => setFormBuku({ ...formBuku, jumlah_total: e.target.value })} />
                 {editingBukuId && (
-                  <p className="text-xs text-ink-700/40 mt-1">Mengubah jumlah total tidak memengaruhi jumlah yang sedang dipinjam saat ini.</p>
+                  <p className="text-xs text-[#6b0f1a]/40 mt-1">Mengubah jumlah total tidak memengaruhi jumlah yang sedang dipinjam saat ini.</p>
                 )}
               </div>
               <div className="flex justify-end gap-3 pt-2">
-                <button type="button" className="btn-secondary" onClick={() => setShowFormBuku(false)}>Batal</button>
-                <button type="submit" className="btn-primary" disabled={savingBuku}>
+                <button type="button" className="px-4 py-2 rounded-lg text-sm font-medium bg-[#f7e6e3] text-[#6b0f1a] hover:bg-[#efd3ce] transition-colors" onClick={() => setShowFormBuku(false)}>Batal</button>
+                <button type="submit" className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-[#6b0f1a] text-white hover:bg-[#7d1420] transition-colors" disabled={savingBuku}>
                   {savingBuku && <Loader2 size={16} className="animate-spin" />}
                   Simpan
                 </button>
@@ -360,16 +371,16 @@ export default function Perpustakaan() {
 
       {/* Modal Catat Peminjaman */}
       {showFormPinjam && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-lg p-6">
+        <div className="fixed inset-0 bg-[#3b0a0a]/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-lg p-6 border-t-4 border-[#6b0f1a]">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="font-display text-lg font-semibold flex items-center gap-2"><BookOpen size={18} /> Catat Peminjaman</h2>
-              <button className="icon-btn" onClick={() => setShowFormPinjam(false)}><X size={18} /></button>
+              <h2 className="font-display text-lg font-semibold flex items-center gap-2 text-[#3b0a0a]"><BookOpen size={18} className="text-[#6b0f1a]" /> Catat Peminjaman</h2>
+              <button className="p-1.5 rounded-md hover:bg-[#6b0f1a]/10 text-[#6b0f1a]" onClick={() => setShowFormPinjam(false)}><X size={18} /></button>
             </div>
             <form onSubmit={handleSubmitPinjam} className="space-y-3">
               <div>
-                <label className="label-field">Buku *</label>
-                <select required className="input-field" value={formPinjam.buku_id} onChange={(e) => setFormPinjam({ ...formPinjam, buku_id: e.target.value })}>
+                <label className="block text-xs font-medium text-[#6b0f1a]/70 mb-1">Buku *</label>
+                <select required className="w-full px-3 py-2 rounded-lg border border-[#6b0f1a]/15 focus:border-[#6b0f1a] focus:ring-2 focus:ring-[#6b0f1a]/20 outline-none transition-colors" value={formPinjam.buku_id} onChange={(e) => setFormPinjam({ ...formPinjam, buku_id: e.target.value })}>
                   <option value="">-- Pilih buku --</option>
                   {bukuList.filter((b) => b.jumlah_tersedia > 0).map((b) => (
                     <option key={b.id} value={b.id}>{b.judul} (tersedia: {b.jumlah_tersedia})</option>
@@ -378,17 +389,17 @@ export default function Perpustakaan() {
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="label-field">Jenis Peminjam</label>
-                  <select className="input-field" value={formPinjam.jenis_peminjam} onChange={(e) => setFormPinjam({ ...formPinjam, jenis_peminjam: e.target.value, siswa_id: '' })}>
+                  <label className="block text-xs font-medium text-[#6b0f1a]/70 mb-1">Jenis Peminjam</label>
+                  <select className="w-full px-3 py-2 rounded-lg border border-[#6b0f1a]/15 focus:border-[#6b0f1a] focus:ring-2 focus:ring-[#6b0f1a]/20 outline-none transition-colors" value={formPinjam.jenis_peminjam} onChange={(e) => setFormPinjam({ ...formPinjam, jenis_peminjam: e.target.value, siswa_id: '' })}>
                     <option value="siswa">Siswa</option>
                     <option value="guru">Guru</option>
                   </select>
                 </div>
                 {formPinjam.jenis_peminjam === 'siswa' ? (
                   <div>
-                    <label className="label-field">Nama Siswa</label>
+                    <label className="block text-xs font-medium text-[#6b0f1a]/70 mb-1">Nama Siswa</label>
                     <select
-                      className="input-field"
+                      className="w-full px-3 py-2 rounded-lg border border-[#6b0f1a]/15 focus:border-[#6b0f1a] focus:ring-2 focus:ring-[#6b0f1a]/20 outline-none transition-colors"
                       value={formPinjam.siswa_id}
                       onChange={(e) => {
                         const s = siswaList.find((x) => x.id === e.target.value)
@@ -401,9 +412,9 @@ export default function Perpustakaan() {
                   </div>
                 ) : (
                   <div>
-                    <label className="label-field">Nama Guru</label>
+                    <label className="block text-xs font-medium text-[#6b0f1a]/70 mb-1">Nama Guru</label>
                     <input
-                      className="input-field"
+                      className="w-full px-3 py-2 rounded-lg border border-[#6b0f1a]/15 focus:border-[#6b0f1a] focus:ring-2 focus:ring-[#6b0f1a]/20 outline-none transition-colors"
                       value={formPinjam.nama_peminjam}
                       onChange={(e) => setFormPinjam({ ...formPinjam, nama_peminjam: e.target.value })}
                     />
@@ -412,17 +423,17 @@ export default function Perpustakaan() {
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="label-field">Tanggal Pinjam</label>
-                  <input type="date" className="input-field" value={formPinjam.tanggal_pinjam} onChange={(e) => setFormPinjam({ ...formPinjam, tanggal_pinjam: e.target.value })} />
+                  <label className="block text-xs font-medium text-[#6b0f1a]/70 mb-1">Tanggal Pinjam</label>
+                  <input type="date" className="w-full px-3 py-2 rounded-lg border border-[#6b0f1a]/15 focus:border-[#6b0f1a] focus:ring-2 focus:ring-[#6b0f1a]/20 outline-none transition-colors" value={formPinjam.tanggal_pinjam} onChange={(e) => setFormPinjam({ ...formPinjam, tanggal_pinjam: e.target.value })} />
                 </div>
                 <div>
-                  <label className="label-field">Wajib Kembali</label>
-                  <input type="date" className="input-field" value={formPinjam.tanggal_wajib_kembali} onChange={(e) => setFormPinjam({ ...formPinjam, tanggal_wajib_kembali: e.target.value })} />
+                  <label className="block text-xs font-medium text-[#6b0f1a]/70 mb-1">Wajib Kembali</label>
+                  <input type="date" className="w-full px-3 py-2 rounded-lg border border-[#6b0f1a]/15 focus:border-[#6b0f1a] focus:ring-2 focus:ring-[#6b0f1a]/20 outline-none transition-colors" value={formPinjam.tanggal_wajib_kembali} onChange={(e) => setFormPinjam({ ...formPinjam, tanggal_wajib_kembali: e.target.value })} />
                 </div>
               </div>
               <div className="flex justify-end gap-3 pt-2">
-                <button type="button" className="btn-secondary" onClick={() => setShowFormPinjam(false)}>Batal</button>
-                <button type="submit" className="btn-primary" disabled={savingPinjam || !formPinjam.nama_peminjam}>
+                <button type="button" className="px-4 py-2 rounded-lg text-sm font-medium bg-[#f7e6e3] text-[#6b0f1a] hover:bg-[#efd3ce] transition-colors" onClick={() => setShowFormPinjam(false)}>Batal</button>
+                <button type="submit" className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-[#6b0f1a] text-white hover:bg-[#7d1420] transition-colors disabled:opacity-50" disabled={savingPinjam || !formPinjam.nama_peminjam}>
                   {savingPinjam && <Loader2 size={16} className="animate-spin" />}
                   Simpan
                 </button>
@@ -431,6 +442,7 @@ export default function Perpustakaan() {
           </div>
         </div>
       )}
+      </div>
     </Layout>
   )
 }
