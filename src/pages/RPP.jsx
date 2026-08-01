@@ -3,7 +3,7 @@ import { PDFDocument, StandardFonts, rgb } from 'pdf-lib'
 import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../lib/AuthContext'
 import Layout from '../components/Layout'
-import { Upload, FileText, Download, CheckCircle2, XCircle, Clock, Loader2 } from 'lucide-react'
+import { Upload, FileText, Download, CheckCircle2, XCircle, Clock, Loader2, NotebookPen } from 'lucide-react'
 
 const STATUS_STYLE = {
   menunggu: 'bg-brass-400/15 text-brass-600',
@@ -185,33 +185,55 @@ export default function RPP() {
     await load()
   }
 
+  const menungguCount = items.filter((i) => i.status === 'menunggu').length
+
   return (
     <Layout title="RPP" subtitle={isAdmin ? 'Tinjau dan setujui RPP dari guru' : 'Upload dan pantau status persetujuan RPP Anda'}>
+      {/* Banner biru — senada dengan Dokumen & Presensi */}
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-ink-950 to-[#22315B] p-6 mb-6">
+        <div className="relative z-10 flex items-center gap-4">
+          <div className="w-11 h-11 rounded-full bg-white/15 flex items-center justify-center shrink-0">
+            <NotebookPen size={20} className="text-paper" />
+          </div>
+          <div>
+            <p className="font-display font-semibold text-lg text-paper">RPP</p>
+            <p className="text-sm text-paper/70 mt-0.5">
+              {isAdmin
+                ? menungguCount > 0
+                  ? `${menungguCount} RPP menunggu persetujuan`
+                  : 'Semua RPP sudah diproses'
+                : 'Upload dan pantau status persetujuan RPP Anda'}
+            </p>
+          </div>
+        </div>
+        <NotebookPen size={120} className="absolute -right-4 -bottom-6 text-white/5 rotate-12" />
+      </div>
+
       {!isAdmin && (
         <form onSubmit={handleUpload} className="card p-6 mb-6 space-y-3">
           <h3 className="font-display text-lg font-semibold mb-1">Upload RPP Baru</h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <input
-              className="input"
+              className="input-field"
               placeholder="Judul RPP"
               value={form.judul}
               onChange={(e) => setForm({ ...form, judul: e.target.value })}
               required
             />
             <input
-              className="input"
+              className="input-field"
               placeholder="Mata Pelajaran"
               value={form.mata_pelajaran}
               onChange={(e) => setForm({ ...form, mata_pelajaran: e.target.value })}
             />
             <input
-              className="input"
+              className="input-field"
               placeholder="Kelas"
               value={form.kelas}
               onChange={(e) => setForm({ ...form, kelas: e.target.value })}
             />
             <select
-              className="input"
+              className="input-field"
               value={form.semester}
               onChange={(e) => setForm({ ...form, semester: e.target.value })}
             >
@@ -219,24 +241,20 @@ export default function RPP() {
               <option value="Genap">Genap</option>
             </select>
             <input
-              className="input"
+              className="input-field"
               placeholder="Tahun Ajaran (mis. 2026/2027)"
               value={form.tahun_ajaran}
               onChange={(e) => setForm({ ...form, tahun_ajaran: e.target.value })}
             />
             <input
-              className="input"
+              className="input-field"
               type="file"
               accept=".pdf,.doc,.docx"
               onChange={(e) => setForm({ ...form, file: e.target.files?.[0] || null })}
               required
             />
           </div>
-          <button
-            type="submit"
-            disabled={uploading}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-brass-400 text-ink-950 text-sm font-medium disabled:opacity-50"
-          >
+          <button type="submit" disabled={uploading} className="btn-primary">
             {uploading ? <Loader2 size={16} className="animate-spin" /> : <Upload size={16} />}
             {uploading ? 'Mengunggah...' : 'Upload RPP'}
           </button>
@@ -246,13 +264,13 @@ export default function RPP() {
       {isAdmin && (
         <div className="card p-4 mb-6 grid grid-cols-1 sm:grid-cols-2 gap-3">
           <input
-            className="input"
+            className="input-field"
             placeholder="Nama penandatangan (mis. Siti Aminah, S.Pd.)"
             value={approvalForm.nama}
             onChange={(e) => setApprovalForm({ ...approvalForm, nama: e.target.value })}
           />
           <input
-            className="input"
+            className="input-field"
             placeholder="Jabatan"
             value={approvalForm.jabatan}
             onChange={(e) => setApprovalForm({ ...approvalForm, jabatan: e.target.value })}
@@ -320,7 +338,7 @@ export default function RPP() {
                       {rejectingId === item.id ? (
                         <div className="flex items-center gap-1.5">
                           <input
-                            className="input !py-1.5 !text-xs w-40"
+                            className="input-field !py-1.5 !text-xs w-40"
                             placeholder="Alasan tolak"
                             value={catatanTolak}
                             onChange={(e) => setCatatanTolak(e.target.value)}
