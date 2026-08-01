@@ -45,7 +45,8 @@ export default function App() {
     <Routes>
       {/* Halaman publik — TIDAK perlu login, dibagikan ke orang tua calon siswa */}
       <Route path="/ppdb" element={<PPDBPublik />} />
-
+<Route path="/buat-ujian" element={<ProtectedRoute><BuatUjian /></ProtectedRoute>} />
+<Route path="/ujian-online" element={<UjianOnline />} />
       <Route path="/login" element={<Login />} />
       <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
       <Route path="/siswa" element={<ProtectedRoute adminOnly><Siswa /></ProtectedRoute>} />
