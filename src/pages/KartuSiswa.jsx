@@ -111,7 +111,7 @@ export default function KartuSiswa() {
           page.drawRectangle({ x, y, width: CARD_W, height: CARD_H, color: rgb(1, 1, 1), borderColor: warna, borderWidth: 1.5 })
           // Header berwarna
           page.drawRectangle({ x, y: y + CARD_H - 28, width: CARD_W, height: 28, color: warna })
-          page.drawText('SD NEGERI WARIALAU', { x: x + 10, y: y + CARD_H - 13, size: 8, font: fontBold, color: rgb(1, 1, 1) })
+          page.drawText('SD NEGERI WARIA', { x: x + 10, y: y + CARD_H - 13, size: 8, font: fontBold, color: rgb(1, 1, 1) })
           page.drawText(judulKartu, { x: x + 10, y: y + CARD_H - 23, size: 7, font, color: rgb(1, 1, 1) })
 
           // Foto
