@@ -37,21 +37,58 @@ export default function BankSoal() {
       const sheet = wb.Sheets[wb.SheetNames[0]]
       const rows = XLSX.utils.sheet_to_json(sheet)
 
-      const soalRows = rows
-        .map((r) => ({
+      const soalRows = []
+      const gagal = [] // { baris, alasan }
+
+      rows.forEach((r, idx) => {
+        const baris = idx + 2 // baris 1 = header, data mulai baris 2 di Excel
+
+        const soal = String(r.soal || r.Soal || '').trim()
+        const pilihan_a = String(r.pilihan_a || r['Pilihan A'] || r.pilihan_A || '').trim()
+        const pilihan_b = String(r.pilihan_b || r['Pilihan B'] || r.pilihan_B || '').trim()
+        const pilihan_c = String(r.pilihan_c || r['Pilihan C'] || r.pilihan_C || '').trim()
+        const pilihan_d = String(r.pilihan_d || r['Pilihan D'] || r.pilihan_D || '').trim()
+        const jawaban_benar = String(r.jawaban_benar || r['Jawaban Benar'] || r.jawaban || '').trim().toUpperCase()
+
+        // Lewati baris yang memang kosong total (bukan error, cuma baris kosong di Excel)
+        const semuaKosong = !soal && !pilihan_a && !pilihan_b && !pilihan_c && !pilihan_d && !jawaban_benar
+        if (semuaKosong) return
+
+        const alasanBaris = []
+        if (!soal) alasanBaris.push('kolom "soal" kosong')
+        if (!pilihan_a) alasanBaris.push('pilihan_a kosong')
+        if (!pilihan_b) alasanBaris.push('pilihan_b kosong')
+        if (!pilihan_c) alasanBaris.push('pilihan_c kosong')
+        if (!pilihan_d) alasanBaris.push('pilihan_d kosong')
+        if (!['A', 'B', 'C', 'D'].includes(jawaban_benar)) {
+          alasanBaris.push(`jawaban_benar harus A/B/C/D (terbaca: "${jawaban_benar || '-'}")`)
+        }
+
+        if (alasanBaris.length > 0) {
+          gagal.push({ baris, alasan: alasanBaris.join(', ') })
+          return
+        }
+
+        soalRows.push({
           mata_pelajaran: mapelUpload,
-          soal: r.soal || r.Soal || '',
-          pilihan_a: r.pilihan_a || r['Pilihan A'] || r.pilihan_A || '',
-          pilihan_b: r.pilihan_b || r['Pilihan B'] || r.pilihan_B || '',
-          pilihan_c: r.pilihan_c || r['Pilihan C'] || r.pilihan_C || '',
-          pilihan_d: r.pilihan_d || r['Pilihan D'] || r.pilihan_D || '',
-          jawaban_benar: String(r.jawaban_benar || r['Jawaban Benar'] || r.jawaban || '').trim().toUpperCase(),
+          soal,
+          pilihan_a,
+          pilihan_b,
+          pilihan_c,
+          pilihan_d,
+          jawaban_benar,
           guru_id: profil.guru_id,
-        }))
-        .filter((r) => r.soal && ['A', 'B', 'C', 'D'].includes(r.jawaban_benar))
+        })
+      })
 
       if (soalRows.length === 0) {
-        alert('Tidak ada soal valid ditemukan. Pastikan kolom Excel: soal, pilihan_a, pilihan_b, pilihan_c, pilihan_d, jawaban_benar (isi A/B/C/D).')
+        const detailGagal = gagal.length > 0
+          ? '\n\nDetail baris gagal:\n' + gagal.map((g) => `Baris ${g.baris}: ${g.alasan}`).join('\n')
+          : ''
+        alert(
+          'Tidak ada soal valid ditemukan. Pastikan kolom Excel: soal, pilihan_a, pilihan_b, pilihan_c, pilihan_d, jawaban_benar (isi A/B/C/D).' +
+          detailGagal
+        )
         setUploading(false)
         return
       }
@@ -60,7 +97,12 @@ export default function BankSoal() {
       if (error) {
         alert('Gagal menyimpan soal: ' + error.message)
       } else {
-        alert(`${soalRows.length} soal berhasil ditambahkan ke Bank Soal ${mapelUpload}.`)
+        let pesan = `${soalRows.length} soal berhasil ditambahkan ke Bank Soal ${mapelUpload}.`
+        if (gagal.length > 0) {
+          pesan += `\n\n${gagal.length} baris ditolak dan TIDAK ikut diupload:\n` +
+            gagal.map((g) => `Baris ${g.baris}: ${g.alasan}`).join('\n')
+        }
+        alert(pesan)
         setMapelUpload('')
         await load()
       }
