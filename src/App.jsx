@@ -1,4 +1,5 @@
 import Galeri from './pages/Galeri'
+import Dokumen from './pages/Dokumen'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { useAuth } from './lib/AuthContext'
 import Login from './pages/Login'
@@ -63,6 +64,7 @@ export default function App() {
       <Route path="/perpustakaan" element={<ProtectedRoute><Perpustakaan /></ProtectedRoute>} />
       <Route path="/pengumuman" element={<ProtectedRoute><Pengumuman /></ProtectedRoute>} />
       <Route path="/galeri" element={<ProtectedRoute><Galeri /></ProtectedRoute>} />
+      <Route path="/dokumen" element={<ProtectedRoute><Dokumen /></ProtectedRoute>} />
       <Route path="/rpp" element={<ProtectedRoute><RPP /></ProtectedRoute>} />
       <Route path="/profil-saya" element={<ProtectedRoute><ProfilSaya /></ProtectedRoute>} />
       <Route path="*" element={<Navigate to="/" replace />} />
