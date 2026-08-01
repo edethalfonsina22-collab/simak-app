@@ -2,7 +2,10 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../lib/AuthContext'
 import Layout from '../components/Layout'
-import { FileUp, Loader2, FileText, Download, Trash2 } from 'lucide-react'
+import { FileUp, Loader2, FileText, Download, Trash2, HardDrive } from 'lucide-react'
+
+const CARD_BORDER = ['border-t-brass-400', 'border-t-sage-500', 'border-t-ink-950', 'border-t-red-400']
+const ICON_BG = ['bg-brass-400/15 text-brass-600', 'bg-sage-500/15 text-sage-500', 'bg-ink-950/10 text-ink-950', 'bg-red-100 text-red-500']
 
 export default function Dokumen() {
   const { profil, isAdmin } = useAuth()
@@ -91,6 +94,20 @@ export default function Dokumen() {
 
   return (
     <Layout title="Dokumen Penting" subtitle="Berkas dan dokumen bersama untuk seluruh warga sekolah">
+      {/* Banner sambutan */}
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-ink-950 to-[#22315B] p-6 mb-6">
+        <div className="relative z-10 flex items-center gap-4">
+          <div className="w-11 h-11 rounded-full bg-white/15 flex items-center justify-center shrink-0">
+            <HardDrive size={20} className="text-paper" />
+          </div>
+          <div>
+            <p className="font-display font-semibold text-lg text-paper">Dokumen Penting</p>
+            <p className="text-sm text-paper/70 mt-0.5">Semua berkas resmi sekolah tersimpan rapi di sini.</p>
+          </div>
+        </div>
+        <HardDrive size={120} className="absolute -right-4 -bottom-6 text-white/5 rotate-12" />
+      </div>
+
       <div className="flex items-center justify-between mb-6">
         <p className="text-sm text-ink-700/50">{items.length} dokumen</p>
         <button
@@ -135,51 +152,53 @@ export default function Dokumen() {
         </form>
       )}
 
-      <div className="card p-6">
-        {loading ? (
-          <p className="text-sm text-ink-700/50">Memuat...</p>
-        ) : items.length === 0 ? (
+      {loading ? (
+        <p className="text-sm text-ink-700/50">Memuat...</p>
+      ) : items.length === 0 ? (
+        <div className="card p-6">
           <p className="text-sm text-ink-700/50">Belum ada dokumen diupload.</p>
-        ) : (
-          <ul className="divide-y divide-ink-900/[0.06]">
-            {items.map((item) => (
-              <li key={item.id} className="py-4 flex items-center gap-4">
-                <div className="w-10 h-10 rounded-lg bg-brass-400/15 text-brass-600 flex items-center justify-center shrink-0">
-                  <FileText size={18} />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-ink-900/[0.06] text-ink-700/60">
-                      {extBadge(item.file_nama)}
-                    </span>
-                    <p className="text-sm font-medium text-ink-950 truncate">{item.judul}</p>
-                  </div>
-                  {item.deskripsi && <p className="text-xs text-ink-700/50 mt-0.5 truncate">{item.deskripsi}</p>}
-                  <p className="text-xs text-ink-700/40 mt-0.5">
-                    {item.guru?.nama_lengkap || 'Admin'} · {new Date(item.dibuat_pada).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}
-                  </p>
-                </div>
-                <div className="flex items-center gap-2 shrink-0">
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {items.map((item, i) => (
+            <div
+              key={item.id}
+              className={`relative overflow-hidden card border-t-4 ${CARD_BORDER[i % CARD_BORDER.length]} p-5 flex flex-col`}
+            >
+              <div className={`w-10 h-10 rounded-full flex items-center justify-center mb-3 ${ICON_BG[i % ICON_BG.length]}`}>
+                <FileText size={18} />
+              </div>
+              <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-ink-900/[0.06] text-ink-700/60 w-fit mb-1.5">
+                {extBadge(item.file_nama)}
+              </span>
+              <p className="text-sm font-medium text-ink-950 leading-snug">{item.judul}</p>
+              {item.deskripsi && <p className="text-xs text-ink-700/50 mt-1 line-clamp-2">{item.deskripsi}</p>}
+              <p className="text-xs text-ink-700/40 mt-2">
+                {item.guru?.nama_lengkap || 'Admin'} · {new Date(item.dibuat_pada).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}
+              </p>
+
+              <div className="flex items-center gap-2 mt-4 pt-3 border-t border-ink-900/[0.06]">
+                <button
+                  onClick={() => handleDownload(item)}
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-ink-700 hover:bg-ink-900/[0.05]"
+                >
+                  <Download size={14} /> Unduh
+                </button>
+                {canDelete(item) && (
                   <button
-                    onClick={() => handleDownload(item)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-ink-700 hover:bg-ink-900/[0.05]"
+                    onClick={() => handleDelete(item)}
+                    className="w-7 h-7 rounded-lg flex items-center justify-center text-red-600 hover:bg-red-50 ml-auto"
                   >
-                    <Download size={14} /> Unduh
+                    <Trash2 size={14} />
                   </button>
-                  {canDelete(item) && (
-                    <button
-                      onClick={() => handleDelete(item)}
-                      className="w-8 h-8 rounded-lg flex items-center justify-center text-red-600 hover:bg-red-50"
-                    >
-                      <Trash2 size={14} />
-                    </button>
-                  )}
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
+                )}
+              </div>
+
+              <FileText size={72} className="absolute -right-3 -bottom-4 text-ink-950/[0.03]" />
+            </div>
+          ))}
+        </div>
+      )}
     </Layout>
   )
 }
