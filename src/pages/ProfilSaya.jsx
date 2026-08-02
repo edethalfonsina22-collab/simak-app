@@ -146,8 +146,6 @@ export default function ProfilSaya() {
           </div>
         </div>
 
-        <GrafikAktivitas guruId={profil.guru_id} />
-
         <div className="card relative overflow-hidden p-6 space-y-4">
           <span className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-900 to-brass-400" />
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -245,6 +243,10 @@ export default function ProfilSaya() {
           </div>
         </div>
       </form>
+
+      <div className="max-w-2xl mt-5">
+        <GrafikAktivitas guruId={profil.guru_id} />
+      </div>
     </Layout>
   )
 }
