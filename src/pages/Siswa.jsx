@@ -7,6 +7,7 @@ import { Plus, UploadCloud, Pencil, Trash2, Search, X, Loader2, Download, FileSp
 const emptyForm = {
   nis: '',
   nisn: '',
+  nik: '',
   nama_lengkap: '',
   jenis_kelamin: 'L',
   tempat_lahir: '',
@@ -16,6 +17,24 @@ const emptyForm = {
   no_hp_orang_tua: '',
   kelas_id: '',
   status: 'aktif',
+}
+
+function formatTanggalLahir(tgl) {
+  if (!tgl) return null
+  try {
+    return new Date(tgl).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })
+  } catch {
+    return tgl
+  }
+}
+
+function tempatTanggalLahir(s) {
+  const tempat = s.tempat_lahir?.trim()
+  const tanggal = formatTanggalLahir(s.tanggal_lahir)
+  if (tempat && tanggal) return `${tempat}, ${tanggal}`
+  if (tempat) return tempat
+  if (tanggal) return tanggal
+  return '—'
 }
 
 export default function Siswa() {
@@ -96,17 +115,18 @@ export default function Siswa() {
   }
 
   const filtered = data.filter((s) =>
-    `${s.nama_lengkap} ${s.nis} ${s.nisn}`.toLowerCase().includes(search.toLowerCase())
+    `${s.nama_lengkap} ${s.nis} ${s.nisn} ${s.nik}`.toLowerCase().includes(search.toLowerCase())
   )
 
   // --- Export: Excel (CSV) ---
   function handleExportCSV() {
     setShowExportMenu(false)
-    const headers = ['Nama Lengkap', 'NIS', 'NISN', 'Kelas', 'Jenis Kelamin', 'Status', 'Tempat Lahir', 'Tanggal Lahir', 'Nama Orang Tua/Wali', 'No. HP Orang Tua', 'Alamat']
+    const headers = ['Nama Lengkap', 'NIS', 'NISN', 'NIK', 'Kelas', 'Jenis Kelamin', 'Status', 'Tempat Lahir', 'Tanggal Lahir', 'Nama Orang Tua/Wali', 'No. HP Orang Tua', 'Alamat']
     const rows = filtered.map((s) => [
       s.nama_lengkap || '',
       s.nis || '',
       s.nisn || '',
+      s.nik || '',
       s.kelas?.nama_kelas || '',
       s.jenis_kelamin === 'L' ? 'Laki-laki' : 'Perempuan',
       s.status || '',
@@ -145,6 +165,7 @@ export default function Siswa() {
           <td>${s.nama_lengkap || '-'}</td>
           <td>${s.nis || '-'}</td>
           <td>${s.nisn || '-'}</td>
+          <td>${s.nik || '-'}</td>
           <td>${s.kelas?.nama_kelas || '-'}</td>
           <td>${s.jenis_kelamin === 'L' ? 'Laki-laki' : 'Perempuan'}</td>
           <td>${s.status || '-'}</td>
@@ -180,6 +201,7 @@ export default function Siswa() {
               <th>Nama Lengkap</th>
               <th>NIS</th>
               <th>NISN</th>
+              <th>NIK</th>
               <th>Kelas</th>
               <th>Jenis Kelamin</th>
               <th>Status</th>
@@ -250,7 +272,7 @@ export default function Siswa() {
         <div className="relative max-w-sm w-full">
           <input
             className="input-field w-full"
-            placeholder="Cari nama, NIS, atau NISN..."
+            placeholder="Cari nama, NIS, NISN, atau NIK..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
@@ -265,6 +287,8 @@ export default function Siswa() {
               <th>Nama Lengkap</th>
               <th>NIS</th>
               <th>NISN</th>
+              <th>NIK</th>
+              <th>Tempat, Tanggal Lahir</th>
               <th>Kelas</th>
               <th>Jenis Kelamin</th>
               <th>Status</th>
@@ -273,16 +297,18 @@ export default function Siswa() {
           </thead>
           <tbody>
             {loading && (
-              <tr><td colSpan={7} className="text-center py-8 text-ink-700/50">Memuat data...</td></tr>
+              <tr><td colSpan={9} className="text-center py-8 text-ink-700/50">Memuat data...</td></tr>
             )}
             {!loading && filtered.length === 0 && (
-              <tr><td colSpan={7} className="text-center py-8 text-ink-700/50">Belum ada data siswa.</td></tr>
+              <tr><td colSpan={9} className="text-center py-8 text-ink-700/50">Belum ada data siswa.</td></tr>
             )}
             {filtered.map((s) => (
               <tr key={s.id}>
                 <td className="font-medium">{s.nama_lengkap}</td>
                 <td className="font-mono text-xs">{s.nis}</td>
                 <td className="font-mono text-xs">{s.nisn}</td>
+                <td className="font-mono text-xs">{s.nik || '—'}</td>
+                <td className="text-xs whitespace-nowrap">{tempatTanggalLahir(s)}</td>
                 <td>{s.kelas?.nama_kelas || '—'}</td>
                 <td>{s.jenis_kelamin === 'L' ? 'Laki-laki' : 'Perempuan'}</td>
                 <td>
@@ -328,6 +354,10 @@ export default function Siswa() {
               <Field label="NISN">
                 <input className="input-field" value={form.nisn}
                   onChange={(e) => setForm({ ...form, nisn: e.target.value })} />
+              </Field>
+              <Field label="NIK" full>
+                <input className="input-field" placeholder="16 digit NIK sesuai KK/KTP" value={form.nik}
+                  onChange={(e) => setForm({ ...form, nik: e.target.value })} />
               </Field>
               <Field label="Jenis Kelamin">
                 <select className="input-field" value={form.jenis_kelamin}
@@ -388,7 +418,7 @@ export default function Siswa() {
         open={showImport}
         onClose={() => { setShowImport(false); loadData() }}
         title="Impor Data Siswa"
-        templateHeaders={['nama_lengkap', 'nis', 'nisn', 'kelas', 'jenis_kelamin(L/P)', 'tempat_lahir', 'tanggal_lahir(YYYY-MM-DD)', 'nama_orang_tua', 'no_hp_orang_tua', 'alamat']}
+        templateHeaders={['nama_lengkap', 'nis', 'nisn', 'nik', 'kelas', 'jenis_kelamin(L/P)', 'tempat_lahir', 'tanggal_lahir(YYYY-MM-DD)', 'nama_orang_tua', 'no_hp_orang_tua', 'alamat']}
         mapRow={(row) => {
           if (!row.nama_lengkap) return null
           const namaKelas = String(row.kelas || '').trim()
@@ -399,6 +429,7 @@ export default function Siswa() {
             nama_lengkap: String(row.nama_lengkap).trim(),
             nis: String(row.nis || '').trim(),
             nisn: String(row.nisn || '').trim(),
+            nik: String(row.nik || '').trim(),
             kelas_id: matchedKelas ? matchedKelas.id : null,
             jenis_kelamin: String(row['jenis_kelamin(L/P)'] || row.jenis_kelamin || 'L').trim().toUpperCase(),
             tempat_lahir: String(row.tempat_lahir || '').trim(),
