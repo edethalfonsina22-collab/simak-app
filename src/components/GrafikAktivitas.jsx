@@ -9,8 +9,8 @@ const JUMLAH_MINGGU = 8
 // --- Konfigurasi sumber data ---
 // Sesuaikan nama tabel & kolom di sini kalau berbeda dengan struktur database Anda.
 const SUMBER_DATA = [
-  { key: 'absensi', label: 'Absensi', table: 'presensi_siswa', kolom_guru: 'diisi_oleh', kolom_tanggal: 'tanggal', warna: '#1e3a8a' },
-  { key: 'nilai', label: 'Nilai', table: 'nilai', kolom_guru: 'diisi_oleh', kolom_tanggal: 'dibuat_pada', warna: '#d4a94e' },
+  { key: 'absensi', label: 'Absensi', table: 'presensi_siswa', kolom_guru: 'diisi_oleh', kolom_tanggal: 'tanggal', warna: '#14532d' },
+  { key: 'nilai', label: 'Nilai', table: 'nilai', kolom_guru: 'diisi_oleh', kolom_tanggal: 'dibuat_pada', warna: '#111111' },
 ]
 
 function awalMinggu(date) {
@@ -102,7 +102,7 @@ export default function GrafikAktivitas({ guruId }) {
 
   return (
     <div className="card relative overflow-hidden p-6 space-y-4">
-      <span className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-900 to-brass-400" />
+      <span className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-green-900 to-black" />
       <div className="flex items-center gap-2">
         <TrendingUp size={18} className="text-blue-900" />
         <h3 className="font-display font-semibold text-ink-950">Aktivitas Administrasi Kelas</h3>
