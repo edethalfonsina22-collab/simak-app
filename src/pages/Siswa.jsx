@@ -1,5 +1,7 @@
 import { useEffect, useState, useRef } from 'react'
+import * as XLSX from 'xlsx'
 import { supabase } from '../lib/supabaseClient'
+import { useAuth } from '../lib/AuthContext'
 import Layout from '../components/Layout'
 import BulkImportModal from '../components/BulkImportModal'
 import { Plus, UploadCloud, Pencil, Trash2, Search, X, Loader2, Download, FileSpreadsheet, Printer, ChevronDown, Camera, IdCard } from 'lucide-react'
@@ -18,6 +20,13 @@ const emptyForm = {
   kelas_id: '',
   status: 'aktif',
 }
+
+// Header ini HARUS sama persis dengan templateHeaders di BulkImportModal (Impor Massal)
+// supaya file yang diunduh dari sini bisa langsung diupload ulang tanpa perlu diubah nama kolomnya.
+const EXCEL_HEADERS = [
+  'nama_lengkap', 'nis', 'nisn', 'nik', 'kelas', 'jenis_kelamin(L/P)',
+  'tempat_lahir', 'tanggal_lahir(YYYY-MM-DD)', 'nama_orang_tua', 'no_hp_orang_tua', 'alamat',
+]
 
 function formatTanggalLahir(tgl) {
   if (!tgl) return null
@@ -38,6 +47,7 @@ function tempatTanggalLahir(s) {
 }
 
 export default function Siswa() {
+  const { isAdmin } = useAuth()
   const [data, setData] = useState([])
   const [kelasList, setKelasList] = useState([])
   const [loading, setLoading] = useState(true)
@@ -146,6 +156,35 @@ export default function Siswa() {
   const filtered = data.filter((s) =>
     `${s.nama_lengkap} ${s.nis} ${s.nisn} ${s.nik}`.toLowerCase().includes(search.toLowerCase())
   )
+
+  // --- Export: Excel (.xlsx) siap-edit & siap-impor-ulang ---
+  // Kolomnya dibuat SAMA PERSIS dengan format Impor Massal, jadi guru/admin bisa:
+  // unduh -> edit data massal di Excel -> upload lagi lewat "Impor Massal" tanpa perlu ubah header.
+  function handleExportExcel() {
+    setShowExportMenu(false)
+    const rows = filtered.map((s) => ({
+      nama_lengkap: s.nama_lengkap || '',
+      nis: s.nis || '',
+      nisn: s.nisn || '',
+      nik: s.nik || '',
+      kelas: s.kelas?.nama_kelas || '',
+      'jenis_kelamin(L/P)': s.jenis_kelamin || '',
+      tempat_lahir: s.tempat_lahir || '',
+      'tanggal_lahir(YYYY-MM-DD)': s.tanggal_lahir || '',
+      nama_orang_tua: s.nama_orang_tua || '',
+      no_hp_orang_tua: s.no_hp_orang_tua || '',
+      alamat: s.alamat || '',
+    }))
+
+    const ws = XLSX.utils.json_to_sheet(rows, { header: EXCEL_HEADERS })
+    ws['!cols'] = [
+      { wch: 24 }, { wch: 10 }, { wch: 12 }, { wch: 18 }, { wch: 10 }, { wch: 16 },
+      { wch: 16 }, { wch: 20 }, { wch: 22 }, { wch: 16 }, { wch: 30 },
+    ]
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, 'Data Siswa')
+    XLSX.writeFile(wb, `Data-Siswa-${new Date().toISOString().slice(0, 10)}.xlsx`)
+  }
 
   // --- Export: Excel (CSV) ---
   function handleExportCSV() {
@@ -265,7 +304,13 @@ export default function Siswa() {
               <Download size={16} /> Unduh / Cetak <ChevronDown size={14} />
             </button>
             {showExportMenu && (
-              <div className="absolute right-0 mt-1.5 w-56 card p-1.5 z-20 shadow-lg">
+              <div className="absolute right-0 mt-1.5 w-64 card p-1.5 z-20 shadow-lg">
+                <button
+                  onClick={handleExportExcel}
+                  className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-ink-700 hover:bg-ink-900/[0.05] text-left"
+                >
+                  <FileSpreadsheet size={16} /> Unduh Excel (siap edit & impor ulang)
+                </button>
                 <button
                   onClick={handleExportCSV}
                   className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-ink-700 hover:bg-ink-900/[0.05] text-left"
@@ -281,12 +326,16 @@ export default function Siswa() {
               </div>
             )}
           </div>
-          <button className="btn-secondary" onClick={() => setShowImport(true)}>
-            <UploadCloud size={16} /> Impor Massal
-          </button>
-          <button className="btn-primary" onClick={openAdd}>
-            <Plus size={16} /> Tambah Siswa
-          </button>
+          {isAdmin && (
+            <button className="btn-secondary" onClick={() => setShowImport(true)}>
+              <UploadCloud size={16} /> Impor Massal
+            </button>
+          )}
+          {isAdmin && (
+            <button className="btn-primary" onClick={openAdd}>
+              <Plus size={16} /> Tambah Siswa
+            </button>
+          )}
         </>
       }
     >
@@ -380,14 +429,16 @@ export default function Siswa() {
                   </span>
                 </td>
                 <td>
-                  <div className="flex items-center gap-1 justify-end">
-                    <button onClick={() => openEdit(s)} className="p-2 hover:bg-ink-900/5 rounded-lg text-ink-700/60">
-                      <Pencil size={15} />
-                    </button>
-                    <button onClick={() => handleDelete(s.id)} className="p-2 hover:bg-red-50 rounded-lg text-red-600/70">
-                      <Trash2 size={15} />
-                    </button>
-                  </div>
+                  {isAdmin && (
+                    <div className="flex items-center gap-1 justify-end">
+                      <button onClick={() => openEdit(s)} className="p-2 hover:bg-ink-900/5 rounded-lg text-ink-700/60">
+                        <Pencil size={15} />
+                      </button>
+                      <button onClick={() => handleDelete(s.id)} className="p-2 hover:bg-red-50 rounded-lg text-red-600/70">
+                        <Trash2 size={15} />
+                      </button>
+                    </div>
+                  )}
                 </td>
               </tr>
             ))}
@@ -546,13 +597,15 @@ export default function Siswa() {
               </div>
 
               <div className="flex gap-2 mt-4">
-                <button
-                  type="button"
-                  onClick={() => { setProfilLihat(null); openEdit(profilLihat) }}
-                  className="btn-secondary flex-1 justify-center"
-                >
-                  <Pencil size={15} /> Ubah Data
-                </button>
+                {isAdmin && (
+                  <button
+                    type="button"
+                    onClick={() => { setProfilLihat(null); openEdit(profilLihat) }}
+                    className="btn-secondary flex-1 justify-center"
+                  >
+                    <Pencil size={15} /> Ubah Data
+                  </button>
+                )}
                 <a
                   href="/kartu"
                   className="btn-primary flex-1 justify-center"
@@ -592,14 +645,45 @@ export default function Siswa() {
           }
         }}
         onImport={async (rows) => {
-          const { error } = await supabase.from('siswa').insert(rows)
-          if (error) throw error
-          const tanpaKelas = rows.filter((r) => !r.kelas_id).length
-          if (tanpaKelas > 0) {
-            setTimeout(() => {
-              alert(`Impor berhasil. Catatan: ${tanpaKelas} siswa tidak punya kelas yang cocok — pastikan nama kelas di file sama persis dengan yang ada di menu Kelas, lalu perbaiki manual lewat tombol edit.`)
-            }, 300)
+          // Cocokkan tiap baris dengan siswa yang SUDAH ADA berdasarkan NIS atau NISN.
+          // Kalau cocok -> UPDATE data siswa itu (tidak menambah baris baru / duplikat).
+          // Kalau tidak cocok dengan siapa pun -> INSERT sebagai siswa baru.
+          const toUpdate = []
+          const toInsert = []
+
+          rows.forEach((row) => {
+            const match = data.find(
+              (d) =>
+                (row.nis && d.nis && String(d.nis).trim() === String(row.nis).trim()) ||
+                (row.nisn && d.nisn && String(d.nisn).trim() === String(row.nisn).trim())
+            )
+            if (match) {
+              toUpdate.push({ id: match.id, ...row })
+            } else {
+              toInsert.push(row)
+            }
+          })
+
+          if (toInsert.length > 0) {
+            const { error } = await supabase.from('siswa').insert(toInsert)
+            if (error) throw error
           }
+
+          for (const row of toUpdate) {
+            const { id, ...payload } = row
+            const { error } = await supabase.from('siswa').update(payload).eq('id', id)
+            if (error) throw error
+          }
+
+          const tanpaKelas = rows.filter((r) => !r.kelas_id).length
+          setTimeout(() => {
+            let pesan = `Impor selesai: ${toInsert.length} siswa baru ditambahkan, ${toUpdate.length} siswa yang sudah ada di-update (dicocokkan lewat NIS/NISN).`
+            if (tanpaKelas > 0) {
+              pesan += `\n\nCatatan: ${tanpaKelas} baris tidak punya kelas yang cocok — pastikan nama kelas di file sama persis dengan yang ada di menu Kelas, lalu perbaiki manual lewat tombol edit.`
+            }
+            alert(pesan)
+          }, 300)
+
           return { count: rows.length }
         }}
       />
