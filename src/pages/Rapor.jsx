@@ -48,10 +48,10 @@ export default function Rapor() {
   const [presensi, setPresensi] = useState({ hadir: 0, izin: 0, sakit: 0, alpa: 0 })
 
   // Deskripsi capaian per mapel — tabel capaian_mapel
-  const [capaianList, setCapaianList] = useState([]) // [{id, mata_pelajaran, deskripsi_capaian}]
+  const [capaianList, setCapaianList] = useState([]) // [{id, mata_pelajaran, deskripsi_capaian, terkunci}]
 
-  // P5 — tabel rapor_p5 (read-only di sini, isi dari halaman/tab lain jika ada)
-  const [p5List, setP5List] = useState([])
+  // P5 — tabel rapor_p5
+  const [p5List, setP5List] = useState([]) // [{id, tema, dimensi, sub_elemen, capaian}]
 
   // Ekstrakurikuler — tabel ekstrakurikuler_nilai
   const [ekskulList, setEkskulList] = useState([]) // [{id, nama_ekstrakurikuler, predikat, keterangan}]
@@ -137,6 +137,7 @@ export default function Rapor() {
           id: existing?.id || null,
           mata_pelajaran: mapel,
           deskripsi_capaian: existing?.deskripsi_capaian || '',
+          terkunci: mapelDariNilai.includes(mapel), // nama mapel dari tabel nilai, tidak diedit di sini
         }
       })
     )
@@ -158,10 +159,25 @@ export default function Rapor() {
   }))
 
   // ---------- Deskripsi capaian ----------
-  function ubahDeskripsi(mapel, teks) {
+  function ubahBarisCapaian(index, field, value) {
     setCapaianList((prev) =>
-      prev.map((c) => (c.mata_pelajaran === mapel ? { ...c, deskripsi_capaian: teks } : c))
+      prev.map((c, i) => (i === index ? { ...c, [field]: value } : c))
     )
+  }
+
+  function tambahBarisCapaian() {
+    setCapaianList((prev) => [
+      ...prev,
+      { id: null, mata_pelajaran: '', deskripsi_capaian: '', terkunci: false },
+    ])
+  }
+
+  async function hapusBarisCapaian(index) {
+    const row = capaianList[index]
+    if (row.id) {
+      await supabase.from('capaian_mapel').delete().eq('id', row.id)
+    }
+    setCapaianList((prev) => prev.filter((_, i) => i !== index))
   }
 
   async function simpanCapaian() {
@@ -171,10 +187,15 @@ export default function Rapor() {
     } = await supabase.auth.getUser()
 
     for (const c of capaianList) {
+      if (!c.mata_pelajaran.trim()) continue
       if (c.id) {
         await supabase
           .from('capaian_mapel')
-          .update({ deskripsi_capaian: c.deskripsi_capaian, diisi_oleh: user?.id })
+          .update({
+            mata_pelajaran: c.mata_pelajaran,
+            deskripsi_capaian: c.deskripsi_capaian,
+            diisi_oleh: user?.id,
+          })
           .eq('id', c.id)
       } else if (c.deskripsi_capaian.trim()) {
         await supabase.from('capaian_mapel').insert({
@@ -184,6 +205,51 @@ export default function Rapor() {
           tahun_ajaran: tahunAjaran,
           deskripsi_capaian: c.deskripsi_capaian,
           diisi_oleh: user?.id,
+        })
+      }
+    }
+    await muatRapor()
+    setSaving(false)
+  }
+
+  // ---------- P5 ----------
+  function ubahBarisP5(index, field, value) {
+    setP5List((prev) => prev.map((p, i) => (i === index ? { ...p, [field]: value } : p)))
+  }
+
+  function tambahBarisP5() {
+    setP5List((prev) => [
+      ...prev,
+      { id: null, tema: '', dimensi: '', sub_elemen: '', capaian: '' },
+    ])
+  }
+
+  async function hapusBarisP5(index) {
+    const row = p5List[index]
+    if (row.id) {
+      await supabase.from('rapor_p5').delete().eq('id', row.id)
+    }
+    setP5List((prev) => prev.filter((_, i) => i !== index))
+  }
+
+  async function simpanP5() {
+    setSaving(true)
+    for (const p of p5List) {
+      if (!p.tema.trim() && !p.dimensi.trim()) continue
+      if (p.id) {
+        await supabase
+          .from('rapor_p5')
+          .update({ tema: p.tema, dimensi: p.dimensi, sub_elemen: p.sub_elemen, capaian: p.capaian })
+          .eq('id', p.id)
+      } else {
+        await supabase.from('rapor_p5').insert({
+          siswa_id: siswaId,
+          semester,
+          tahun_ajaran: tahunAjaran,
+          tema: p.tema,
+          dimensi: p.dimensi,
+          sub_elemen: p.sub_elemen,
+          capaian: p.capaian,
         })
       }
     }
@@ -407,57 +473,105 @@ export default function Rapor() {
               <>
                 {capaianList.length === 0 && (
                   <p className="text-sm text-ink-700/50 mb-4">
-                    Belum ada mata pelajaran. Isi nilai di menu Nilai terlebih dahulu, atau tunggu data muncul di sini.
+                    Belum ada mata pelajaran. Klik &quot;Tambah Mapel&quot; untuk mulai isi deskripsi capaian.
                   </p>
                 )}
                 <div className="space-y-4">
-                  {capaianList.map((c) => (
-                    <div key={c.mata_pelajaran}>
-                      <label className="label-field">{c.mata_pelajaran}</label>
+                  {capaianList.map((c, i) => (
+                    <div key={c.id || `baru-${i}`} className="border border-ink-950/10 rounded-lg p-3">
+                      <div className="flex items-start justify-between gap-3 mb-2">
+                        {c.terkunci ? (
+                          <label className="label-field">{c.mata_pelajaran}</label>
+                        ) : (
+                          <input
+                            className="input-field"
+                            placeholder="Nama mata pelajaran"
+                            value={c.mata_pelajaran}
+                            onChange={(e) => ubahBarisCapaian(i, 'mata_pelajaran', e.target.value)}
+                          />
+                        )}
+                        <button
+                          className="btn-secondary !px-3 shrink-0"
+                          onClick={() => hapusBarisCapaian(i)}
+                          title="Hapus mapel ini"
+                        >
+                          <Trash2 size={15} />
+                        </button>
+                      </div>
                       <textarea
                         className="input-field min-h-[80px]"
-                        placeholder={`Deskripsi capaian pembelajaran untuk ${c.mata_pelajaran}...`}
+                        placeholder="Deskripsi capaian pembelajaran..."
                         value={c.deskripsi_capaian}
-                        onChange={(e) => ubahDeskripsi(c.mata_pelajaran, e.target.value)}
+                        onChange={(e) => ubahBarisCapaian(i, 'deskripsi_capaian', e.target.value)}
                       />
                     </div>
                   ))}
                 </div>
-                {capaianList.length > 0 && (
-                  <button className="btn-primary mt-5" onClick={simpanCapaian} disabled={saving}>
+                <div className="flex flex-wrap gap-3 mt-4">
+                  <button className="btn-secondary" onClick={tambahBarisCapaian}>
+                    <Plus size={16} /> Tambah Mapel
+                  </button>
+                  <button className="btn-primary" onClick={simpanCapaian} disabled={saving}>
                     {saving && <Loader2 size={16} className="animate-spin" />}
                     <Save size={16} /> Simpan Deskripsi Capaian
                   </button>
-                )}
+                </div>
               </>
             )}
 
             {activeTab === 'p5' && (
               <>
-                {p5List.length === 0 ? (
-                  <p className="text-sm text-ink-700/50">Belum ada data P5 untuk periode ini.</p>
-                ) : (
-                  <table className="table-shell">
-                    <thead>
-                      <tr>
-                        <th>Tema</th>
-                        <th>Dimensi</th>
-                        <th>Sub-elemen</th>
-                        <th>Capaian</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {p5List.map((p) => (
-                        <tr key={p.id}>
-                          <td className="font-medium">{p.tema}</td>
-                          <td>{p.dimensi}</td>
-                          <td>{p.sub_elemen}</td>
-                          <td>{p.capaian}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                )}
+                <div className="space-y-3">
+                  {p5List.map((p, i) => (
+                    <div key={p.id || `baru-${i}`} className="border border-ink-950/10 rounded-lg p-3">
+                      <div className="grid sm:grid-cols-[1fr_1fr_1fr_auto] gap-3 mb-2">
+                        <input
+                          className="input-field"
+                          placeholder="Tema"
+                          value={p.tema}
+                          onChange={(e) => ubahBarisP5(i, 'tema', e.target.value)}
+                        />
+                        <input
+                          className="input-field"
+                          placeholder="Dimensi"
+                          value={p.dimensi}
+                          onChange={(e) => ubahBarisP5(i, 'dimensi', e.target.value)}
+                        />
+                        <input
+                          className="input-field"
+                          placeholder="Sub-elemen"
+                          value={p.sub_elemen}
+                          onChange={(e) => ubahBarisP5(i, 'sub_elemen', e.target.value)}
+                        />
+                        <button
+                          className="btn-secondary !px-3"
+                          onClick={() => hapusBarisP5(i)}
+                          title="Hapus baris"
+                        >
+                          <Trash2 size={15} />
+                        </button>
+                      </div>
+                      <textarea
+                        className="input-field min-h-[60px]"
+                        placeholder="Deskripsi capaian P5..."
+                        value={p.capaian}
+                        onChange={(e) => ubahBarisP5(i, 'capaian', e.target.value)}
+                      />
+                    </div>
+                  ))}
+                  {p5List.length === 0 && (
+                    <p className="text-sm text-ink-700/50">Belum ada data P5 untuk periode ini.</p>
+                  )}
+                </div>
+                <div className="flex flex-wrap gap-3 mt-4">
+                  <button className="btn-secondary" onClick={tambahBarisP5}>
+                    <Plus size={16} /> Tambah Baris P5
+                  </button>
+                  <button className="btn-primary" onClick={simpanP5} disabled={saving}>
+                    {saving && <Loader2 size={16} className="animate-spin" />}
+                    <Save size={16} /> Simpan P5
+                  </button>
+                </div>
               </>
             )}
 
