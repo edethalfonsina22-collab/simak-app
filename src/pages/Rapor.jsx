@@ -48,6 +48,52 @@ function kategoriDariNilai(rataRata) {
   return 'Perlu Bimbingan'
 }
 
+const TEMPLATE_P5 = [
+  {
+    kategori: 'Sangat Baik',
+    teks: (dimensi) =>
+      `Ananda menunjukkan capaian yang sangat baik pada dimensi ${dimensi}, mampu menginternalisasi nilai-nilai Profil Pelajar Pancasila secara konsisten dalam kegiatan proyek.`,
+  },
+  {
+    kategori: 'Baik',
+    teks: (dimensi) =>
+      `Ananda menunjukkan capaian yang baik pada dimensi ${dimensi}, mampu berpartisipasi aktif dan menerapkan nilai-nilai yang diharapkan dalam sebagian besar kegiatan proyek.`,
+  },
+  {
+    kategori: 'Cukup',
+    teks: (dimensi) =>
+      `Ananda menunjukkan capaian yang cukup pada dimensi ${dimensi}. Dengan pendampingan lebih lanjut, ananda diharapkan dapat lebih mengembangkan dimensi ini.`,
+  },
+  {
+    kategori: 'Perlu Bimbingan',
+    teks: (dimensi) =>
+      `Ananda masih memerlukan bimbingan lebih lanjut untuk mengembangkan dimensi ${dimensi} dalam kegiatan Proyek Penguatan Profil Pelajar Pancasila.`,
+  },
+]
+
+const TEMPLATE_CATATAN = [
+  {
+    kategori: 'Sangat Baik',
+    teks: () =>
+      `Ananda menunjukkan perkembangan sikap dan perilaku yang sangat baik selama semester ini, aktif, disiplin, dan mampu bekerja sama dengan baik bersama teman-teman.`,
+  },
+  {
+    kategori: 'Baik',
+    teks: () =>
+      `Ananda menunjukkan perkembangan sikap dan perilaku yang baik selama semester ini, cukup disiplin dan mampu mengikuti kegiatan pembelajaran dengan baik.`,
+  },
+  {
+    kategori: 'Cukup',
+    teks: () =>
+      `Ananda menunjukkan perkembangan sikap dan perilaku yang cukup baik selama semester ini. Diperlukan motivasi lebih lanjut agar ananda dapat lebih berkembang.`,
+  },
+  {
+    kategori: 'Perlu Perhatian Khusus',
+    teks: () =>
+      `Ananda memerlukan perhatian khusus dari orang tua dan sekolah terkait sikap dan kedisiplinan selama semester ini, agar dapat mengikuti pembelajaran dengan lebih optimal.`,
+  },
+]
+
 const TABS = [
   { key: 'ringkasan', label: 'Ringkasan Nilai', icon: ClipboardList },
   { key: 'capaian', label: 'Deskripsi Capaian', icon: NotebookPen },
@@ -94,6 +140,10 @@ export default function Rapor() {
 
   // Dropdown rekomendasi deskripsi capaian — index baris yang sedang terbuka
   const [rekomendasiTerbuka, setRekomendasiTerbuka] = useState(null)
+  // Dropdown rekomendasi P5 — index baris yang sedang terbuka
+  const [rekomendasiP5Terbuka, setRekomendasiP5Terbuka] = useState(null)
+  // Dropdown rekomendasi catatan wali kelas — boolean, cuma satu baris
+  const [rekomendasiCatatanTerbuka, setRekomendasiCatatanTerbuka] = useState(false)
 
   useEffect(() => {
     supabase
@@ -263,6 +313,12 @@ export default function Rapor() {
     setP5List((prev) => prev.map((p, i) => (i === index ? { ...p, [field]: value } : p)))
   }
 
+  function pilihRekomendasiP5(index, template) {
+    const dimensi = p5List[index].dimensi || 'ini'
+    ubahBarisP5(index, 'capaian', template.teks(dimensi))
+    setRekomendasiP5Terbuka(null)
+  }
+
   function tambahBarisP5() {
     setP5List((prev) => [
       ...prev,
@@ -364,6 +420,11 @@ export default function Rapor() {
   // ---------- Catatan wali kelas ----------
   function ubahCatatan(field, value) {
     setCatatan((prev) => ({ ...prev, [field]: value }))
+  }
+
+  function pilihRekomendasiCatatan(template) {
+    ubahCatatan('catatan', template.teks())
+    setRekomendasiCatatanTerbuka(false)
   }
 
   async function simpanCatatan() {
@@ -646,12 +707,43 @@ export default function Rapor() {
                           <Trash2 size={15} />
                         </button>
                       </div>
-                      <textarea
-                        className="input-field min-h-[60px]"
-                        placeholder="Deskripsi capaian P5..."
-                        value={p.capaian}
-                        onChange={(e) => ubahBarisP5(i, 'capaian', e.target.value)}
-                      />
+                      <div className="flex items-start gap-2">
+                        <textarea
+                          className="input-field min-h-[60px] flex-1"
+                          placeholder="Deskripsi capaian P5..."
+                          value={p.capaian}
+                          onChange={(e) => ubahBarisP5(i, 'capaian', e.target.value)}
+                        />
+                        <div className="relative shrink-0">
+                          <button
+                            type="button"
+                            className="btn-secondary !px-3"
+                            onClick={() =>
+                              setRekomendasiP5Terbuka(rekomendasiP5Terbuka === i ? null : i)
+                            }
+                            title="Lihat rekomendasi deskripsi"
+                          >
+                            <Lightbulb size={15} />
+                          </button>
+                          {rekomendasiP5Terbuka === i && (
+                            <div className="absolute right-0 z-10 mt-2 w-72 rounded-lg border border-ink-950/10 bg-white shadow-lg p-2">
+                              {TEMPLATE_P5.map((tpl) => (
+                                <button
+                                  key={tpl.kategori}
+                                  type="button"
+                                  onClick={() => pilihRekomendasiP5(i, tpl)}
+                                  className="w-full text-left px-2.5 py-2 rounded-md hover:bg-ink-950/5 text-sm"
+                                >
+                                  <span className="font-medium text-ink-950">{tpl.kategori}</span>
+                                  <span className="block text-xs text-ink-700/50 mt-0.5 line-clamp-2">
+                                    {tpl.teks(p.dimensi || 'ini')}
+                                  </span>
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
                     </div>
                   ))}
                   {p5List.length === 0 && (
@@ -758,7 +850,36 @@ export default function Rapor() {
                   </select>
                 </div>
                 <div className="mb-4">
-                  <label className="label-field">Catatan Wali Kelas</label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="label-field !mb-0">Catatan Wali Kelas</label>
+                    <div className="relative">
+                      <button
+                        type="button"
+                        className="btn-secondary !px-3"
+                        onClick={() => setRekomendasiCatatanTerbuka((v) => !v)}
+                        title="Lihat rekomendasi catatan"
+                      >
+                        <Lightbulb size={15} /> Rekomendasi
+                      </button>
+                      {rekomendasiCatatanTerbuka && (
+                        <div className="absolute right-0 z-10 mt-2 w-72 rounded-lg border border-ink-950/10 bg-white shadow-lg p-2">
+                          {TEMPLATE_CATATAN.map((tpl) => (
+                            <button
+                              key={tpl.kategori}
+                              type="button"
+                              onClick={() => pilihRekomendasiCatatan(tpl)}
+                              className="w-full text-left px-2.5 py-2 rounded-md hover:bg-ink-950/5 text-sm"
+                            >
+                              <span className="font-medium text-ink-950">{tpl.kategori}</span>
+                              <span className="block text-xs text-ink-700/50 mt-0.5 line-clamp-2">
+                                {tpl.teks()}
+                              </span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
                   <textarea
                     className="input-field min-h-[100px]"
                     placeholder="Catatan perkembangan siswa dari wali kelas..."
