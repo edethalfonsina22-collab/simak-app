@@ -388,13 +388,18 @@ export default function Siswa() {
         open={showImport}
         onClose={() => { setShowImport(false); loadData() }}
         title="Impor Data Siswa"
-        templateHeaders={['nama_lengkap', 'nis', 'nisn', 'jenis_kelamin(L/P)', 'tempat_lahir', 'tanggal_lahir(YYYY-MM-DD)', 'nama_orang_tua', 'no_hp_orang_tua', 'alamat']}
+        templateHeaders={['nama_lengkap', 'nis', 'nisn', 'kelas', 'jenis_kelamin(L/P)', 'tempat_lahir', 'tanggal_lahir(YYYY-MM-DD)', 'nama_orang_tua', 'no_hp_orang_tua', 'alamat']}
         mapRow={(row) => {
           if (!row.nama_lengkap) return null
+          const namaKelas = String(row.kelas || '').trim()
+          const matchedKelas = kelasList.find(
+            (k) => k.nama_kelas.trim().toLowerCase() === namaKelas.toLowerCase()
+          )
           return {
             nama_lengkap: String(row.nama_lengkap).trim(),
             nis: String(row.nis || '').trim(),
             nisn: String(row.nisn || '').trim(),
+            kelas_id: matchedKelas ? matchedKelas.id : null,
             jenis_kelamin: String(row['jenis_kelamin(L/P)'] || row.jenis_kelamin || 'L').trim().toUpperCase(),
             tempat_lahir: String(row.tempat_lahir || '').trim(),
             tanggal_lahir: row['tanggal_lahir(YYYY-MM-DD)'] || row.tanggal_lahir || null,
@@ -407,6 +412,12 @@ export default function Siswa() {
         onImport={async (rows) => {
           const { error } = await supabase.from('siswa').insert(rows)
           if (error) throw error
+          const tanpaKelas = rows.filter((r) => !r.kelas_id).length
+          if (tanpaKelas > 0) {
+            setTimeout(() => {
+              alert(`Impor berhasil. Catatan: ${tanpaKelas} siswa tidak punya kelas yang cocok — pastikan nama kelas di file sama persis dengan yang ada di menu Kelas, lalu perbaiki manual lewat tombol edit.`)
+            }, 300)
+          }
           return { count: rows.length }
         }}
       />
