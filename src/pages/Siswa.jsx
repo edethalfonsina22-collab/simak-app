@@ -2,7 +2,7 @@ import { useEffect, useState, useRef } from 'react'
 import { supabase } from '../lib/supabaseClient'
 import Layout from '../components/Layout'
 import BulkImportModal from '../components/BulkImportModal'
-import { Plus, UploadCloud, Pencil, Trash2, Search, X, Loader2, Download, FileSpreadsheet, Printer, ChevronDown } from 'lucide-react'
+import { Plus, UploadCloud, Pencil, Trash2, Search, X, Loader2, Download, FileSpreadsheet, Printer, ChevronDown, Camera, IdCard } from 'lucide-react'
 
 const emptyForm = {
   nis: '',
@@ -49,6 +49,8 @@ export default function Siswa() {
   const [saving, setSaving] = useState(false)
   const [showExportMenu, setShowExportMenu] = useState(false)
   const exportMenuRef = useRef(null)
+  const [uploadingId, setUploadingId] = useState(null)
+  const [profilLihat, setProfilLihat] = useState(null) // siswa yang sedang dilihat detail profilnya
 
   async function loadData() {
     setLoading(true)
@@ -59,10 +61,16 @@ export default function Siswa() {
     setData(siswa || [])
     setKelasList(kelas || [])
     setLoading(false)
+    // Jaga agar modal profil tetap sinkron kalau datanya baru saja diubah (misal setelah upload foto)
+    if (profilLihat) {
+      const updated = (siswa || []).find((s) => s.id === profilLihat.id)
+      if (updated) setProfilLihat(updated)
+    }
   }
 
   useEffect(() => {
     loadData()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // Tutup dropdown export saat klik di luar area tombolnya
@@ -75,6 +83,27 @@ export default function Siswa() {
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
+
+  // --- Foto profil: memakai bucket & kolom yang sama persis dengan fitur Cetak Kartu ---
+  function fotoUrl(path) {
+    if (!path) return null
+    return supabase.storage.from('foto-siswa').getPublicUrl(path).data.publicUrl
+  }
+
+  async function handleFotoUpload(siswaId, file) {
+    setUploadingId(siswaId)
+    const ext = file.name.split('.').pop()
+    const path = `${siswaId}/foto.${ext}`
+    const { error: uploadError } = await supabase.storage.from('foto-siswa').upload(path, file, { upsert: true })
+    if (uploadError) {
+      alert('Gagal upload foto: ' + uploadError.message)
+      setUploadingId(null)
+      return
+    }
+    await supabase.from('siswa').update({ foto_path: path }).eq('id', siswaId)
+    await loadData()
+    setUploadingId(null)
+  }
 
   function openAdd() {
     setForm(emptyForm)
@@ -284,6 +313,7 @@ export default function Siswa() {
         <table className="table-shell">
           <thead>
             <tr>
+              <th>Foto</th>
               <th>Nama Lengkap</th>
               <th>NIS</th>
               <th>NISN</th>
@@ -297,14 +327,47 @@ export default function Siswa() {
           </thead>
           <tbody>
             {loading && (
-              <tr><td colSpan={9} className="text-center py-8 text-ink-700/50">Memuat data...</td></tr>
+              <tr><td colSpan={10} className="text-center py-8 text-ink-700/50">Memuat data...</td></tr>
             )}
             {!loading && filtered.length === 0 && (
-              <tr><td colSpan={9} className="text-center py-8 text-ink-700/50">Belum ada data siswa.</td></tr>
+              <tr><td colSpan={10} className="text-center py-8 text-ink-700/50">Belum ada data siswa.</td></tr>
             )}
             {filtered.map((s) => (
               <tr key={s.id}>
-                <td className="font-medium">{s.nama_lengkap}</td>
+                <td>
+                  <label className="relative block w-10 h-10 rounded-full overflow-hidden bg-ink-900/[0.06] cursor-pointer shrink-0 group">
+                    {fotoUrl(s.foto_path) ? (
+                      <img src={fotoUrl(s.foto_path)} alt="" className="w-full h-full object-cover" />
+                    ) : (
+                      <span className="w-full h-full flex items-center justify-center text-xs font-semibold text-ink-700/40">
+                        {s.nama_lengkap?.[0]}
+                      </span>
+                    )}
+                    <span className="absolute inset-0 bg-ink-950/0 group-hover:bg-ink-950/40 flex items-center justify-center transition-colors">
+                      {uploadingId === s.id ? (
+                        <Loader2 size={14} className="animate-spin text-white" />
+                      ) : (
+                        <Camera size={13} className="text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                      )}
+                    </span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      disabled={uploadingId === s.id}
+                      onChange={(e) => e.target.files?.[0] && handleFotoUpload(s.id, e.target.files[0])}
+                    />
+                  </label>
+                </td>
+                <td className="font-medium">
+                  <button
+                    type="button"
+                    onClick={() => setProfilLihat(s)}
+                    className="hover:underline hover:text-blue-900 text-left"
+                  >
+                    {s.nama_lengkap}
+                  </button>
+                </td>
                 <td className="font-mono text-xs">{s.nis}</td>
                 <td className="font-mono text-xs">{s.nisn}</td>
                 <td className="font-mono text-xs">{s.nik || '—'}</td>
@@ -341,6 +404,35 @@ export default function Siswa() {
             <h2 className="font-display text-xl font-semibold mb-4">
               {editingId ? 'Ubah Data Siswa' : 'Tambah Siswa'}
             </h2>
+
+            {editingId && (
+              <div className="flex items-center gap-4 mb-4 p-3 rounded-lg bg-ink-900/[0.03]">
+                <label className="relative block w-16 h-16 rounded-full overflow-hidden bg-ink-900/[0.06] cursor-pointer shrink-0 group">
+                  {fotoUrl(data.find((d) => d.id === editingId)?.foto_path) ? (
+                    <img src={fotoUrl(data.find((d) => d.id === editingId)?.foto_path)} alt="" className="w-full h-full object-cover" />
+                  ) : (
+                    <span className="w-full h-full flex items-center justify-center text-lg font-semibold text-ink-700/40">
+                      {form.nama_lengkap?.[0]}
+                    </span>
+                  )}
+                  <span className="absolute inset-0 bg-ink-950/0 group-hover:bg-ink-950/40 flex items-center justify-center transition-colors">
+                    {uploadingId === editingId ? (
+                      <Loader2 size={16} className="animate-spin text-white" />
+                    ) : (
+                      <Camera size={15} className="text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                    )}
+                  </span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    disabled={uploadingId === editingId}
+                    onChange={(e) => e.target.files?.[0] && handleFotoUpload(editingId, e.target.files[0])}
+                  />
+                </label>
+                <p className="text-xs text-ink-700/50">Klik foto untuk mengganti. Foto ini juga dipakai untuk Cetak Kartu Pelajar/Perpustakaan.</p>
+              </div>
+            )}
 
             <div className="grid grid-cols-2 gap-3">
               <Field label="Nama Lengkap" full>
@@ -414,6 +506,65 @@ export default function Siswa() {
         </div>
       )}
 
+      {/* Modal Lihat Profil — identitas lengkap + foto besar, dibuka dengan klik nama siswa */}
+      {profilLihat && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink-950/50 backdrop-blur-sm p-4">
+          <div className="card w-full max-w-md p-0 relative overflow-hidden max-h-[90vh] overflow-y-auto">
+            <button
+              type="button"
+              onClick={() => setProfilLihat(null)}
+              className="absolute top-4 right-4 z-10 text-white/80 hover:text-white bg-ink-950/20 rounded-full p-1"
+            >
+              <X size={18} />
+            </button>
+
+            <div className="relative bg-gradient-to-br from-blue-900 to-blue-950 pt-8 pb-14 flex flex-col items-center">
+              <div className="w-24 h-24 rounded-full overflow-hidden ring-4 ring-white/20 bg-white/10 flex items-center justify-center shrink-0">
+                {fotoUrl(profilLihat.foto_path) ? (
+                  <img src={fotoUrl(profilLihat.foto_path)} alt="" className="w-full h-full object-cover" />
+                ) : (
+                  <span className="text-3xl font-semibold text-white/60">{profilLihat.nama_lengkap?.[0]}</span>
+                )}
+              </div>
+              <p className="font-display font-semibold text-lg text-white mt-3 text-center px-6">{profilLihat.nama_lengkap}</p>
+              <span className={`badge mt-1.5 ${profilLihat.status === 'aktif' ? 'bg-sage-500/20 text-sage-100' : 'bg-white/10 text-white/70'}`}>
+                {profilLihat.status}
+              </span>
+            </div>
+
+            <div className="px-6 -mt-8 pb-6">
+              <div className="card p-4 space-y-3 bg-white shadow-md">
+                <ProfilRow label="NIS" value={profilLihat.nis} />
+                <ProfilRow label="NISN" value={profilLihat.nisn} />
+                <ProfilRow label="NIK" value={profilLihat.nik} />
+                <ProfilRow label="Kelas" value={profilLihat.kelas?.nama_kelas} />
+                <ProfilRow label="Jenis Kelamin" value={profilLihat.jenis_kelamin === 'L' ? 'Laki-laki' : 'Perempuan'} />
+                <ProfilRow label="Tempat, Tanggal Lahir" value={tempatTanggalLahir(profilLihat)} />
+                <ProfilRow label="Alamat" value={profilLihat.alamat} />
+                <ProfilRow label="Nama Orang Tua/Wali" value={profilLihat.nama_orang_tua} />
+                <ProfilRow label="No. HP Orang Tua/Wali" value={profilLihat.no_hp_orang_tua} />
+              </div>
+
+              <div className="flex gap-2 mt-4">
+                <button
+                  type="button"
+                  onClick={() => { setProfilLihat(null); openEdit(profilLihat) }}
+                  className="btn-secondary flex-1 justify-center"
+                >
+                  <Pencil size={15} /> Ubah Data
+                </button>
+                <a
+                  href="/kartu"
+                  className="btn-primary flex-1 justify-center"
+                >
+                  <IdCard size={15} /> Cetak Kartu
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <BulkImportModal
         open={showImport}
         onClose={() => { setShowImport(false); loadData() }}
@@ -461,6 +612,15 @@ function Field({ label, children, full }) {
     <div className={full ? 'col-span-2' : ''}>
       <label className="eyebrow mb-1.5 block">{label}</label>
       {children}
+    </div>
+  )
+}
+
+function ProfilRow({ label, value }) {
+  return (
+    <div className="flex items-start justify-between gap-4 text-sm">
+      <span className="text-ink-700/50 shrink-0">{label}</span>
+      <span className="text-ink-950 font-medium text-right">{value || '—'}</span>
     </div>
   )
 }
