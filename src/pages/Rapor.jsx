@@ -48,26 +48,28 @@ function kategoriDariNilai(rataRata) {
   return 'Perlu Bimbingan'
 }
 
-const TEMPLATE_P5 = [
+const OPSI_CAPAIAN_P5 = ['Belum Berkembang', 'Mulai Berkembang', 'Berkembang Sesuai Harapan', 'Sangat Berkembang']
+
+const TEMPLATE_EKSKUL = [
   {
     kategori: 'Sangat Baik',
-    teks: (dimensi) =>
-      `Ananda menunjukkan capaian yang sangat baik pada dimensi ${dimensi}, mampu menginternalisasi nilai-nilai Profil Pelajar Pancasila secara konsisten dalam kegiatan proyek.`,
+    teks: (nama) =>
+      `Ananda menunjukkan minat dan keaktifan yang sangat baik dalam kegiatan ${nama}, serta mampu menguasai keterampilan yang diajarkan dengan sangat baik.`,
   },
   {
     kategori: 'Baik',
-    teks: (dimensi) =>
-      `Ananda menunjukkan capaian yang baik pada dimensi ${dimensi}, mampu berpartisipasi aktif dan menerapkan nilai-nilai yang diharapkan dalam sebagian besar kegiatan proyek.`,
+    teks: (nama) =>
+      `Ananda menunjukkan keaktifan yang baik dalam kegiatan ${nama} dan mampu mengikuti setiap kegiatan dengan cukup baik.`,
   },
   {
     kategori: 'Cukup',
-    teks: (dimensi) =>
-      `Ananda menunjukkan capaian yang cukup pada dimensi ${dimensi}. Dengan pendampingan lebih lanjut, ananda diharapkan dapat lebih mengembangkan dimensi ini.`,
+    teks: (nama) =>
+      `Ananda cukup aktif mengikuti kegiatan ${nama}, namun masih perlu meningkatkan konsistensi keikutsertaan.`,
   },
   {
-    kategori: 'Perlu Bimbingan',
-    teks: (dimensi) =>
-      `Ananda masih memerlukan bimbingan lebih lanjut untuk mengembangkan dimensi ${dimensi} dalam kegiatan Proyek Penguatan Profil Pelajar Pancasila.`,
+    kategori: 'Perlu Peningkatan',
+    teks: (nama) =>
+      `Ananda perlu meningkatkan minat dan keaktifan dalam mengikuti kegiatan ${nama} agar dapat mengembangkan potensi diri secara optimal.`,
   },
 ]
 
@@ -140,8 +142,8 @@ export default function Rapor() {
 
   // Dropdown rekomendasi deskripsi capaian — index baris yang sedang terbuka
   const [rekomendasiTerbuka, setRekomendasiTerbuka] = useState(null)
-  // Dropdown rekomendasi P5 — index baris yang sedang terbuka
-  const [rekomendasiP5Terbuka, setRekomendasiP5Terbuka] = useState(null)
+  // Dropdown rekomendasi keterangan ekstrakurikuler — index baris yang sedang terbuka
+  const [rekomendasiEkskulTerbuka, setRekomendasiEkskulTerbuka] = useState(null)
   // Dropdown rekomendasi catatan wali kelas — boolean, cuma satu baris
   const [rekomendasiCatatanTerbuka, setRekomendasiCatatanTerbuka] = useState(false)
 
@@ -313,16 +315,10 @@ export default function Rapor() {
     setP5List((prev) => prev.map((p, i) => (i === index ? { ...p, [field]: value } : p)))
   }
 
-  function pilihRekomendasiP5(index, template) {
-    const dimensi = p5List[index].dimensi || 'ini'
-    ubahBarisP5(index, 'capaian', template.teks(dimensi))
-    setRekomendasiP5Terbuka(null)
-  }
-
   function tambahBarisP5() {
     setP5List((prev) => [
       ...prev,
-      { id: null, tema: '', dimensi: '', sub_elemen: '', capaian: '' },
+      { id: null, tema: '', dimensi: '', sub_elemen: '', capaian: OPSI_CAPAIAN_P5[0] },
     ])
   }
 
@@ -375,6 +371,12 @@ export default function Rapor() {
     setEkskulList((prev) =>
       prev.map((row, i) => (i === index ? { ...row, [field]: value } : row))
     )
+  }
+
+  function pilihRekomendasiEkskul(index, template) {
+    const nama = ekskulList[index].nama_ekstrakurikuler || 'ini'
+    ubahBarisEkskul(index, 'keterangan', template.teks(nama))
+    setRekomendasiEkskulTerbuka(null)
   }
 
   async function hapusBarisEkskul(index) {
@@ -707,42 +709,19 @@ export default function Rapor() {
                           <Trash2 size={15} />
                         </button>
                       </div>
-                      <div className="flex items-start gap-2">
-                        <textarea
-                          className="input-field min-h-[60px] flex-1"
-                          placeholder="Deskripsi capaian P5..."
-                          value={p.capaian}
+                      <div>
+                        <label className="text-xs text-ink-700/50 mb-1 block">Capaian</label>
+                        <select
+                          className="input-field"
+                          value={p.capaian || OPSI_CAPAIAN_P5[0]}
                           onChange={(e) => ubahBarisP5(i, 'capaian', e.target.value)}
-                        />
-                        <div className="relative shrink-0">
-                          <button
-                            type="button"
-                            className="btn-secondary !px-3"
-                            onClick={() =>
-                              setRekomendasiP5Terbuka(rekomendasiP5Terbuka === i ? null : i)
-                            }
-                            title="Lihat rekomendasi deskripsi"
-                          >
-                            <Lightbulb size={15} />
-                          </button>
-                          {rekomendasiP5Terbuka === i && (
-                            <div className="absolute right-0 bottom-full z-10 mb-2 w-72 max-h-72 overflow-y-auto rounded-lg border border-ink-950/10 bg-white shadow-lg p-2">
-                              {TEMPLATE_P5.map((tpl) => (
-                                <button
-                                  key={tpl.kategori}
-                                  type="button"
-                                  onClick={() => pilihRekomendasiP5(i, tpl)}
-                                  className="w-full text-left px-2.5 py-2 rounded-md hover:bg-ink-950/5 text-sm"
-                                >
-                                  <span className="font-medium text-ink-950">{tpl.kategori}</span>
-                                  <span className="block text-xs text-ink-700/50 mt-0.5 line-clamp-2">
-                                    {tpl.teks(p.dimensi || 'ini')}
-                                  </span>
-                                </button>
-                              ))}
-                            </div>
-                          )}
-                        </div>
+                        >
+                          {OPSI_CAPAIAN_P5.map((opsi) => (
+                            <option key={opsi} value={opsi}>
+                              {opsi}
+                            </option>
+                          ))}
+                        </select>
                       </div>
                     </div>
                   ))}
@@ -766,7 +745,7 @@ export default function Rapor() {
               <>
                 <div className="space-y-3">
                   {ekskulList.map((row, i) => (
-                    <div key={row.id || `baru-${i}`} className="grid sm:grid-cols-[2fr_1fr_2fr_auto] gap-3 items-start">
+                    <div key={row.id || `baru-${i}`} className="grid sm:grid-cols-[2fr_1fr_2fr_auto_auto] gap-3 items-start">
                       <input
                         className="input-field"
                         placeholder="Nama ekstrakurikuler"
@@ -785,6 +764,35 @@ export default function Rapor() {
                         value={row.keterangan}
                         onChange={(e) => ubahBarisEkskul(i, 'keterangan', e.target.value)}
                       />
+                      <div className="relative shrink-0">
+                        <button
+                          type="button"
+                          className="btn-secondary !px-3"
+                          onClick={() =>
+                            setRekomendasiEkskulTerbuka(rekomendasiEkskulTerbuka === i ? null : i)
+                          }
+                          title="Lihat rekomendasi keterangan"
+                        >
+                          <Lightbulb size={15} />
+                        </button>
+                        {rekomendasiEkskulTerbuka === i && (
+                          <div className="absolute right-0 bottom-full z-10 mb-2 w-72 max-h-72 overflow-y-auto rounded-lg border border-ink-950/10 bg-white shadow-lg p-2">
+                            {TEMPLATE_EKSKUL.map((tpl) => (
+                              <button
+                                key={tpl.kategori}
+                                type="button"
+                                onClick={() => pilihRekomendasiEkskul(i, tpl)}
+                                className="w-full text-left px-2.5 py-2 rounded-md hover:bg-ink-950/5 text-sm"
+                              >
+                                <span className="font-medium text-ink-950">{tpl.kategori}</span>
+                                <span className="block text-xs text-ink-700/50 mt-0.5 line-clamp-2">
+                                  {tpl.teks(row.nama_ekstrakurikuler || 'ini')}
+                                </span>
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
                       <button
                         className="btn-secondary !px-3"
                         onClick={() => hapusBarisEkskul(i)}
