@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react'
 import BankSoal from './pages/BankSoal'
 import KartuSiswa from './pages/KartuSiswa'
 import Galeri from './pages/Galeri'
@@ -35,7 +36,14 @@ import Loader from './components/Loader'
 
 function ProtectedRoute({ children, adminOnly }) {
   const { session, loading, isAdmin } = useAuth()
-  if (loading) {
+  const [minTimeElapsed, setMinTimeElapsed] = useState(false)
+
+  useEffect(() => {
+    const timer = setTimeout(() => setMinTimeElapsed(true), 900)
+    return () => clearTimeout(timer)
+  }, [])
+
+  if (loading || !minTimeElapsed) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-paper">
         <Loader />
