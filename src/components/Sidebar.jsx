@@ -88,6 +88,7 @@ const linksGuru = [
   { to: '/profil-saya', label: 'Profil Saya', icon: UserCircle },
   { to: '/galeri', label: 'Galeri Kegiatan', icon: Images },
   { to: '/dokumen', label: 'Dokumen Penting', icon: HardDrive },
+  { to: '/siswa', label: 'Data Siswa', icon: Users },
   { to: '/presensi', label: 'Presensi', icon: ClipboardCheck },
   { to: '/nilai', label: 'Nilai Siswa', icon: BookOpenCheck },
   { to: '/rapor', label: 'Rapor Siswa', icon: FileBadge },
