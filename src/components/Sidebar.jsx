@@ -20,6 +20,7 @@ import {
   Landmark,
   Library,
   NotebookPen,
+  Archive,
   UserCircle,
   Images,
   HardDrive,
@@ -27,12 +28,6 @@ import {
   Database,
   IdCard,
   FilePlus,
-  import {
-  ...
-  NotebookPen,
-  Archive,   // tambahkan ini
-  ...
-} from 'lucide-react'
 } from 'lucide-react'
 import { useAuth } from '../lib/AuthContext'
 
@@ -59,6 +54,7 @@ const groupsAdmin = [
       { to: '/nilai', label: 'Nilai Siswa', icon: BookOpenCheck },
       { to: '/rapor', label: 'Rapor Siswa', icon: FileBadge },
       { to: '/rpp', label: 'RPP', icon: NotebookPen },
+      { to: '/arsip-rpp', label: 'Arsip RPP', icon: Archive },
       { to: '/buat-ujian', label: 'Buat Ujian', icon: FilePlus },
       { to: '/hasil-ujian', label: 'Hasil Ujian', icon: ClipboardList },
       { to: '/bank-soal', label: 'Bank Soal', icon: Database },
@@ -96,6 +92,7 @@ const linksGuru = [
   { to: '/nilai', label: 'Nilai Siswa', icon: BookOpenCheck },
   { to: '/rapor', label: 'Rapor Siswa', icon: FileBadge },
   { to: '/rpp', label: 'RPP', icon: NotebookPen },
+  { to: '/arsip-rpp', label: 'Arsip RPP', icon: Archive },
   { to: '/buat-ujian', label: 'Buat Ujian', icon: FilePlus },
   { to: '/hasil-ujian', label: 'Hasil Ujian', icon: ClipboardList },
   { to: '/bank-soal', label: 'Bank Soal', icon: Database },
