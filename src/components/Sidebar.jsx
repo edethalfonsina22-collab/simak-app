@@ -26,6 +26,7 @@ import {
   ClipboardList,
   Database,
   IdCard,
+  FilePlus,
 } from 'lucide-react'
 import { useAuth } from '../lib/AuthContext'
 
@@ -52,6 +53,7 @@ const groupsAdmin = [
       { to: '/nilai', label: 'Nilai Siswa', icon: BookOpenCheck },
       { to: '/rapor', label: 'Rapor Siswa', icon: FileBadge },
       { to: '/rpp', label: 'RPP', icon: NotebookPen },
+      { to: '/buat-ujian', label: 'Buat Ujian', icon: FilePlus },
       { to: '/hasil-ujian', label: 'Hasil Ujian', icon: ClipboardList },
       { to: '/bank-soal', label: 'Bank Soal', icon: Database },
     ],
@@ -88,6 +90,7 @@ const linksGuru = [
   { to: '/nilai', label: 'Nilai Siswa', icon: BookOpenCheck },
   { to: '/rapor', label: 'Rapor Siswa', icon: FileBadge },
   { to: '/rpp', label: 'RPP', icon: NotebookPen },
+  { to: '/buat-ujian', label: 'Buat Ujian', icon: FilePlus },
   { to: '/hasil-ujian', label: 'Hasil Ujian', icon: ClipboardList },
   { to: '/bank-soal', label: 'Bank Soal', icon: Database },
   { to: '/perpustakaan', label: 'Perpustakaan', icon: Library },
