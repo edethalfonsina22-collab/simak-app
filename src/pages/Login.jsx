@@ -33,18 +33,21 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-ink-950 px-4 relative overflow-hidden">
-      {/* Ambient background — dua cahaya lembut yang melayang pelan, tidak mengganggu */}
-      <div
-        aria-hidden
-        className="pointer-events-none absolute -top-24 -left-24 w-72 h-72 rounded-full bg-brass-400/10 blur-3xl animate-[float-a_9s_ease-in-out_infinite]"
-      />
-      <div
-        aria-hidden
-        className="pointer-events-none absolute -bottom-28 -right-16 w-80 h-80 rounded-full bg-brass-400/[0.08] blur-3xl animate-[float-b_11s_ease-in-out_infinite]"
-      />
-
+    <div className="min-h-screen flex items-center justify-center bg-paper px-4 relative overflow-hidden login-ledger">
       <div className="w-full max-w-sm relative">
+        {/* Pelangi tipis melayang di atas logo */}
+        <svg
+          aria-hidden
+          viewBox="0 0 340 170"
+          className="pointer-events-none absolute left-1/2 -top-24 w-[280px] -translate-x-1/2 animate-[rainbow-breathe_5s_ease-in-out_infinite]"
+        >
+          <path d="M20 170 A150 150 0 0 1 320 170" stroke="#E8A33D" strokeWidth="7" strokeLinecap="round" opacity="0.85" fill="none" />
+          <path d="M38 170 A132 132 0 0 1 302 170" stroke="#EA7C4C" strokeWidth="7" strokeLinecap="round" opacity="0.85" fill="none" />
+          <path d="M56 170 A114 114 0 0 1 284 170" stroke="#D9556B" strokeWidth="7" strokeLinecap="round" opacity="0.85" fill="none" />
+          <path d="M74 170 A96 96 0 0 1 266 170" stroke="#157A9E" strokeWidth="7" strokeLinecap="round" opacity="0.85" fill="none" />
+          <path d="M92 170 A78 78 0 0 1 248 170" stroke="#0B4F6C" strokeWidth="7" strokeLinecap="round" opacity="0.85" fill="none" />
+        </svg>
+
         <div
           className={`text-center mb-8 transition-all duration-700 ease-out ${
             mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-3'
@@ -57,8 +60,8 @@ export default function Login() {
               S
             </div>
           </div>
-          <h1 className="font-display text-2xl font-semibold text-paper">SIMAK</h1>
-          <p className="text-sm text-paper/50 mt-1">Sistem Informasi Manajemen Sekolah</p>
+          <h1 className="font-display text-2xl font-semibold text-ink-950">SIMAK</h1>
+          <p className="text-sm text-ink-700/60 mt-1">Sistem Informasi Manajemen Sekolah</p>
         </div>
 
         <form
@@ -118,7 +121,7 @@ export default function Login() {
         </form>
 
         <p
-          className={`text-center text-xs text-paper/40 mt-5 transition-all duration-700 ease-out delay-500 ${
+          className={`text-center text-xs text-ink-700/50 mt-5 transition-all duration-700 ease-out delay-500 ${
             mounted ? 'opacity-100' : 'opacity-0'
           }`}
         >
@@ -126,15 +129,41 @@ export default function Login() {
         </p>
       </div>
 
+      {/* Ombak tenang di dasar layar, dengan perahu berlayar pelan */}
+      <div aria-hidden className="pointer-events-none fixed bottom-0 left-0 w-full h-[120px] overflow-hidden z-0">
+        <div className="absolute bottom-[52px] w-[70px] h-[64px] animate-[sail_22s_linear_infinite,bob_2.6s_ease-in-out_infinite]">
+          <svg viewBox="0 0 70 64" className="w-full h-full overflow-visible">
+            <path d="M12 46 Q35 58 58 46 L52 54 Q35 60 18 54 Z" fill="#0B4F6C" />
+            <line x1="35" y1="46" x2="35" y2="16" stroke="#5C3A21" strokeWidth="2" strokeLinecap="round" />
+            <path d="M35 18 L35 44 Q22 40 18 26 Q24 20 35 18 Z" fill="#F6D186" stroke="#E8A33D" strokeWidth="1" />
+            <path d="M35 18 L35 44 Q48 40 52 26 Q46 20 35 18 Z" fill="#F1C40F" stroke="#E8A33D" strokeWidth="1" />
+          </svg>
+        </div>
+        <div className="absolute bottom-0 left-0 w-[220%] h-full opacity-45 animate-[wave-scroll_16s_linear_infinite]">
+          <svg viewBox="0 0 1200 200" preserveAspectRatio="none" className="w-full h-full block">
+            <path d="M0 110 Q150 80 300 110 T600 110 T900 110 T1200 110 T1500 110 T1800 110 V200 H0 Z" fill="#157A9E" />
+          </svg>
+        </div>
+        <div className="absolute bottom-0 left-0 w-[220%] h-full animate-[wave-scroll_10s_linear_infinite]">
+          <svg viewBox="0 0 1200 200" preserveAspectRatio="none" className="w-full h-full block">
+            <path d="M0 120 Q150 145 300 120 T600 120 T900 120 T1200 120 T1500 120 T1800 120 V200 H0 Z" fill="#0B4F6C" />
+          </svg>
+        </div>
+      </div>
+
       {/* Keyframes animasi kustom — tidak memerlukan perubahan tailwind.config */}
       <style>{`
-        @keyframes float-a {
-          0%, 100% { transform: translate(0, 0); }
-          50% { transform: translate(18px, 14px); }
+        .login-ledger {
+          background-image: repeating-linear-gradient(
+            to bottom,
+            transparent,
+            transparent 37px,
+            rgba(11,79,108,0.08) 38px
+          );
         }
-        @keyframes float-b {
-          0%, 100% { transform: translate(0, 0); }
-          50% { transform: translate(-16px, -12px); }
+        @keyframes rainbow-breathe {
+          0%, 100% { opacity: 0.55; transform: translateX(-50%) translateY(0); }
+          50% { opacity: 0.9; transform: translateX(-50%) translateY(-4px); }
         }
         @keyframes glow-pulse {
           0%, 100% { opacity: 0.35; }
@@ -146,6 +175,18 @@ export default function Login() {
           40% { transform: translateX(4px); }
           60% { transform: translateX(-3px); }
           80% { transform: translateX(3px); }
+        }
+        @keyframes sail {
+          0% { left: -8%; }
+          100% { left: 106%; }
+        }
+        @keyframes bob {
+          0%, 100% { transform: translateY(0) rotate(-2deg); }
+          50% { transform: translateY(-7px) rotate(2deg); }
+        }
+        @keyframes wave-scroll {
+          from { transform: translateX(0); }
+          to { transform: translateX(-50%); }
         }
         @media (prefers-reduced-motion: reduce) {
           * { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
