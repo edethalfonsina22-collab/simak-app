@@ -18,6 +18,7 @@ import Inventaris from './pages/Inventaris'
 import Agenda from './pages/Agenda'
 import Surat from './pages/Surat'
 import Rapor from './pages/Rapor'
+import RaporCetak from './pages/RaporCetak'
 import LaporanBulanan from './pages/LaporanBulanan'
 import Keuangan from './pages/Keuangan'
 import Backup from './pages/Backup'
@@ -61,6 +62,7 @@ export default function App() {
       <Route path="/presensi" element={<ProtectedRoute><Presensi /></ProtectedRoute>} />
       <Route path="/nilai" element={<ProtectedRoute><Nilai /></ProtectedRoute>} />
       <Route path="/rapor" element={<ProtectedRoute><Rapor /></ProtectedRoute>} />
+      <Route path="/rapor/cetak" element={<ProtectedRoute><RaporCetak /></ProtectedRoute>} />
       <Route path="/inventaris" element={<ProtectedRoute adminOnly><Inventaris /></ProtectedRoute>} />
       <Route path="/agenda" element={<ProtectedRoute><Agenda /></ProtectedRoute>} />
       <Route path="/surat" element={<ProtectedRoute adminOnly><Surat /></ProtectedRoute>} />
