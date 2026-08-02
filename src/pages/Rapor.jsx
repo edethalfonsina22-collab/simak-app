@@ -12,8 +12,41 @@ import {
   Dumbbell,
   NotebookPen,
   Printer,
+  Lightbulb,
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
+
+const TEMPLATE_DESKRIPSI = [
+  {
+    kategori: 'Sangat Baik',
+    teks: (mapel) =>
+      `Ananda menunjukkan penguasaan yang sangat baik pada mata pelajaran ${mapel}, mampu memahami dan menerapkan konsep dengan tepat, serta menunjukkan inisiatif dan rasa ingin tahu yang tinggi dalam pembelajaran.`,
+  },
+  {
+    kategori: 'Baik',
+    teks: (mapel) =>
+      `Ananda menunjukkan pemahaman yang baik pada mata pelajaran ${mapel}, mampu mengikuti pembelajaran dengan baik dan menyelesaikan sebagian besar tugas dengan tepat waktu.`,
+  },
+  {
+    kategori: 'Cukup',
+    teks: (mapel) =>
+      `Ananda menunjukkan pemahaman yang cukup pada mata pelajaran ${mapel}. Dengan bimbingan dan latihan lebih lanjut, ananda diharapkan dapat meningkatkan pemahamannya.`,
+  },
+  {
+    kategori: 'Perlu Bimbingan',
+    teks: (mapel) =>
+      `Ananda masih memerlukan bimbingan lebih lanjut pada mata pelajaran ${mapel} untuk dapat memahami materi secara optimal. Diperlukan perhatian dan pendampingan yang lebih intensif.`,
+  },
+]
+
+function kategoriDariNilai(rataRata) {
+  if (rataRata === undefined || rataRata === null || isNaN(rataRata)) return null
+  const n = Number(rataRata)
+  if (n >= 90) return 'Sangat Baik'
+  if (n >= 75) return 'Baik'
+  if (n >= 60) return 'Cukup'
+  return 'Perlu Bimbingan'
+}
 
 const TABS = [
   { key: 'ringkasan', label: 'Ringkasan Nilai', icon: ClipboardList },
@@ -58,6 +91,9 @@ export default function Rapor() {
 
   // Catatan wali kelas — tabel catatan_siswa
   const [catatan, setCatatan] = useState(CATATAN_KOSONG)
+
+  // Dropdown rekomendasi deskripsi capaian — index baris yang sedang terbuka
+  const [rekomendasiTerbuka, setRekomendasiTerbuka] = useState(null)
 
   useEffect(() => {
     supabase
@@ -163,6 +199,12 @@ export default function Rapor() {
     setCapaianList((prev) =>
       prev.map((c, i) => (i === index ? { ...c, [field]: value } : c))
     )
+  }
+
+  function pilihRekomendasi(index, template) {
+    const mapel = capaianList[index].mata_pelajaran || 'mata pelajaran ini'
+    ubahBarisCapaian(index, 'deskripsi_capaian', template.teks(mapel))
+    setRekomendasiTerbuka(null)
   }
 
   function tambahBarisCapaian() {
@@ -488,35 +530,77 @@ export default function Rapor() {
                   </p>
                 )}
                 <div className="space-y-4">
-                  {capaianList.map((c, i) => (
-                    <div key={c.id || `baru-${i}`} className="border border-ink-950/10 rounded-lg p-3">
-                      <div className="flex items-start justify-between gap-3 mb-2">
-                        {c.terkunci ? (
-                          <label className="label-field">{c.mata_pelajaran}</label>
-                        ) : (
-                          <input
-                            className="input-field"
-                            placeholder="Nama mata pelajaran"
-                            value={c.mata_pelajaran}
-                            onChange={(e) => ubahBarisCapaian(i, 'mata_pelajaran', e.target.value)}
-                          />
-                        )}
-                        <button
-                          className="btn-secondary !px-3 shrink-0"
-                          onClick={() => hapusBarisCapaian(i)}
-                          title="Hapus mapel ini"
-                        >
-                          <Trash2 size={15} />
-                        </button>
+                  {capaianList.map((c, i) => {
+                    const mapelInfo = barisMapel.find((b) => b.mapel === c.mata_pelajaran)
+                    const rekomendasiKategori = kategoriDariNilai(mapelInfo?.rataRata)
+                    return (
+                      <div key={c.id || `baru-${i}`} className="border border-ink-950/10 rounded-lg p-3">
+                        <div className="flex items-start justify-between gap-3 mb-2">
+                          {c.terkunci ? (
+                            <label className="label-field">{c.mata_pelajaran}</label>
+                          ) : (
+                            <input
+                              className="input-field"
+                              placeholder="Nama mata pelajaran"
+                              value={c.mata_pelajaran}
+                              onChange={(e) => ubahBarisCapaian(i, 'mata_pelajaran', e.target.value)}
+                            />
+                          )}
+                          <div className="flex items-center gap-2 shrink-0">
+                            <div className="relative">
+                              <button
+                                type="button"
+                                className="btn-secondary !px-3"
+                                onClick={() =>
+                                  setRekomendasiTerbuka(rekomendasiTerbuka === i ? null : i)
+                                }
+                                title="Lihat rekomendasi deskripsi"
+                              >
+                                <Lightbulb size={15} /> Rekomendasi
+                              </button>
+                              {rekomendasiTerbuka === i && (
+                                <div className="absolute right-0 z-10 mt-2 w-72 rounded-lg border border-ink-950/10 bg-white shadow-lg p-2">
+                                  {TEMPLATE_DESKRIPSI.map((tpl) => (
+                                    <button
+                                      key={tpl.kategori}
+                                      type="button"
+                                      onClick={() => pilihRekomendasi(i, tpl)}
+                                      className="w-full text-left px-2.5 py-2 rounded-md hover:bg-ink-950/5 text-sm"
+                                    >
+                                      <span className="font-medium text-ink-950 flex items-center gap-1.5">
+                                        {tpl.kategori}
+                                        {rekomendasiKategori === tpl.kategori && (
+                                          <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-sage-500/15 text-sage-500">
+                                            disarankan
+                                          </span>
+                                        )}
+                                      </span>
+                                      <span className="block text-xs text-ink-700/50 mt-0.5 line-clamp-2">
+                                        {tpl.teks(c.mata_pelajaran || 'mapel ini')}
+                                      </span>
+                                    </button>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                            <button
+                              className="btn-secondary !px-3"
+                              onClick={() => hapusBarisCapaian(i)}
+                              title="Hapus mapel ini"
+                            >
+                              <Trash2 size={15} />
+                            </button>
+                          </div>
+                        </div>
+                        <textarea
+                          className="input-field min-h-[80px]"
+                          placeholder="Deskripsi capaian pembelajaran..."
+                          value={c.deskripsi_capaian}
+                          onChange={(e) => ubahBarisCapaian(i, 'deskripsi_capaian', e.target.value)}
+                        />
                       </div>
-                      <textarea
-                        className="input-field min-h-[80px]"
-                        placeholder="Deskripsi capaian pembelajaran..."
-                        value={c.deskripsi_capaian}
-                        onChange={(e) => ubahBarisCapaian(i, 'deskripsi_capaian', e.target.value)}
-                      />
-                    </div>
-                  ))}
+                    )
+                  })}
                 </div>
                 <div className="flex flex-wrap gap-3 mt-4">
                   <button className="btn-secondary" onClick={tambahBarisCapaian}>
