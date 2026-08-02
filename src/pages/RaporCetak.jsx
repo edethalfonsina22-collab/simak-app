@@ -42,7 +42,9 @@ export default function RaporCetak() {
     ] = await Promise.all([
       supabase
         .from('siswa')
-        .select('id, nama_lengkap, nis, nisn, kelas(nama_kelas)')
+        .select(
+          'id, nama_lengkap, nis, nisn, nama_orang_tua, kelas(nama_kelas, wali_kelas:guru!wali_kelas_id(nama_lengkap, nip))'
+        )
         .eq('id', siswaId)
         .single(),
       supabase
@@ -286,12 +288,19 @@ export default function RaporCetak() {
           <div>
             <p>Orang Tua/Wali</p>
             <div className="h-16" />
-            <p className="border-t border-ink-950/40 pt-1">(.......................................)</p>
+            <p className="font-semibold border-t border-ink-950/40 pt-1">
+              {siswa?.nama_orang_tua || '(.......................................)'}
+            </p>
           </div>
           <div>
             <p>Wali Kelas</p>
-            <div className="h-16" />
-            <p className="border-t border-ink-950/40 pt-1">(.......................................)</p>
+            <div className="h-12" />
+            <p className="font-semibold border-t border-ink-950/40 pt-1">
+              {siswa?.kelas?.wali_kelas?.nama_lengkap || '(.......................................)'}
+            </p>
+            {siswa?.kelas?.wali_kelas?.nip && (
+              <p className="text-xs text-ink-700/60">NIP. {siswa.kelas.wali_kelas.nip}</p>
+            )}
           </div>
           <div>
             <p>Mengetahui,<br />Kepala Sekolah</p>
