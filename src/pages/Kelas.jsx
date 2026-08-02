@@ -5,6 +5,11 @@ import { Plus, Pencil, Trash2, X, Loader2 } from 'lucide-react'
 
 const emptyForm = { nama_kelas: '', tingkat: '', wali_kelas_id: '', tahun_ajaran: '' }
 
+function fotoWaliUrl(path) {
+  if (!path) return null
+  return supabase.storage.from('foto-profil').getPublicUrl(path).data.publicUrl
+}
+
 export default function Kelas() {
   const [data, setData] = useState([])
   const [guruList, setGuruList] = useState([])
@@ -17,7 +22,7 @@ export default function Kelas() {
   async function loadData() {
     setLoading(true)
     const [{ data: kelas }, { data: guru }, { data: siswaCounts }] = await Promise.all([
-      supabase.from('kelas').select('*, guru(nama_lengkap)').order('nama_kelas'),
+      supabase.from('kelas').select('*, guru(nama_lengkap, foto_profil_path)').order('nama_kelas'),
       supabase.from('guru').select('id, nama_lengkap').order('nama_lengkap'),
       supabase.from('siswa').select('kelas_id'),
     ])
@@ -81,7 +86,16 @@ export default function Kelas() {
               </div>
             </div>
             <div className="relative mt-4 pt-4 border-t border-white/10 flex items-center justify-between text-sm">
-              <span className="text-red-100/70">Wali: {k.guru?.nama_lengkap || '—'}</span>
+              <div className="flex items-center gap-2">
+                <div className="w-7 h-7 rounded-full bg-white/10 ring-1 ring-white/20 overflow-hidden flex items-center justify-center shrink-0">
+                  {fotoWaliUrl(k.guru?.foto_profil_path) ? (
+                    <img src={fotoWaliUrl(k.guru.foto_profil_path)} alt={k.guru?.nama_lengkap || 'Wali kelas'} className="w-full h-full object-cover" />
+                  ) : (
+                    <span className="text-xs font-semibold text-white/70">{k.guru?.nama_lengkap?.[0] || '?'}</span>
+                  )}
+                </div>
+                <span className="text-red-100/70">Wali: {k.guru?.nama_lengkap || '—'}</span>
+              </div>
               <span className="badge bg-brass-400/20 text-brass-300">{k.jumlah_siswa} siswa</span>
             </div>
           </div>
