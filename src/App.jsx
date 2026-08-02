@@ -31,12 +31,14 @@ import ArsipRPP from './pages/ArsipRPP'
 import BuatUjian from './pages/BuatUjian'
 import UjianOnline from './pages/UjianOnline'
 import ProfilSaya from './pages/ProfilSaya'
+import Loader from './components/Loader'
+
 function ProtectedRoute({ children, adminOnly }) {
   const { session, loading, isAdmin } = useAuth()
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-paper text-ink-700/50 text-sm">
-        Memuat...
+      <div className="min-h-screen flex items-center justify-center bg-paper">
+        <Loader />
       </div>
     )
   }
