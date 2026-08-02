@@ -74,6 +74,7 @@ export default function App() {
       <Route path="/galeri" element={<ProtectedRoute><Galeri /></ProtectedRoute>} />
       <Route path="/dokumen" element={<ProtectedRoute><Dokumen /></ProtectedRoute>} />
       <Route path="/rpp" element={<ProtectedRoute><RPP /></ProtectedRoute>} />
+      <Route path="/arsip-rpp" element={<ProtectedRoute><ArsipRPP /></ProtectedRoute>} />
       <Route path="/bank-soal" element={<ProtectedRoute><BankSoal /></ProtectedRoute>} />
 <Route path="/kartu" element={<ProtectedRoute adminOnly><KartuSiswa /></ProtectedRoute>} />
       <Route path="/buat-ujian" element={<ProtectedRoute><BuatUjian /></ProtectedRoute>} />
