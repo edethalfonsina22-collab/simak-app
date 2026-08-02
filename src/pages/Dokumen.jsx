@@ -2,10 +2,51 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../lib/AuthContext'
 import Layout from '../components/Layout'
-import { FileUp, Loader2, FileText, Download, Trash2, HardDrive } from 'lucide-react'
+import { FileUp, Loader2, FileText, Download, Trash2, HardDrive, Eye, X } from 'lucide-react'
 
 const CARD_BORDER = ['border-t-brass-400', 'border-t-sage-500', 'border-t-ink-950', 'border-t-red-400']
 const ICON_BG = ['bg-brass-400/15 text-brass-600', 'bg-sage-500/15 text-sage-500', 'bg-ink-950/10 text-ink-950', 'bg-red-100 text-red-500']
+
+const IMAGE_EXT = ['jpg', 'jpeg', 'png', 'gif', 'webp']
+const OFFICE_EXT = ['doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx']
+
+function getExt(fileName = '') {
+  return (fileName.split('.').pop() || '').toLowerCase()
+}
+
+function isPreviewable(fileName) {
+  const ext = getExt(fileName)
+  return ext === 'pdf' || IMAGE_EXT.includes(ext) || OFFICE_EXT.includes(ext)
+}
+
+// Modal preview: PDF & gambar dibuka langsung, dokumen Office lewat Google Docs Viewer
+function PreviewModal({ url, fileName, onClose }) {
+  if (!url) return null
+  const ext = getExt(fileName)
+  const isImage = IMAGE_EXT.includes(ext)
+  const isOffice = OFFICE_EXT.includes(ext)
+  const viewerSrc = isOffice ? `https://docs.google.com/viewer?url=${encodeURIComponent(url)}&embedded=true` : url
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
+      <div className="bg-white rounded-xl w-full max-w-4xl h-[85vh] flex flex-col overflow-hidden">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-ink-900/[0.08]">
+          <p className="text-sm font-medium text-ink-900 truncate pr-4">{fileName}</p>
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-ink-900/[0.05] shrink-0">
+            <X size={18} />
+          </button>
+        </div>
+        {isImage ? (
+          <div className="flex-1 overflow-auto flex items-center justify-center bg-ink-950/[0.03] p-4">
+            <img src={url} alt={fileName} className="max-w-full max-h-full object-contain" />
+          </div>
+        ) : (
+          <iframe src={viewerSrc} title={fileName} className="flex-1 w-full" style={{ border: 'none' }} />
+        )}
+      </div>
+    </div>
+  )
+}
 
 export default function Dokumen() {
   const { profil, isAdmin } = useAuth()
@@ -14,6 +55,7 @@ export default function Dokumen() {
   const [uploading, setUploading] = useState(false)
   const [showForm, setShowForm] = useState(false)
   const [form, setForm] = useState({ judul: '', deskripsi: '', file: null })
+  const [preview, setPreview] = useState(null) // { url, fileName }
 
   async function load() {
     setLoading(true)
@@ -62,16 +104,31 @@ export default function Dokumen() {
     setUploading(false)
   }
 
+  async function getSignedUrl(path, expiresIn = 60) {
+    const { data, error } = await supabase.storage.from('dokumen-penting').createSignedUrl(path, expiresIn)
+    if (error) throw error
+    return data.signedUrl
+  }
+
   async function handleDownload(item) {
-    const { data, error } = await supabase.storage.from('dokumen-penting').createSignedUrl(item.file_path, 60)
-    if (error) {
-      alert('Gagal buka file: ' + error.message)
-      return
+    try {
+      const url = await getSignedUrl(item.file_path)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = item.file_nama
+      a.click()
+    } catch (err) {
+      alert('Gagal buka file: ' + err.message)
     }
-    const a = document.createElement('a')
-    a.href = data.signedUrl
-    a.download = item.file_nama
-    a.click()
+  }
+
+  async function handlePreview(item) {
+    try {
+      const url = await getSignedUrl(item.file_path, 300)
+      setPreview({ url, fileName: item.file_nama })
+    } catch (err) {
+      alert('Gagal membuka pratinjau: ' + err.message)
+    }
   }
 
   async function handleDelete(item) {
@@ -177,7 +234,15 @@ export default function Dokumen() {
                 {item.guru?.nama_lengkap || 'Admin'} · {new Date(item.dibuat_pada).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}
               </p>
 
-              <div className="flex items-center gap-2 mt-4 pt-3 border-t border-ink-900/[0.06]">
+              <div className="flex items-center gap-2 mt-4 pt-3 border-t border-ink-900/[0.06] flex-wrap">
+                {isPreviewable(item.file_nama) && (
+                  <button
+                    onClick={() => handlePreview(item)}
+                    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-ink-700 hover:bg-ink-900/[0.05]"
+                  >
+                    <Eye size={14} /> Lihat
+                  </button>
+                )}
                 <button
                   onClick={() => handleDownload(item)}
                   className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-ink-700 hover:bg-ink-900/[0.05]"
@@ -199,6 +264,8 @@ export default function Dokumen() {
           ))}
         </div>
       )}
+
+      {preview && <PreviewModal url={preview.url} fileName={preview.fileName} onClose={() => setPreview(null)} />}
     </Layout>
   )
 }
