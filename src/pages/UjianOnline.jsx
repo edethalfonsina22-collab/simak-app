@@ -16,6 +16,8 @@ export default function UjianOnline() {
   const [error, setError] = useState('');
   const [memuat, setMemuat] = useState(false);
   const [skorAkhir, setSkorAkhir] = useState(null);
+  const [sudahMengerjakan, setSudahMengerjakan] = useState(null); // null = belum dicek, angka = skor lama, false = belum pernah
+  const [cekStatusLoading, setCekStatusLoading] = useState(false);
 
   // Kalau siswa membuka lewat link yang sudah membawa ?kode=XXXXXX,
   // ambil otomatis dari URL dan langsung cari ujiannya — tidak perlu ketik manual.
@@ -94,6 +96,26 @@ export default function UjianOnline() {
     setJawaban({ ...jawaban, [soalId]: pilihan });
   }
 
+  // Dipanggil begitu siswa memilih namanya, sebelum mulai mengerjakan.
+  // Kalau NIS ini sudah pernah submit ujian ini, tampilkan skornya dan
+  // blokir tombol "Mulai Kerjakan" — supaya siswa tidak buang waktu
+  // mengisi ulang semua soal baru ditolak di akhir.
+  async function cekStatusUjian(nis) {
+    setSudahMengerjakan(null);
+    if (!nis) return;
+    setCekStatusLoading(true);
+    const { data, error: errCek } = await supabase.rpc('cek_status_ujian', {
+      p_kode_ujian: ujian.kode_ujian,
+      p_nis_siswa: nis,
+    });
+    setCekStatusLoading(false);
+    if (!errCek && data && data.length > 0 && data[0].sudah_mengerjakan) {
+      setSudahMengerjakan(data[0].skor);
+    } else {
+      setSudahMengerjakan(false);
+    }
+  }
+
   async function kirimJawaban() {
     if (!nisSiswa) {
       setError('Pilih namamu dulu dari daftar.');
@@ -165,6 +187,8 @@ export default function UjianOnline() {
             setNisSiswa(nis);
             const siswa = daftarSiswa.find((s) => s.nis === nis);
             setNamaSiswa(siswa?.nama_lengkap || '');
+            setError('');
+            cekStatusUjian(nis);
           }}
           className="w-full border rounded-lg px-3 py-2"
         >
@@ -175,6 +199,18 @@ export default function UjianOnline() {
             </option>
           ))}
         </select>
+
+        {cekStatusLoading && (
+          <p className="text-sm text-gray-400 mt-2">Mengecek status...</p>
+        )}
+
+        {sudahMengerjakan !== null && sudahMengerjakan !== false && (
+          <div className="mt-3 text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-3">
+            Kamu sudah mengerjakan ujian ini sebelumnya. Skor kamu:{' '}
+            <strong>{sudahMengerjakan}</strong>. Setiap siswa hanya bisa mengerjakan 1 kali.
+          </div>
+        )}
+
         {error && <p className="text-sm text-red-600 mt-2">{error}</p>}
         <button
           onClick={() => {
@@ -182,10 +218,15 @@ export default function UjianOnline() {
               setError('Pilih namamu dulu.');
               return;
             }
+            if (sudahMengerjakan !== null && sudahMengerjakan !== false) {
+              setError('Kamu sudah mengerjakan ujian ini sebelumnya.');
+              return;
+            }
             setError('');
             setTahap('kerjakan');
           }}
-          className="mt-4 w-full py-2 rounded-lg bg-blue-600 text-white font-medium hover:bg-blue-700"
+          disabled={cekStatusLoading || (sudahMengerjakan !== null && sudahMengerjakan !== false)}
+          className="mt-4 w-full py-2 rounded-lg bg-blue-600 text-white font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           Mulai Kerjakan
         </button>
