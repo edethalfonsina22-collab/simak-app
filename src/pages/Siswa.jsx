@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { supabase } from '../lib/supabaseClient'
 import Layout from '../components/Layout'
 import BulkImportModal from '../components/BulkImportModal'
-import { Plus, UploadCloud, Pencil, Trash2, Search, X, Loader2 } from 'lucide-react'
+import { Plus, UploadCloud, Pencil, Trash2, Search, X, Loader2, Download, FileSpreadsheet, Printer, ChevronDown } from 'lucide-react'
 
 const emptyForm = {
   nis: '',
@@ -28,6 +28,8 @@ export default function Siswa() {
   const [editingId, setEditingId] = useState(null)
   const [form, setForm] = useState(emptyForm)
   const [saving, setSaving] = useState(false)
+  const [showExportMenu, setShowExportMenu] = useState(false)
+  const exportMenuRef = useRef(null)
 
   async function loadData() {
     setLoading(true)
@@ -42,6 +44,17 @@ export default function Siswa() {
 
   useEffect(() => {
     loadData()
+  }, [])
+
+  // Tutup dropdown export saat klik di luar area tombolnya
+  useEffect(() => {
+    function handleClickOutside(e) {
+      if (exportMenuRef.current && !exportMenuRef.current.contains(e.target)) {
+        setShowExportMenu(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
   function openAdd() {
@@ -86,12 +99,137 @@ export default function Siswa() {
     `${s.nama_lengkap} ${s.nis} ${s.nisn}`.toLowerCase().includes(search.toLowerCase())
   )
 
+  // --- Export: Excel (CSV) ---
+  function handleExportCSV() {
+    setShowExportMenu(false)
+    const headers = ['Nama Lengkap', 'NIS', 'NISN', 'Kelas', 'Jenis Kelamin', 'Status', 'Tempat Lahir', 'Tanggal Lahir', 'Nama Orang Tua/Wali', 'No. HP Orang Tua', 'Alamat']
+    const rows = filtered.map((s) => [
+      s.nama_lengkap || '',
+      s.nis || '',
+      s.nisn || '',
+      s.kelas?.nama_kelas || '',
+      s.jenis_kelamin === 'L' ? 'Laki-laki' : 'Perempuan',
+      s.status || '',
+      s.tempat_lahir || '',
+      s.tanggal_lahir || '',
+      s.nama_orang_tua || '',
+      s.no_hp_orang_tua || '',
+      s.alamat || '',
+    ])
+
+    const escapeCell = (val) => {
+      const str = String(val).replace(/"/g, '""')
+      return /[",\n]/.test(str) ? `"${str}"` : str
+    }
+
+    const csvContent = [headers, ...rows].map((r) => r.map(escapeCell).join(',')).join('\r\n')
+    const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `Data-Siswa-${new Date().toISOString().slice(0, 10)}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  // --- Export: Cetak / Unduh PDF (lewat dialog cetak browser) ---
+  function handlePrintPDF() {
+    setShowExportMenu(false)
+    const tanggal = new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })
+
+    const rowsHtml = filtered
+      .map(
+        (s, i) => `
+        <tr>
+          <td>${i + 1}</td>
+          <td>${s.nama_lengkap || '-'}</td>
+          <td>${s.nis || '-'}</td>
+          <td>${s.nisn || '-'}</td>
+          <td>${s.kelas?.nama_kelas || '-'}</td>
+          <td>${s.jenis_kelamin === 'L' ? 'Laki-laki' : 'Perempuan'}</td>
+          <td>${s.status || '-'}</td>
+        </tr>`
+      )
+      .join('')
+
+    const html = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8" />
+        <title>Data Siswa</title>
+        <style>
+          body { font-family: Arial, Helvetica, sans-serif; padding: 24px; color: #1a1a1a; }
+          h1 { font-size: 18px; margin-bottom: 2px; }
+          p.subtitle { font-size: 12px; color: #666; margin-top: 0; margin-bottom: 16px; }
+          table { width: 100%; border-collapse: collapse; font-size: 11px; }
+          th, td { border: 1px solid #ccc; padding: 6px 8px; text-align: left; }
+          th { background: #f2f2f2; }
+          @media print {
+            @page { size: landscape; margin: 16mm; }
+          }
+        </style>
+      </head>
+      <body>
+        <h1>Data Siswa</h1>
+        <p class="subtitle">Dicetak pada ${tanggal} · Total ${filtered.length} siswa</p>
+        <table>
+          <thead>
+            <tr>
+              <th>No</th>
+              <th>Nama Lengkap</th>
+              <th>NIS</th>
+              <th>NISN</th>
+              <th>Kelas</th>
+              <th>Jenis Kelamin</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rowsHtml}
+          </tbody>
+        </table>
+        <script>
+          window.onload = function () {
+            window.print();
+          };
+        </script>
+      </body>
+      </html>
+    `
+
+    const printWindow = window.open('', '_blank')
+    printWindow.document.write(html)
+    printWindow.document.close()
+  }
+
   return (
     <Layout
       title="Data Siswa"
       subtitle={`${data.length} siswa terdaftar`}
       actions={
         <>
+          <div className="relative" ref={exportMenuRef}>
+            <button className="btn-secondary" onClick={() => setShowExportMenu((v) => !v)}>
+              <Download size={16} /> Unduh / Cetak <ChevronDown size={14} />
+            </button>
+            {showExportMenu && (
+              <div className="absolute right-0 mt-1.5 w-56 card p-1.5 z-20 shadow-lg">
+                <button
+                  onClick={handleExportCSV}
+                  className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-ink-700 hover:bg-ink-900/[0.05] text-left"
+                >
+                  <FileSpreadsheet size={16} /> Unduh Excel (.csv)
+                </button>
+                <button
+                  onClick={handlePrintPDF}
+                  className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-ink-700 hover:bg-ink-900/[0.05] text-left"
+                >
+                  <Printer size={16} /> Cetak / Unduh PDF
+                </button>
+              </div>
+            )}
+          </div>
           <button className="btn-secondary" onClick={() => setShowImport(true)}>
             <UploadCloud size={16} /> Impor Massal
           </button>
