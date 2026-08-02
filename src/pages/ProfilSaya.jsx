@@ -78,6 +78,8 @@ export default function ProfilSaya() {
         alamat: data.alamat,
         tanggal_lahir: data.tanggal_lahir || null,
         pendidikan_terakhir: data.pendidikan_terakhir,
+        nuptk: data.nuptk,
+        pangkat_golongan: data.pangkat_golongan,
       })
       .eq('id', profil.guru_id)
 
@@ -161,6 +163,24 @@ export default function ProfilSaya() {
                 className="input w-full"
                 value={data.mata_pelajaran || ''}
                 onChange={(e) => setData({ ...data, mata_pelajaran: e.target.value })}
+              />
+            </div>
+            <div>
+              <label className="text-xs text-ink-700/60 mb-1 block">NUPTK</label>
+              <input
+                className="input w-full"
+                placeholder="mis. 1234567890123456"
+                value={data.nuptk || ''}
+                onChange={(e) => setData({ ...data, nuptk: e.target.value })}
+              />
+            </div>
+            <div>
+              <label className="text-xs text-ink-700/60 mb-1 block">Pangkat / Golongan</label>
+              <input
+                className="input w-full"
+                placeholder="mis. Penata Muda / III-a"
+                value={data.pangkat_golongan || ''}
+                onChange={(e) => setData({ ...data, pangkat_golongan: e.target.value })}
               />
             </div>
             <div>
