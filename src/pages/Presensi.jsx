@@ -11,6 +11,11 @@ const STATUS_OPTS = [
   { value: 'alpa', label: 'Alpa', color: 'bg-red-100 text-red-700' },
 ]
 
+function fotoGuruUrl(path) {
+  if (!path) return null
+  return supabase.storage.from('foto-profil').getPublicUrl(path).data.publicUrl
+}
+
 export default function Presensi() {
   const { profil } = useAuth()
   const [tab, setTab] = useState('siswa')
@@ -29,7 +34,7 @@ export default function Presensi() {
       setKelasList(data || [])
       if (data?.length) setKelasId(data[0].id)
     })
-    supabase.from('guru').select('id, nama_lengkap').eq('status', 'aktif').order('nama_lengkap').then(({ data }) => setGuruList(data || []))
+    supabase.from('guru').select('id, nama_lengkap, foto_profil_path').eq('status', 'aktif').order('nama_lengkap').then(({ data }) => setGuruList(data || []))
   }, [])
 
   useEffect(() => {
@@ -130,7 +135,22 @@ export default function Presensi() {
             )}
             {list.map((item) => (
               <tr key={item.id}>
-                <td className="font-medium">{item.nama_lengkap}</td>
+                <td className="font-medium">
+                  {tab === 'guru' ? (
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-full bg-ink-900/10 ring-1 ring-ink-900/10 overflow-hidden flex items-center justify-center shrink-0">
+                        {fotoGuruUrl(item.foto_profil_path) ? (
+                          <img src={fotoGuruUrl(item.foto_profil_path)} alt={item.nama_lengkap} className="w-full h-full object-cover" />
+                        ) : (
+                          <span className="text-xs font-semibold text-ink-700/60">{item.nama_lengkap?.[0] || '?'}</span>
+                        )}
+                      </div>
+                      <span>{item.nama_lengkap}</span>
+                    </div>
+                  ) : (
+                    item.nama_lengkap
+                  )}
+                </td>
                 <td>
                   <div className="flex gap-1.5">
                     {STATUS_OPTS.map((opt) => (
