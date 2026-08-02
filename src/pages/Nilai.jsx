@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabaseClient'
+import { useAuth } from '../lib/AuthContext'
 import Layout from '../components/Layout'
 import { Loader2, Save, BookOpenCheck } from 'lucide-react'
 
 const JENIS_OPTS = ['Tugas', 'UH', 'UTS', 'UAS']
 
 export default function Nilai() {
+  const { profil } = useAuth()
   const [kelasList, setKelasList] = useState([])
   const [kelasId, setKelasId] = useState('')
   const [siswaList, setSiswaList] = useState([])
@@ -60,6 +62,7 @@ export default function Nilai() {
         semester,
         tahun_ajaran: tahunAjaran,
         nilai: Number(nilaiMap[s.id]),
+        diisi_oleh: profil?.guru_id || null,
       }))
     const { error } = await supabase.from('nilai').upsert(rows, { onConflict: 'siswa_id,mata_pelajaran,jenis,semester,tahun_ajaran' })
     setSaving(false)
