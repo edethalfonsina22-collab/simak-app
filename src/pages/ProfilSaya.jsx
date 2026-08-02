@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../lib/AuthContext'
 import Layout from '../components/Layout'
+import GrafikAktivitas from '../components/GrafikAktivitas'
 import { Camera, Loader2, Save } from 'lucide-react'
 
 export default function ProfilSaya() {
@@ -144,6 +145,8 @@ export default function ProfilSaya() {
             <p className="text-sm text-blue-200/70">{data.nip ? `NIP ${data.nip}` : 'NIP belum diisi'}</p>
           </div>
         </div>
+
+        <GrafikAktivitas guruId={profil.guru_id} />
 
         <div className="card relative overflow-hidden p-6 space-y-4">
           <span className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-900 to-brass-400" />
