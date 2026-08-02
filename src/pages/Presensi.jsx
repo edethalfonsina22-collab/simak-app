@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabaseClient'
+import { useAuth } from '../lib/AuthContext'
 import Layout from '../components/Layout'
 import { Loader2, Save, ClipboardCheck } from 'lucide-react'
 
@@ -11,6 +12,7 @@ const STATUS_OPTS = [
 ]
 
 export default function Presensi() {
+  const { profil } = useAuth()
   const [tab, setTab] = useState('siswa')
   const [tanggal, setTanggal] = useState(() => new Date().toISOString().slice(0, 10))
   const [kelasList, setKelasList] = useState([])
@@ -63,7 +65,7 @@ export default function Presensi() {
   async function handleSave() {
     setSaving(true)
     const rows = tab === 'siswa'
-      ? siswaList.map((s) => ({ siswa_id: s.id, tanggal, status: statusMap[s.id] || 'hadir' }))
+      ? siswaList.map((s) => ({ siswa_id: s.id, tanggal, status: statusMap[s.id] || 'hadir', diisi_oleh: profil?.guru_id || null }))
       : guruList.map((g) => ({ guru_id: g.id, tanggal, status: statusMap[g.id] || 'hadir' }))
 
     const table = tab === 'siswa' ? 'presensi_siswa' : 'presensi_guru'
