@@ -12,7 +12,6 @@ import {
   Dumbbell,
   NotebookPen,
   Printer,
-  Wand2,
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 
@@ -32,65 +31,6 @@ const CATATAN_KOSONG = {
   kondisi_kesehatan: '',
   keputusan: '',
 }
-
-// --- Template deskripsi capaian siap pakai ---
-// Guru tinggal pilih predikat, teks otomatis terisi (nama siswa & mapel disesuaikan), lalu bisa diedit manual.
-const TEMPLATE_CAPAIAN = {
-  'Sangat Baik': (nama, mapel) =>
-    `${nama} menunjukkan penguasaan yang sangat baik pada mata pelajaran ${mapel}. Mampu memahami konsep dengan cepat, aktif dalam pembelajaran, dan menerapkannya secara konsisten dalam berbagai latihan dan tugas.`,
-  Baik: (nama, mapel) =>
-    `${nama} menunjukkan pemahaman yang baik pada mata pelajaran ${mapel}. Mengikuti pembelajaran dengan cukup baik, meski masih memerlukan sedikit penguatan pada beberapa bagian materi.`,
-  Cukup: (nama, mapel) =>
-    `${nama} menunjukkan pemahaman yang cukup pada mata pelajaran ${mapel}. Perlu bimbingan lebih lanjut agar penguasaan materi dapat semakin optimal.`,
-  'Perlu Bimbingan': (nama, mapel) =>
-    `${nama} masih memerlukan bimbingan intensif pada mata pelajaran ${mapel}. Diperlukan pendampingan lebih agar dapat memahami konsep-konsep dasar dengan baik.`,
-}
-const OPSI_TEMPLATE = Object.keys(TEMPLATE_CAPAIAN)
-
-// --- Template capaian P5 siap pakai (istilah standar Kurikulum Merdeka) ---
-const TEMPLATE_P5 = {
-  BB: (nama, dimensi) =>
-    `${nama} belum menunjukkan perkembangan yang konsisten pada dimensi ${dimensi}. Diperlukan pendampingan dan stimulasi lebih lanjut agar dapat berkembang secara optimal.`,
-  MB: (nama, dimensi) =>
-    `${nama} mulai menunjukkan perkembangan pada dimensi ${dimensi}, namun masih memerlukan bimbingan agar sikap dan keterampilan tersebut menjadi lebih konsisten.`,
-  BSH: (nama, dimensi) =>
-    `${nama} berkembang sesuai harapan pada dimensi ${dimensi}, mampu menunjukkan sikap dan keterampilan yang diharapkan secara konsisten dalam kegiatan sehari-hari.`,
-  SB: (nama, dimensi) =>
-    `${nama} sangat berkembang pada dimensi ${dimensi}, mampu menunjukkan sikap dan keterampilan yang diharapkan secara mandiri, bahkan dapat menjadi teladan bagi teman-temannya.`,
-}
-const OPSI_TEMPLATE_P5 = Object.keys(TEMPLATE_P5)
-const LABEL_TEMPLATE_P5 = {
-  BB: 'BB — Belum Berkembang',
-  MB: 'MB — Mulai Berkembang',
-  BSH: 'BSH — Berkembang Sesuai Harapan',
-  SB: 'SB — Sangat Berkembang',
-}
-
-// --- Template keterangan ekstrakurikuler siap pakai ---
-const TEMPLATE_EKSKUL = {
-  'Sangat Baik': (nama, ekskul) =>
-    `${nama} menunjukkan keaktifan dan capaian yang sangat baik dalam kegiatan ${ekskul}. Antusias mengikuti setiap kegiatan dan mampu menunjukkan hasil yang optimal.`,
-  Baik: (nama, ekskul) =>
-    `${nama} menunjukkan keaktifan yang baik dalam kegiatan ${ekskul}, mengikuti kegiatan dengan cukup baik dan menunjukkan perkembangan kemampuan.`,
-  Cukup: (nama, ekskul) =>
-    `${nama} mengikuti kegiatan ${ekskul} dengan cukup baik, namun keikutsertaan dan capaiannya masih perlu ditingkatkan.`,
-  'Perlu Bimbingan': (nama, ekskul) =>
-    `${nama} masih memerlukan motivasi dan bimbingan lebih lanjut agar dapat lebih aktif dan berkembang dalam kegiatan ${ekskul}.`,
-}
-const OPSI_TEMPLATE_EKSKUL = Object.keys(TEMPLATE_EKSKUL)
-
-// --- Template catatan wali kelas siap pakai ---
-const TEMPLATE_CATATAN = {
-  'Perkembangan Baik': (nama) =>
-    `${nama} menunjukkan perkembangan yang baik secara akademik maupun sikap selama semester ini. Diharapkan dapat mempertahankan dan terus meningkatkan semangat belajarnya.`,
-  'Aktif dan Berprestasi': (nama) =>
-    `${nama} merupakan siswa yang aktif dan berprestasi, baik dalam kegiatan akademik maupun non-akademik. Diharapkan dapat terus menjadi teladan bagi teman-temannya.`,
-  'Perlu Peningkatan Kedisiplinan': (nama) =>
-    `${nama} perlu meningkatkan kedisiplinan, terutama dalam hal kehadiran dan ketepatan mengumpulkan tugas. Dukungan dan pemantauan dari orang tua di rumah sangat diharapkan.`,
-  'Perlu Perhatian Khusus': (nama) =>
-    `${nama} memerlukan perhatian khusus dari orang tua dan guru terkait perkembangan belajarnya. Kerja sama antara sekolah dan keluarga sangat diperlukan untuk mendukung perkembangan ${nama}.`,
-}
-const OPSI_TEMPLATE_CATATAN = Object.keys(TEMPLATE_CATATAN)
 
 export default function Rapor() {
   const navigate = useNavigate()
@@ -225,15 +165,6 @@ export default function Rapor() {
     )
   }
 
-  function terapkanTemplate(index, predikat) {
-    if (!predikat) return
-    const c = capaianList[index]
-    const namaSiswa = siswaTerpilih?.nama_lengkap || 'Siswa ini'
-    const namaMapel = c.mata_pelajaran?.trim() || 'mata pelajaran ini'
-    const teks = TEMPLATE_CAPAIAN[predikat](namaSiswa, namaMapel)
-    ubahBarisCapaian(index, 'deskripsi_capaian', teks)
-  }
-
   function tambahBarisCapaian() {
     setCapaianList((prev) => [
       ...prev,
@@ -255,10 +186,11 @@ export default function Rapor() {
       data: { user },
     } = await supabase.auth.getUser()
 
+    let gagal = []
     for (const c of capaianList) {
       if (!c.mata_pelajaran.trim()) continue
       if (c.id) {
-        await supabase
+        const { error } = await supabase
           .from('capaian_mapel')
           .update({
             mata_pelajaran: c.mata_pelajaran,
@@ -266,8 +198,9 @@ export default function Rapor() {
             diisi_oleh: user?.id,
           })
           .eq('id', c.id)
+        if (error) gagal.push(error.message)
       } else if (c.deskripsi_capaian.trim()) {
-        await supabase.from('capaian_mapel').insert({
+        const { error } = await supabase.from('capaian_mapel').insert({
           siswa_id: siswaId,
           mata_pelajaran: c.mata_pelajaran,
           semester,
@@ -275,8 +208,10 @@ export default function Rapor() {
           deskripsi_capaian: c.deskripsi_capaian,
           diisi_oleh: user?.id,
         })
+        if (error) gagal.push(error.message)
       }
     }
+    if (gagal.length) alert('Gagal menyimpan sebagian deskripsi capaian:\n' + [...new Set(gagal)].join('\n'))
     await muatRapor()
     setSaving(false)
   }
@@ -284,15 +219,6 @@ export default function Rapor() {
   // ---------- P5 ----------
   function ubahBarisP5(index, field, value) {
     setP5List((prev) => prev.map((p, i) => (i === index ? { ...p, [field]: value } : p)))
-  }
-
-  function terapkanTemplateP5(index, level) {
-    if (!level) return
-    const p = p5List[index]
-    const namaSiswa = siswaTerpilih?.nama_lengkap || 'Siswa ini'
-    const dimensi = p.dimensi?.trim() || 'dimensi ini'
-    const teks = TEMPLATE_P5[level](namaSiswa, dimensi)
-    ubahBarisP5(index, 'capaian', teks)
   }
 
   function tambahBarisP5() {
@@ -312,15 +238,17 @@ export default function Rapor() {
 
   async function simpanP5() {
     setSaving(true)
+    let gagal = []
     for (const p of p5List) {
       if (!p.tema.trim() && !p.dimensi.trim()) continue
       if (p.id) {
-        await supabase
+        const { error } = await supabase
           .from('rapor_p5')
           .update({ tema: p.tema, dimensi: p.dimensi, sub_elemen: p.sub_elemen, capaian: p.capaian })
           .eq('id', p.id)
+        if (error) gagal.push(error.message)
       } else {
-        await supabase.from('rapor_p5').insert({
+        const { error } = await supabase.from('rapor_p5').insert({
           siswa_id: siswaId,
           semester,
           tahun_ajaran: tahunAjaran,
@@ -329,8 +257,10 @@ export default function Rapor() {
           sub_elemen: p.sub_elemen,
           capaian: p.capaian,
         })
+        if (error) gagal.push(error.message)
       }
     }
+    if (gagal.length) alert('Gagal menyimpan sebagian data P5:\n' + [...new Set(gagal)].join('\n'))
     await muatRapor()
     setSaving(false)
   }
@@ -349,16 +279,6 @@ export default function Rapor() {
     )
   }
 
-  function terapkanTemplateEkskul(index, predikat) {
-    if (!predikat) return
-    const row = ekskulList[index]
-    const namaSiswa = siswaTerpilih?.nama_lengkap || 'Siswa ini'
-    const namaEkskul = row.nama_ekstrakurikuler?.trim() || 'kegiatan ini'
-    const teks = TEMPLATE_EKSKUL[predikat](namaSiswa, namaEkskul)
-    ubahBarisEkskul(index, 'predikat', predikat)
-    ubahBarisEkskul(index, 'keterangan', teks)
-  }
-
   async function hapusBarisEkskul(index) {
     const row = ekskulList[index]
     if (row.id) {
@@ -369,10 +289,11 @@ export default function Rapor() {
 
   async function simpanEkskul() {
     setSaving(true)
+    let gagal = []
     for (const row of ekskulList) {
       if (!row.nama_ekstrakurikuler.trim()) continue
       if (row.id) {
-        await supabase
+        const { error } = await supabase
           .from('ekstrakurikuler_nilai')
           .update({
             nama_ekstrakurikuler: row.nama_ekstrakurikuler,
@@ -380,8 +301,9 @@ export default function Rapor() {
             keterangan: row.keterangan,
           })
           .eq('id', row.id)
+        if (error) gagal.push(error.message)
       } else {
-        await supabase.from('ekstrakurikuler_nilai').insert({
+        const { error } = await supabase.from('ekstrakurikuler_nilai').insert({
           siswa_id: siswaId,
           semester,
           tahun_ajaran: tahunAjaran,
@@ -389,8 +311,10 @@ export default function Rapor() {
           predikat: row.predikat,
           keterangan: row.keterangan,
         })
+        if (error) gagal.push(error.message)
       }
     }
+    if (gagal.length) alert('Gagal menyimpan sebagian data Ekstrakurikuler:\n' + [...new Set(gagal)].join('\n'))
     await muatRapor()
     setSaving(false)
   }
@@ -398,13 +322,6 @@ export default function Rapor() {
   // ---------- Catatan wali kelas ----------
   function ubahCatatan(field, value) {
     setCatatan((prev) => ({ ...prev, [field]: value }))
-  }
-
-  function terapkanTemplateCatatan(kategori) {
-    if (!kategori) return
-    const namaSiswa = siswaTerpilih?.nama_lengkap || 'Siswa ini'
-    const teks = TEMPLATE_CATATAN[kategori](namaSiswa)
-    ubahCatatan('catatan', teks)
   }
 
   async function simpanCatatan() {
@@ -419,11 +336,10 @@ export default function Rapor() {
       kondisi_kesehatan: catatan.kondisi_kesehatan,
       keputusan: catatan.keputusan,
     }
-    if (catatan.id) {
-      await supabase.from('catatan_siswa').update(payload).eq('id', catatan.id)
-    } else {
-      await supabase.from('catatan_siswa').insert(payload)
-    }
+    const { error } = catatan.id
+      ? await supabase.from('catatan_siswa').update(payload).eq('id', catatan.id)
+      : await supabase.from('catatan_siswa').insert(payload)
+    if (error) alert('Gagal menyimpan catatan wali kelas:\n' + error.message)
     await muatRapor()
     setSaving(false)
   }
@@ -593,26 +509,6 @@ export default function Rapor() {
                           <Trash2 size={15} />
                         </button>
                       </div>
-
-                      <div className="flex items-center gap-2 mb-2">
-                        <Wand2 size={14} className="text-ink-700/40 shrink-0" />
-                        <select
-                          className="input-field !py-1.5 text-sm w-auto"
-                          defaultValue=""
-                          onChange={(e) => {
-                            terapkanTemplate(i, e.target.value)
-                            e.target.value = ''
-                          }}
-                        >
-                          <option value="">Isi dari template...</option>
-                          {OPSI_TEMPLATE.map((opt) => (
-                            <option key={opt} value={opt}>
-                              {opt}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-
                       <textarea
                         className="input-field min-h-[80px]"
                         placeholder="Deskripsi capaian pembelajaran..."
@@ -666,24 +562,6 @@ export default function Rapor() {
                           <Trash2 size={15} />
                         </button>
                       </div>
-                      <div className="flex items-center gap-2 mb-2">
-                        <Wand2 size={14} className="text-ink-700/40 shrink-0" />
-                        <select
-                          className="input-field !py-1.5 text-sm w-auto"
-                          defaultValue=""
-                          onChange={(e) => {
-                            terapkanTemplateP5(i, e.target.value)
-                            e.target.value = ''
-                          }}
-                        >
-                          <option value="">Isi dari template...</option>
-                          {OPSI_TEMPLATE_P5.map((opt) => (
-                            <option key={opt} value={opt}>
-                              {LABEL_TEMPLATE_P5[opt]}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
                       <textarea
                         className="input-field min-h-[60px]"
                         placeholder="Deskripsi capaian P5..."
@@ -712,52 +590,32 @@ export default function Rapor() {
               <>
                 <div className="space-y-3">
                   {ekskulList.map((row, i) => (
-                    <div key={row.id || `baru-${i}`} className="border border-ink-950/10 rounded-lg p-3">
-                      <div className="grid sm:grid-cols-[2fr_1fr_2fr_auto] gap-3 items-start mb-2">
-                        <input
-                          className="input-field"
-                          placeholder="Nama ekstrakurikuler"
-                          value={row.nama_ekstrakurikuler}
-                          onChange={(e) => ubahBarisEkskul(i, 'nama_ekstrakurikuler', e.target.value)}
-                        />
-                        <input
-                          className="input-field"
-                          placeholder="Predikat"
-                          value={row.predikat}
-                          onChange={(e) => ubahBarisEkskul(i, 'predikat', e.target.value)}
-                        />
-                        <input
-                          className="input-field"
-                          placeholder="Keterangan"
-                          value={row.keterangan}
-                          onChange={(e) => ubahBarisEkskul(i, 'keterangan', e.target.value)}
-                        />
-                        <button
-                          className="btn-secondary !px-3"
-                          onClick={() => hapusBarisEkskul(i)}
-                          title="Hapus baris"
-                        >
-                          <Trash2 size={15} />
-                        </button>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Wand2 size={14} className="text-ink-700/40 shrink-0" />
-                        <select
-                          className="input-field !py-1.5 text-sm w-auto"
-                          defaultValue=""
-                          onChange={(e) => {
-                            terapkanTemplateEkskul(i, e.target.value)
-                            e.target.value = ''
-                          }}
-                        >
-                          <option value="">Isi predikat & keterangan dari template...</option>
-                          {OPSI_TEMPLATE_EKSKUL.map((opt) => (
-                            <option key={opt} value={opt}>
-                              {opt}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
+                    <div key={row.id || `baru-${i}`} className="grid sm:grid-cols-[2fr_1fr_2fr_auto] gap-3 items-start">
+                      <input
+                        className="input-field"
+                        placeholder="Nama ekstrakurikuler"
+                        value={row.nama_ekstrakurikuler}
+                        onChange={(e) => ubahBarisEkskul(i, 'nama_ekstrakurikuler', e.target.value)}
+                      />
+                      <input
+                        className="input-field"
+                        placeholder="Predikat"
+                        value={row.predikat}
+                        onChange={(e) => ubahBarisEkskul(i, 'predikat', e.target.value)}
+                      />
+                      <input
+                        className="input-field"
+                        placeholder="Keterangan"
+                        value={row.keterangan}
+                        onChange={(e) => ubahBarisEkskul(i, 'keterangan', e.target.value)}
+                      />
+                      <button
+                        className="btn-secondary !px-3"
+                        onClick={() => hapusBarisEkskul(i)}
+                        title="Hapus baris"
+                      >
+                        <Trash2 size={15} />
+                      </button>
                     </div>
                   ))}
                 </div>
@@ -817,24 +675,6 @@ export default function Rapor() {
                 </div>
                 <div className="mb-4">
                   <label className="label-field">Catatan Wali Kelas</label>
-                  <div className="flex items-center gap-2 mb-2">
-                    <Wand2 size={14} className="text-ink-700/40 shrink-0" />
-                    <select
-                      className="input-field !py-1.5 text-sm w-auto"
-                      defaultValue=""
-                      onChange={(e) => {
-                        terapkanTemplateCatatan(e.target.value)
-                        e.target.value = ''
-                      }}
-                    >
-                      <option value="">Isi dari template...</option>
-                      {OPSI_TEMPLATE_CATATAN.map((opt) => (
-                        <option key={opt} value={opt}>
-                          {opt}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
                   <textarea
                     className="input-field min-h-[100px]"
                     placeholder="Catatan perkembangan siswa dari wali kelas..."
