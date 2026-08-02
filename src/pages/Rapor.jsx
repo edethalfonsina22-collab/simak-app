@@ -12,6 +12,7 @@ import {
   Dumbbell,
   NotebookPen,
   Printer,
+  Wand2,
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 
@@ -31,6 +32,20 @@ const CATATAN_KOSONG = {
   kondisi_kesehatan: '',
   keputusan: '',
 }
+
+// --- Template deskripsi capaian siap pakai ---
+// Guru tinggal pilih predikat, teks otomatis terisi (nama siswa & mapel disesuaikan), lalu bisa diedit manual.
+const TEMPLATE_CAPAIAN = {
+  'Sangat Baik': (nama, mapel) =>
+    `${nama} menunjukkan penguasaan yang sangat baik pada mata pelajaran ${mapel}. Mampu memahami konsep dengan cepat, aktif dalam pembelajaran, dan menerapkannya secara konsisten dalam berbagai latihan dan tugas.`,
+  Baik: (nama, mapel) =>
+    `${nama} menunjukkan pemahaman yang baik pada mata pelajaran ${mapel}. Mengikuti pembelajaran dengan cukup baik, meski masih memerlukan sedikit penguatan pada beberapa bagian materi.`,
+  Cukup: (nama, mapel) =>
+    `${nama} menunjukkan pemahaman yang cukup pada mata pelajaran ${mapel}. Perlu bimbingan lebih lanjut agar penguasaan materi dapat semakin optimal.`,
+  'Perlu Bimbingan': (nama, mapel) =>
+    `${nama} masih memerlukan bimbingan intensif pada mata pelajaran ${mapel}. Diperlukan pendampingan lebih agar dapat memahami konsep-konsep dasar dengan baik.`,
+}
+const OPSI_TEMPLATE = Object.keys(TEMPLATE_CAPAIAN)
 
 export default function Rapor() {
   const navigate = useNavigate()
@@ -163,6 +178,15 @@ export default function Rapor() {
     setCapaianList((prev) =>
       prev.map((c, i) => (i === index ? { ...c, [field]: value } : c))
     )
+  }
+
+  function terapkanTemplate(index, predikat) {
+    if (!predikat) return
+    const c = capaianList[index]
+    const namaSiswa = siswaTerpilih?.nama_lengkap || 'Siswa ini'
+    const namaMapel = c.mata_pelajaran?.trim() || 'mata pelajaran ini'
+    const teks = TEMPLATE_CAPAIAN[predikat](namaSiswa, namaMapel)
+    ubahBarisCapaian(index, 'deskripsi_capaian', teks)
   }
 
   function tambahBarisCapaian() {
@@ -498,6 +522,26 @@ export default function Rapor() {
                           <Trash2 size={15} />
                         </button>
                       </div>
+
+                      <div className="flex items-center gap-2 mb-2">
+                        <Wand2 size={14} className="text-ink-700/40 shrink-0" />
+                        <select
+                          className="input-field !py-1.5 text-sm w-auto"
+                          defaultValue=""
+                          onChange={(e) => {
+                            terapkanTemplate(i, e.target.value)
+                            e.target.value = ''
+                          }}
+                        >
+                          <option value="">Isi dari template...</option>
+                          {OPSI_TEMPLATE.map((opt) => (
+                            <option key={opt} value={opt}>
+                              {opt}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
                       <textarea
                         className="input-field min-h-[80px]"
                         placeholder="Deskripsi capaian pembelajaran..."
