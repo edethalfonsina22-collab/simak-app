@@ -26,6 +26,7 @@ export default function BuatUjian() {
   const [status, setStatus] = useState('idle'); // idle | membaca | menyimpan | selesai | error
   const [pesanError, setPesanError] = useState('');
   const [ujianDibuat, setUjianDibuat] = useState(null);
+  const [tersalin, setTersalin] = useState(false); // status tombol "Copy Link"
 
   // Ambil daftar kelas dari tabel "kelas" yang sudah ada di SIMAK
   useEffect(() => {
@@ -154,6 +155,22 @@ export default function BuatUjian() {
     }
   }
 
+  // Membangun link lengkap ke halaman siswa, contoh: https://simak-sekolah.com/ujian-online?kode=X7K2QP
+  function buatLinkUjian(kode) {
+    return `${window.location.origin}/ujian-online?kode=${kode}`;
+  }
+
+  async function copyLinkUjian() {
+    const teks = `Link Ujian: ${buatLinkUjian(ujianDibuat.kode_ujian)}\nKode Ujian: ${ujianDibuat.kode_ujian}`;
+    try {
+      await navigator.clipboard.writeText(teks);
+      setTersalin(true);
+      setTimeout(() => setTersalin(false), 2000);
+    } catch (err) {
+      setPesanError('Gagal menyalin link. Salin manual: ' + teks);
+    }
+  }
+
   if (status === 'selesai' && ujianDibuat) {
     const namaKelasDibuat = daftarKelas.find((k) => k.id === ujianDibuat.kelas_id)?.nama_kelas;
     return (
@@ -169,6 +186,23 @@ export default function BuatUjian() {
           <div className="mt-3 text-3xl font-mono font-bold tracking-widest text-[#6b0f1a] text-center bg-[#f7e6e3] rounded-lg py-3">
             {ujianDibuat.kode_ujian}
           </div>
+
+          <p className="mt-4 text-sm text-gray-700">Atau bagikan link langsung ini ke siswa:</p>
+          <div className="mt-2 flex items-stretch gap-2">
+            <input
+              readOnly
+              value={buatLinkUjian(ujianDibuat.kode_ujian)}
+              onFocus={(e) => e.target.select()}
+              className="flex-1 rounded-lg px-3 py-2 border border-[#6b0f1a]/15 bg-[#f7e6e3]/40 text-sm text-[#3b0a0a] font-mono truncate"
+            />
+            <button
+              onClick={copyLinkUjian}
+              className="px-4 py-2 rounded-lg bg-[#d4a017] text-[#3b0a0a] font-medium hover:bg-[#c4930f] transition-colors whitespace-nowrap"
+            >
+              {tersalin ? 'Tersalin! ✓' : 'Copy Link'}
+            </button>
+          </div>
+
           <p className="mt-3 text-sm text-gray-600">
             Status saat ini: <strong>{ujianDibuat.status}</strong>. Siswa baru bisa mengerjakan
             setelah Anda klik Aktifkan.
