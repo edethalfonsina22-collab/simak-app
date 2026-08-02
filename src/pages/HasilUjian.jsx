@@ -9,8 +9,10 @@ export default function HasilUjian() {
   const [daftarUjian, setDaftarUjian] = useState([]);
   const [ujianDipilih, setUjianDipilih] = useState('');
   const [hasil, setHasil] = useState([]);
+  const [soalDetail, setSoalDetail] = useState([]); // [{id, urutan, soal, jawaban_benar}]
   const [jumlahSoal, setJumlahSoal] = useState(0);
   const [memuat, setMemuat] = useState(true);
+  const [tampilkanPerSoal, setTampilkanPerSoal] = useState(false);
 
   // Ambil semua ujian milik guru ini
   useEffect(() => {
@@ -31,25 +33,29 @@ export default function HasilUjian() {
     ambilUjian();
   }, [guruId]);
 
-  // Ambil hasil + jumlah soal setiap kali ujian yang dipilih berubah
+  // Ambil hasil + detail soal setiap kali ujian yang dipilih berubah
   useEffect(() => {
     if (!ujianDipilih) return;
 
     async function ambilHasil() {
       const { data: hasilData } = await supabase
         .from('hasil_ujian')
-        .select('id, nama_siswa, skor, waktu_selesai')
+        .select('id, nama_siswa, skor, waktu_selesai, jawaban')
         .eq('ujian_id', ujianDipilih)
         .order('skor', { ascending: false });
 
       setHasil(hasilData || []);
 
-      const { count } = await supabase
+      // Ambil detail soal (bukan cuma jumlahnya) supaya bisa dicocokkan dengan
+      // jawaban tiap siswa untuk analisis per-soal.
+      const { data: soalData } = await supabase
         .from('soal_ujian')
-        .select('id', { count: 'exact', head: true })
-        .eq('ujian_id', ujianDipilih);
+        .select('id, urutan, soal, jawaban_benar')
+        .eq('ujian_id', ujianDipilih)
+        .order('urutan', { ascending: true });
 
-      setJumlahSoal(count || 0);
+      setSoalDetail(soalData || []);
+      setJumlahSoal((soalData || []).length);
     }
     ambilHasil();
 
@@ -82,6 +88,14 @@ export default function HasilUjian() {
     hasil.length > 0
       ? (hasil.reduce((sum, h) => sum + Number(h.skor), 0) / hasil.length).toFixed(1)
       : '-';
+
+  // Statistik per soal: berapa % siswa yang menjawab benar soal ini.
+  // Dipakai untuk menandai soal yang paling banyak salah (kandidat remedial).
+  const statistikPerSoal = soalDetail.map((s, i) => {
+    const totalBenar = hasil.filter((h) => h.jawaban?.[s.id] === s.jawaban_benar).length;
+    const persen = hasil.length > 0 ? Math.round((totalBenar / hasil.length) * 100) : 0;
+    return { ...s, nomor: i + 1, persen };
+  });
 
   function unduhCSV() {
     const header = 'Nama Siswa,Skor,Waktu Selesai\n';
@@ -123,7 +137,7 @@ export default function HasilUjian() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-[#fdf3f1] to-[#f7e6e3] flex items-start justify-center p-6">
-      <div className="w-full max-w-3xl space-y-5 bg-white rounded-xl border border-[#6b0f1a]/15 shadow-sm p-6">
+      <div className="w-full max-w-5xl space-y-5 bg-white rounded-xl border border-[#6b0f1a]/15 shadow-sm p-6">
         <h3 className="text-lg font-semibold text-[#3b0a0a] flex items-center gap-2">
           <span className="w-1.5 h-5 rounded-full bg-[#d4a017]"></span>
           Hasil Ujian
@@ -159,19 +173,28 @@ export default function HasilUjian() {
           </div>
         )}
 
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between flex-wrap gap-2">
           <p className="text-sm text-[#6b0f1a]/60">
             {ujianAktif?.status === 'aktif'
               ? '🟢 Ujian aktif — hasil masuk otomatis secara real-time'
               : 'Ujian tidak aktif'}
           </p>
-          <button
-            onClick={unduhCSV}
-            disabled={hasil.length === 0}
-            className="text-sm px-3 py-1.5 rounded-lg border border-[#6b0f1a]/20 text-[#6b0f1a] hover:bg-[#6b0f1a]/5 transition-colors disabled:opacity-40"
-          >
-            Unduh CSV
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setTampilkanPerSoal(!tampilkanPerSoal)}
+              disabled={hasil.length === 0 || soalDetail.length === 0}
+              className="text-sm px-3 py-1.5 rounded-lg border border-[#6b0f1a]/20 text-[#6b0f1a] hover:bg-[#6b0f1a]/5 transition-colors disabled:opacity-40"
+            >
+              {tampilkanPerSoal ? 'Sembunyikan Analisis Per Soal' : 'Lihat Analisis Per Soal'}
+            </button>
+            <button
+              onClick={unduhCSV}
+              disabled={hasil.length === 0}
+              className="text-sm px-3 py-1.5 rounded-lg border border-[#6b0f1a]/20 text-[#6b0f1a] hover:bg-[#6b0f1a]/5 transition-colors disabled:opacity-40"
+            >
+              Unduh CSV
+            </button>
+          </div>
         </div>
 
         <table className="w-full text-sm rounded-xl overflow-hidden border border-[#6b0f1a]/10">
@@ -203,6 +226,79 @@ export default function HasilUjian() {
             ))}
           </tbody>
         </table>
+
+        {tampilkanPerSoal && hasil.length > 0 && soalDetail.length > 0 && (
+          <div className="space-y-3">
+            <div>
+              <h4 className="text-sm font-semibold text-[#3b0a0a]">Analisis Per Soal</h4>
+              <p className="text-xs text-[#6b0f1a]/50">
+                Arahkan kursor ke nomor soal untuk lihat teks soal & jawaban benar. Kolom dengan
+                latar merah (di bawah 50% benar) menandakan soal yang paling banyak salah —
+                kandidat untuk dijelaskan ulang / remedial.
+              </p>
+            </div>
+
+            <div className="overflow-x-auto border border-[#6b0f1a]/10 rounded-xl">
+              <table className="text-sm border-collapse w-full">
+                <thead>
+                  <tr>
+                    <th className="sticky left-0 bg-[#6b0f1a] text-white px-3 py-2 text-left whitespace-nowrap z-10">
+                      Nama Siswa
+                    </th>
+                    {statistikPerSoal.map((s) => (
+                      <th
+                        key={s.id}
+                        title={`Soal ${s.nomor}: ${s.soal}\nJawaban benar: ${s.jawaban_benar}\n${s.persen}% siswa menjawab benar`}
+                        className={`px-2 py-2 text-center font-medium cursor-help ${
+                          s.persen < 50 ? 'bg-red-100 text-red-700' : 'bg-[#f7e6e3]/60 text-[#6b0f1a]'
+                        }`}
+                      >
+                        {s.nomor}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {hasil.map((h) => (
+                    <tr key={h.id} className="border-t border-[#6b0f1a]/8">
+                      <td className="sticky left-0 bg-white px-3 py-2 font-medium text-[#3b0a0a] whitespace-nowrap">
+                        {h.nama_siswa}
+                      </td>
+                      {statistikPerSoal.map((s) => {
+                        const benar = h.jawaban?.[s.id] === s.jawaban_benar;
+                        return (
+                          <td
+                            key={s.id}
+                            className={`px-2 py-2 text-center ${
+                              benar ? 'text-green-600' : 'text-red-600 bg-red-50/60'
+                            }`}
+                          >
+                            {benar ? '✓' : '✗'}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))}
+                  <tr className="border-t-2 border-[#6b0f1a]/15 bg-[#f7e6e3]/40 font-semibold">
+                    <td className="sticky left-0 bg-[#f7e6e3]/40 px-3 py-2 text-[#3b0a0a] whitespace-nowrap">
+                      % Benar
+                    </td>
+                    {statistikPerSoal.map((s) => (
+                      <td
+                        key={s.id}
+                        className={`px-2 py-2 text-center ${
+                          s.persen < 50 ? 'text-red-700' : 'text-[#6b0f1a]'
+                        }`}
+                      >
+                        {s.persen}%
+                      </td>
+                    ))}
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
