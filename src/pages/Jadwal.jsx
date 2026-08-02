@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabaseClient'
 import Layout from '../components/Layout'
-import { Plus, Trash2, X, Loader2, Upload, Download, CheckCircle2, AlertCircle } from 'lucide-react'
+import { Plus, Trash2, X, Loader2, Upload, Download, CheckCircle2, AlertCircle, Pencil } from 'lucide-react'
 
 const HARI = ['Senin', 'Selasa', 'Rabu', 'Kamis', "Jum'at", 'Sabtu']
 const emptyForm = { kelas_id: '', mata_pelajaran: '', guru_id: '', hari: 'Senin', jam_mulai: '', jam_selesai: '' }
@@ -18,6 +18,7 @@ export default function Jadwal() {
   const [showForm, setShowForm] = useState(false)
   const [form, setForm] = useState(emptyForm)
   const [saving, setSaving] = useState(false)
+  const [editingId, setEditingId] = useState(null) // null = mode tambah, isi id = mode edit
 
   // --- State untuk Import Massal ---
   const [showImport, setShowImport] = useState(false)
@@ -45,10 +46,37 @@ export default function Jadwal() {
     e.preventDefault()
     setSaving(true)
     const payload = { ...form, kelas_id: form.kelas_id || null, guru_id: form.guru_id || null }
-    const { error } = await supabase.from('jadwal').insert(payload)
+
+    const { error } = editingId
+      ? await supabase.from('jadwal').update(payload).eq('id', editingId)
+      : await supabase.from('jadwal').insert(payload)
+
     setSaving(false)
-    if (!error) { setShowForm(false); setForm(emptyForm); loadData() }
-    else alert('Gagal menyimpan: ' + error.message)
+    if (!error) {
+      closeFormModal()
+      loadData()
+    } else {
+      alert('Gagal menyimpan: ' + error.message)
+    }
+  }
+
+  function handleEdit(j) {
+    setForm({
+      kelas_id: j.kelas_id || '',
+      mata_pelajaran: j.mata_pelajaran || '',
+      guru_id: j.guru_id || '',
+      hari: j.hari,
+      jam_mulai: j.jam_mulai?.slice(0, 5) || '',
+      jam_selesai: j.jam_selesai?.slice(0, 5) || '',
+    })
+    setEditingId(j.id)
+    setShowForm(true)
+  }
+
+  function closeFormModal() {
+    setShowForm(false)
+    setForm(emptyForm)
+    setEditingId(null)
   }
 
   async function handleDelete(id) {
@@ -234,7 +262,8 @@ export default function Jadwal() {
                       <td className="px-4 py-3">{j.kelas?.nama_kelas || '—'}</td>
                       <td className="px-4 py-3 font-medium text-[#3b0a0a]">{j.mata_pelajaran}</td>
                       <td className="px-4 py-3">{j.guru?.nama_lengkap || '—'}</td>
-                      <td className="px-4 py-3 text-right">
+                      <td className="px-4 py-3 text-right whitespace-nowrap">
+                        <button onClick={() => handleEdit(j)} className="p-1.5 hover:bg-[#6b0f1a]/10 rounded-lg text-[#6b0f1a] mr-1"><Pencil size={14} /></button>
                         <button onClick={() => handleDelete(j.id)} className="p-1.5 hover:bg-[#6b0f1a]/10 rounded-lg text-[#8f1f22]"><Trash2 size={14} /></button>
                       </td>
                     </tr>
@@ -250,8 +279,8 @@ export default function Jadwal() {
       {showForm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#3b0a0a]/50 backdrop-blur-sm p-4">
           <form onSubmit={handleSubmit} className="bg-white rounded-xl shadow-xl w-full max-w-md p-6 relative border-t-4 border-[#6b0f1a]">
-            <button type="button" onClick={() => setShowForm(false)} className="absolute top-4 right-4 text-[#6b0f1a]/40 hover:text-[#6b0f1a]"><X size={20} /></button>
-            <h2 className="font-display text-xl font-semibold mb-4 text-[#3b0a0a]">Tambah Jadwal</h2>
+            <button type="button" onClick={closeFormModal} className="absolute top-4 right-4 text-[#6b0f1a]/40 hover:text-[#6b0f1a]"><X size={20} /></button>
+            <h2 className="font-display text-xl font-semibold mb-4 text-[#3b0a0a]">{editingId ? 'Edit Jadwal' : 'Tambah Jadwal'}</h2>
             <div className="space-y-3">
               <div>
                 <label className="text-xs font-medium text-[#6b0f1a]/70 uppercase tracking-wide mb-1.5 block">Kelas</label>
@@ -289,8 +318,8 @@ export default function Jadwal() {
               </div>
             </div>
             <div className="mt-5 flex justify-end gap-3">
-              <button type="button" className="px-4 py-2 rounded-lg text-sm font-medium bg-[#f7e6e3] text-[#6b0f1a] hover:bg-[#efd3ce] transition-colors" onClick={() => setShowForm(false)}>Batal</button>
-              <button type="submit" disabled={saving} className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-[#6b0f1a] text-white hover:bg-[#7d1420] transition-colors disabled:opacity-50">{saving && <Loader2 size={16} className="animate-spin" />} Simpan</button>
+              <button type="button" className="px-4 py-2 rounded-lg text-sm font-medium bg-[#f7e6e3] text-[#6b0f1a] hover:bg-[#efd3ce] transition-colors" onClick={closeFormModal}>Batal</button>
+              <button type="submit" disabled={saving} className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-[#6b0f1a] text-white hover:bg-[#7d1420] transition-colors disabled:opacity-50">{saving && <Loader2 size={16} className="animate-spin" />} {editingId ? 'Update' : 'Simpan'}</button>
             </div>
           </form>
         </div>
