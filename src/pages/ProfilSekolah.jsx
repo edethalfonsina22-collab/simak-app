@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabaseClient'
 import Layout from '../components/Layout'
-import { Save, Loader2, CheckCircle2 } from 'lucide-react'
+import { Save, Loader2, CheckCircle2, ImagePlus } from 'lucide-react'
 
 const emptyForm = {
   nama_sekolah: '',
@@ -10,6 +10,8 @@ const emptyForm = {
   telepon: '',
   email: '',
   kepala_sekolah: '',
+  nip_kepala_sekolah: '',
+  logo_path: '',
   tahun_berdiri: '',
   akreditasi: '',
   visi: '',
@@ -21,12 +23,20 @@ export default function ProfilSekolah() {
   const [form, setForm] = useState(emptyForm)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [uploadingLogo, setUploadingLogo] = useState(false)
   const [tersimpan, setTersimpan] = useState(false)
+  const [logoUrl, setLogoUrl] = useState('')
 
   async function muatData() {
     setLoading(true)
     const { data } = await supabase.from('profil_sekolah').select('*').eq('id', 1).maybeSingle()
-    if (data) setForm({ ...emptyForm, ...data })
+    if (data) {
+      setForm({ ...emptyForm, ...data })
+      if (data.logo_path) {
+        const { data: pub } = supabase.storage.from('profil-sekolah').getPublicUrl(data.logo_path)
+        setLogoUrl(pub.publicUrl)
+      }
+    }
     setLoading(false)
   }
 
@@ -52,6 +62,30 @@ export default function ProfilSekolah() {
     }
   }
 
+  async function handleLogoChange(e) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setUploadingLogo(true)
+
+    const ext = file.name.split('.').pop()
+    const path = `logo-${Date.now()}.${ext}`
+
+    const { error: uploadError } = await supabase.storage.from('profil-sekolah').upload(path, file, {
+      upsert: true,
+    })
+
+    if (uploadError) {
+      alert('Gagal upload logo: ' + uploadError.message)
+      setUploadingLogo(false)
+      return
+    }
+
+    const { data: pub } = supabase.storage.from('profil-sekolah').getPublicUrl(path)
+    setLogoUrl(pub.publicUrl)
+    setForm((f) => ({ ...f, logo_path: path }))
+    setUploadingLogo(false)
+  }
+
   function ubah(field, value) {
     setForm({ ...form, [field]: value })
   }
@@ -67,9 +101,30 @@ export default function ProfilSekolah() {
   return (
     <Layout
       title="Profil Sekolah"
-      subtitle="Data ini tampil di halaman PPDB publik dan bisa dipakai untuk keperluan administrasi lain"
+      subtitle="Data ini tampil di halaman PPDB publik dan dipakai untuk kop rapor & dokumen resmi lain"
     >
       <form onSubmit={handleSubmit} className="space-y-5 max-w-3xl">
+        <div className="card p-6">
+          <h3 className="font-display font-semibold text-ink-950 mb-4">Logo Sekolah</h3>
+          <div className="flex items-center gap-4">
+            <div className="w-20 h-20 rounded-lg border border-ink-900/[0.1] flex items-center justify-center overflow-hidden bg-ink-900/[0.02] shrink-0">
+              {logoUrl ? (
+                <img src={logoUrl} alt="Logo sekolah" className="w-full h-full object-contain" />
+              ) : (
+                <ImagePlus size={24} className="text-ink-700/30" />
+              )}
+            </div>
+            <div>
+              <label className="btn-secondary cursor-pointer inline-flex">
+                {uploadingLogo ? <Loader2 size={16} className="animate-spin" /> : <ImagePlus size={16} />}
+                {uploadingLogo ? 'Mengunggah...' : 'Upload Logo'}
+                <input type="file" accept="image/*" className="hidden" onChange={handleLogoChange} disabled={uploadingLogo} />
+              </label>
+              <p className="text-xs text-ink-700/50 mt-1.5">Format PNG/JPG, dipakai di kop rapor & dokumen resmi.</p>
+            </div>
+          </div>
+        </div>
+
         <div className="card p-6">
           <h3 className="font-display font-semibold text-ink-950 mb-4">Data Umum</h3>
           <div className="grid sm:grid-cols-2 gap-4">
@@ -84,6 +139,10 @@ export default function ProfilSekolah() {
             <div>
               <label className="label-field">Kepala Sekolah</label>
               <input className="input-field" value={form.kepala_sekolah} onChange={(e) => ubah('kepala_sekolah', e.target.value)} />
+            </div>
+            <div>
+              <label className="label-field">NIP Kepala Sekolah</label>
+              <input className="input-field" value={form.nip_kepala_sekolah} onChange={(e) => ubah('nip_kepala_sekolah', e.target.value)} />
             </div>
             <div>
               <label className="label-field">Tahun Berdiri</label>
