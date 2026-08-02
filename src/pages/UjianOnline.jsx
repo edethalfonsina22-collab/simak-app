@@ -4,6 +4,16 @@ import { supabase } from '../lib/supabaseClient'; // sesuaikan kalau nama/lokasi
 // Halaman ini dipasang terpisah, contoh route: /ujian-online
 // TIDAK perlu login siswa sama sekali — dan HARUS di luar <ProtectedRoute> di App.jsx.
 
+// Mengacak urutan array secara acak (Fisher-Yates), tidak mengubah array aslinya.
+function acakUrutan(arr) {
+  const hasil = [...arr];
+  for (let i = hasil.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [hasil[i], hasil[j]] = [hasil[j], hasil[i]];
+  }
+  return hasil;
+}
+
 export default function UjianOnline() {
   const [tahap, setTahap] = useState('masuk'); // masuk | pilih-nama | kerjakan | selesai
   const [kodeUjian, setKodeUjian] = useState('');
@@ -18,6 +28,10 @@ export default function UjianOnline() {
   const [skorAkhir, setSkorAkhir] = useState(null);
   const [sudahMengerjakan, setSudahMengerjakan] = useState(null); // null = belum dicek, angka = skor lama, false = belum pernah
   const [cekStatusLoading, setCekStatusLoading] = useState(false);
+  // Pemetaan posisi tampil (A/B/C/D di layar) -> huruf jawaban asli di database,
+  // dibuat sekali per siswa per soal supaya isi pilihan jawaban terlihat acak
+  // (anti-nyontek), tapi tetap konsisten selama siswa mengerjakan.
+  const [pemetaanPilihan, setPemetaanPilihan] = useState({}); // { [soalId]: ['C','A','D','B'] }
 
   // Kalau siswa membuka lewat link yang sudah membawa ?kode=XXXXXX,
   // ambil otomatis dari URL dan langsung cari ujiannya — tidak perlu ketik manual.
@@ -86,7 +100,20 @@ export default function UjianOnline() {
     }
 
     setUjian(ujianData);
-    setSoalList(soalData);
+
+    // Acak urutan soal per siswa (anti-nyontek antar siswa yang duduk berdekatan)
+    const soalTeracak = acakUrutan(soalData);
+
+    // Untuk setiap soal, buat pemetaan posisi tampil A/B/C/D -> huruf jawaban asli.
+    // Contoh: pemetaan['id-soal-1'] = ['C','A','D','B'] artinya slot A di layar
+    // menampilkan konten pilihan_c asli, slot B menampilkan pilihan_a asli, dst.
+    const pemetaan = {};
+    soalData.forEach((s) => {
+      pemetaan[s.id] = acakUrutan(['A', 'B', 'C', 'D']);
+    });
+
+    setSoalList(soalTeracak);
+    setPemetaanPilihan(pemetaan);
     setDaftarSiswa(siswaData);
     setMemuat(false);
     setTahap('pilih-nama');
@@ -250,24 +277,31 @@ export default function UjianOnline() {
             <p className="font-medium mb-3">
               {i + 1}. {s.soal}
             </p>
-            {['a', 'b', 'c', 'd'].map((huruf) => (
-              <label
-                key={huruf}
-                className={`flex items-center gap-2 p-2 rounded-lg cursor-pointer mb-1 ${
-                  jawaban[s.id] === huruf.toUpperCase() ? 'bg-blue-50 border border-blue-300' : ''
-                }`}
-              >
-                <input
-                  type="radio"
-                  name={`soal-${s.id}`}
-                  checked={jawaban[s.id] === huruf.toUpperCase()}
-                  onChange={() => pilihJawaban(s.id, huruf.toUpperCase())}
-                />
-                <span>
-                  {huruf.toUpperCase()}. {s[`pilihan_${huruf}`]}
-                </span>
-              </label>
-            ))}
+            {['a', 'b', 'c', 'd'].map((huruf, idx) => {
+              // hurufAsli = huruf jawaban sesungguhnya di database untuk konten yang
+              // ditampilkan di slot ini (posisi tampil sudah diacak per siswa)
+              const petaSoal = pemetaanPilihan[s.id];
+              const hurufAsli = petaSoal ? petaSoal[idx] : huruf.toUpperCase();
+              const kontenPilihan = s[`pilihan_${hurufAsli.toLowerCase()}`];
+              return (
+                <label
+                  key={huruf}
+                  className={`flex items-center gap-2 p-2 rounded-lg cursor-pointer mb-1 ${
+                    jawaban[s.id] === hurufAsli ? 'bg-blue-50 border border-blue-300' : ''
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name={`soal-${s.id}`}
+                    checked={jawaban[s.id] === hurufAsli}
+                    onChange={() => pilihJawaban(s.id, hurufAsli)}
+                  />
+                  <span>
+                    {huruf.toUpperCase()}. {kontenPilihan}
+                  </span>
+                </label>
+              );
+            })}
           </div>
         ))}
 
