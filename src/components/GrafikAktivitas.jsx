@@ -9,9 +9,8 @@ const JUMLAH_MINGGU = 8
 // --- Konfigurasi sumber data ---
 // Sesuaikan nama tabel & kolom di sini kalau berbeda dengan struktur database Anda.
 const SUMBER_DATA = [
-  { key: 'absensi', label: 'Absensi', table: 'absensi', kolom_guru: 'guru_id', kolom_tanggal: 'tanggal', warna: '#1e3a8a' },
-  { key: 'nilai', label: 'Nilai', table: 'nilai', kolom_guru: 'guru_id', kolom_tanggal: 'tanggal', warna: '#d4a94e' },
-  { key: 'lainnya', label: 'Lainnya', table: 'jurnal_kelas', kolom_guru: 'guru_id', kolom_tanggal: 'tanggal', warna: '#6b9080' },
+  { key: 'absensi', label: 'Absensi', table: 'presensi_siswa', kolom_guru: 'diisi_oleh', kolom_tanggal: 'tanggal', warna: '#1e3a8a' },
+  { key: 'nilai', label: 'Nilai', table: 'nilai', kolom_guru: 'diisi_oleh', kolom_tanggal: 'dibuat_pada', warna: '#d4a94e' },
 ]
 
 function awalMinggu(date) {
@@ -74,7 +73,6 @@ export default function GrafikAktivitas({ guruId }) {
           _mulai: mulai,
           absensi: 0,
           nilai: 0,
-          lainnya: 0,
         }))
 
         for (const sumber of SUMBER_DATA) {
@@ -110,7 +108,7 @@ export default function GrafikAktivitas({ guruId }) {
         <h3 className="font-display font-semibold text-ink-950">Aktivitas Administrasi Kelas</h3>
       </div>
       <p className="text-xs text-ink-700/60 -mt-2">
-        Ringkasan pengisian absensi, nilai, dan catatan kelas per minggu ({JUMLAH_MINGGU} minggu terakhir)
+        Ringkasan pengisian absensi dan nilai per minggu ({JUMLAH_MINGGU} minggu terakhir)
       </p>
 
       {loading && (
