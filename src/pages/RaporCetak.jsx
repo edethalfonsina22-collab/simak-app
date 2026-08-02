@@ -157,22 +157,37 @@ export default function RaporCetak() {
       </div>
 
       <div className="lembar-cetak max-w-[800px] mx-auto bg-white shadow-lg p-10 text-sm text-ink-950">
-        <div className="flex items-center gap-4 mb-4 pb-4 border-b-2 border-ink-950/70">
-          <div className="w-16 h-16 shrink-0 flex items-center justify-center">
+        <div className="flex items-center gap-4 mb-1.5">
+          <div className="w-20 h-20 shrink-0 flex items-center justify-center">
             {logoUrl && <img src={logoUrl} alt="Logo sekolah" className="w-full h-full object-contain" />}
           </div>
           <div className="text-center flex-1">
-            <h1 className="font-display text-lg font-bold uppercase">{sekolah?.nama_sekolah || 'Nama Sekolah'}</h1>
-            {sekolah?.npsn && <p className="text-xs text-ink-700/60">NPSN: {sekolah.npsn}</p>}
-            {sekolah?.alamat && <p className="text-xs text-ink-700/60">{sekolah.alamat}</p>}
-            {(sekolah?.telepon || sekolah?.email) && (
-              <p className="text-xs text-ink-700/60">
-                {[sekolah?.telepon, sekolah?.email].filter(Boolean).join(' · ')}
-              </p>
+            {sekolah?.kabupaten && (
+              <p className="font-display font-bold uppercase text-sm tracking-wide">{sekolah.kabupaten}</p>
+            )}
+            {sekolah?.dinas_pendidikan && (
+              <p className="font-display font-bold uppercase text-sm tracking-wide">{sekolah.dinas_pendidikan}</p>
+            )}
+            <h1 className="font-display text-2xl font-bold uppercase">{sekolah?.nama_sekolah || 'Nama Sekolah'}</h1>
+            {sekolah?.kecamatan && (
+              <p className="font-display font-bold uppercase text-xs tracking-wide">{sekolah.kecamatan}</p>
             )}
           </div>
-          <div className="w-16 shrink-0" />
+          <div className="w-20 shrink-0" />
         </div>
+        <div className="border-t-4 border-double border-ink-950 mb-1" />
+        <div className="border-t border-ink-950 mb-4" />
+        {(sekolah?.npsn || sekolah?.alamat || sekolah?.telepon || sekolah?.email) && (
+          <p className="text-center text-xs text-ink-700/60 mb-4">
+            {[
+              sekolah?.npsn && `NPSN: ${sekolah.npsn}`,
+              sekolah?.alamat,
+              [sekolah?.telepon, sekolah?.email].filter(Boolean).join(' · '),
+            ]
+              .filter(Boolean)
+              .join(' — ')}
+          </p>
+        )}
 
         <div className="text-center mb-6 border-b border-ink-950/20 pb-4">
           <h1 className="font-display text-xl font-semibold">LAPORAN HASIL BELAJAR SISWA</h1>
