@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../lib/AuthContext'
 import Layout from '../components/Layout'
 import GrafikAktivitas from '../components/GrafikAktivitas'
-import { Camera, Loader2, Save } from 'lucide-react'
+import { Camera, Loader2, Save, Users, School } from 'lucide-react'
 
 export default function ProfilSaya() {
   const { profil } = useAuth()
@@ -13,10 +13,15 @@ export default function ProfilSaya() {
   const [uploadingFoto, setUploadingFoto] = useState(false)
   const [savedAt, setSavedAt] = useState(null)
 
+  // Kelas & siswa yang diampu (sebagai wali kelas)
+  const [kelasAsuh, setKelasAsuh] = useState([]) // [{ id, nama_kelas, siswa: [...] }]
+  const [loadingSiswa, setLoadingSiswa] = useState(true)
+
   useEffect(() => {
     async function load() {
       if (!profil?.guru_id) {
         setLoading(false)
+        setLoadingSiswa(false)
         return
       }
       const { data: row } = await supabase
@@ -30,9 +35,52 @@ export default function ProfilSaya() {
     load()
   }, [profil])
 
+  useEffect(() => {
+    async function loadSiswaAsuh() {
+      if (!profil?.guru_id) {
+        setLoadingSiswa(false)
+        return
+      }
+      setLoadingSiswa(true)
+
+      const { data: kelasList } = await supabase
+        .from('kelas')
+        .select('id, nama_kelas, tingkat')
+        .eq('wali_kelas_id', profil.guru_id)
+        .order('nama_kelas')
+
+      if (!kelasList || kelasList.length === 0) {
+        setKelasAsuh([])
+        setLoadingSiswa(false)
+        return
+      }
+
+      const kelasIds = kelasList.map((k) => k.id)
+      const { data: siswaList } = await supabase
+        .from('siswa')
+        .select('id, nama_lengkap, nis, foto_path, kelas_id, status')
+        .in('kelas_id', kelasIds)
+        .eq('status', 'aktif')
+        .order('nama_lengkap')
+
+      const gabung = kelasList.map((k) => ({
+        ...k,
+        siswa: (siswaList || []).filter((s) => s.kelas_id === k.id),
+      }))
+      setKelasAsuh(gabung)
+      setLoadingSiswa(false)
+    }
+    loadSiswaAsuh()
+  }, [profil])
+
   function fotoUrl() {
     if (!data?.foto_profil_path) return null
     return supabase.storage.from('foto-profil').getPublicUrl(data.foto_profil_path).data.publicUrl
+  }
+
+  function fotoSiswaUrl(path) {
+    if (!path) return null
+    return supabase.storage.from('foto-siswa').getPublicUrl(path).data.publicUrl
   }
 
   async function handleFotoChange(e) {
@@ -111,6 +159,8 @@ export default function ProfilSaya() {
       </Layout>
     )
   }
+
+  const totalSiswaAsuh = kelasAsuh.reduce((sum, k) => sum + k.siswa.length, 0)
 
   return (
     <Layout title="Profil Saya" subtitle="Data diri dan foto profil Anda">
@@ -243,6 +293,59 @@ export default function ProfilSaya() {
           </div>
         </div>
       </form>
+
+      {/* Siswa yang diampu — hanya muncul kalau guru ini tercatat sebagai wali kelas di satu atau lebih kelas */}
+      {!loadingSiswa && kelasAsuh.length > 0 && (
+        <div className="max-w-2xl mt-5 space-y-4">
+          <div className="relative overflow-hidden rounded-xl p-6 flex items-center gap-4 bg-gradient-to-br from-red-900 to-red-950">
+            <div className="absolute -top-10 -right-10 w-40 h-40 rounded-full bg-white/5 pointer-events-none" />
+            <div className="relative w-11 h-11 rounded-full bg-white/10 ring-2 ring-white/20 flex items-center justify-center shrink-0 text-white">
+              <Users size={20} />
+            </div>
+            <div className="relative">
+              <p className="font-display font-semibold text-lg text-white">
+                {totalSiswaAsuh} siswa diampu
+              </p>
+              <p className="text-sm text-red-200/70 mt-0.5">
+                Sebagai wali kelas di {kelasAsuh.length} kelas: {kelasAsuh.map((k) => k.nama_kelas).join(', ')}
+              </p>
+            </div>
+          </div>
+
+          {kelasAsuh.map((k) => (
+            <div key={k.id} className="card relative overflow-hidden">
+              <span className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-red-900 to-brass-400" />
+              <div className="flex items-center gap-2 p-4 border-b border-ink-900/[0.06]">
+                <School size={16} className="text-ink-700/50" />
+                <p className="text-sm font-medium text-ink-950">
+                  {k.nama_kelas} <span className="text-ink-700/40 font-normal">({k.siswa.length} siswa)</span>
+                </p>
+              </div>
+              {k.siswa.length === 0 ? (
+                <p className="text-sm text-ink-700/50 p-4">Belum ada siswa aktif di kelas ini.</p>
+              ) : (
+                <ul className="divide-y divide-ink-900/[0.06]">
+                  {k.siswa.map((s) => (
+                    <li key={s.id} className="p-3 flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-full bg-ink-900/[0.06] overflow-hidden flex items-center justify-center shrink-0">
+                        {fotoSiswaUrl(s.foto_path) ? (
+                          <img src={fotoSiswaUrl(s.foto_path)} alt="" className="w-full h-full object-cover" />
+                        ) : (
+                          <span className="text-xs font-semibold text-ink-700/40">{s.nama_lengkap?.[0]}</span>
+                        )}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-ink-950 truncate">{s.nama_lengkap}</p>
+                        <p className="text-xs text-ink-700/50">NIS: {s.nis || '—'}</p>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
 
       <div className="max-w-2xl mt-5">
         <GrafikAktivitas guruId={profil.guru_id} />
