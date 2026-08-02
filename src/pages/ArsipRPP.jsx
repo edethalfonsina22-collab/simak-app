@@ -182,6 +182,19 @@ export default function ArsipRPP() {
     await loadArsip()
   }
 
+  async function handleDeleteRpp(item) {
+    if (!confirm(`Hapus "${item.judul}" dari arsip pengajuan? Data pengajuan ini akan hilang permanen.`)) return
+    const { error } = await supabase.from('rpp').delete().eq('id', item.id)
+    if (error) {
+      alert('Gagal menghapus: ' + error.message)
+      return
+    }
+    const pathsToRemove = [item.file_path]
+    if (item.lembar_persetujuan_path) pathsToRemove.push(item.lembar_persetujuan_path)
+    await supabase.storage.from('rpp-files').remove(pathsToRemove)
+    await load()
+  }
+
   const filtered = items.filter((item) => {
     const q = query.toLowerCase()
     return (
@@ -297,6 +310,14 @@ export default function ArsipRPP() {
                           className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-sage-500 hover:bg-sage-500/10"
                         >
                           <FileText size={14} /> Lembar Persetujuan
+                        </button>
+                      )}
+                      {isAdmin && (
+                        <button
+                          onClick={() => handleDeleteRpp(item)}
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-red-100 text-red-600"
+                        >
+                          <Trash2 size={14} />
                         </button>
                       )}
                     </div>
