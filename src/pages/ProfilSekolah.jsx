@@ -17,6 +17,9 @@ const emptyForm = {
   visi: '',
   misi: '',
   sejarah: '',
+  kabupaten: '',
+  dinas_pendidikan: '',
+  kecamatan: '',
 }
 
 export default function ProfilSekolah() {
@@ -121,6 +124,42 @@ export default function ProfilSekolah() {
                 <input type="file" accept="image/*" className="hidden" onChange={handleLogoChange} disabled={uploadingLogo} />
               </label>
               <p className="text-xs text-ink-700/50 mt-1.5">Format PNG/JPG, dipakai di kop rapor & dokumen resmi.</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="card p-6">
+          <h3 className="font-display font-semibold text-ink-950 mb-4">Kop Surat / Kop Rapor</h3>
+          <p className="text-xs text-ink-700/50 mb-4">
+            Diisi kalau kop rapor perlu menampilkan susunan pemerintahan lengkap (kabupaten, dinas, kecamatan) di atas nama sekolah.
+          </p>
+          <div className="grid sm:grid-cols-2 gap-4">
+            <div>
+              <label className="label-field">Kabupaten/Kota</label>
+              <input
+                className="input-field"
+                placeholder="KABUPATEN KEPULAUAN ARU"
+                value={form.kabupaten}
+                onChange={(e) => ubah('kabupaten', e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="label-field">Dinas Pendidikan</label>
+              <input
+                className="input-field"
+                placeholder="DINAS PENDIDIKAN DAN KEBUDAYAAN"
+                value={form.dinas_pendidikan}
+                onChange={(e) => ubah('dinas_pendidikan', e.target.value)}
+              />
+            </div>
+            <div className="sm:col-span-2">
+              <label className="label-field">Kecamatan</label>
+              <input
+                className="input-field"
+                placeholder="KECAMATAN ARU UTARA TIMUR BATULEY"
+                value={form.kecamatan}
+                onChange={(e) => ubah('kecamatan', e.target.value)}
+              />
             </div>
           </div>
         </div>
