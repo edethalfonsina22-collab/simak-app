@@ -17,6 +17,8 @@ export default function RaporCetak() {
   const [p5List, setP5List] = useState([])
   const [ekskulList, setEkskulList] = useState([])
   const [catatan, setCatatan] = useState(null)
+  const [sekolah, setSekolah] = useState(null)
+  const [logoUrl, setLogoUrl] = useState('')
 
   useEffect(() => {
     if (!siswaId || !semester || !tahunAjaran) {
@@ -36,6 +38,7 @@ export default function RaporCetak() {
       { data: p5Rows },
       { data: ekskulRows },
       { data: catatanRow },
+      { data: sekolahRow },
     ] = await Promise.all([
       supabase
         .from('siswa')
@@ -75,7 +78,14 @@ export default function RaporCetak() {
         .eq('semester', semester)
         .eq('tahun_ajaran', tahunAjaran)
         .maybeSingle(),
+      supabase.from('profil_sekolah').select('*').eq('id', 1).maybeSingle(),
     ])
+
+    setSekolah(sekolahRow || null)
+    if (sekolahRow?.logo_path) {
+      const { data: pub } = supabase.storage.from('profil-sekolah').getPublicUrl(sekolahRow.logo_path)
+      setLogoUrl(pub.publicUrl)
+    }
 
     setSiswa(siswaRow || null)
     setNilai(nilaiRows || [])
@@ -145,6 +155,23 @@ export default function RaporCetak() {
       </div>
 
       <div className="lembar-cetak max-w-[800px] mx-auto bg-white shadow-lg p-10 text-sm text-ink-950">
+        <div className="flex items-center gap-4 mb-4 pb-4 border-b-2 border-ink-950/70">
+          <div className="w-16 h-16 shrink-0 flex items-center justify-center">
+            {logoUrl && <img src={logoUrl} alt="Logo sekolah" className="w-full h-full object-contain" />}
+          </div>
+          <div className="text-center flex-1">
+            <h1 className="font-display text-lg font-bold uppercase">{sekolah?.nama_sekolah || 'Nama Sekolah'}</h1>
+            {sekolah?.npsn && <p className="text-xs text-ink-700/60">NPSN: {sekolah.npsn}</p>}
+            {sekolah?.alamat && <p className="text-xs text-ink-700/60">{sekolah.alamat}</p>}
+            {(sekolah?.telepon || sekolah?.email) && (
+              <p className="text-xs text-ink-700/60">
+                {[sekolah?.telepon, sekolah?.email].filter(Boolean).join(' · ')}
+              </p>
+            )}
+          </div>
+          <div className="w-16 shrink-0" />
+        </div>
+
         <div className="text-center mb-6 border-b border-ink-950/20 pb-4">
           <h1 className="font-display text-xl font-semibold">LAPORAN HASIL BELAJAR SISWA</h1>
           <p className="text-ink-700/60">Semester {semester} · Tahun Ajaran {tahunAjaran}</p>
@@ -255,7 +282,7 @@ export default function RaporCetak() {
           <span className="font-semibold">{catatan?.keputusan || 'Belum ditentukan'}</span>
         </div>
 
-        <div className="grid grid-cols-2 gap-8 mt-10 text-center text-sm">
+        <div className="grid grid-cols-3 gap-6 mt-10 text-center text-sm">
           <div>
             <p>Orang Tua/Wali</p>
             <div className="h-16" />
@@ -265,6 +292,16 @@ export default function RaporCetak() {
             <p>Wali Kelas</p>
             <div className="h-16" />
             <p className="border-t border-ink-950/40 pt-1">(.......................................)</p>
+          </div>
+          <div>
+            <p>Mengetahui,<br />Kepala Sekolah</p>
+            <div className="h-12" />
+            <p className="font-semibold border-t border-ink-950/40 pt-1">
+              {sekolah?.kepala_sekolah || '(.......................................)'}
+            </p>
+            {sekolah?.nip_kepala_sekolah && (
+              <p className="text-xs text-ink-700/60">NIP. {sekolah.nip_kepala_sekolah}</p>
+            )}
           </div>
         </div>
       </div>
