@@ -516,8 +516,8 @@ export default function Rapor() {
       </div>
 
       {siswaTerpilih && (
-        <div className="card p-0 overflow-hidden">
-          <div className="flex flex-wrap border-b border-ink-950/10">
+        <div className="card p-0">
+          <div className="flex flex-wrap border-b border-ink-950/10 rounded-t-2xl overflow-hidden">
             {TABS.map((tab) => {
               const Icon = tab.icon
               return (
@@ -620,7 +620,7 @@ export default function Rapor() {
                                 <Lightbulb size={15} /> Rekomendasi
                               </button>
                               {rekomendasiTerbuka === i && (
-                                <div className="absolute right-0 z-10 mt-2 w-72 rounded-lg border border-ink-950/10 bg-white shadow-lg p-2">
+                                <div className="absolute right-0 bottom-full z-10 mb-2 w-72 max-h-72 overflow-y-auto rounded-lg border border-ink-950/10 bg-white shadow-lg p-2">
                                   {TEMPLATE_DESKRIPSI.map((tpl) => (
                                     <button
                                       key={tpl.kategori}
@@ -726,7 +726,7 @@ export default function Rapor() {
                             <Lightbulb size={15} />
                           </button>
                           {rekomendasiP5Terbuka === i && (
-                            <div className="absolute right-0 z-10 mt-2 w-72 rounded-lg border border-ink-950/10 bg-white shadow-lg p-2">
+                            <div className="absolute right-0 bottom-full z-10 mb-2 w-72 max-h-72 overflow-y-auto rounded-lg border border-ink-950/10 bg-white shadow-lg p-2">
                               {TEMPLATE_P5.map((tpl) => (
                                 <button
                                   key={tpl.kategori}
@@ -862,7 +862,7 @@ export default function Rapor() {
                         <Lightbulb size={15} /> Rekomendasi
                       </button>
                       {rekomendasiCatatanTerbuka && (
-                        <div className="absolute right-0 z-10 mt-2 w-72 rounded-lg border border-ink-950/10 bg-white shadow-lg p-2">
+                        <div className="absolute right-0 bottom-full z-10 mb-2 w-72 max-h-72 overflow-y-auto rounded-lg border border-ink-950/10 bg-white shadow-lg p-2">
                           {TEMPLATE_CATATAN.map((tpl) => (
                             <button
                               key={tpl.kategori}
