@@ -27,6 +27,12 @@ import {
   Database,
   IdCard,
   FilePlus,
+  import {
+  ...
+  NotebookPen,
+  Archive,   // tambahkan ini
+  ...
+} from 'lucide-react'
 } from 'lucide-react'
 import { useAuth } from '../lib/AuthContext'
 
