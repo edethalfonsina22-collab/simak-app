@@ -28,6 +28,13 @@ export default function BuatUjian() {
   const [ujianDibuat, setUjianDibuat] = useState(null);
   const [tersalin, setTersalin] = useState(false); // status tombol "Copy Link"
 
+  // --- Sumber soal: upload Excel baru, atau pilih dari Bank Soal yang sudah ada ---
+  const [sumberSoal, setSumberSoal] = useState('excel'); // 'excel' | 'bank'
+  const [bankSoalList, setBankSoalList] = useState([]); // semua soal dari tabel bank_soal
+  const [bankLoading, setBankLoading] = useState(false);
+  const [mapelBankFilter, setMapelBankFilter] = useState('');
+  const [idTerpilih, setIdTerpilih] = useState(new Set()); // id soal bank_soal yang dicentang
+
   // Ambil daftar kelas dari tabel "kelas" yang sudah ada di SIMAK
   useEffect(() => {
     async function ambilKelas() {
@@ -39,6 +46,73 @@ export default function BuatUjian() {
     }
     ambilKelas();
   }, []);
+
+  // Ambil semua soal dari Bank Soal saat tab "Pilih dari Bank Soal" pertama kali dibuka
+  useEffect(() => {
+    if (sumberSoal !== 'bank' || bankSoalList.length > 0 || bankLoading) return;
+    async function ambilBankSoal() {
+      setBankLoading(true);
+      const { data, error } = await supabase
+        .from('bank_soal')
+        .select('*')
+        .order('mata_pelajaran')
+        .order('dibuat_pada', { ascending: false });
+      if (!error && data) setBankSoalList(data);
+      setBankLoading(false);
+    }
+    ambilBankSoal();
+  }, [sumberSoal, bankSoalList.length, bankLoading]);
+
+  const daftarMapelBank = [...new Set(bankSoalList.map((s) => s.mata_pelajaran))].sort();
+  const bankSoalTampil = mapelBankFilter
+    ? bankSoalList.filter((s) => s.mata_pelajaran === mapelBankFilter)
+    : bankSoalList;
+
+  function toggleSoalBank(id) {
+    setIdTerpilih((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function pilihSemuaSoalBank() {
+    setIdTerpilih((prev) => {
+      const semuaSudahTerpilih = bankSoalTampil.every((s) => prev.has(s.id));
+      if (semuaSudahTerpilih) {
+        // batalkan pilihan untuk soal yang sedang ditampilkan saja
+        const next = new Set(prev);
+        bankSoalTampil.forEach((s) => next.delete(s.id));
+        return next;
+      }
+      const next = new Set(prev);
+      bankSoalTampil.forEach((s) => next.add(s.id));
+      return next;
+    });
+  }
+
+  // Menyalin soal yang dicentang dari Bank Soal ke dalam draft ujian (format sama seperti hasil baca Excel)
+  function gunakanSoalTerpilih() {
+    const dipilih = bankSoalList.filter((s) => idTerpilih.has(s.id));
+    if (dipilih.length === 0) {
+      setPesanError('Centang minimal 1 soal dari Bank Soal dulu.');
+      return;
+    }
+    const soalTerpakai = dipilih.map((s, i) => ({
+      urutan: i + 1,
+      soal: s.soal,
+      pilihan_a: s.pilihan_a,
+      pilihan_b: s.pilihan_b,
+      pilihan_c: s.pilihan_c,
+      pilihan_d: s.pilihan_d,
+      jawaban_benar: s.jawaban_benar,
+    }));
+    setSoalPreview(soalTerpakai);
+    // Isi otomatis Mata Pelajaran kalau kolomnya masih kosong, biar konsisten dengan soal yang dipakai
+    if (!mapel && mapelBankFilter) setMapel(mapelBankFilter);
+    setPesanError('');
+  }
 
   function bacaFileExcel(e) {
     const file = e.target.files[0];
@@ -265,16 +339,118 @@ export default function BuatUjian() {
         </div>
 
         <div>
-          <label className="block text-sm font-medium mb-1 text-[#6b0f1a]">
-            Upload Soal (Excel — kolom: soal, pilihan_a, pilihan_b, pilihan_c, pilihan_d, jawaban_benar)
-          </label>
-          <input
-            type="file"
-            accept=".xlsx,.xls"
-            onChange={bacaFileExcel}
-            className="w-full text-sm text-[#6b0f1a]/80 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:bg-[#6b0f1a] file:text-white file:font-medium hover:file:bg-[#7d1420] file:cursor-pointer file:transition-colors"
-          />
+          <label className="block text-sm font-medium mb-2 text-[#6b0f1a]">Sumber Soal</label>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setSumberSoal('excel');
+                setSoalPreview([]);
+                setPesanError('');
+              }}
+              className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors ${
+                sumberSoal === 'excel'
+                  ? 'bg-[#6b0f1a] text-white'
+                  : 'bg-[#6b0f1a]/5 text-[#6b0f1a] hover:bg-[#6b0f1a]/10'
+              }`}
+            >
+              Upload Excel
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setSumberSoal('bank');
+                setSoalPreview([]);
+                setPesanError('');
+              }}
+              className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors ${
+                sumberSoal === 'bank'
+                  ? 'bg-[#6b0f1a] text-white'
+                  : 'bg-[#6b0f1a]/5 text-[#6b0f1a] hover:bg-[#6b0f1a]/10'
+              }`}
+            >
+              Pilih dari Bank Soal
+            </button>
+          </div>
         </div>
+
+        {sumberSoal === 'excel' && (
+          <div>
+            <label className="block text-sm font-medium mb-1 text-[#6b0f1a]">
+              Upload Soal (Excel — kolom: soal, pilihan_a, pilihan_b, pilihan_c, pilihan_d, jawaban_benar)
+            </label>
+            <input
+              type="file"
+              accept=".xlsx,.xls"
+              onChange={bacaFileExcel}
+              className="w-full text-sm text-[#6b0f1a]/80 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:bg-[#6b0f1a] file:text-white file:font-medium hover:file:bg-[#7d1420] file:cursor-pointer file:transition-colors"
+            />
+          </div>
+        )}
+
+        {sumberSoal === 'bank' && (
+          <div className="space-y-3">
+            {bankLoading ? (
+              <p className="text-sm text-[#6b0f1a]/60">Memuat Bank Soal...</p>
+            ) : bankSoalList.length === 0 ? (
+              <p className="text-sm text-[#6b0f1a]/60">
+                Belum ada soal di Bank Soal. Upload dulu lewat menu Bank Soal.
+              </p>
+            ) : (
+              <>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <select
+                    value={mapelBankFilter}
+                    onChange={(e) => setMapelBankFilter(e.target.value)}
+                    className="rounded-lg px-3 py-1.5 border border-[#6b0f1a]/15 text-sm text-[#3b0a0a] outline-none"
+                  >
+                    <option value="">Semua Mata Pelajaran</option>
+                    {daftarMapelBank.map((m) => (
+                      <option key={m} value={m}>
+                        {m}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    onClick={pilihSemuaSoalBank}
+                    className="text-xs font-medium text-[#6b0f1a] underline"
+                  >
+                    Pilih/Batal semua ({bankSoalTampil.length} soal)
+                  </button>
+                </div>
+
+                <div className="max-h-72 overflow-y-auto border border-[#6b0f1a]/15 rounded-lg divide-y divide-[#6b0f1a]/10">
+                  {bankSoalTampil.map((s, i) => (
+                    <label
+                      key={s.id}
+                      className="flex items-start gap-2 p-3 text-sm cursor-pointer hover:bg-[#f7e6e3]/40"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={idTerpilih.has(s.id)}
+                        onChange={() => toggleSoalBank(s.id)}
+                        className="mt-1"
+                      />
+                      <span className="text-[#3b0a0a]">
+                        {i + 1}. {s.soal}{' '}
+                        <span className="text-[#6b0f1a]/50">({s.mata_pelajaran})</span>
+                      </span>
+                    </label>
+                  ))}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={gunakanSoalTerpilih}
+                  className="w-full py-2 rounded-lg bg-[#d4a017] text-[#3b0a0a] font-medium hover:bg-[#c4930f] transition-colors"
+                >
+                  Gunakan {idTerpilih.size} Soal Terpilih
+                </button>
+              </>
+            )}
+          </div>
+        )}
 
         {pesanError && (
           <div className="text-sm text-[#8f1f22] bg-[#6b0f1a]/5 border border-[#6b0f1a]/20 rounded-lg p-3">
@@ -284,8 +460,8 @@ export default function BuatUjian() {
 
         {soalPreview.length > 0 && (
           <div className="text-sm text-[#3b0a0a] bg-[#d4a017]/10 border border-[#d4a017]/30 rounded-lg p-3">
-            ✅ {soalPreview.length} soal terbaca dari Excel. Contoh soal #1:{' '}
-            <em>{soalPreview[0].soal}</em>
+            ✅ {soalPreview.length} soal siap dipakai ({sumberSoal === 'bank' ? 'dari Bank Soal' : 'dari Excel'}).
+            Contoh soal #1: <em>{soalPreview[0].soal}</em>
           </div>
         )}
 
