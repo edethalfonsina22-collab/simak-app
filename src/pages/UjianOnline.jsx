@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabaseClient'; // sesuaikan kalau nama/lokasi file berbeda
 
 // Halaman ini dipasang terpisah, contoh route: /ujian-online
@@ -17,15 +17,28 @@ export default function UjianOnline() {
   const [memuat, setMemuat] = useState(false);
   const [skorAkhir, setSkorAkhir] = useState(null);
 
-  async function cariUjian() {
+  // Kalau siswa membuka lewat link yang sudah membawa ?kode=XXXXXX,
+  // ambil otomatis dari URL dan langsung cari ujiannya — tidak perlu ketik manual.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const kodeDariUrl = params.get('kode');
+    if (kodeDariUrl) {
+      setKodeUjian(kodeDariUrl.toUpperCase());
+      cariUjian(kodeDariUrl);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  async function cariUjian(kodeOverride) {
     setError('');
-    if (!kodeUjian.trim()) {
+    const kodeInput = (kodeOverride ?? kodeUjian).trim();
+    if (!kodeInput) {
       setError('Masukkan kode ujian dulu.');
       return;
     }
     setMemuat(true);
 
-    const kode = kodeUjian.trim().toUpperCase();
+    const kode = kodeInput.toUpperCase();
 
     const { data: ujianData, error: errUjian } = await supabase
       .from('ujian_publik')
@@ -127,7 +140,7 @@ export default function UjianOnline() {
         />
         {error && <p className="text-sm text-red-600 mt-2">{error}</p>}
         <button
-          onClick={cariUjian}
+          onClick={() => cariUjian()}
           disabled={memuat}
           className="mt-4 w-full py-2 rounded-lg bg-blue-600 text-white font-medium hover:bg-blue-700 disabled:opacity-50"
         >
