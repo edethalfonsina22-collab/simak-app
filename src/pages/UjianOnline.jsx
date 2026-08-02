@@ -72,7 +72,7 @@ export default function UjianOnline() {
 
     // Ambil daftar siswa di kelas ini dari tabel "siswa" (kelas_id, nama_lengkap, nis)
     const { data: siswaData, error: errSiswa } = await supabase
-      .from('siswa')
+      .from('siswa_publik')
       .select('nis, nama_lengkap')
       .eq('kelas_id', ujianData.kelas_id)
       .order('nama_lengkap', { ascending: true });
