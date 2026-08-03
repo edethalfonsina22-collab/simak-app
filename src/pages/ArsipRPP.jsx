@@ -37,11 +37,15 @@ function AiRppModal({ isOpen, onClose, onApplyToForm }) {
     setLoading(true)
     setResult('')
 
-    // Membaca API Key yang tersimpan di Vercel
-    const apiKey = import.meta.env.VITE_OPENAI_API_KEY
+    // Membaca API Key dari Vercel Environment Variables
+    // PERHATIAN: Masukkan API Key OpenAI Anda di dalam tanda petik di paling bawah sebagai cadangan
+    const apiKey =
+      import.meta.env.VITE_OPENAI_API_KEY ||
+      import.meta.env.VITE_OPENAI_KEY ||
+      "PASTE_OPENAI_API_KEY_ANDA_DI_SINI"
 
-    if (!apiKey) {
-      alert('API Key belum ditemukan! Pastikan VITE_OPENAI_API_KEY sudah ditambahkan di Vercel Environment Variables dan sudah di-Redeploy.')
+    if (!apiKey || apiKey === "PASTE_OPENAI_API_KEY_ANDA_DI_SINI") {
+      alert('API Key belum diisi! Silakan masukkan API Key OpenAI Anda di Vercel Environment Variables atau langsung di kode ArsipRPP.jsx.')
       setLoading(false)
       return
     }
