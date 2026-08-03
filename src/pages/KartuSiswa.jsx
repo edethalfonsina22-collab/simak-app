@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib'
+import QRCode from 'qrcode'
 import { supabase } from '../lib/supabaseClient'
 import Layout from '../components/Layout'
 import { Camera, Loader2, IdCard, Library, Download } from 'lucide-react'
@@ -10,6 +11,9 @@ const MARGIN = 30
 const GAP = 14
 const COLS = 2
 const ROWS = 4
+
+// Ganti dengan domain Vercel Anda yang sebenarnya
+const BASE_URL = 'https://domain-anda.vercel.app'
 
 export default function KartuSiswa() {
   const [kelasList, setKelasList] = useState([])
@@ -80,6 +84,21 @@ export default function KartuSiswa() {
     return new Uint8Array(await res.arrayBuffer())
   }
 
+  // Ubah QR data-URL (base64) menjadi bytes agar bisa di-embed pdf-lib
+  function dataUrlToBytes(dataUrl) {
+    const base64 = dataUrl.split(',')[1]
+    const binary = atob(base64)
+    const bytes = new Uint8Array(binary.length)
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
+    return bytes
+  }
+
+  async function generateQRBytes(siswaId) {
+    const verifyUrl = `${BASE_URL}/verify/siswa/${siswaId}`
+    const dataUrl = await QRCode.toDataURL(verifyUrl, { width: 200, margin: 0 })
+    return dataUrlToBytes(dataUrl)
+  }
+
   async function generateKartu(jenis) {
     const terpilih = siswaList.filter((s) => selected[s.id])
     if (terpilih.length === 0) {
@@ -141,6 +160,18 @@ export default function KartuSiswa() {
           page.drawText(`Kelas: ${siswa.kelas?.nama_kelas || '-'}`, { x: textX, y: textY, size: 8, font, color: rgb(0.3, 0.3, 0.3) })
           textY -= 12
           page.drawText(`TP ${new Date().getFullYear()}/${new Date().getFullYear() + 1}`, { x: textX, y: textY, size: 7, font, color: rgb(0.5, 0.5, 0.5) })
+
+          // QR Code (pojok kanan bawah kartu)
+          try {
+            const qrBytes = await generateQRBytes(siswa.id)
+            const qrImg = await pdfDoc.embedPng(qrBytes)
+            const qrSize = 30
+            const qrX = x + CARD_W - qrSize - 10
+            const qrY = y + 8
+            page.drawImage(qrImg, { x: qrX, y: qrY, width: qrSize, height: qrSize })
+          } catch (err) {
+            console.error('Gagal generate QR:', err)
+          }
         }
       }
 
@@ -235,7 +266,7 @@ export default function KartuSiswa() {
       </div>
 
       <p className="text-xs text-ink-700/40 mt-4">
-        Siswa tanpa foto akan tetap tercetak dengan kotak foto kosong. Kartu dicetak 8 per halaman A4, tinggal potong sesuai garis.
+        Siswa tanpa foto akan tetap tercetak dengan kotak foto kosong. QR code di pojok kanan bawah untuk verifikasi. Kartu dicetak 8 per halaman A4, tinggal potong sesuai garis.
       </p>
     </Layout>
   )
