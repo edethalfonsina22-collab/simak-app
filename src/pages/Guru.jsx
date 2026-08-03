@@ -14,6 +14,15 @@ const emptyForm = {
   status: 'aktif',
 }
 
+function formatTanggal(tgl) {
+  if (!tgl) return null
+  try {
+    return new Date(tgl).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })
+  } catch {
+    return tgl
+  }
+}
+
 export default function Guru() {
   const [data, setData] = useState([])
   const [loading, setLoading] = useState(true)
@@ -23,15 +32,27 @@ export default function Guru() {
   const [editingId, setEditingId] = useState(null)
   const [form, setForm] = useState(emptyForm)
   const [saving, setSaving] = useState(false)
+  const [profilLihat, setProfilLihat] = useState(null) // guru yang sedang dilihat detail profilnya
 
   async function loadData() {
     setLoading(true)
     const { data: guru } = await supabase.from('guru').select('*').order('nama_lengkap')
     setData(guru || [])
     setLoading(false)
+    // Jaga agar modal profil tetap sinkron kalau datanya baru saja diubah
+    if (profilLihat) {
+      const updated = (guru || []).find((g) => g.id === profilLihat.id)
+      if (updated) setProfilLihat(updated)
+    }
   }
 
   useEffect(() => { loadData() }, [])
+
+  // Foto profil guru — memakai bucket & kolom yang sama persis dengan Profil Saya
+  function fotoUrl(path) {
+    if (!path) return null
+    return supabase.storage.from('foto-profil').getPublicUrl(path).data.publicUrl
+  }
 
   function openAdd() {
     setForm(emptyForm)
@@ -117,7 +138,15 @@ export default function Guru() {
             )}
             {filtered.map((g) => (
               <tr key={g.id} className="hover:bg-blue-600/[0.03] transition-colors">
-                <td className="font-medium">{g.nama_lengkap}</td>
+                <td className="font-medium">
+                  <button
+                    type="button"
+                    onClick={() => setProfilLihat(g)}
+                    className="hover:underline hover:text-blue-700 text-left"
+                  >
+                    {g.nama_lengkap}
+                  </button>
+                </td>
                 <td className="font-mono text-xs">{g.nip}</td>
                 <td>{g.mata_pelajaran}</td>
                 <td>{g.no_hp}</td>
@@ -189,6 +218,60 @@ export default function Guru() {
         </div>
       )}
 
+      {/* Modal Lihat Profil — identitas lengkap + foto besar, dibuka dengan klik nama guru (pola sama seperti di Data Siswa) */}
+      {profilLihat && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink-950/50 backdrop-blur-sm p-4">
+          <div className="card w-full max-w-md p-0 relative overflow-hidden max-h-[90vh] overflow-y-auto">
+            <button
+              type="button"
+              onClick={() => setProfilLihat(null)}
+              className="absolute top-4 right-4 z-10 text-white/80 hover:text-white bg-ink-950/20 rounded-full p-1"
+            >
+              <X size={18} />
+            </button>
+
+            <div className="relative bg-gradient-to-br from-blue-900 to-blue-950 pt-8 pb-14 flex flex-col items-center">
+              <div className="w-24 h-24 rounded-full overflow-hidden ring-4 ring-white/20 bg-white/10 flex items-center justify-center shrink-0">
+                {fotoUrl(profilLihat.foto_profil_path) ? (
+                  <img src={fotoUrl(profilLihat.foto_profil_path)} alt="" className="w-full h-full object-cover" />
+                ) : (
+                  <span className="text-3xl font-semibold text-white/60">{profilLihat.nama_lengkap?.[0]}</span>
+                )}
+              </div>
+              <p className="font-display font-semibold text-lg text-white mt-3 text-center px-6">{profilLihat.nama_lengkap}</p>
+              <span className={`badge mt-1.5 ${profilLihat.status === 'aktif' ? 'bg-sage-500/20 text-sage-100' : 'bg-white/10 text-white/70'}`}>
+                {profilLihat.status}
+              </span>
+            </div>
+
+            <div className="px-6 -mt-8 pb-6">
+              <div className="card p-4 space-y-3 bg-white shadow-md">
+                <ProfilRow label="NIP" value={profilLihat.nip} />
+                <ProfilRow label="NUPTK" value={profilLihat.nuptk} />
+                <ProfilRow label="Mata Pelajaran" value={profilLihat.mata_pelajaran} />
+                <ProfilRow label="Jenis Kelamin" value={profilLihat.jenis_kelamin === 'L' ? 'Laki-laki' : 'Perempuan'} />
+                <ProfilRow label="Pangkat / Golongan" value={profilLihat.pangkat_golongan} />
+                <ProfilRow label="Pendidikan Terakhir" value={profilLihat.pendidikan_terakhir} />
+                <ProfilRow label="Tanggal Lahir" value={formatTanggal(profilLihat.tanggal_lahir)} />
+                <ProfilRow label="No. HP" value={profilLihat.no_hp} />
+                <ProfilRow label="Email" value={profilLihat.email} />
+                <ProfilRow label="Alamat" value={profilLihat.alamat} />
+              </div>
+
+              <div className="flex gap-2 mt-4">
+                <button
+                  type="button"
+                  onClick={() => { setProfilLihat(null); openEdit(profilLihat) }}
+                  className="btn-secondary flex-1 justify-center"
+                >
+                  <Pencil size={15} /> Ubah Data
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <BulkImportModal
         open={showImport}
         onClose={() => { setShowImport(false); loadData() }}
@@ -221,6 +304,15 @@ function Field({ label, children, full }) {
     <div className={full ? 'col-span-2' : ''}>
       <label className="eyebrow mb-1.5 block">{label}</label>
       {children}
+    </div>
+  )
+}
+
+function ProfilRow({ label, value }) {
+  return (
+    <div className="flex items-start justify-between gap-4 text-sm">
+      <span className="text-ink-700/50 shrink-0">{label}</span>
+      <span className="text-ink-950 font-medium text-right">{value || '—'}</span>
     </div>
   )
 }
