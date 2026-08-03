@@ -273,21 +273,6 @@ export default function ProfilSaya() {
               />
             </div>
 
-            {/* Kode batang ID guru — mengisi area kosong di bawah "Pendidikan Terakhir", dipakai untuk absensi */}
-            <div className="sm:col-span-2 flex flex-col items-center justify-center gap-2 py-2">
-              <div className="p-3 rounded-lg bg-white ring-1 ring-ink-900/[0.08] shadow-sm">
-                <Barcode
-                  value={String(data.id)}
-                  width={1.6}
-                  height={56}
-                  fontSize={12}
-                  background="#ffffff"
-                  lineColor="#1e3a5f"
-                />
-              </div>
-              <p className="text-xs text-ink-700/50">ID Absensi Guru</p>
-            </div>
-
             <div className="sm:col-span-2">
               <label className="text-xs text-ink-700/60 mb-1 block">Alamat</label>
               <textarea
@@ -365,6 +350,21 @@ export default function ProfilSaya() {
           ))}
         </div>
       )}
+
+      {/* Kode batang ID guru — jadi pemisah visual antara bagian profil dan grafik aktivitas */}
+      <div className="max-w-2xl mt-5 flex flex-col items-center gap-2 py-4 border-t border-ink-900/[0.08]">
+        <div className="p-3 rounded-lg bg-white ring-1 ring-ink-900/[0.08] shadow-sm">
+          <Barcode
+            value={String(data.id)}
+            width={1.6}
+            height={56}
+            fontSize={12}
+            background="#ffffff"
+            lineColor="#1e3a5f"
+          />
+        </div>
+        <p className="text-xs text-ink-700/50">ID Absensi Guru</p>
+      </div>
 
       <div className="max-w-2xl mt-5">
         <GrafikAktivitas guruId={profil.guru_id} />
