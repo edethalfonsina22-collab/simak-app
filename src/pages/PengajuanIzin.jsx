@@ -3,7 +3,7 @@ import { PDFDocument, StandardFonts, rgb } from 'pdf-lib'
 import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../lib/AuthContext'
 import Layout from '../components/Layout'
-import { Send, CheckCircle2, XCircle, Clock, Loader2, CalendarClock, Printer, FileText, Eye } from 'lucide-react'
+import { Send, CheckCircle2, XCircle, Clock, Loader2, CalendarClock, Printer, FileText, Eye, Trash2 } from 'lucide-react'
 
 const STATUS_STYLE = {
   menunggu: 'bg-brass-400/15 text-brass-600',
@@ -53,15 +53,15 @@ async function buatNomorSurat() {
   return `${nomorUrut}/SK-IZIN/${bulanRomawi}/${tahun}`
 }
 
-// Ambil logo dari Supabase Storage lalu embed ke PDF (PNG/JPG)
-async function embedLogoSekolah(pdfDoc, logoPath) {
-  if (!logoPath) return null
+// Ambil gambar (logo / tanda tangan) dari Supabase Storage lalu embed ke PDF (PNG/JPG)
+async function embedGambarSekolah(pdfDoc, path) {
+  if (!path) return null
   try {
-    const { data: pub } = supabase.storage.from('profil-sekolah').getPublicUrl(logoPath)
+    const { data: pub } = supabase.storage.from('profil-sekolah').getPublicUrl(path)
     const res = await fetch(pub.publicUrl)
     if (!res.ok) return null
     const bytes = await res.arrayBuffer()
-    const ext = logoPath.split('.').pop().toLowerCase()
+    const ext = path.split('.').pop().toLowerCase()
     if (ext === 'png') return await pdfDoc.embedPng(bytes)
     if (ext === 'jpg' || ext === 'jpeg') return await pdfDoc.embedJpg(bytes)
     return null
@@ -90,6 +90,7 @@ export default function PengajuanIzin() {
   const [catatanTolak, setCatatanTolak] = useState('')
   const [printingId, setPrintingId] = useState(null)
   const [previewingId, setPreviewingId] = useState(null)
+  const [deletingId, setDeletingId] = useState(null)
 
   async function load() {
     setLoading(true)
@@ -185,6 +186,30 @@ export default function PengajuanIzin() {
     await load()
   }
 
+  // Hapus pengajuan izin. Kalau statusnya sudah disetujui, presensi yang
+  // otomatis tercatat dari pengajuan ini ikut dihapus supaya rekap presensi
+  // tidak jadi salah.
+  async function handleHapus(item) {
+    const konfirmasi = window.confirm(
+      `Hapus pengajuan ${item.jenis} ${isAdmin && item.guru?.nama_lengkap ? `milik ${item.guru.nama_lengkap} ` : ''}ini? Tindakan ini tidak bisa dibatalkan.`
+    )
+    if (!konfirmasi) return
+
+    setDeletingId(item.id)
+    try {
+      if (item.status === 'disetujui') {
+        const tanggalList = rentangTanggal(item.tanggal_mulai, item.tanggal_selesai)
+        await supabase.from('presensi_guru').delete().eq('guru_id', item.guru_id).in('tanggal', tanggalList)
+      }
+      const { error } = await supabase.from('pengajuan_izin').delete().eq('id', item.id)
+      if (error) throw error
+      await load()
+    } catch (err) {
+      alert('Gagal menghapus pengajuan: ' + err.message)
+    }
+    setDeletingId(null)
+  }
+
   // Susun PDF Surat Keterangan Izin/Cuti dan kembalikan bytes-nya.
   // Dipakai bersama oleh tombol "Lihat" (preview) dan "Cetak Surat" (unduh).
   async function buatPdfSurat(item) {
@@ -195,7 +220,8 @@ export default function PengajuanIzin() {
       const font = await pdfDoc.embedFont(StandardFonts.Helvetica)
       const bold = await pdfDoc.embedFont(StandardFonts.HelveticaBold)
       const tanggalCetak = new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })
-      const logoImage = await embedLogoSekolah(pdfDoc, sekolah?.logo_path)
+      const logoImage = await embedGambarSekolah(pdfDoc, sekolah?.logo_path)
+      const ttdImage = await embedGambarSekolah(pdfDoc, sekolah?.ttd_kepala_sekolah_path)
 
       let y = 800
       const draw = (text, opts = {}) => {
@@ -267,7 +293,17 @@ export default function PengajuanIzin() {
 
       // ---------- TANDA TANGAN ----------
       draw(`${tanggalCetak}`, { x: 340, gap: 20 })
-      draw(sekolah?.kepala_sekolah ? 'Kepala Sekolah,' : 'Mengetahui,', { x: 340, gap: 60 })
+      draw(sekolah?.kepala_sekolah ? 'Kepala Sekolah,' : 'Mengetahui,', { x: 340, gap: ttdImage ? 8 : 60 })
+
+      // Tanda tangan elektronik terpasang otomatis kalau sudah diunggah di Profil Sekolah
+      if (ttdImage) {
+        const ttdTinggi = 42
+        const ttdDims = ttdImage.scale(ttdTinggi / ttdImage.height)
+        page.drawImage(ttdImage, { x: 340, y: y - ttdTinggi + 6, width: ttdDims.width, height: ttdTinggi })
+        y -= ttdTinggi
+        draw('*Ditandatangani secara elektronik', { x: 340, size: 7, gap: 6 })
+      }
+
       draw(sekolah?.kepala_sekolah || '(.........................)', { x: 340, bold: true, gap: 18 })
       if (sekolah?.nip_kepala_sekolah) {
         draw(`NIP. ${sekolah.nip_kepala_sekolah}`, { x: 340, size: 10, gap: 0 })
@@ -486,6 +522,18 @@ export default function PengajuanIzin() {
                     <span className="flex items-center gap-1.5 text-xs text-ink-700/40">
                       <Clock size={14} /> Menunggu persetujuan
                     </span>
+                  )}
+
+                  {(isAdmin || (item.guru_id === profil?.guru_id && item.status === 'menunggu')) && (
+                    <button
+                      onClick={() => handleHapus(item)}
+                      disabled={deletingId === item.id}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-red-600 hover:bg-red-100 disabled:opacity-50"
+                      title="Hapus pengajuan"
+                    >
+                      {deletingId === item.id ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                      Hapus
+                    </button>
                   )}
                 </div>
               </li>
