@@ -42,9 +42,9 @@ function AiRppModal({ isOpen, onClose, onApplyToForm }) {
     const apiKey =
       import.meta.env.VITE_OPENAI_API_KEY ||
       import.meta.env.VITE_OPENAI_KEY ||
-      "PASTE_OPENAI_API_KEY_ANDA_DI_SINI"
+      "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"
 
-    if (!apiKey || apiKey === "PASTE_OPENAI_API_KEY_ANDA_DI_SINI") {
+    if (!apiKey || apiKey === "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") {
       alert('API Key belum diisi! Silakan masukkan API Key OpenAI Anda di Vercel Environment Variables atau langsung di kode ArsipRPP.jsx.')
       setLoading(false)
       return
