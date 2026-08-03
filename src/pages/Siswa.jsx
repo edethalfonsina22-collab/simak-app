@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../lib/AuthContext'
 import Layout from '../components/Layout'
 import BulkImportModal from '../components/BulkImportModal'
+import TeleponLink from '../components/TeleponLink'
 import { Plus, UploadCloud, Pencil, Trash2, Search, X, Loader2, Download, FileSpreadsheet, Printer, ChevronDown, Camera, IdCard } from 'lucide-react'
 
 const emptyForm = {
@@ -593,7 +594,7 @@ export default function Siswa() {
                 <ProfilRow label="Tempat, Tanggal Lahir" value={tempatTanggalLahir(profilLihat)} />
                 <ProfilRow label="Alamat" value={profilLihat.alamat} />
                 <ProfilRow label="Nama Orang Tua/Wali" value={profilLihat.nama_orang_tua} />
-                <ProfilRow label="No. HP Orang Tua/Wali" value={profilLihat.no_hp_orang_tua} />
+                <ProfilRow label="No. HP Orang Tua/Wali" value={profilLihat.no_hp_orang_tua} telepon />
               </div>
 
               <div className="flex gap-2 mt-4">
@@ -700,11 +701,14 @@ function Field({ label, children, full }) {
   )
 }
 
-function ProfilRow({ label, value }) {
+function ProfilRow({ label, value, telepon }) {
   return (
     <div className="flex items-start justify-between gap-4 text-sm">
       <span className="text-ink-700/50 shrink-0">{label}</span>
-      <span className="text-ink-950 font-medium text-right">{value || '—'}</span>
+      <span className="text-ink-950 font-medium text-right inline-flex items-center gap-1.5">
+        {value || '—'}
+        {telepon && <TeleponLink nomor={value} />}
+      </span>
     </div>
   )
 }
