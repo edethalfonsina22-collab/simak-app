@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
+import { PDFDocument, StandardFonts, rgb } from 'pdf-lib'
 import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../lib/AuthContext'
 import Layout from '../components/Layout'
-import { Send, CheckCircle2, XCircle, Clock, Loader2, CalendarClock } from 'lucide-react'
+import { Send, CheckCircle2, XCircle, Clock, Loader2, CalendarClock, Printer } from 'lucide-react'
 
 const STATUS_STYLE = {
   menunggu: 'bg-brass-400/15 text-brass-600',
@@ -45,6 +46,7 @@ export default function PengajuanIzin() {
   // Form penolakan admin, per baris
   const [rejectingId, setRejectingId] = useState(null)
   const [catatanTolak, setCatatanTolak] = useState('')
+  const [printingId, setPrintingId] = useState(null)
 
   async function load() {
     setLoading(true)
@@ -136,6 +138,69 @@ export default function PengajuanIzin() {
     setCatatanTolak('')
     setProcessingId(null)
     await load()
+  }
+
+  // Buat & unduh PDF Surat Keterangan Izin/Cuti — dipakai untuk pengajuan yang sudah disetujui
+  async function handleCetakSurat(item) {
+    setPrintingId(item.id)
+    try {
+      const { data: sekolah } = await supabase.from('profil_sekolah').select('*').eq('id', 1).maybeSingle()
+
+      const pdfDoc = await PDFDocument.create()
+      const page = pdfDoc.addPage([595, 842]) // A4
+      const font = await pdfDoc.embedFont(StandardFonts.Helvetica)
+      const bold = await pdfDoc.embedFont(StandardFonts.HelveticaBold)
+      const tanggalCetak = new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })
+
+      let y = 800
+      const draw = (text, opts = {}) => {
+        const size = opts.size ?? 11
+        const useFont = opts.bold ? bold : font
+        if (opts.center) {
+          const width = useFont.widthOfTextAtSize(text, size)
+          page.drawText(text, { x: (595 - width) / 2, y, size, font: useFont, color: rgb(0.1, 0.1, 0.1) })
+        } else {
+          page.drawText(text, { x: opts.x ?? 60, y, size, font: useFont, color: rgb(0.1, 0.1, 0.1) })
+        }
+        y -= opts.gap ?? 20
+      }
+
+      draw(sekolah?.nama_sekolah || 'NAMA SEKOLAH', { bold: true, size: 14, center: true, gap: 16 })
+      draw(sekolah?.alamat || '-', { size: 9, center: true, gap: 30 })
+      page.drawLine({ start: { x: 60, y }, end: { x: 535, y }, thickness: 1.5, color: rgb(0.1, 0.1, 0.1) })
+      y -= 26
+
+      draw('SURAT KETERANGAN IZIN / CUTI', { bold: true, size: 13, center: true, gap: 34 })
+
+      draw(`Yang bertanda tangan di bawah ini menerangkan bahwa:`, { gap: 26 })
+      draw(`Nama`, { x: 60, gap: 0 })
+      draw(`: ${item.guru?.nama_lengkap || '-'}`, { x: 180, gap: 20 })
+      draw(`Jenis Pengajuan`, { x: 60, gap: 0 })
+      draw(`: ${item.jenis}`, { x: 180, gap: 20 })
+      draw(`Tanggal`, { x: 60, gap: 0 })
+      draw(`: ${formatTanggal(item.tanggal_mulai)} s.d. ${formatTanggal(item.tanggal_selesai)}`, { x: 180, gap: 20 })
+      draw(`Alasan`, { x: 60, gap: 0 })
+      draw(`: ${item.alasan || '-'}`, { x: 180, gap: 34 })
+
+      draw('Telah disetujui dan tercatat sebagai izin resmi pada sistem informasi', { gap: 18 })
+      draw('sekolah, dan diharap dimaklumi oleh semua pihak terkait.', { gap: 50 })
+
+      draw(`${tanggalCetak}`, { x: 340, gap: 20 })
+      draw(sekolah?.kepala_sekolah ? 'Kepala Sekolah,' : 'Mengetahui,', { x: 340, gap: 60 })
+      draw(sekolah?.kepala_sekolah || '(.........................)', { x: 340, bold: true, gap: 0 })
+
+      const bytes = await pdfDoc.save()
+      const blob = new Blob([bytes], { type: 'application/pdf' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `Surat-Izin-${(item.guru?.nama_lengkap || 'guru').replace(/\s+/g, '-')}-${item.tanggal_mulai}.pdf`
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch (err) {
+      alert('Gagal membuat surat: ' + err.message)
+    }
+    setPrintingId(null)
   }
 
   // Guru hanya melihat pengajuannya sendiri (RLS di database juga sudah membatasi ini,
@@ -238,6 +303,17 @@ export default function PengajuanIzin() {
                 </div>
 
                 <div className="flex items-center gap-2 shrink-0">
+                  {item.status === 'disetujui' && (
+                    <button
+                      onClick={() => handleCetakSurat(item)}
+                      disabled={printingId === item.id}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-sage-500 hover:bg-sage-500/10 disabled:opacity-50"
+                    >
+                      {printingId === item.id ? <Loader2 size={14} className="animate-spin" /> : <Printer size={14} />}
+                      Cetak Surat
+                    </button>
+                  )}
+
                   {isAdmin && item.status === 'menunggu' && (
                     <>
                       <button
