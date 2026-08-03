@@ -2,7 +2,9 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../lib/AuthContext'
 import Layout from '../components/Layout'
-import { ImagePlus, Loader2, X, Trash2, Images } from 'lucide-react'
+import { ImagePlus, Loader2, X, Trash2, Images, ChevronLeft, ChevronRight } from 'lucide-react'
+
+const KATEGORI_LIST = ['Semua', 'Akademik', 'Ekstrakurikuler', 'Perayaan', 'Umum']
 
 export default function Galeri() {
   const { profil, isAdmin } = useAuth()
@@ -11,8 +13,10 @@ export default function Galeri() {
   const [uploading, setUploading] = useState(false)
   const [openAlbum, setOpenAlbum] = useState(null)
   const [showForm, setShowForm] = useState(false)
+  const [filterKategori, setFilterKategori] = useState('Semua')
+  const [lightboxIndex, setLightboxIndex] = useState(null) // index foto yang lagi dibuka, null = tertutup
 
-  const [form, setForm] = useState({ judul: '', deskripsi: '', files: [] })
+  const [form, setForm] = useState({ judul: '', deskripsi: '', kategori: 'Umum', files: [] })
 
   async function load() {
     setLoading(true)
@@ -39,7 +43,7 @@ export default function Galeri() {
 
     const { data: newKegiatan, error: insertError } = await supabase
       .from('galeri_kegiatan')
-      .insert({ judul: form.judul, deskripsi: form.deskripsi, guru_id: profil.guru_id })
+      .insert({ judul: form.judul, deskripsi: form.deskripsi, kategori: form.kategori, guru_id: profil.guru_id })
       .select()
       .single()
 
@@ -60,7 +64,7 @@ export default function Galeri() {
       await supabase.from('galeri_foto').insert({ kegiatan_id: newKegiatan.id, foto_path: path })
     }
 
-    setForm({ judul: '', deskripsi: '', files: [] })
+    setForm({ judul: '', deskripsi: '', kategori: 'Umum', files: [] })
     setShowForm(false)
     setUploading(false)
     await load()
@@ -84,11 +88,45 @@ export default function Galeri() {
 
   const canDelete = (item) => isAdmin || item.guru_id === profil?.guru_id
 
+  const kegiatanTerfilter =
+    filterKategori === 'Semua' ? kegiatan : kegiatan.filter((k) => (k.kategori || 'Umum') === filterKategori)
+
+  function openLightboxAt(index) {
+    setLightboxIndex(index)
+  }
+
+  function closeLightbox() {
+    setLightboxIndex(null)
+  }
+
+  function nextFoto() {
+    const total = (openAlbum?.galeri_foto || []).length
+    setLightboxIndex((i) => (i + 1) % total)
+  }
+
+  function prevFoto() {
+    const total = (openAlbum?.galeri_foto || []).length
+    setLightboxIndex((i) => (i - 1 + total) % total)
+  }
+
+  // Navigasi keyboard saat lightbox terbuka
+  useEffect(() => {
+    if (lightboxIndex === null) return
+    function handleKey(e) {
+      if (e.key === 'ArrowRight') nextFoto()
+      if (e.key === 'ArrowLeft') prevFoto()
+      if (e.key === 'Escape') closeLightbox()
+    }
+    window.addEventListener('keydown', handleKey)
+    return () => window.removeEventListener('keydown', handleKey)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lightboxIndex, openAlbum])
+
   return (
     <Layout title="Galeri Kegiatan" subtitle="Dokumentasi foto kegiatan sekolah">
       <div className="bg-sage-500/10 rounded-2xl p-5 -m-1">
-        <div className="flex items-center justify-between mb-6">
-          <p className="text-sm text-ink-700/50">{kegiatan.length} album kegiatan</p>
+        <div className="flex items-center justify-between mb-4">
+          <p className="text-sm text-ink-700/50">{kegiatanTerfilter.length} album kegiatan</p>
           <button
             onClick={() => setShowForm(!showForm)}
             className="flex items-center gap-2 px-4 py-2 rounded-lg bg-brass-400 text-ink-950 text-sm font-medium"
@@ -96,6 +134,23 @@ export default function Galeri() {
             <ImagePlus size={16} />
             Album Baru
           </button>
+        </div>
+
+        {/* Filter kategori */}
+        <div className="flex flex-wrap gap-2 mb-6">
+          {KATEGORI_LIST.map((kat) => (
+            <button
+              key={kat}
+              onClick={() => setFilterKategori(kat)}
+              className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+                filterKategori === kat
+                  ? 'bg-ink-950 text-paper'
+                  : 'bg-ink-900/[0.06] text-ink-700 hover:bg-ink-900/[0.1]'
+              }`}
+            >
+              {kat}
+            </button>
+          ))}
         </div>
 
         {showForm && (
@@ -107,6 +162,15 @@ export default function Galeri() {
               onChange={(e) => setForm({ ...form, judul: e.target.value })}
               required
             />
+            <select
+              className="input w-full"
+              value={form.kategori}
+              onChange={(e) => setForm({ ...form, kategori: e.target.value })}
+            >
+              {KATEGORI_LIST.filter((k) => k !== 'Semua').map((kat) => (
+                <option key={kat} value={kat}>{kat}</option>
+              ))}
+            </select>
             <textarea
               className="input w-full"
               rows={2}
@@ -138,13 +202,13 @@ export default function Galeri() {
 
         {loading ? (
           <p className="text-sm text-ink-700/50">Memuat...</p>
-        ) : kegiatan.length === 0 ? (
+        ) : kegiatanTerfilter.length === 0 ? (
           <div className="card p-6">
-            <p className="text-sm text-ink-700/50">Belum ada album kegiatan. Klik "Album Baru" untuk mulai.</p>
+            <p className="text-sm text-ink-700/50">Belum ada album kegiatan di kategori ini.</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-            {kegiatan.map((item) => {
+            {kegiatanTerfilter.map((item) => {
               const foto = item.galeri_foto || []
               return (
                 <button
@@ -160,6 +224,9 @@ export default function Galeri() {
                         <Images size={28} />
                       </div>
                     )}
+                    <span className="absolute top-2 left-2 text-[11px] font-medium px-2 py-0.5 rounded-md bg-ink-950/70 text-paper">
+                      {item.kategori || 'Umum'}
+                    </span>
                     <span className="absolute bottom-2 right-2 text-[11px] font-medium px-2 py-0.5 rounded-md bg-ink-950/70 text-paper">
                       {foto.length} foto
                     </span>
@@ -177,6 +244,7 @@ export default function Galeri() {
         )}
       </div>
 
+      {/* Modal Album (grid foto) */}
       {openAlbum && (
         <div className="fixed inset-0 bg-ink-950/70 flex items-center justify-center p-4 z-50" onClick={() => setOpenAlbum(null)}>
           <div className="bg-paper rounded-xl max-w-3xl w-full max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
@@ -206,16 +274,57 @@ export default function Galeri() {
               </div>
             </div>
             <div className="p-5 grid grid-cols-2 sm:grid-cols-3 gap-3">
-              {(openAlbum.galeri_foto || []).map((f) => (
-                <img
-                  key={f.id}
-                  src={fotoUrl(f.foto_path)}
-                  alt=""
-                  className="w-full aspect-square object-cover rounded-lg"
-                />
+              {(openAlbum.galeri_foto || []).map((f, idx) => (
+                <button key={f.id} onClick={() => openLightboxAt(idx)} className="block">
+                  <img
+                    src={fotoUrl(f.foto_path)}
+                    alt=""
+                    className="w-full aspect-square object-cover rounded-lg hover:opacity-90 transition-opacity cursor-zoom-in"
+                  />
+                </button>
               ))}
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Lightbox foto (klik foto, geser next/prev) */}
+      {openAlbum && lightboxIndex !== null && (
+        <div
+          className="fixed inset-0 bg-ink-950/90 flex items-center justify-center z-[60]"
+          onClick={closeLightbox}
+        >
+          <button
+            onClick={closeLightbox}
+            className="absolute top-4 right-4 w-10 h-10 rounded-full flex items-center justify-center text-paper bg-white/10 hover:bg-white/20"
+          >
+            <X size={20} />
+          </button>
+
+          <button
+            onClick={(e) => { e.stopPropagation(); prevFoto() }}
+            className="absolute left-2 sm:left-6 w-10 h-10 sm:w-12 sm:h-12 rounded-full flex items-center justify-center text-paper bg-white/10 hover:bg-white/20"
+          >
+            <ChevronLeft size={24} />
+          </button>
+
+          <img
+            src={fotoUrl(openAlbum.galeri_foto[lightboxIndex].foto_path)}
+            alt=""
+            className="max-w-[90vw] max-h-[85vh] object-contain rounded-lg"
+            onClick={(e) => e.stopPropagation()}
+          />
+
+          <button
+            onClick={(e) => { e.stopPropagation(); nextFoto() }}
+            className="absolute right-2 sm:right-6 w-10 h-10 sm:w-12 sm:h-12 rounded-full flex items-center justify-center text-paper bg-white/10 hover:bg-white/20"
+          >
+            <ChevronRight size={24} />
+          </button>
+
+          <span className="absolute bottom-4 left-1/2 -translate-x-1/2 text-xs text-paper/70">
+            {lightboxIndex + 1} / {openAlbum.galeri_foto.length}
+          </span>
         </div>
       )}
     </Layout>
