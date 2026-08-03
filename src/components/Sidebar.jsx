@@ -28,6 +28,7 @@ import {
   Database,
   IdCard,
   FilePlus,
+  FileClock,
 } from 'lucide-react'
 import { useAuth } from '../lib/AuthContext'
 
@@ -71,6 +72,7 @@ const groupsAdmin = [
   {
     label: 'Administrasi',
     links: [
+      { to: '/pengajuan-izin', label: 'Pengajuan Izin', icon: FileClock },
       { to: '/agenda', label: 'Agenda Sekolah', icon: CalendarDays },
       { to: '/surat', label: 'Surat Masuk/Keluar', icon: Mail },
       { to: '/ppdb-admin', label: 'PPDB Siswa Baru', icon: UserPlus },
@@ -94,6 +96,7 @@ const linksGuru = [
   { to: '/rapor', label: 'Rapor Siswa', icon: FileBadge },
   { to: '/rpp', label: 'RPP', icon: NotebookPen },
   { to: '/arsip-rpp', label: 'Arsip RPP', icon: Archive },
+  { to: '/pengajuan-izin', label: 'Pengajuan Izin', icon: FileClock },
   { to: '/buat-ujian', label: 'Buat Ujian', icon: FilePlus },
   { to: '/hasil-ujian', label: 'Hasil Ujian', icon: ClipboardList },
   { to: '/bank-soal', label: 'Bank Soal', icon: Database },
