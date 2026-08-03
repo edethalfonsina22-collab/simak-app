@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabaseClient'
 import Layout from '../components/Layout'
-import { Save, Loader2, CheckCircle2, ImagePlus } from 'lucide-react'
+import { Save, Loader2, CheckCircle2, ImagePlus, PenTool } from 'lucide-react'
 
 const emptyForm = {
   nama_sekolah: '',
@@ -12,6 +12,7 @@ const emptyForm = {
   kepala_sekolah: '',
   nip_kepala_sekolah: '',
   logo_path: '',
+  ttd_kepala_sekolah_path: '',
   tahun_berdiri: '',
   akreditasi: '',
   visi: '',
@@ -27,8 +28,10 @@ export default function ProfilSekolah() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [uploadingLogo, setUploadingLogo] = useState(false)
+  const [uploadingTtd, setUploadingTtd] = useState(false)
   const [tersimpan, setTersimpan] = useState(false)
   const [logoUrl, setLogoUrl] = useState('')
+  const [ttdUrl, setTtdUrl] = useState('')
 
   async function muatData() {
     setLoading(true)
@@ -38,6 +41,10 @@ export default function ProfilSekolah() {
       if (data.logo_path) {
         const { data: pub } = supabase.storage.from('profil-sekolah').getPublicUrl(data.logo_path)
         setLogoUrl(pub.publicUrl)
+      }
+      if (data.ttd_kepala_sekolah_path) {
+        const { data: pub } = supabase.storage.from('profil-sekolah').getPublicUrl(data.ttd_kepala_sekolah_path)
+        setTtdUrl(pub.publicUrl)
       }
     }
     setLoading(false)
@@ -89,6 +96,32 @@ export default function ProfilSekolah() {
     setUploadingLogo(false)
   }
 
+  // Upload gambar tanda tangan elektronik kepala sekolah — dipakai otomatis
+  // di setiap surat yang dicetak untuk pengajuan yang sudah disetujui.
+  async function handleTtdChange(e) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setUploadingTtd(true)
+
+    const ext = file.name.split('.').pop()
+    const path = `ttd-kepsek-${Date.now()}.${ext}`
+
+    const { error: uploadError } = await supabase.storage.from('profil-sekolah').upload(path, file, {
+      upsert: true,
+    })
+
+    if (uploadError) {
+      alert('Gagal upload tanda tangan: ' + uploadError.message)
+      setUploadingTtd(false)
+      return
+    }
+
+    const { data: pub } = supabase.storage.from('profil-sekolah').getPublicUrl(path)
+    setTtdUrl(pub.publicUrl)
+    setForm((f) => ({ ...f, ttd_kepala_sekolah_path: path }))
+    setUploadingTtd(false)
+  }
+
   function ubah(field, value) {
     setForm({ ...form, [field]: value })
   }
@@ -124,6 +157,30 @@ export default function ProfilSekolah() {
                 <input type="file" accept="image/*" className="hidden" onChange={handleLogoChange} disabled={uploadingLogo} />
               </label>
               <p className="text-xs text-ink-700/50 mt-1.5">Format PNG/JPG, dipakai di kop rapor & dokumen resmi.</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="card p-6">
+          <h3 className="font-display font-semibold text-ink-950 mb-4">Tanda Tangan Elektronik Kepala Sekolah</h3>
+          <div className="flex items-center gap-4">
+            <div className="w-32 h-20 rounded-lg border border-ink-900/[0.1] flex items-center justify-center overflow-hidden bg-ink-900/[0.02] shrink-0">
+              {ttdUrl ? (
+                <img src={ttdUrl} alt="Tanda tangan kepala sekolah" className="w-full h-full object-contain" />
+              ) : (
+                <PenTool size={24} className="text-ink-700/30" />
+              )}
+            </div>
+            <div>
+              <label className="btn-secondary cursor-pointer inline-flex">
+                {uploadingTtd ? <Loader2 size={16} className="animate-spin" /> : <PenTool size={16} />}
+                {uploadingTtd ? 'Mengunggah...' : 'Upload Tanda Tangan'}
+                <input type="file" accept="image/*" className="hidden" onChange={handleTtdChange} disabled={uploadingTtd} />
+              </label>
+              <p className="text-xs text-ink-700/50 mt-1.5">
+                Gunakan PNG dengan latar transparan agar rapi. Sekali diunggah, tanda tangan ini otomatis
+                terpasang di setiap Surat Keterangan Izin/Cuti yang dicetak untuk pengajuan yang sudah disetujui.
+              </p>
             </div>
           </div>
         </div>
