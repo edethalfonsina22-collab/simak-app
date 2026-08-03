@@ -21,7 +21,7 @@ function isDocFile(nameOrType = '') {
   return /\.(docx?|DOCX?)$/.test(nameOrType) || nameOrType.includes('word')
 }
 
-// Modal Rekomendasi RPP berbasis AI
+// Modal Rekomendasi RPP berbasis AI (Langsung panggil OpenAI)
 function AiRppModal({ isOpen, onClose, onApplyToForm }) {
   const [mataPelajaran, setMataPelajaran] = useState('')
   const [kelas, setKelas] = useState('')
@@ -37,18 +37,48 @@ function AiRppModal({ isOpen, onClose, onApplyToForm }) {
     setLoading(true)
     setResult('')
 
+    // Membaca API Key yang tersimpan di Vercel
+    const apiKey = import.meta.env.VITE_OPENAI_API_KEY
+
+    if (!apiKey) {
+      alert('API Key belum ditemukan! Pastikan VITE_OPENAI_API_KEY sudah ditambahkan di Vercel Environment Variables dan sudah di-Redeploy.')
+      setLoading(false)
+      return
+    }
+
+    const promptText = `Anda adalah asisten ahli kurikulum pendidikan Indonesia. 
+Buatkan draf RPP (Rencana Pelaksanaan Pembelajaran) ringkas dan terstruktur berdasarkan data berikut:
+- Mata Pelajaran: ${mataPelajaran}
+- Kelas/Semester: ${kelas || 'Sesuai'}
+- Materi Pokok: ${materi}
+
+Format RPP yang dihasilkan harus mencakup:
+1. Tujuan Pembelajaran
+2. Langkah-Langkah Pembelajaran (Pendahuluan, Kegiatan Inti, Penutup)
+3. Metode & Media Pembelajaran
+4. Penilaian / Asesmen`
+
     try {
-      const res = await fetch('/api/generate-rpp', {
+      const res = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mataPelajaran, kelas, materi }),
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model: 'gpt-4o-mini',
+          messages: [{ role: 'user', content: promptText }],
+          temperature: 0.7,
+        }),
       })
+
       const data = await res.json()
 
       if (res.ok) {
-        setResult(data.result)
+        const textHasil = data.choices?.[0]?.message?.content || 'Gagal menghasilkan RPP.'
+        setResult(textHasil)
       } else {
-        alert(data.error || 'Terjadi kesalahan saat menghasilkan RPP')
+        alert('Error dari OpenAI: ' + (data.error?.message || 'Gagal memproses permintaan AI.'))
       }
     } catch (err) {
       alert('Gagal membuat rekomendasi RPP: ' + err.message)
