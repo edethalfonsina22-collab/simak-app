@@ -11,7 +11,9 @@ async function kirimWA(target, pesan) {
     },
     body: JSON.stringify({ target, message: pesan }),
   })
-  return res.json()
+  const hasil = await res.json()
+  console.log('Fonnte response untuk target', target, ':', JSON.stringify(hasil))
+  return hasil
 }
 
 export default async function handler(req, res) {
@@ -51,7 +53,7 @@ export default async function handler(req, res) {
     const pesanGrup = `*Pengingat Presensi Guru*\nTanggal: ${hariIni}\n\nBerikut guru yang belum mengisi presensi hari ini:\n${daftarNama}\n\nMohon segera diisi melalui aplikasi SIMAK.`
 
     // 1. Kirim ke grup WA guru
-    await kirimWA(process.env.FONNTE_GROUP_ID, pesanGrup)
+    const hasilGrup = await kirimWA(process.env.FONNTE_GROUP_ID, pesanGrup)
 
     // 2. Kirim personal ke masing-masing guru yang belum absen
     const hasilPersonal = []
@@ -64,8 +66,8 @@ export default async function handler(req, res) {
 
     return res.status(200).json({
       total_belum_absen: belumAbsen.length,
-      dikirim_ke_grup: true,
-      dikirim_personal: hasilPersonal.length,
+      hasil_kirim_grup: hasilGrup,
+      hasil_kirim_personal: hasilPersonal,
     })
   } catch (err) {
     console.error(err)
