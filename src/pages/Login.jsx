@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Navigate } from 'react-router-dom'
 import { useAuth } from '../lib/AuthContext'
+import { supabase } from '../lib/supabaseClient'
 import { Loader2, LogIn } from 'lucide-react'
 
 export default function Login() {
@@ -11,11 +12,23 @@ export default function Login() {
   const [loading, setLoading] = useState(false)
   const [mounted, setMounted] = useState(false)
   const [shake, setShake] = useState(0)
+  const [namaSekolah, setNamaSekolah] = useState('')
 
   useEffect(() => {
     // Memicu animasi masuk sesaat setelah komponen ter-render
     const t = requestAnimationFrame(() => setMounted(true))
     return () => cancelAnimationFrame(t)
+  }, [])
+
+  useEffect(() => {
+    supabase
+      .from('profil_sekolah')
+      .select('nama_sekolah')
+      .limit(1)
+      .single()
+      .then(({ data }) => {
+        if (data?.nama_sekolah) setNamaSekolah(data.nama_sekolah)
+      })
   }, [])
 
   if (session) return <Navigate to="/" replace />
@@ -62,6 +75,9 @@ export default function Login() {
           </div>
           <h1 className="font-display text-2xl font-semibold text-ink-950">SIMAK</h1>
           <p className="text-sm text-ink-700/60 mt-1">Sistem Informasi Manajemen Sekolah</p>
+          {namaSekolah && (
+            <p className="text-sm font-medium text-ink-950 mt-0.5">{namaSekolah}</p>
+          )}
         </div>
 
         <form
@@ -125,7 +141,7 @@ export default function Login() {
             mounted ? 'opacity-100' : 'opacity-0'
           }`}
         >
-          Akun admin dibuat lewat Supabase Dashboard &mdash; lihat panduan setup.
+          Aplikasi ini dikembangkan oleh LD_SALIM
         </p>
       </div>
 
