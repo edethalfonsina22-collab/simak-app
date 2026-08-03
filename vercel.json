@@ -4,9 +4,7 @@
       "source": "/(.*)",
       "destination": "/index.html"
     }
-  ]
-}
-{
+  ],
   "crons": [
     {
       "path": "/api/cron/notifikasi-absen",
