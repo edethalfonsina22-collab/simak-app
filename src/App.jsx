@@ -32,6 +32,7 @@ import ArsipRPP from './pages/ArsipRPP'
 import BuatUjian from './pages/BuatUjian'
 import UjianOnline from './pages/UjianOnline'
 import ProfilSaya from './pages/ProfilSaya'
+import PengajuanIzin from './pages/PengajuanIzin'
 import Loader from './components/Loader'
 
 function ProtectedRoute({ children, adminOnly }) {
@@ -86,6 +87,7 @@ export default function App() {
       <Route path="/dokumen" element={<ProtectedRoute><Dokumen /></ProtectedRoute>} />
       <Route path="/rpp" element={<ProtectedRoute><RPP /></ProtectedRoute>} />
       <Route path="/arsip-rpp" element={<ProtectedRoute><ArsipRPP /></ProtectedRoute>} />
+      <Route path="/pengajuan-izin" element={<ProtectedRoute><PengajuanIzin /></ProtectedRoute>} />
       <Route path="/bank-soal" element={<ProtectedRoute><BankSoal /></ProtectedRoute>} />
 <Route path="/kartu" element={<ProtectedRoute adminOnly><KartuSiswa /></ProtectedRoute>} />
       <Route path="/buat-ujian" element={<ProtectedRoute><BuatUjian /></ProtectedRoute>} />
