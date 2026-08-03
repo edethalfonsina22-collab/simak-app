@@ -3,7 +3,7 @@ import { PDFDocument, StandardFonts, rgb } from 'pdf-lib'
 import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../lib/AuthContext'
 import Layout from '../components/Layout'
-import { Send, CheckCircle2, XCircle, Clock, Loader2, CalendarClock, Printer } from 'lucide-react'
+import { Send, CheckCircle2, XCircle, Clock, Loader2, CalendarClock, Printer, FileText, Eye } from 'lucide-react'
 
 const STATUS_STYLE = {
   menunggu: 'bg-brass-400/15 text-brass-600',
@@ -11,6 +11,8 @@ const STATUS_STYLE = {
   ditolak: 'bg-red-100 text-red-600',
 }
 const STATUS_LABEL = { menunggu: 'Menunggu', disetujui: 'Disetujui', ditolak: 'Ditolak' }
+
+const BULAN_ROMAWI = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII']
 
 function formatTanggal(tgl) {
   if (!tgl) return '-'
@@ -26,6 +28,46 @@ function rentangTanggal(mulai, selesai) {
     cur.setDate(cur.getDate() + 1)
   }
   return hasil
+}
+
+// Nomor surat otomatis, format: 001/SK-IZIN/VIII/2026
+// Urutan dihitung dari jumlah surat yang sudah bernomor pada tahun berjalan.
+async function buatNomorSurat() {
+  const sekarang = new Date()
+  const tahun = sekarang.getFullYear()
+  const bulanRomawi = BULAN_ROMAWI[sekarang.getMonth()]
+  const awalTahun = `${tahun}-01-01T00:00:00.000Z`
+  const akhirTahun = `${tahun}-12-31T23:59:59.999Z`
+
+  const { count, error } = await supabase
+    .from('pengajuan_izin')
+    .select('id', { count: 'exact', head: true })
+    .not('nomor_surat', 'is', null)
+    .gte('diproses_pada', awalTahun)
+    .lte('diproses_pada', akhirTahun)
+
+  if (error) throw error
+
+  const urutan = (count || 0) + 1
+  const nomorUrut = String(urutan).padStart(3, '0')
+  return `${nomorUrut}/SK-IZIN/${bulanRomawi}/${tahun}`
+}
+
+// Ambil logo dari Supabase Storage lalu embed ke PDF (PNG/JPG)
+async function embedLogoSekolah(pdfDoc, logoPath) {
+  if (!logoPath) return null
+  try {
+    const { data: pub } = supabase.storage.from('profil-sekolah').getPublicUrl(logoPath)
+    const res = await fetch(pub.publicUrl)
+    if (!res.ok) return null
+    const bytes = await res.arrayBuffer()
+    const ext = logoPath.split('.').pop().toLowerCase()
+    if (ext === 'png') return await pdfDoc.embedPng(bytes)
+    if (ext === 'jpg' || ext === 'jpeg') return await pdfDoc.embedJpg(bytes)
+    return null
+  } catch {
+    return null
+  }
 }
 
 export default function PengajuanIzin() {
@@ -47,6 +89,7 @@ export default function PengajuanIzin() {
   const [rejectingId, setRejectingId] = useState(null)
   const [catatanTolak, setCatatanTolak] = useState('')
   const [printingId, setPrintingId] = useState(null)
+  const [previewingId, setPreviewingId] = useState(null)
 
   async function load() {
     setLoading(true)
@@ -106,10 +149,12 @@ export default function PengajuanIzin() {
     setProcessingId(item.id)
     try {
       await catatKePresensi(item)
+      const nomorSurat = await buatNomorSurat()
       const { error } = await supabase
         .from('pengajuan_izin')
         .update({
           status: 'disetujui',
+          nomor_surat: nomorSurat,
           diproses_oleh: session.user.id,
           diproses_pada: new Date().toISOString(),
         })
@@ -140,17 +185,17 @@ export default function PengajuanIzin() {
     await load()
   }
 
-  // Buat & unduh PDF Surat Keterangan Izin/Cuti — dipakai untuk pengajuan yang sudah disetujui
-  async function handleCetakSurat(item) {
-    setPrintingId(item.id)
-    try {
-      const { data: sekolah } = await supabase.from('profil_sekolah').select('*').eq('id', 1).maybeSingle()
+  // Susun PDF Surat Keterangan Izin/Cuti dan kembalikan bytes-nya.
+  // Dipakai bersama oleh tombol "Lihat" (preview) dan "Cetak Surat" (unduh).
+  async function buatPdfSurat(item) {
+    const { data: sekolah } = await supabase.from('profil_sekolah').select('*').eq('id', 1).maybeSingle()
 
       const pdfDoc = await PDFDocument.create()
       const page = pdfDoc.addPage([595, 842]) // A4
       const font = await pdfDoc.embedFont(StandardFonts.Helvetica)
       const bold = await pdfDoc.embedFont(StandardFonts.HelveticaBold)
       const tanggalCetak = new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })
+      const logoImage = await embedLogoSekolah(pdfDoc, sekolah?.logo_path)
 
       let y = 800
       const draw = (text, opts = {}) => {
@@ -165,12 +210,47 @@ export default function PengajuanIzin() {
         y -= opts.gap ?? 20
       }
 
-      draw(sekolah?.nama_sekolah || 'NAMA SEKOLAH', { bold: true, size: 14, center: true, gap: 16 })
-      draw(sekolah?.alamat || '-', { size: 9, center: true, gap: 30 })
-      page.drawLine({ start: { x: 60, y }, end: { x: 535, y }, thickness: 1.5, color: rgb(0.1, 0.1, 0.1) })
+      // ---------- KOP SURAT ----------
+      const kopMulaiY = y
+      if (sekolah?.dinas_pendidikan) {
+        const teksKabupaten = sekolah?.kabupaten
+          ? sekolah.kabupaten.toUpperCase().startsWith('PEMERINTAH')
+            ? sekolah.kabupaten.toUpperCase()
+            : `PEMERINTAH ${sekolah.kabupaten.toUpperCase()}`
+          : ''
+        if (teksKabupaten) draw(teksKabupaten, { bold: true, size: 12, center: true, gap: 15 })
+        draw(sekolah.dinas_pendidikan.toUpperCase(), { bold: true, size: 12, center: true, gap: 15 })
+        if (sekolah?.kecamatan) draw(sekolah.kecamatan.toUpperCase(), { bold: true, size: 11, center: true, gap: 15 })
+        draw(sekolah?.nama_sekolah || 'NAMA SEKOLAH', { bold: true, size: 14, center: true, gap: 14 })
+      } else {
+        draw(sekolah?.nama_sekolah || 'NAMA SEKOLAH', { bold: true, size: 14, center: true, gap: 16 })
+      }
+
+      const detailAlamat = [sekolah?.alamat, sekolah?.telepon ? `Telp. ${sekolah.telepon}` : null, sekolah?.email]
+        .filter(Boolean)
+        .join(' — ')
+      if (detailAlamat) draw(detailAlamat, { size: 9, center: true, gap: 20 })
+
+      // Logo di kiri atas kop, sejajar dengan blok teks kop
+      if (logoImage) {
+        const logoSize = 55
+        const logoDims = logoImage.scale(logoSize / Math.max(logoImage.width, logoImage.height))
+        page.drawImage(logoImage, {
+          x: 60,
+          y: kopMulaiY - logoDims.height + 5,
+          width: logoDims.width,
+          height: logoDims.height,
+        })
+      }
+
+      page.drawLine({ start: { x: 60, y }, end: { x: 535, y }, thickness: 2, color: rgb(0.1, 0.1, 0.1) })
+      y -= 3
+      page.drawLine({ start: { x: 60, y }, end: { x: 535, y }, thickness: 0.75, color: rgb(0.1, 0.1, 0.1) })
       y -= 26
 
-      draw('SURAT KETERANGAN IZIN / CUTI', { bold: true, size: 13, center: true, gap: 34 })
+      // ---------- JUDUL & NOMOR SURAT ----------
+      draw('SURAT KETERANGAN IZIN / CUTI', { bold: true, size: 13, center: true, gap: 16 })
+      draw(`Nomor: ${item.nomor_surat || '-'}`, { size: 10, center: true, gap: 34 })
 
       draw(`Yang bertanda tangan di bawah ini menerangkan bahwa:`, { gap: 26 })
       draw(`Nama`, { x: 60, gap: 0 })
@@ -185,16 +265,51 @@ export default function PengajuanIzin() {
       draw('Telah disetujui dan tercatat sebagai izin resmi pada sistem informasi', { gap: 18 })
       draw('sekolah, dan diharap dimaklumi oleh semua pihak terkait.', { gap: 50 })
 
+      // ---------- TANDA TANGAN ----------
       draw(`${tanggalCetak}`, { x: 340, gap: 20 })
       draw(sekolah?.kepala_sekolah ? 'Kepala Sekolah,' : 'Mengetahui,', { x: 340, gap: 60 })
-      draw(sekolah?.kepala_sekolah || '(.........................)', { x: 340, bold: true, gap: 0 })
+      draw(sekolah?.kepala_sekolah || '(.........................)', { x: 340, bold: true, gap: 18 })
+      if (sekolah?.nip_kepala_sekolah) {
+        draw(`NIP. ${sekolah.nip_kepala_sekolah}`, { x: 340, size: 10, gap: 0 })
+      }
 
-      const bytes = await pdfDoc.save()
+      return await pdfDoc.save()
+  }
+
+  function namaFileSurat(item) {
+    const namaFileNomor = (item.nomor_surat || '').replace(/\//g, '-')
+    return `Surat-Izin-${namaFileNomor ? namaFileNomor + '-' : ''}${(item.guru?.nama_lengkap || 'guru').replace(/\s+/g, '-')}.pdf`
+  }
+
+  // Buka pratinjau PDF di tab baru, tanpa langsung mengunduh
+  async function handleLihatSurat(item) {
+    setPreviewingId(item.id)
+    try {
+      const bytes = await buatPdfSurat(item)
+      const blob = new Blob([bytes], { type: 'application/pdf' })
+      const url = URL.createObjectURL(blob)
+      const tab = window.open(url, '_blank')
+      if (!tab) {
+        alert('Pop-up diblokir browser. Izinkan pop-up untuk melihat pratinjau surat.')
+      }
+      // Beri waktu tab baru memuat blob sebelum URL-nya dilepas
+      setTimeout(() => URL.revokeObjectURL(url), 60000)
+    } catch (err) {
+      alert('Gagal membuat pratinjau surat: ' + err.message)
+    }
+    setPreviewingId(null)
+  }
+
+  // Unduh PDF Surat Keterangan Izin/Cuti — dipakai untuk pengajuan yang sudah disetujui
+  async function handleCetakSurat(item) {
+    setPrintingId(item.id)
+    try {
+      const bytes = await buatPdfSurat(item)
       const blob = new Blob([bytes], { type: 'application/pdf' })
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      a.download = `Surat-Izin-${(item.guru?.nama_lengkap || 'guru').replace(/\s+/g, '-')}-${item.tanggal_mulai}.pdf`
+      a.download = namaFileSurat(item)
       a.click()
       URL.revokeObjectURL(url)
     } catch (err) {
@@ -291,6 +406,11 @@ export default function PengajuanIzin() {
                       {STATUS_LABEL[item.status]}
                     </span>
                     <span className="text-sm font-medium text-ink-900">{item.jenis}</span>
+                    {item.nomor_surat && (
+                      <span className="flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-md bg-ink-900/[0.05] text-ink-700/70">
+                        <FileText size={11} /> {item.nomor_surat}
+                      </span>
+                    )}
                   </div>
                   <p className="text-xs text-ink-700/50 mt-1">
                     {isAdmin && <>{item.guru?.nama_lengkap || 'Guru'} · </>}
@@ -304,14 +424,24 @@ export default function PengajuanIzin() {
 
                 <div className="flex items-center gap-2 shrink-0">
                   {item.status === 'disetujui' && (
-                    <button
-                      onClick={() => handleCetakSurat(item)}
-                      disabled={printingId === item.id}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-sage-500 hover:bg-sage-500/10 disabled:opacity-50"
-                    >
-                      {printingId === item.id ? <Loader2 size={14} className="animate-spin" /> : <Printer size={14} />}
-                      Cetak Surat
-                    </button>
+                    <>
+                      <button
+                        onClick={() => handleLihatSurat(item)}
+                        disabled={previewingId === item.id}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-ink-700/70 hover:bg-ink-900/[0.05] disabled:opacity-50"
+                      >
+                        {previewingId === item.id ? <Loader2 size={14} className="animate-spin" /> : <Eye size={14} />}
+                        Lihat
+                      </button>
+                      <button
+                        onClick={() => handleCetakSurat(item)}
+                        disabled={printingId === item.id}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-sage-500 hover:bg-sage-500/10 disabled:opacity-50"
+                      >
+                        {printingId === item.id ? <Loader2 size={14} className="animate-spin" /> : <Printer size={14} />}
+                        Cetak Surat
+                      </button>
+                    </>
                   )}
 
                   {isAdmin && item.status === 'menunggu' && (
