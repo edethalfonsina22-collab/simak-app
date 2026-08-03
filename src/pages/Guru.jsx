@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabaseClient'
 import Layout from '../components/Layout'
 import BulkImportModal from '../components/BulkImportModal'
+import TeleponLink from '../components/TeleponLink'
 import { Plus, UploadCloud, Pencil, Trash2, Search, X, Loader2, GraduationCap } from 'lucide-react'
 
 const emptyForm = {
@@ -149,7 +150,12 @@ export default function Guru() {
                 </td>
                 <td className="font-mono text-xs">{g.nip}</td>
                 <td>{g.mata_pelajaran}</td>
-                <td>{g.no_hp}</td>
+                <td>
+                  <span className="inline-flex items-center gap-1.5">
+                    {g.no_hp}
+                    <TeleponLink nomor={g.no_hp} />
+                  </span>
+                </td>
                 <td>{g.email}</td>
                 <td>
                   <span className={`badge ${g.status === 'aktif' ? 'bg-blue-600/15 text-blue-700' : 'bg-red-900/10 text-red-900'}`}>
@@ -253,7 +259,7 @@ export default function Guru() {
                 <ProfilRow label="Pangkat / Golongan" value={profilLihat.pangkat_golongan} />
                 <ProfilRow label="Pendidikan Terakhir" value={profilLihat.pendidikan_terakhir} />
                 <ProfilRow label="Tanggal Lahir" value={formatTanggal(profilLihat.tanggal_lahir)} />
-                <ProfilRow label="No. HP" value={profilLihat.no_hp} />
+                <ProfilRow label="No. HP" value={profilLihat.no_hp} telepon />
                 <ProfilRow label="Email" value={profilLihat.email} />
                 <ProfilRow label="Alamat" value={profilLihat.alamat} />
               </div>
@@ -308,11 +314,14 @@ function Field({ label, children, full }) {
   )
 }
 
-function ProfilRow({ label, value }) {
+function ProfilRow({ label, value, telepon }) {
   return (
     <div className="flex items-start justify-between gap-4 text-sm">
       <span className="text-ink-700/50 shrink-0">{label}</span>
-      <span className="text-ink-950 font-medium text-right">{value || '—'}</span>
+      <span className="text-ink-950 font-medium text-right inline-flex items-center gap-1.5">
+        {value || '—'}
+        {telepon && <TeleponLink nomor={value} />}
+      </span>
     </div>
   )
 }
