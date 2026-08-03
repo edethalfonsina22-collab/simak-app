@@ -37,14 +37,13 @@ function AiRppModal({ isOpen, onClose, onApplyToForm }) {
     setLoading(true)
     setResult('')
 
-    // Membaca API Key dari Vercel Environment Variables
-    // PERHATIAN: Masukkan API Key OpenAI Anda di dalam tanda petik di paling bawah sebagai cadangan
+    // Membaca API Key dari Vercel Environment Variables atau API Key Cadangan
     const apiKey =
       import.meta.env.VITE_OPENAI_API_KEY ||
       import.meta.env.VITE_OPENAI_KEY ||
-      "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"
+      "sk-proj-9Ad05dA_8wR3q2_1H_rRt-0CuyXOH6nVdTih8kvHQq59f1Jguo0jV3X3rs2m2InL-hDRcxuNNTT3B1bkFJL-eOlSSowf2mrrU-SapUDn3IUBTQ85a4kRdFzrcI3DPRXzl0wY3mug"
 
-    if (!apiKey || apiKey === "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") {
+    if (!apiKey || apiKey === "PASTE_OPENAI_API_KEY_ANDA_DI_SINI") {
       alert('API Key belum diisi! Silakan masukkan API Key OpenAI Anda di Vercel Environment Variables atau langsung di kode ArsipRPP.jsx.')
       setLoading(false)
       return
