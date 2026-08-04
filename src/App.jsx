@@ -33,6 +33,7 @@ import BuatUjian from './pages/BuatUjian'
 import UjianOnline from './pages/UjianOnline'
 import ProfilSaya from './pages/ProfilSaya'
 import PengajuanIzin from './pages/PengajuanIzin'
+import HariLibur from './pages/HariLibur'
 import Loader from './components/Loader'
 
 function ProtectedRoute({ children, adminOnly }) {
@@ -77,6 +78,7 @@ export default function App() {
       <Route path="/agenda" element={<ProtectedRoute><Agenda /></ProtectedRoute>} />
       <Route path="/surat" element={<ProtectedRoute adminOnly><Surat /></ProtectedRoute>} />
       <Route path="/laporan" element={<ProtectedRoute adminOnly><LaporanBulanan /></ProtectedRoute>} />
+      <Route path="/hari-libur" element={<ProtectedRoute adminOnly><HariLibur /></ProtectedRoute>} />
       <Route path="/keuangan" element={<ProtectedRoute adminOnly><Keuangan /></ProtectedRoute>} />
       <Route path="/backup" element={<ProtectedRoute adminOnly><Backup /></ProtectedRoute>} />
       <Route path="/profil-sekolah" element={<ProtectedRoute adminOnly><ProfilSekolah /></ProtectedRoute>} />
