@@ -74,9 +74,11 @@ export default function Login() {
             </div>
           </div>
           <h1 className="font-display text-2xl font-semibold text-ink-950">SIMAK</h1>
-          <p className="text-sm text-ink-700/60 mt-1">Sistem Informasi Manajemen Sekolah</p>
+          <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-ink-700/45 mt-2">
+            School Management Information System
+          </p>
           {namaSekolah && (
-            <p className="text-sm font-medium text-ink-950 mt-0.5">{namaSekolah}</p>
+            <p className="text-sm font-medium text-ink-950 mt-1.5">{namaSekolah}</p>
           )}
         </div>
 
@@ -137,11 +139,12 @@ export default function Login() {
         </form>
 
         <p
-          className={`text-center text-xs text-ink-700/50 mt-5 transition-all duration-700 ease-out delay-500 ${
+          className={`text-center text-xs font-display italic text-ink-700/45 mt-5 tracking-wide transition-all duration-700 ease-out delay-500 ${
             mounted ? 'opacity-100' : 'opacity-0'
           }`}
         >
-          Aplikasi ini dikembangkan oleh LD_SALIM
+          This application was crafted by{' '}
+          <span className="not-italic font-semibold text-ink-700/65">LD_SALIM</span>
         </p>
       </div>
 
