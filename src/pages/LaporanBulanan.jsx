@@ -36,10 +36,18 @@ export default function LaporanBulanan() {
   const [tanggalLibur, setTanggalLibur] = useState('') // input manual tambahan, contoh: "16,21"
   const [hariLiburDB, setHariLiburDB] = useState(new Set()) // dari tabel hari_libur, untuk bulan aktif
   const [profilSekolah, setProfilSekolah] = useState(null)
+  const [logoUrl, setLogoUrl] = useState('')
+  const [mengeksporPDF, setMengeksporPDF] = useState(false)
 
   useEffect(() => {
     supabase.from('profil_sekolah').select('*').eq('id', 1).maybeSingle().then(({ data }) => {
       setProfilSekolah(data || {})
+      if (data?.logo_path) {
+        const { data: pub } = supabase.storage.from('profil-sekolah').getPublicUrl(data.logo_path)
+        setLogoUrl(pub.publicUrl)
+      } else {
+        setLogoUrl('')
+      }
     })
   }, [])
 
@@ -178,19 +186,25 @@ export default function LaporanBulanan() {
   const isHariLibur = (tgl) =>
     apakahHariMinggu(tahun, bulan, tgl) || hariLiburDB.has(tgl) || hariLiburManual.has(tgl)
 
-  function handleExportPDF() {
+  async function handleExportPDF() {
     if (jenis === 'presensi_guru' && tampilanGuru === 'daftar_hadir' && daftarHadirGuru) {
       const akhirBulan = jumlahHariDalamBulan(tahun, bulan)
-      eksporPDFDaftarHadir({
-        profilSekolah: profilSekolah || {},
-        bulanLabel: NAMA_BULAN[bulan - 1],
-        tahun,
-        baris: daftarHadirGuru.baris,
-        totalHari: daftarHadirGuru.totalHari,
-        isHariLibur,
-        tanggalCetak: `${akhirBulan} ${NAMA_BULAN[bulan - 1]} ${tahun}`,
-        namaFile: `daftar-hadir-guru-${tahun}-${bulan}`,
-      })
+      setMengeksporPDF(true)
+      try {
+        await eksporPDFDaftarHadir({
+          profilSekolah: profilSekolah || {},
+          logoUrl,
+          bulanLabel: NAMA_BULAN[bulan - 1],
+          tahun,
+          baris: daftarHadirGuru.baris,
+          totalHari: daftarHadirGuru.totalHari,
+          isHariLibur,
+          tanggalCetak: `${akhirBulan} ${NAMA_BULAN[bulan - 1]} ${tahun}`,
+          namaFile: `daftar-hadir-guru-${tahun}-${bulan}`,
+        })
+      } finally {
+        setMengeksporPDF(false)
+      }
       return
     }
     const { kolom, baris } = siapkanTabel()
@@ -241,6 +255,8 @@ export default function LaporanBulanan() {
         .tabel-hadir th, .tabel-hadir td { border: 1px solid #333; text-align: center; padding: 2px; }
         .tabel-hadir td.nama { text-align: left; white-space: nowrap; }
         .kolom-libur { background: #e11d2e; color: #fff; font-weight: 600; }
+        .kop-sekolah { display: flex; align-items: center; justify-content: center; gap: 12px; }
+        .kop-sekolah img { width: 56px; height: 56px; object-fit: contain; flex-shrink: 0; }
       `}</style>
 
       <div className="card p-5 mb-5 sembunyikan-saat-cetak">
@@ -304,8 +320,9 @@ export default function LaporanBulanan() {
           <button className="btn-secondary" onClick={handleCetak} disabled={!modeGridAktif && baris.length === 0}>
             <Printer size={16} /> Cetak
           </button>
-          <button className="btn-secondary" onClick={handleExportPDF} disabled={!modeGridAktif && baris.length === 0}>
-            <FileDown size={16} /> Unduh PDF
+          <button className="btn-secondary" onClick={handleExportPDF} disabled={mengeksporPDF || (!modeGridAktif && baris.length === 0)}>
+            {mengeksporPDF ? <Loader2 size={16} className="animate-spin" /> : <FileDown size={16} />}
+            {mengeksporPDF ? 'Menyiapkan PDF...' : 'Unduh PDF'}
           </button>
           <button className="btn-secondary" onClick={handleExportExcel} disabled={!modeGridAktif && baris.length === 0}>
             <FileSpreadsheet size={16} /> Unduh Excel
@@ -344,12 +361,15 @@ export default function LaporanBulanan() {
         {/* ---------- Tampilan Daftar Hadir (grid kalender, format kertas absensi) ---------- */}
         {!loading && modeGridAktif && daftarHadirGuru && (
           <div>
-            <div className="text-center mb-3">
-              <p className="font-semibold uppercase">{profilSekolah?.dinas_pendidikan}</p>
-              <p className="uppercase">{profilSekolah?.kabupaten}</p>
-              <p className="font-semibold uppercase">{profilSekolah?.nama_sekolah}</p>
-              <p className="uppercase">{profilSekolah?.kecamatan}</p>
-              <p className="text-xs">{profilSekolah?.alamat}</p>
+            <div className="kop-sekolah mb-3">
+              {logoUrl && <img src={logoUrl} alt="Logo sekolah" />}
+              <div className="text-center">
+                <p className="font-semibold uppercase">{profilSekolah?.dinas_pendidikan}</p>
+                <p className="uppercase">{profilSekolah?.kabupaten}</p>
+                <p className="font-semibold uppercase">{profilSekolah?.nama_sekolah}</p>
+                <p className="uppercase">{profilSekolah?.kecamatan}</p>
+                <p className="text-xs">{profilSekolah?.alamat}</p>
+              </div>
             </div>
             <p className="text-sm font-medium mb-1">BULAN: {NAMA_BULAN[bulan - 1].toUpperCase()} {tahun}</p>
 
@@ -396,7 +416,6 @@ export default function LaporanBulanan() {
             </table>
 
             <div className="mt-8 text-sm" style={{ textAlign: 'right' }}>
-              {/* DIPERBAIKI: nama tempat sekarang diambil dari profilSekolah.tempat_ttd, bukan hardcode "Masidang" */}
               <p>{profilSekolah?.tempat_ttd || '(isi Nama Tempat di Profil Sekolah)'}, {jumlahHariDalamBulan(tahun, bulan)} {NAMA_BULAN[bulan - 1].toUpperCase()} {tahun}</p>
               <p>KEPALA SEKOLAH</p>
               <div style={{ height: 48 }} />
