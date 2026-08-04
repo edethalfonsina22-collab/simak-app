@@ -62,9 +62,11 @@ export function eksporPDF(judul, kolom, baris, namaFile, subjudul = '') {
 
 /**
  * Ambil gambar dari URL publik lalu ubah jadi base64 (data URL), supaya bisa
- * disisipkan ke PDF via jsPDF addImage. SELALU aman: kalau gagal (logo belum
- * diupload, bucket tidak public, jaringan bermasalah, CORS, dsb), fungsi ini
- * mengembalikan null — TIDAK PERNAH melempar error ke pemanggilnya.
+ * disisipkan ke PDF via jsPDF addImage. SELALU aman: kalau gagal (logo/ttd
+ * belum diupload, bucket tidak public, jaringan bermasalah, CORS, dsb),
+ * fungsi ini mengembalikan null — TIDAK PERNAH melempar error ke pemanggilnya.
+ * Fungsi ini generik: dipakai untuk logo sekolah maupun tanda tangan kepala
+ * sekolah, karena keduanya sama-sama gambar publik di storage Supabase.
  * @param {string} url
  * @returns {Promise<{ base64: string, format: string }|null>}
  */
@@ -73,40 +75,68 @@ async function urlKeBase64(url) {
   try {
     const res = await fetch(url)
     if (!res.ok) {
-      console.warn('Logo sekolah tidak bisa diambil, status:', res.status)
+      console.warn('Gambar tidak bisa diambil, status:', res.status)
       return null
     }
     const blob = await res.blob()
     const base64 = await new Promise((resolve, reject) => {
       const reader = new FileReader()
       reader.onloadend = () => resolve(reader.result)
-      reader.onerror = () => reject(new Error('FileReader gagal membaca gambar logo'))
+      reader.onerror = () => reject(new Error('FileReader gagal membaca gambar'))
       reader.readAsDataURL(blob)
     })
     // Deteksi format dari mime type asli (PNG/JPEG), fallback ke PNG
     const format = blob.type && blob.type.includes('jpeg') ? 'JPEG' : 'PNG'
     return { base64, format }
   } catch (e) {
-    console.warn('Logo sekolah dilewati (gagal dimuat):', e.message || e)
+    console.warn('Gambar dilewati (gagal dimuat):', e.message || e)
     return null
+  }
+}
+
+/**
+ * Tempel gambar ke PDF dengan lebar/tinggi maksimum tertentu, TANPA membuat
+ * gambar gepeng — rasio asli gambar tetap dipertahankan (di-fit ke dalam
+ * kotak maxW x maxH). Kalau gagal (gambar korup, dsb), dilewati saja.
+ * @param {jsPDF} doc
+ * @param {{base64:string, format:string}} gambar - hasil dari urlKeBase64()
+ * @param {number} x
+ * @param {number} y
+ * @param {number} maxW
+ * @param {number} maxH
+ */
+function tempelGambarProporsional(doc, gambar, x, y, maxW, maxH) {
+  try {
+    const props = doc.getImageProperties(gambar.base64)
+    let w = maxW
+    let h = (props.height * w) / props.width
+    if (h > maxH) {
+      h = maxH
+      w = (props.width * h) / props.height
+    }
+    doc.addImage(gambar.base64, gambar.format, x, y, w, h)
+  } catch (e) {
+    console.warn('Gambar gagal ditempel ke PDF, dilewati:', e.message || e)
   }
 }
 
 /**
  * Ekspor Daftar Hadir bulanan (format kertas absensi: NO/NAMA/JABATAN + kolom
  * tanggal 1..31 + rekap S/I/TK/JML) sebagai PDF landscape, kolom Minggu/libur
- * diwarnai merah, ditutup blok tanda tangan Kepala Sekolah. Kop surat
- * menampilkan logo sekolah di kiri (jika ada) dan susunan teks dinas/
+ * diwarnai merah, ditutup blok tanda tangan Kepala Sekolah (otomatis memakai
+ * gambar tanda tangan elektronik dari Profil Sekolah jika tersedia). Kop
+ * surat menampilkan logo sekolah di kiri (jika ada) dan susunan teks dinas/
  * kabupaten/nama sekolah/kecamatan/alamat di tengah.
  *
  * Fungsi ini ASYNC — panggil dengan `await eksporPDFDaftarHadir({...})`
  * dan bungkus pemanggilannya dengan try/catch di sisi komponen supaya
- * error apapun (bukan hanya soal logo) bisa ditangkap dan ditampilkan
+ * error apapun (bukan hanya soal logo/ttd) bisa ditangkap dan ditampilkan
  * ke pengguna, bukan membuat tombol "menggantung" tanpa penjelasan.
  *
  * @param {Object} opsi
  * @param {Object} opsi.profilSekolah - baris dari tabel profil_sekolah (id=1)
  * @param {string} [opsi.logoUrl] - URL publik logo sekolah (opsional)
+ * @param {string} [opsi.ttdUrl] - URL publik tanda tangan elektronik kepala sekolah (opsional)
  * @param {string} opsi.bulanLabel - contoh 'Juni'
  * @param {number} opsi.tahun
  * @param {Array} opsi.baris - hasil dari susunDaftarHadir(...).baris
@@ -118,6 +148,7 @@ async function urlKeBase64(url) {
 export async function eksporPDFDaftarHadir({
   profilSekolah = {},
   logoUrl = '',
+  ttdUrl = '',
   bulanLabel,
   tahun,
   baris,
@@ -152,14 +183,11 @@ export async function eksporPDFDaftarHadir({
     doc.text(text, pageWidth / 2, y, { align: 'center' })
   }
 
-  // Logo: proses ini TIDAK BOLEH menggagalkan keseluruhan PDF.
-  const logo = await urlKeBase64(logoUrl)
+  // Logo & tanda tangan diambil paralel — keduanya TIDAK BOLEH menggagalkan
+  // keseluruhan PDF kalau gagal dimuat (lihat urlKeBase64).
+  const [logo, ttd] = await Promise.all([urlKeBase64(logoUrl), urlKeBase64(ttdUrl)])
   if (logo) {
-    try {
-      doc.addImage(logo.base64, logo.format, 14, 6, 22, 22)
-    } catch (e) {
-      console.warn('Logo gagal ditempel ke PDF, dilewati:', e.message || e)
-    }
+    tempelGambarProporsional(doc, logo, 14, 6, 22, 22)
   }
 
   teksTengah(profilSekolah.dinas_pendidikan, 10, 11, true)
@@ -214,6 +242,14 @@ export async function eksporPDFDaftarHadir({
   doc.setFontSize(9)
   doc.text(`${profilSekolah.tempat_ttd || '(isi Nama Tempat di Profil Sekolah)'}, ${tanggalCetak}`, xKanan, finalY)
   doc.text('KEPALA SEKOLAH', xKanan, finalY + 5)
+
+  // Tanda tangan elektronik: ditempel di ruang antara "KEPALA SEKOLAH" dan
+  // nama kepala sekolah, memakai gambar dari Profil Sekolah kalau ada.
+  // Kalau belum diupload, ruang ini tetap kosong seperti semula (tanpa error).
+  if (ttd) {
+    tempelGambarProporsional(doc, ttd, xKanan, finalY + 7, 40, 16)
+  }
+
   doc.setFont(undefined, 'bold')
   doc.text(profilSekolah.kepala_sekolah || '________________', xKanan, finalY + 25)
   doc.setFont(undefined, 'normal')
