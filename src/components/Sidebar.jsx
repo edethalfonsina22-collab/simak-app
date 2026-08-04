@@ -29,6 +29,7 @@ import {
   IdCard,
   FilePlus,
   FileClock,
+  CalendarOff,
 } from 'lucide-react'
 import { useAuth } from '../lib/AuthContext'
 
@@ -77,6 +78,7 @@ const groupsAdmin = [
       { to: '/surat', label: 'Surat Masuk/Keluar', icon: Mail },
       { to: '/ppdb-admin', label: 'PPDB Siswa Baru', icon: UserPlus },
       { to: '/laporan', label: 'Laporan Bulanan', icon: FileText },
+      { to: '/hari-libur', label: 'Hari Libur', icon: CalendarOff },
       { to: '/backup', label: 'Backup Data', icon: DatabaseBackup },
       { to: '/profil-sekolah', label: 'Profil Sekolah', icon: Landmark },
       { to: '/kartu', label: 'Cetak Kartu', icon: IdCard },
