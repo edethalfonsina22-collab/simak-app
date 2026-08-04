@@ -45,8 +45,8 @@ export default function SuratKeteranganForm({ onSaved }) {
     async function loadSiswa() {
       const { data, error } = await supabase
         .from("siswa")
-        .select("id, nama, nisn, tempat_lahir, tanggal_lahir, kelas:kelas_id(nama_kelas)")
-        .order("nama", { ascending: true });
+        .select("id, nama_lengkap, nisn, tempat_lahir, tanggal_lahir, kelas:kelas_id(nama_kelas)")
+        .order("nama_lengkap", { ascending: true });
 
       if (error) {
         // Penyebab paling umum: RLS policy memblokir SELECT, atau relasi
@@ -95,7 +95,7 @@ export default function SuratKeteranganForm({ onSaved }) {
     setJudul("Surat Keterangan Pindah Sekolah");
     setIsi(
       templatePindah({
-        nama: siswa.nama,
+        nama: siswa.nama_lengkap,
         nisn: siswa.nisn || "-",
         ttl: `${siswa.tempat_lahir || "-"}, ${
           siswa.tanggal_lahir
@@ -188,7 +188,7 @@ export default function SuratKeteranganForm({ onSaved }) {
             <option value="">Pilih Siswa</option>
             {siswaList.map((s) => (
               <option key={s.id} value={s.id}>
-                {s.nama} — Kelas {s.kelas?.nama_kelas || "-"}
+                {s.nama_lengkap} — Kelas {s.kelas?.nama_kelas || "-"}
               </option>
             ))}
           </select>
