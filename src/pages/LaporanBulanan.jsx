@@ -33,7 +33,8 @@ export default function LaporanBulanan() {
   const [loading, setLoading] = useState(false)
   const [dataLaporan, setDataLaporan] = useState(null)
   const [daftarHadirGuru, setDaftarHadirGuru] = useState(null) // { baris, totalHari }
-  const [tanggalLibur, setTanggalLibur] = useState('') // input manual, contoh: "16,21"
+  const [tanggalLibur, setTanggalLibur] = useState('') // input manual tambahan, contoh: "16,21"
+  const [hariLiburDB, setHariLiburDB] = useState(new Set()) // dari tabel hari_libur, untuk bulan aktif
   const [profilSekolah, setProfilSekolah] = useState(null)
 
   useEffect(() => {
@@ -87,6 +88,14 @@ export default function LaporanBulanan() {
 
       // Data untuk tampilan Daftar Hadir (grid kalender)
       setDaftarHadirGuru(susunDaftarHadir(guru || [], presensi || [], tahun, bulan))
+
+      // Tanggal libur (nasional/sekolah) untuk bulan aktif, dari tabel hari_libur
+      const { data: libur } = await supabase
+        .from('hari_libur')
+        .select('tanggal')
+        .gte('tanggal', awal)
+        .lte('tanggal', akhir)
+      setHariLiburDB(new Set((libur || []).map((r) => Number(r.tanggal.slice(8, 10)))))
     }
 
     if (jenis === 'surat') {
@@ -166,7 +175,8 @@ export default function LaporanBulanan() {
   const hariLiburManual = new Set(
     tanggalLibur.split(',').map((s) => parseInt(s.trim(), 10)).filter((n) => !isNaN(n))
   )
-  const isHariLibur = (tgl) => apakahHariMinggu(tahun, bulan, tgl) || hariLiburManual.has(tgl)
+  const isHariLibur = (tgl) =>
+    apakahHariMinggu(tahun, bulan, tgl) || hariLiburDB.has(tgl) || hariLiburManual.has(tgl)
 
   function handleExportPDF() {
     if (jenis === 'presensi_guru' && tampilanGuru === 'daftar_hadir' && daftarHadirGuru) {
@@ -273,7 +283,7 @@ export default function LaporanBulanan() {
             </div>
             {tampilanGuru === 'daftar_hadir' && (
               <div>
-                <label className="label-field">Tanggal libur tambahan (selain Minggu, pisah koma)</label>
+                <label className="label-field">Libur mendadak tambahan (pisah koma) — untuk yang tetap belum sempat didaftarkan di menu Hari Libur</label>
                 <input
                   type="text"
                   className="input-field"
