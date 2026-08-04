@@ -67,7 +67,7 @@ const SuratKeteranganPrintTemplate = React.forwardRef(function SuratKeteranganPr
         <p style={{ fontWeight: "bold", textDecoration: "underline", margin: 0 }}>
           {sekolah?.nama_kepala_sekolah}
         </p>
-        <p style={{ margin: 0 }}>NIP. {sekolah?.nip_La Ode Salim,Pd || "-"}</p>
+        <p style={{ margin: 0 }}>NIP. {sekolah?.nip_kepla_sekolah || "-"}</p>
       </div>
     </div>
   );
