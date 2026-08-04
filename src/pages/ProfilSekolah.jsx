@@ -21,6 +21,7 @@ const emptyForm = {
   kabupaten: '',
   dinas_pendidikan: '',
   kecamatan: '',
+  tempat_ttd: '', // <-- TAMBAHAN: nama tempat untuk tanggal di surat/laporan (mis. "Masidang")
 }
 
 export default function ProfilSekolah() {
@@ -217,6 +218,19 @@ export default function ProfilSekolah() {
                 value={form.kecamatan}
                 onChange={(e) => ubah('kecamatan', e.target.value)}
               />
+            </div>
+            {/* TAMBAHAN: Nama Tempat untuk tanggal di surat/laporan (menggantikan hardcode "Masidang") */}
+            <div className="sm:col-span-2">
+              <label className="label-field">Nama Tempat (untuk tanggal di surat/laporan)</label>
+              <input
+                className="input-field"
+                placeholder="Contoh: Masidang"
+                value={form.tempat_ttd}
+                onChange={(e) => ubah('tempat_ttd', e.target.value)}
+              />
+              <p className="text-xs text-ink-700/50 mt-1.5">
+                Muncul di baris tanggal sebelum tanda tangan kepala sekolah, contoh: "Masidang, 30 Juni 2026".
+              </p>
             </div>
           </div>
         </div>
