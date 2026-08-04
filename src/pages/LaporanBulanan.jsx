@@ -396,7 +396,8 @@ export default function LaporanBulanan() {
             </table>
 
             <div className="mt-8 text-sm" style={{ textAlign: 'right' }}>
-              <p>Masidang, {jumlahHariDalamBulan(tahun, bulan)} {NAMA_BULAN[bulan - 1].toUpperCase()} {tahun}</p>
+              {/* DIPERBAIKI: nama tempat sekarang diambil dari profilSekolah.tempat_ttd, bukan hardcode "Masidang" */}
+              <p>{profilSekolah?.tempat_ttd || '(isi Nama Tempat di Profil Sekolah)'}, {jumlahHariDalamBulan(tahun, bulan)} {NAMA_BULAN[bulan - 1].toUpperCase()} {tahun}</p>
               <p>KEPALA SEKOLAH</p>
               <div style={{ height: 48 }} />
               <p style={{ fontWeight: 600 }}>{profilSekolah?.kepala_sekolah || '________________'}</p>
