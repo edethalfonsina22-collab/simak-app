@@ -18,6 +18,7 @@ import Pengumuman from './pages/Pengumuman'
 import Inventaris from './pages/Inventaris'
 import Agenda from './pages/Agenda'
 import Surat from './pages/Surat'
+import SuratKeterangan from './pages/SuratKeterangan'
 import Rapor from './pages/Rapor'
 import RaporCetak from './pages/RaporCetak'
 import LaporanBulanan from './pages/LaporanBulanan'
@@ -77,6 +78,7 @@ export default function App() {
       <Route path="/inventaris" element={<ProtectedRoute adminOnly><Inventaris /></ProtectedRoute>} />
       <Route path="/agenda" element={<ProtectedRoute><Agenda /></ProtectedRoute>} />
       <Route path="/surat" element={<ProtectedRoute adminOnly><Surat /></ProtectedRoute>} />
+      <Route path="/surat-keterangan" element={<ProtectedRoute adminOnly><SuratKeterangan /></ProtectedRoute>} />
       <Route path="/laporan" element={<ProtectedRoute adminOnly><LaporanBulanan /></ProtectedRoute>} />
       <Route path="/hari-libur" element={<ProtectedRoute adminOnly><HariLibur /></ProtectedRoute>} />
       <Route path="/keuangan" element={<ProtectedRoute adminOnly><Keuangan /></ProtectedRoute>} />
