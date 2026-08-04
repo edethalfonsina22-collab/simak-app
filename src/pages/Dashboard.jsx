@@ -23,44 +23,15 @@ const KATEGORI_STYLE = {
   Akademik: 'bg-sage-500/15 text-sage-500',
 }
 
-// Palet kartu ringkasan — gaya bento (badge lingkaran + watermark + hover shadow berwarna)
-// terinspirasi dari referensi desain, dipetakan ke tema brass/sage/ink/terracotta/blue yang sudah ada
+// Palet kartu ringkasan — gaya solid gradient warna-warni (terinspirasi referensi SIMAJU):
+// kartu berwarna penuh, ikon dalam lingkaran putih transparan, angka besar putih.
 const CARD_THEME = {
-  brass: {
-    tint: 'bg-brass-400/[0.06]',
-    accent: 'bg-brass-400',
-    badge: 'bg-brass-400/20 text-brass-600',
-    watermark: 'text-brass-500',
-    hover: 'hover:border-brass-400/50 hover:shadow-[0_20px_25px_-8px_rgba(217,164,65,0.25)]',
-  },
-  sage: {
-    tint: 'bg-sage-500/[0.06]',
-    accent: 'bg-sage-500',
-    badge: 'bg-sage-500/20 text-sage-600',
-    watermark: 'text-sage-500',
-    hover: 'hover:border-sage-500/50 hover:shadow-[0_20px_25px_-8px_rgba(76,122,110,0.25)]',
-  },
-  ink: {
-    tint: 'bg-ink-700/[0.05]',
-    accent: 'bg-ink-700',
-    badge: 'bg-ink-700/15 text-ink-700',
-    watermark: 'text-ink-700',
-    hover: 'hover:border-ink-700/40 hover:shadow-[0_20px_25px_-8px_rgba(34,49,91,0.22)]',
-  },
-  terracotta: {
-    tint: 'bg-[#B4453A]/[0.06]',
-    accent: 'bg-[#B4453A]',
-    badge: 'bg-[#B4453A]/20 text-[#B4453A]',
-    watermark: 'text-[#B4453A]',
-    hover: 'hover:border-[#B4453A]/40 hover:shadow-[0_20px_25px_-8px_rgba(180,69,58,0.22)]',
-  },
-  blue: {
-    tint: 'bg-blue-600/[0.06]',
-    accent: 'bg-blue-600',
-    badge: 'bg-blue-600/20 text-blue-700',
-    watermark: 'text-blue-600',
-    hover: 'hover:border-blue-600/50 hover:shadow-[0_20px_25px_-8px_rgba(37,99,235,0.22)]',
-  },
+  blue: { gradient: 'from-blue-500 to-blue-600' },
+  green: { gradient: 'from-emerald-500 to-emerald-600' },
+  teal: { gradient: 'from-teal-500 to-teal-600' },
+  purple: { gradient: 'from-purple-500 to-purple-600' },
+  orange: { gradient: 'from-orange-500 to-orange-600' },
+  rose: { gradient: 'from-rose-500 to-rose-600' },
 }
 
 function formatRelativeDate(iso) {
@@ -174,23 +145,23 @@ export default function Dashboard() {
   }, [])
 
   const cards = [
-    { label: 'Total Siswa', value: stats.siswa, icon: Users, theme: 'brass' },
-    { label: 'Total Guru', value: stats.guru, icon: GraduationCap, theme: 'sage' },
-    { label: 'Jumlah Kelas', value: stats.kelas, icon: DoorOpen, theme: 'ink' },
-    { label: 'Pengumuman', value: stats.pengumuman, icon: Megaphone, theme: 'terracotta' },
+    { label: 'Total Siswa', value: stats.siswa, icon: Users, theme: 'blue' },
+    { label: 'Total Guru', value: stats.guru, icon: GraduationCap, theme: 'green' },
+    { label: 'Jumlah Kelas', value: stats.kelas, icon: DoorOpen, theme: 'teal' },
+    { label: 'Pengumuman', value: stats.pengumuman, icon: Megaphone, theme: 'purple' },
     {
       label: 'Presensi Hari Ini',
       value: `${presensiHariIni.terisi}/${stats.siswa}`,
       sublabel: `${presensiHariIni.hadir} hadir · ${presensiHariIni.izin} izin · ${presensiHariIni.alpa} alpa`,
       icon: ClipboardCheck,
-      theme: 'blue',
+      theme: 'orange',
     },
     {
       label: 'Pengajuan Menunggu',
       value: pengajuanMenunggu,
       sublabel: pengajuanMenunggu > 0 ? 'menunggu persetujuan Anda' : 'tidak ada yang menunggu',
       icon: FileClock,
-      theme: pengajuanMenunggu > 0 ? 'terracotta' : 'sage',
+      theme: pengajuanMenunggu > 0 ? 'rose' : 'green',
     },
   ]
 
@@ -260,31 +231,21 @@ export default function Dashboard() {
           return (
             <div
               key={label}
-              className={`dash-fade-in opacity-0 group card relative overflow-hidden border border-transparent p-5 transition-all duration-300 ease-out hover:-translate-y-1 ${t.tint} ${t.hover}`}
+              className={`dash-fade-in opacity-0 rounded-2xl p-5 text-white shadow-md bg-gradient-to-br ${t.gradient} transition-transform duration-300 ease-out hover:-translate-y-1`}
               style={{ animationDelay: `${i * 90}ms` }}
             >
-              {/* Garis aksen warna di tepi atas kartu — pembeda visual langsung tanpa perlu hover */}
-              <span className={`absolute top-0 left-0 w-full h-1 ${t.accent}`} />
-
-              {/* Watermark ikon besar di pojok, membesar & miring halus saat hover */}
-              <Icon
-                size={112}
-                strokeWidth={1.3}
-                className={`absolute -right-6 -bottom-6 opacity-[0.10] pointer-events-none transition-all duration-300 ease-out group-hover:opacity-[0.16] group-hover:scale-110 group-hover:-rotate-6 ${t.watermark}`}
-              />
-
-              <div className="relative z-10">
-                <div className={`w-12 h-12 rounded-full flex items-center justify-center mb-4 shadow-sm ${t.badge}`}>
-                  <Icon size={22} />
+              <div className="flex items-start justify-between mb-4">
+                <p className="text-sm font-medium text-white/90">{label}</p>
+                <div className="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center shrink-0">
+                  <Icon size={18} />
                 </div>
-                <p className="text-[11px] font-semibold uppercase tracking-wider text-ink-700/50">{label}</p>
-                <p className="text-3xl font-display font-extrabold text-ink-950 mt-1">
-                  {loading ? '—' : value}
-                </p>
-                {sublabel && !loading && (
-                  <p className="text-[11px] text-ink-700/50 mt-1">{sublabel}</p>
-                )}
               </div>
+              <p className="text-3xl font-display font-bold">
+                {loading ? '—' : value}
+              </p>
+              {sublabel && !loading && (
+                <p className="text-xs text-white/80 mt-1.5">{sublabel}</p>
+              )}
             </div>
           )
         })}
