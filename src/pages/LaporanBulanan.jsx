@@ -187,7 +187,11 @@ export default function LaporanBulanan() {
     apakahHariMinggu(tahun, bulan, tgl) || hariLiburDB.has(tgl) || hariLiburManual.has(tgl)
 
   async function handleExportPDF() {
-    if (jenis === 'presensi_guru' && tampilanGuru === 'daftar_hadir' && daftarHadirGuru) {
+    if (jenis === 'presensi_guru' && tampilanGuru === 'daftar_hadir') {
+      if (!daftarHadirGuru) {
+        alert('Data Daftar Hadir belum dimuat. Klik "Tampilkan Laporan" dulu, lalu coba unduh PDF lagi.')
+        return
+      }
       const akhirBulan = jumlahHariDalamBulan(tahun, bulan)
       setMengeksporPDF(true)
       try {
@@ -202,14 +206,26 @@ export default function LaporanBulanan() {
           tanggalCetak: `${akhirBulan} ${NAMA_BULAN[bulan - 1]} ${tahun}`,
           namaFile: `daftar-hadir-guru-${tahun}-${bulan}`,
         })
+      } catch (err) {
+        console.error('Gagal membuat PDF Daftar Hadir:', err)
+        alert('Gagal membuat PDF: ' + (err?.message || 'Terjadi kesalahan tidak dikenal. Cek console browser (F12) untuk detail.'))
       } finally {
         setMengeksporPDF(false)
       }
       return
     }
-    const { kolom, baris } = siapkanTabel()
-    if (baris.length === 0) return
-    eksporPDF(judulLaporan, kolom, baris, `laporan-${jenis}-${tahun}-${bulan}`)
+
+    try {
+      const { kolom, baris } = siapkanTabel()
+      if (baris.length === 0) {
+        alert('Tidak ada data untuk diunduh pada periode ini.')
+        return
+      }
+      eksporPDF(judulLaporan, kolom, baris, `laporan-${jenis}-${tahun}-${bulan}`)
+    } catch (err) {
+      console.error('Gagal membuat PDF laporan:', err)
+      alert('Gagal membuat PDF: ' + (err?.message || 'Terjadi kesalahan tidak dikenal.'))
+    }
   }
 
   function handleExportExcel() {
