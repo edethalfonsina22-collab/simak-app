@@ -3,17 +3,7 @@ import { supabase } from "../lib/supabaseClient";
 import SuratKeteranganPrintTemplate from "./SuratKeteranganPrintTemplate";
 import { exportSuratToPDF, exportSuratToDocx } from "../utils/suratKeteranganExport";
 
-// Daftar jenis surat yang didukung tombol "Generate Otomatis".
-// Tambah jenis baru cukup: (1) tambah entri di sini, (2) buat fungsi templateXxx di bawah,
-// (3) tambah case di switch dalam useEffect auto-generate.
-const JENIS_SURAT = [
-  { key: "pindah", label: "Pindah Sekolah", judul: "Surat Keterangan Pindah Sekolah" },
-  { key: "izin", label: "Izin", judul: "Surat Keterangan Izin" },
-  { key: "aktif", label: "Keterangan Aktif", judul: "Surat Keterangan Aktif" },
-  { key: "lulus", label: "Keterangan Lulus", judul: "Surat Keterangan Lulus" },
-  { key: "bebas", label: "Template Bebas", judul: "" },
-];
-
+// ---------- Template: Keterangan Pindah Sekolah (siswa) ----------
 function templatePindah({ nama, nisn, ttl, kelas, alasan, tujuan, tanggal }) {
   return `Yang bertanda tangan di bawah ini Kepala Sekolah menerangkan bahwa:
 
@@ -27,51 +17,43 @@ adalah benar siswa/i pada sekolah kami dan telah mengajukan pindah/keluar dari s
 Demikian surat keterangan ini dibuat untuk dipergunakan sebagaimana mestinya.`;
 }
 
-function templateIzin({ nama, nisn, kelas, alasan, tanggal }) {
+// ---------- Template: SK Mengajar (guru) ----------
+function templateMengajar({ nama, nip, mapel, kelasAjar, tahunAjaran, tanggal }) {
   return `Yang bertanda tangan di bawah ini Kepala Sekolah menerangkan bahwa:
 
 Nama              : ${nama}
-NISN              : ${nisn}
-Kelas             : ${kelas}
+NIP               : ${nip}
 
-adalah benar siswa/i pada sekolah kami dan diberikan izin tidak masuk sekolah pada tanggal ${tanggal} dengan alasan ${alasan}.
+adalah benar guru pada sekolah kami dan diberi tugas untuk mengajar mata pelajaran ${mapel} pada kelas ${kelasAjar} untuk Tahun Ajaran ${tahunAjaran}, terhitung mulai tanggal ${tanggal}.
 
 Demikian surat keterangan ini dibuat untuk dipergunakan sebagaimana mestinya.`;
 }
 
-function templateAktif({ nama, nisn, kelas, namaSekolah }) {
-  return `Yang bertanda tangan di bawah ini Kepala Sekolah menerangkan bahwa:
-
-Nama              : ${nama}
-NISN              : ${nisn}
-Kelas             : ${kelas}
-
-adalah benar siswa/i yang masih aktif dan terdaftar di ${namaSekolah || "sekolah kami"} pada tahun ajaran berjalan.
-
-Demikian surat keterangan ini dibuat untuk dipergunakan sebagaimana mestinya.`;
-}
-
-function templateLulus({ nama, nisn, kelas, namaSekolah }) {
-  return `Yang bertanda tangan di bawah ini Kepala Sekolah menerangkan bahwa:
-
-Nama              : ${nama}
-NISN              : ${nisn}
-Kelas             : ${kelas}
-
-adalah benar siswa/i ${namaSekolah || "sekolah kami"} dan telah dinyatakan LULUS pada tahun ajaran berjalan.
-
-Demikian surat keterangan ini dibuat untuk dipergunakan sebagaimana mestinya.`;
-}
+const JENIS_OPTIONS = [
+  { value: "pindah", label: "Keterangan Pindah Sekolah" },
+  { value: "mengajar", label: "SK Mengajar Guru" },
+  { value: "bebas", label: "Template Bebas" },
+];
 
 export default function SuratKeteranganForm({ onSaved }) {
   const [jenis, setJenis] = useState("pindah");
 
+  // --- data siswa (untuk jenis "pindah") ---
   const [siswaList, setSiswaList] = useState([]);
   const [siswaId, setSiswaId] = useState("");
   const [alasan, setAlasan] = useState("");
   const [tujuan, setTujuan] = useState("");
   const [tanggalPindah, setTanggalPindah] = useState("");
 
+  // --- data guru (untuk jenis "mengajar") ---
+  const [guruList, setGuruList] = useState([]);
+  const [guruId, setGuruId] = useState("");
+  const [mapel, setMapel] = useState("");
+  const [kelasAjar, setKelasAjar] = useState("");
+  const [tahunAjaran, setTahunAjaran] = useState("");
+  const [tanggalMulaiMengajar, setTanggalMulaiMengajar] = useState("");
+
+  // --- field umum ---
   const [judul, setJudul] = useState("");
   const [isi, setIsi] = useState("");
   const [nomorSurat, setNomorSurat] = useState("");
@@ -85,126 +67,96 @@ export default function SuratKeteranganForm({ onSaved }) {
   const [loadError, setLoadError] = useState("");
   const printRef = useRef(null);
 
-  // Jenis yang butuh pilih siswa dari daftar
-  const butuhSiswa = ["pindah", "izin", "aktif", "lulus"].includes(jenis);
-  // Jenis yang butuh field alasan + tanggal (pindah & izin)
-  const butuhAlasanTanggal = ["pindah", "izin"].includes(jenis);
-  // Jenis yang butuh field "sekolah tujuan" (khusus pindah)
-  const butuhTujuan = jenis === "pindah";
-
+  // Ambil data siswa, guru, dan profil sekolah
   useEffect(() => {
-    async function loadSiswa() {
-      const { data, error } = await supabase
-        .from("siswa")
-        .select("id, nama_lengkap, nisn, tempat_lahir, tanggal_lahir, kelas:kelas_id(nama_kelas)")
-        .order("nama_lengkap", { ascending: true });
+    supabase
+      .from("siswa")
+      .select("id, nama, nisn, tempat_lahir, tanggal_lahir, kelas:kelas_id(nama)")
+      .then(({ data, error }) => {
+        if (error) {
+          console.error("[siswa] gagal dimuat:", error);
+          setLoadError(
+            (prev) => prev + `Gagal memuat data siswa: ${error.message}. `
+          );
+          return;
+        }
+        setSiswaList(data || []);
+      });
 
-      if (error) {
-        console.error("Gagal memuat data siswa:", error);
-        setLoadError(
-          "Gagal memuat daftar siswa: " + error.message + " (cek Console browser untuk detail)"
-        );
-        setSiswaList([]);
-        return;
-      }
+    supabase
+      .from("guru")
+      .select("id, nama, nip, mapel")
+      .then(({ data, error }) => {
+        if (error) {
+          console.error("[guru] gagal dimuat:", error);
+          setLoadError(
+            (prev) => prev + `Gagal memuat data guru: ${error.message}. `
+          );
+          return;
+        }
+        setGuruList(data || []);
+      });
 
-      setSiswaList(data || []);
-      if (!data || data.length === 0) {
-        setLoadError(
-          "Daftar siswa kosong. Pastikan tabel 'siswa' sudah berisi data dan RLS mengizinkan akses baca."
-        );
-      } else {
-        setLoadError("");
-      }
-    }
-
-    async function loadSekolah() {
-      const { data, error } = await supabase
-        .from("profil_sekolah")
-        .select("*")
-        .maybeSingle();
-
-      if (error) {
-        console.error("Gagal memuat profil sekolah:", error);
-        return;
-      }
-      setSekolah(data || null);
-    }
-
-    loadSiswa();
-    loadSekolah();
+    supabase
+      .from("profil_sekolah")
+      .select("*")
+      .single()
+      .then(({ data, error }) => {
+        if (error) console.error("[profil_sekolah] gagal dimuat:", error);
+        setSekolah(data || null);
+      });
   }, []);
 
-  // Auto-generate isi surat setiap kali jenis atau field terkait berubah
+  // Auto-generate isi surat: pindah (siswa)
   useEffect(() => {
-    if (jenis === "bebas") return;
-
+    if (jenis !== "pindah") return;
     const siswa = siswaList.find((s) => s.id === siswaId);
     if (!siswa) return;
 
-    const jenisInfo = JENIS_SURAT.find((j) => j.key === jenis);
-    const ttl = `${siswa.tempat_lahir || "-"}, ${
-      siswa.tanggal_lahir
-        ? new Date(siswa.tanggal_lahir).toLocaleDateString("id-ID")
-        : "-"
-    }`;
-    const tanggalFormatted = tanggalPindah
-      ? new Date(tanggalPindah).toLocaleDateString("id-ID")
-      : "-";
+    setJudul("Surat Keterangan Pindah Sekolah");
+    setIsi(
+      templatePindah({
+        nama: siswa.nama,
+        nisn: siswa.nisn || "-",
+        ttl: `${siswa.tempat_lahir || "-"}, ${
+          siswa.tanggal_lahir
+            ? new Date(siswa.tanggal_lahir).toLocaleDateString("id-ID")
+            : "-"
+        }`,
+        kelas: siswa.kelas?.nama || "-",
+        alasan: alasan || "-",
+        tujuan: tujuan || "-",
+        tanggal: tanggalPindah
+          ? new Date(tanggalPindah).toLocaleDateString("id-ID")
+          : "-",
+      })
+    );
+  }, [jenis, siswaId, alasan, tujuan, tanggalPindah, siswaList]);
 
-    let teksIsi = "";
-    switch (jenis) {
-      case "pindah":
-        teksIsi = templatePindah({
-          nama: siswa.nama_lengkap,
-          nisn: siswa.nisn || "-",
-          ttl,
-          kelas: siswa.kelas?.nama_kelas || "-",
-          alasan: alasan || "-",
-          tujuan: tujuan || "-",
-          tanggal: tanggalFormatted,
-        });
-        break;
-      case "izin":
-        teksIsi = templateIzin({
-          nama: siswa.nama_lengkap,
-          nisn: siswa.nisn || "-",
-          kelas: siswa.kelas?.nama_kelas || "-",
-          alasan: alasan || "-",
-          tanggal: tanggalFormatted,
-        });
-        break;
-      case "aktif":
-        teksIsi = templateAktif({
-          nama: siswa.nama_lengkap,
-          nisn: siswa.nisn || "-",
-          kelas: siswa.kelas?.nama_kelas || "-",
-          namaSekolah: sekolah?.nama_sekolah,
-        });
-        break;
-      case "lulus":
-        teksIsi = templateLulus({
-          nama: siswa.nama_lengkap,
-          nisn: siswa.nisn || "-",
-          kelas: siswa.kelas?.nama_kelas || "-",
-          namaSekolah: sekolah?.nama_sekolah,
-        });
-        break;
-      default:
-        return;
-    }
+  // Auto-generate isi surat: mengajar (guru)
+  useEffect(() => {
+    if (jenis !== "mengajar") return;
+    const guru = guruList.find((g) => g.id === guruId);
+    if (!guru) return;
 
-    setJudul(jenisInfo.judul);
-    setIsi(teksIsi);
-  }, [jenis, siswaId, alasan, tujuan, tanggalPindah, siswaList, sekolah]);
+    setJudul("Surat Keterangan Mengajar");
+    setIsi(
+      templateMengajar({
+        nama: guru.nama,
+        nip: guru.nip || "-",
+        mapel: mapel || guru.mapel || "-",
+        kelasAjar: kelasAjar || "-",
+        tahunAjaran: tahunAjaran || "-",
+        tanggal: tanggalMulaiMengajar
+          ? new Date(tanggalMulaiMengajar).toLocaleDateString("id-ID")
+          : "-",
+      })
+    );
+  }, [jenis, guruId, mapel, kelasAjar, tahunAjaran, tanggalMulaiMengajar, guruList]);
 
   function gantiJenis(j) {
     setJenis(j);
     setSuratTersimpan(null);
-    setSiswaId("");
-    setAlasan("");
-    setTujuan("");
-    setTanggalPindah("");
     if (j === "bebas") {
       setJudul("");
       setIsi("");
@@ -219,18 +171,26 @@ export default function SuratKeteranganForm({ onSaved }) {
     setSaving(true);
     const { data: userData } = await supabase.auth.getUser();
 
+    const payload = {
+      jenis,
+      nomor_surat: nomorSurat.trim(),
+      judul: judul.trim() || "Surat Keterangan",
+      siswa_id: jenis === "pindah" ? siswaId || null : null,
+      guru_id: jenis === "mengajar" ? guruId || null : null,
+      isi,
+      data:
+        jenis === "pindah"
+          ? { alasan, tujuan, tanggalPindah }
+          : jenis === "mengajar"
+          ? { mapel, kelasAjar, tahunAjaran, tanggalMulaiMengajar }
+          : {},
+      tanggal_surat: tanggalSurat,
+      dibuat_oleh: userData?.user?.id,
+    };
+
     const { data, error } = await supabase
       .from("surat_keterangan")
-      .insert({
-        jenis,
-        nomor_surat: nomorSurat.trim(),
-        judul: judul.trim() || "Surat Keterangan",
-        siswa_id: butuhSiswa ? siswaId || null : null,
-        isi,
-        data: butuhAlasanTanggal ? { alasan, tujuan, tanggalPindah } : {},
-        tanggal_surat: tanggalSurat,
-        dibuat_oleh: userData?.user?.id,
-      })
+      .insert(payload)
       .select()
       .single();
 
@@ -238,6 +198,7 @@ export default function SuratKeteranganForm({ onSaved }) {
 
     if (error) {
       alert("Gagal menyimpan surat: " + error.message);
+      console.error(error);
       return;
     }
 
@@ -247,64 +208,104 @@ export default function SuratKeteranganForm({ onSaved }) {
 
   return (
     <div className="space-y-4">
-      <div className="flex gap-2 flex-wrap">
-        {JENIS_SURAT.map((j) => (
+      {loadError && (
+        <div className="bg-yellow-50 border border-yellow-300 text-yellow-800 text-sm p-3 rounded">
+          {loadError} Cek koneksi tabel / RLS di Supabase.
+        </div>
+      )}
+
+      <div className="flex gap-3 flex-wrap">
+        {JENIS_OPTIONS.map((opt) => (
           <button
-            key={j.key}
+            key={opt.value}
             type="button"
-            onClick={() => gantiJenis(j.key)}
+            onClick={() => gantiJenis(opt.value)}
             className={`px-4 py-2 rounded ${
-              jenis === j.key ? "bg-blue-600 text-white" : "bg-gray-100"
+              jenis === opt.value ? "bg-blue-600 text-white" : "bg-gray-100"
             }`}
           >
-            {j.label}
+            {opt.label}
           </button>
         ))}
       </div>
 
-      {butuhSiswa && (
+      {jenis === "pindah" && (
         <div className="grid grid-cols-2 gap-3">
           <select
             className="border rounded px-3 py-2 col-span-2"
             value={siswaId}
             onChange={(e) => setSiswaId(e.target.value)}
           >
-            <option value="">Pilih Siswa</option>
+            <option value="">
+              {siswaList.length === 0 ? "Tidak ada data siswa" : "Pilih Siswa"}
+            </option>
             {siswaList.map((s) => (
               <option key={s.id} value={s.id}>
-                {s.nama_lengkap} — Kelas {s.kelas?.nama_kelas || "-"}
+                {s.nama} — {s.kelas?.nama || "-"}
               </option>
             ))}
           </select>
-          {loadError && (
-            <p className="col-span-2 text-sm text-red-600">{loadError}</p>
-          )}
+          <input
+            className="border rounded px-3 py-2"
+            placeholder="Alasan pindah"
+            value={alasan}
+            onChange={(e) => setAlasan(e.target.value)}
+          />
+          <input
+            className="border rounded px-3 py-2"
+            placeholder="Sekolah tujuan"
+            value={tujuan}
+            onChange={(e) => setTujuan(e.target.value)}
+          />
+          <input
+            type="date"
+            className="border rounded px-3 py-2"
+            value={tanggalPindah}
+            onChange={(e) => setTanggalPindah(e.target.value)}
+          />
+        </div>
+      )}
 
-          {butuhAlasanTanggal && (
-            <>
-              <input
-                className="border rounded px-3 py-2"
-                placeholder={jenis === "pindah" ? "Alasan pindah" : "Alasan izin"}
-                value={alasan}
-                onChange={(e) => setAlasan(e.target.value)}
-              />
-              <input
-                type="date"
-                className="border rounded px-3 py-2"
-                value={tanggalPindah}
-                onChange={(e) => setTanggalPindah(e.target.value)}
-              />
-            </>
-          )}
-
-          {butuhTujuan && (
-            <input
-              className="border rounded px-3 py-2 col-span-2"
-              placeholder="Sekolah tujuan"
-              value={tujuan}
-              onChange={(e) => setTujuan(e.target.value)}
-            />
-          )}
+      {jenis === "mengajar" && (
+        <div className="grid grid-cols-2 gap-3">
+          <select
+            className="border rounded px-3 py-2 col-span-2"
+            value={guruId}
+            onChange={(e) => setGuruId(e.target.value)}
+          >
+            <option value="">
+              {guruList.length === 0 ? "Tidak ada data guru" : "Pilih Guru"}
+            </option>
+            {guruList.map((g) => (
+              <option key={g.id} value={g.id}>
+                {g.nama} — {g.nip || "-"}
+              </option>
+            ))}
+          </select>
+          <input
+            className="border rounded px-3 py-2"
+            placeholder="Mata pelajaran"
+            value={mapel}
+            onChange={(e) => setMapel(e.target.value)}
+          />
+          <input
+            className="border rounded px-3 py-2"
+            placeholder="Kelas yang diajar (mis. VII A, VIII B)"
+            value={kelasAjar}
+            onChange={(e) => setKelasAjar(e.target.value)}
+          />
+          <input
+            className="border rounded px-3 py-2"
+            placeholder="Tahun ajaran (mis. 2026/2027)"
+            value={tahunAjaran}
+            onChange={(e) => setTahunAjaran(e.target.value)}
+          />
+          <input
+            type="date"
+            className="border rounded px-3 py-2"
+            value={tanggalMulaiMengajar}
+            onChange={(e) => setTanggalMulaiMengajar(e.target.value)}
+          />
         </div>
       )}
 
