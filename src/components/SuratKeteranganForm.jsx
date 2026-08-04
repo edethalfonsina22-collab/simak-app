@@ -1,228 +1,387 @@
-{showForm && (
-  <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink-950/50 backdrop-blur-sm p-4">
-    <form
-      onSubmit={handleSubmit}
-      className="card relative overflow-hidden w-full max-w-2xl p-6 max-h-[90vh] overflow-y-auto"
-    >
-      <span className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-600 to-red-900" />
+import { useEffect, useRef, useState } from "react";
+import { supabase } from "../lib/supabaseClient";
+import SuratKeteranganPrintTemplate from "./SuratKeteranganPrintTemplate";
+import { exportSuratToPDF, exportSuratToDocx } from "../utils/suratKeteranganExport";
+
+// Daftar jenis surat yang didukung tombol "Generate Otomatis".
+// Tambah jenis baru cukup: (1) tambah entri di sini, (2) buat fungsi templateXxx di bawah,
+// (3) tambah case di switch dalam useEffect auto-generate.
+const JENIS_SURAT = [
+  { key: "pindah", label: "Pindah Sekolah", judul: "Surat Keterangan Pindah Sekolah" },
+  { key: "izin", label: "Izin", judul: "Surat Keterangan Izin" },
+  { key: "aktif", label: "Keterangan Aktif", judul: "Surat Keterangan Aktif" },
+  { key: "lulus", label: "Keterangan Lulus", judul: "Surat Keterangan Lulus" },
+  { key: "bebas", label: "Template Bebas", judul: "" },
+];
+
+function templatePindah({ nama, nisn, ttl, kelas, alasan, tujuan, tanggal }) {
+  return `Yang bertanda tangan di bawah ini Kepala Sekolah menerangkan bahwa:
+
+Nama              : ${nama}
+NISN              : ${nisn}
+Tempat, Tgl Lahir : ${ttl}
+Kelas             : ${kelas}
+
+adalah benar siswa/i pada sekolah kami dan telah mengajukan pindah/keluar dari sekolah ini terhitung mulai tanggal ${tanggal} dengan alasan ${alasan}, untuk melanjutkan pendidikan ke ${tujuan}.
+
+Demikian surat keterangan ini dibuat untuk dipergunakan sebagaimana mestinya.`;
+}
+
+function templateIzin({ nama, nisn, kelas, alasan, tanggal }) {
+  return `Yang bertanda tangan di bawah ini Kepala Sekolah menerangkan bahwa:
+
+Nama              : ${nama}
+NISN              : ${nisn}
+Kelas             : ${kelas}
+
+adalah benar siswa/i pada sekolah kami dan diberikan izin tidak masuk sekolah pada tanggal ${tanggal} dengan alasan ${alasan}.
+
+Demikian surat keterangan ini dibuat untuk dipergunakan sebagaimana mestinya.`;
+}
+
+function templateAktif({ nama, nisn, kelas, namaSekolah }) {
+  return `Yang bertanda tangan di bawah ini Kepala Sekolah menerangkan bahwa:
+
+Nama              : ${nama}
+NISN              : ${nisn}
+Kelas             : ${kelas}
+
+adalah benar siswa/i yang masih aktif dan terdaftar di ${namaSekolah || "sekolah kami"} pada tahun ajaran berjalan.
+
+Demikian surat keterangan ini dibuat untuk dipergunakan sebagaimana mestinya.`;
+}
+
+function templateLulus({ nama, nisn, kelas, namaSekolah }) {
+  return `Yang bertanda tangan di bawah ini Kepala Sekolah menerangkan bahwa:
+
+Nama              : ${nama}
+NISN              : ${nisn}
+Kelas             : ${kelas}
+
+adalah benar siswa/i ${namaSekolah || "sekolah kami"} dan telah dinyatakan LULUS pada tahun ajaran berjalan.
+
+Demikian surat keterangan ini dibuat untuk dipergunakan sebagaimana mestinya.`;
+}
+
+export default function SuratKeteranganForm({ onSaved }) {
+  const [jenis, setJenis] = useState("pindah");
+
+  const [siswaList, setSiswaList] = useState([]);
+  const [siswaId, setSiswaId] = useState("");
+  const [alasan, setAlasan] = useState("");
+  const [tujuan, setTujuan] = useState("");
+  const [tanggalPindah, setTanggalPindah] = useState("");
+
+  const [judul, setJudul] = useState("");
+  const [isi, setIsi] = useState("");
+  const [nomorSurat, setNomorSurat] = useState("");
+  const [tanggalSurat, setTanggalSurat] = useState(
+    new Date().toISOString().slice(0, 10)
+  );
+
+  const [sekolah, setSekolah] = useState(null);
+  const [suratTersimpan, setSuratTersimpan] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const [loadError, setLoadError] = useState("");
+  const printRef = useRef(null);
+
+  // Jenis yang butuh pilih siswa dari daftar
+  const butuhSiswa = ["pindah", "izin", "aktif", "lulus"].includes(jenis);
+  // Jenis yang butuh field alasan + tanggal (pindah & izin)
+  const butuhAlasanTanggal = ["pindah", "izin"].includes(jenis);
+  // Jenis yang butuh field "sekolah tujuan" (khusus pindah)
+  const butuhTujuan = jenis === "pindah";
+
+  useEffect(() => {
+    async function loadSiswa() {
+      const { data, error } = await supabase
+        .from("siswa")
+        .select("id, nama_lengkap, nisn, tempat_lahir, tanggal_lahir, kelas:kelas_id(nama_kelas)")
+        .order("nama_lengkap", { ascending: true });
+
+      if (error) {
+        console.error("Gagal memuat data siswa:", error);
+        setLoadError(
+          "Gagal memuat daftar siswa: " + error.message + " (cek Console browser untuk detail)"
+        );
+        setSiswaList([]);
+        return;
+      }
+
+      setSiswaList(data || []);
+      if (!data || data.length === 0) {
+        setLoadError(
+          "Daftar siswa kosong. Pastikan tabel 'siswa' sudah berisi data dan RLS mengizinkan akses baca."
+        );
+      } else {
+        setLoadError("");
+      }
+    }
+
+    async function loadSekolah() {
+      const { data, error } = await supabase
+        .from("profil_sekolah")
+        .select("*")
+        .maybeSingle();
+
+      if (error) {
+        console.error("Gagal memuat profil sekolah:", error);
+        return;
+      }
+      setSekolah(data || null);
+    }
+
+    loadSiswa();
+    loadSekolah();
+  }, []);
+
+  // Auto-generate isi surat setiap kali jenis atau field terkait berubah
+  useEffect(() => {
+    if (jenis === "bebas") return;
+
+    const siswa = siswaList.find((s) => s.id === siswaId);
+    if (!siswa) return;
+
+    const jenisInfo = JENIS_SURAT.find((j) => j.key === jenis);
+    const ttl = `${siswa.tempat_lahir || "-"}, ${
+      siswa.tanggal_lahir
+        ? new Date(siswa.tanggal_lahir).toLocaleDateString("id-ID")
+        : "-"
+    }`;
+    const tanggalFormatted = tanggalPindah
+      ? new Date(tanggalPindah).toLocaleDateString("id-ID")
+      : "-";
+
+    let teksIsi = "";
+    switch (jenis) {
+      case "pindah":
+        teksIsi = templatePindah({
+          nama: siswa.nama_lengkap,
+          nisn: siswa.nisn || "-",
+          ttl,
+          kelas: siswa.kelas?.nama_kelas || "-",
+          alasan: alasan || "-",
+          tujuan: tujuan || "-",
+          tanggal: tanggalFormatted,
+        });
+        break;
+      case "izin":
+        teksIsi = templateIzin({
+          nama: siswa.nama_lengkap,
+          nisn: siswa.nisn || "-",
+          kelas: siswa.kelas?.nama_kelas || "-",
+          alasan: alasan || "-",
+          tanggal: tanggalFormatted,
+        });
+        break;
+      case "aktif":
+        teksIsi = templateAktif({
+          nama: siswa.nama_lengkap,
+          nisn: siswa.nisn || "-",
+          kelas: siswa.kelas?.nama_kelas || "-",
+          namaSekolah: sekolah?.nama_sekolah,
+        });
+        break;
+      case "lulus":
+        teksIsi = templateLulus({
+          nama: siswa.nama_lengkap,
+          nisn: siswa.nisn || "-",
+          kelas: siswa.kelas?.nama_kelas || "-",
+          namaSekolah: sekolah?.nama_sekolah,
+        });
+        break;
+      default:
+        return;
+    }
+
+    setJudul(jenisInfo.judul);
+    setIsi(teksIsi);
+  }, [jenis, siswaId, alasan, tujuan, tanggalPindah, siswaList, sekolah]);
+
+  function gantiJenis(j) {
+    setJenis(j);
+    setSuratTersimpan(null);
+    setSiswaId("");
+    setAlasan("");
+    setTujuan("");
+    setTanggalPindah("");
+    if (j === "bebas") {
+      setJudul("");
+      setIsi("");
+    }
+  }
+
+  async function handleSimpan() {
+    if (!nomorSurat.trim() || !isi.trim()) {
+      alert("Nomor surat dan isi surat wajib diisi.");
+      return;
+    }
+    setSaving(true);
+    const { data: userData } = await supabase.auth.getUser();
+
+    const { data, error } = await supabase
+      .from("surat_keterangan")
+      .insert({
+        jenis,
+        nomor_surat: nomorSurat.trim(),
+        judul: judul.trim() || "Surat Keterangan",
+        siswa_id: butuhSiswa ? siswaId || null : null,
+        isi,
+        data: butuhAlasanTanggal ? { alasan, tujuan, tanggalPindah } : {},
+        tanggal_surat: tanggalSurat,
+        dibuat_oleh: userData?.user?.id,
+      })
+      .select()
+      .single();
+
+    setSaving(false);
+
+    if (error) {
+      alert("Gagal menyimpan surat: " + error.message);
+      return;
+    }
+
+    setSuratTersimpan(data);
+    onSaved?.(data);
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex gap-2 flex-wrap">
+        {JENIS_SURAT.map((j) => (
+          <button
+            key={j.key}
+            type="button"
+            onClick={() => gantiJenis(j.key)}
+            className={`px-4 py-2 rounded ${
+              jenis === j.key ? "bg-blue-600 text-white" : "bg-gray-100"
+            }`}
+          >
+            {j.label}
+          </button>
+        ))}
+      </div>
+
+      {butuhSiswa && (
+        <div className="grid grid-cols-2 gap-3">
+          <select
+            className="border rounded px-3 py-2 col-span-2"
+            value={siswaId}
+            onChange={(e) => setSiswaId(e.target.value)}
+          >
+            <option value="">Pilih Siswa</option>
+            {siswaList.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.nama_lengkap} — Kelas {s.kelas?.nama_kelas || "-"}
+              </option>
+            ))}
+          </select>
+          {loadError && (
+            <p className="col-span-2 text-sm text-red-600">{loadError}</p>
+          )}
+
+          {butuhAlasanTanggal && (
+            <>
+              <input
+                className="border rounded px-3 py-2"
+                placeholder={jenis === "pindah" ? "Alasan pindah" : "Alasan izin"}
+                value={alasan}
+                onChange={(e) => setAlasan(e.target.value)}
+              />
+              <input
+                type="date"
+                className="border rounded px-3 py-2"
+                value={tanggalPindah}
+                onChange={(e) => setTanggalPindah(e.target.value)}
+              />
+            </>
+          )}
+
+          {butuhTujuan && (
+            <input
+              className="border rounded px-3 py-2 col-span-2"
+              placeholder="Sekolah tujuan"
+              value={tujuan}
+              onChange={(e) => setTujuan(e.target.value)}
+            />
+          )}
+        </div>
+      )}
+
+      {jenis === "bebas" && (
+        <input
+          className="border rounded px-3 py-2 w-full"
+          placeholder="Judul surat (mis. Surat Keterangan Berkelakuan Baik)"
+          value={judul}
+          onChange={(e) => setJudul(e.target.value)}
+        />
+      )}
+
+      <div className="grid grid-cols-2 gap-3">
+        <input
+          className="border rounded px-3 py-2"
+          placeholder="Nomor surat (mis. 421.2/10/2026)"
+          value={nomorSurat}
+          onChange={(e) => setNomorSurat(e.target.value)}
+        />
+        <input
+          type="date"
+          className="border rounded px-3 py-2"
+          value={tanggalSurat}
+          onChange={(e) => setTanggalSurat(e.target.value)}
+        />
+      </div>
+
+      <textarea
+        className="border rounded px-3 py-2 w-full h-56 font-serif"
+        placeholder="Isi surat (bisa diedit bebas sebelum disimpan)"
+        value={isi}
+        onChange={(e) => setIsi(e.target.value)}
+      />
 
       <button
         type="button"
-        onClick={() => setShowForm(false)}
-        className="absolute top-4 right-4 text-ink-700/40 hover:text-ink-900"
+        disabled={saving}
+        onClick={handleSimpan}
+        className="bg-green-600 text-white px-4 py-2 rounded disabled:opacity-50"
       >
-        <X size={20} />
+        {saving ? "Menyimpan..." : "Simpan Surat"}
       </button>
 
-      <div className="flex items-center gap-3 mb-5">
-        <div className="w-10 h-10 rounded-full bg-blue-600/10 text-blue-700 flex items-center justify-center shrink-0">
-          <GraduationCap size={19} />
+      {suratTersimpan && (
+        <div className="mt-6 border-t pt-4 space-y-3">
+          <p className="font-medium">Surat tersimpan — unduh:</p>
+          <div className="flex gap-3">
+            <button
+              type="button"
+              onClick={() =>
+                exportSuratToPDF(
+                  printRef,
+                  suratTersimpan.nomor_surat.replace(/\//g, "-")
+                )
+              }
+              className="bg-red-600 text-white px-4 py-2 rounded"
+            >
+              Unduh PDF
+            </button>
+            <button
+              type="button"
+              onClick={() => exportSuratToDocx(suratTersimpan, sekolah)}
+              className="bg-blue-600 text-white px-4 py-2 rounded"
+            >
+              Unduh DOCX
+            </button>
+          </div>
+
+          <div className="overflow-auto border" style={{ maxHeight: 500 }}>
+            <SuratKeteranganPrintTemplate
+              ref={printRef}
+              surat={suratTersimpan}
+              sekolah={sekolah}
+            />
+          </div>
         </div>
-
-        <div>
-          <h2 className="font-display text-xl font-semibold">
-            {editingId ? 'Ubah Data Guru' : 'Tambah Guru'}
-          </h2>
-          <p className="text-sm text-ink-700/50">
-            Lengkapi data identitas guru
-          </p>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-2 gap-3">
-
-        {/* Nama */}
-        <Field label="Nama Lengkap" full>
-          <input
-            required
-            className="input-field"
-            value={form.nama_lengkap}
-            onChange={(e) =>
-              setForm({ ...form, nama_lengkap: e.target.value })
-            }
-            placeholder="Nama lengkap dan gelar"
-          />
-        </Field>
-
-        {/* NIP */}
-        <Field label="NIP">
-          <input
-            className="input-field"
-            value={form.nip}
-            onChange={(e) =>
-              setForm({ ...form, nip: e.target.value })
-            }
-            placeholder="NIP"
-          />
-        </Field>
-
-        {/* NUPTK */}
-        <Field label="NUPTK">
-          <input
-            className="input-field"
-            value={form.nuptk}
-            onChange={(e) =>
-              setForm({ ...form, nuptk: e.target.value })
-            }
-            placeholder="NUPTK"
-          />
-        </Field>
-
-        {/* Jenis Kelamin */}
-        <Field label="Jenis Kelamin">
-          <select
-            className="input-field"
-            value={form.jenis_kelamin}
-            onChange={(e) =>
-              setForm({ ...form, jenis_kelamin: e.target.value })
-            }
-          >
-            <option value="L">Laki-laki</option>
-            <option value="P">Perempuan</option>
-          </select>
-        </Field>
-
-        {/* Mata Pelajaran */}
-        <Field label="Mata Pelajaran">
-          <input
-            className="input-field"
-            value={form.mata_pelajaran}
-            onChange={(e) =>
-              setForm({ ...form, mata_pelajaran: e.target.value })
-            }
-            placeholder="Contoh: Guru Kelas"
-          />
-        </Field>
-
-        {/* Pangkat / Golongan */}
-        <Field label="Pangkat / Golongan">
-          <input
-            className="input-field"
-            value={form.pangkat_golongan}
-            onChange={(e) =>
-              setForm({ ...form, pangkat_golongan: e.target.value })
-            }
-            placeholder="Contoh: Penata Muda / III-b"
-          />
-        </Field>
-
-        {/* Pendidikan */}
-        <Field label="Pendidikan Terakhir">
-          <input
-            className="input-field"
-            value={form.pendidikan_terakhir}
-            onChange={(e) =>
-              setForm({ ...form, pendidikan_terakhir: e.target.value })
-            }
-            placeholder="Contoh: S1 PGSD"
-          />
-        </Field>
-
-        {/* Tanggal Lahir */}
-        <Field label="Tanggal Lahir">
-          <input
-            type="date"
-            className="input-field"
-            value={form.tanggal_lahir || ''}
-            onChange={(e) =>
-              setForm({ ...form, tanggal_lahir: e.target.value })
-            }
-          />
-        </Field>
-
-        {/* No HP */}
-        <Field label="No. HP">
-          <input
-            className="input-field"
-            value={form.no_hp}
-            onChange={(e) =>
-              setForm({ ...form, no_hp: e.target.value })
-            }
-            placeholder="08xxxxxxxxxx"
-          />
-        </Field>
-
-        {/* Email */}
-        <Field label="Email">
-          <input
-            type="email"
-            className="input-field"
-            value={form.email}
-            onChange={(e) =>
-              setForm({ ...form, email: e.target.value })
-            }
-            placeholder="email@contoh.com"
-          />
-        </Field>
-
-        {/* Status */}
-        <Field label="Status">
-          <select
-            className="input-field"
-            value={form.status}
-            onChange={(e) =>
-              setForm({ ...form, status: e.target.value })
-            }
-          >
-            <option value="aktif">Aktif</option>
-            <option value="nonaktif">Nonaktif</option>
-          </select>
-        </Field>
-
-        {/* Alamat */}
-        <Field label="Alamat" full>
-          <textarea
-            className="input-field min-h-[80px]"
-            value={form.alamat}
-            onChange={(e) =>
-              setForm({ ...form, alamat: e.target.value })
-            }
-            placeholder="Alamat lengkap"
-          />
-        </Field>
-
-        {/* Foto Profil Path */}
-        <Field label="Path Foto Profil" full>
-          <input
-            className="input-field"
-            value={form.foto_profil_path}
-            onChange={(e) =>
-              setForm({
-                ...form,
-                foto_profil_path: e.target.value,
-              })
-            }
-            placeholder="Contoh: id-guru/foto.jpg"
-          />
-
-          <p className="text-xs text-ink-700/50 mt-1">
-            Kosongkan jika guru belum memiliki foto.
-          </p>
-        </Field>
-
-      </div>
-
-      <div className="mt-5 flex justify-end gap-3">
-        <button
-          type="button"
-          className="btn-secondary"
-          onClick={() => setShowForm(false)}
-        >
-          Batal
-        </button>
-
-        <button
-          type="submit"
-          disabled={saving}
-          className="btn-primary"
-        >
-          {saving && (
-            <Loader2 size={16} className="animate-spin" />
-          )}
-
-          {saving ? 'Menyimpan...' : 'Simpan Data Guru'}
-        </button>
-      </div>
-    </form>
-  </div>
-)}
+      )}
+    </div>
+  );
+}
