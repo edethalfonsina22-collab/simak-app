@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabaseClient'
 import Layout from '../components/Layout'
-import { Users, GraduationCap, DoorOpen, Megaphone, LayoutDashboard } from 'lucide-react'
+import { Users, GraduationCap, DoorOpen, Megaphone, LayoutDashboard, ClipboardCheck, FileClock } from 'lucide-react'
 import {
   PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend,
   LineChart, Line, XAxis, YAxis, CartesianGrid,
@@ -24,7 +24,7 @@ const KATEGORI_STYLE = {
 }
 
 // Palet kartu ringkasan — gaya bento (badge lingkaran + watermark + hover shadow berwarna)
-// terinspirasi dari referensi desain, dipetakan ke tema brass/sage/ink/terracotta yang sudah ada
+// terinspirasi dari referensi desain, dipetakan ke tema brass/sage/ink/terracotta/blue yang sudah ada
 const CARD_THEME = {
   brass: {
     tint: 'bg-brass-400/[0.06]',
@@ -53,6 +53,13 @@ const CARD_THEME = {
     badge: 'bg-[#B4453A]/20 text-[#B4453A]',
     watermark: 'text-[#B4453A]',
     hover: 'hover:border-[#B4453A]/40 hover:shadow-[0_20px_25px_-8px_rgba(180,69,58,0.22)]',
+  },
+  blue: {
+    tint: 'bg-blue-600/[0.06]',
+    accent: 'bg-blue-600',
+    badge: 'bg-blue-600/20 text-blue-700',
+    watermark: 'text-blue-600',
+    hover: 'hover:border-blue-600/50 hover:shadow-[0_20px_25px_-8px_rgba(37,99,235,0.22)]',
   },
 }
 
@@ -101,6 +108,8 @@ export default function Dashboard() {
   const [attendanceTrend, setAttendanceTrend] = useState([])
   const [nilaiPerMapel, setNilaiPerMapel] = useState([])
   const [rppStatus, setRppStatus] = useState({ menunggu: 0, disetujui: 0, ditolak: 0 })
+  const [presensiHariIni, setPresensiHariIni] = useState({ terisi: 0, hadir: 0, izin: 0, alpa: 0 })
+  const [pengajuanMenunggu, setPengajuanMenunggu] = useState(0)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -108,10 +117,12 @@ export default function Dashboard() {
       const since = new Date()
       since.setDate(since.getDate() - 13)
       const sinceStr = since.toISOString().slice(0, 10)
+      const todayStr = new Date().toISOString().slice(0, 10)
 
       const [
         siswaCount, guruCount, kelasCount, pengumumanCount, lakiCount, perempuanCount, pengumumanRecent,
         presensiRows, nilaiRows, rppMenunggu, rppDisetujui, rppDitolak,
+        presensiHariIniRows, pengajuanMenungguCount,
       ] = await Promise.all([
         supabase.from('siswa').select('*', { count: 'exact', head: true }),
         supabase.from('guru').select('*', { count: 'exact', head: true }),
@@ -125,6 +136,10 @@ export default function Dashboard() {
         supabase.from('rpp').select('*', { count: 'exact', head: true }).eq('status', 'menunggu'),
         supabase.from('rpp').select('*', { count: 'exact', head: true }).eq('status', 'disetujui'),
         supabase.from('rpp').select('*', { count: 'exact', head: true }).eq('status', 'ditolak'),
+        supabase.from('presensi_siswa').select('status').eq('tanggal', todayStr),
+        // Asumsi nilai status 'diajukan' dipakai untuk pengajuan izin yang menunggu persetujuan
+        // kepala sekolah. Kalau nilai sebenarnya beda (misal 'menunggu'/'pending'), ganti string ini.
+        supabase.from('pengajuan_izin').select('*', { count: 'exact', head: true }).eq('status', 'diajukan'),
       ])
 
       setStats({
@@ -145,6 +160,14 @@ export default function Dashboard() {
         disetujui: rppDisetujui.count || 0,
         ditolak: rppDitolak.count || 0,
       })
+
+      const rekapHariIni = { hadir: 0, izin: 0, alpa: 0 }
+      for (const p of presensiHariIniRows.data || []) {
+        if (rekapHariIni[p.status] !== undefined) rekapHariIni[p.status]++
+      }
+      setPresensiHariIni({ terisi: (presensiHariIniRows.data || []).length, ...rekapHariIni })
+      setPengajuanMenunggu(pengajuanMenungguCount.count || 0)
+
       setLoading(false)
     }
     load()
@@ -155,6 +178,20 @@ export default function Dashboard() {
     { label: 'Total Guru', value: stats.guru, icon: GraduationCap, theme: 'sage' },
     { label: 'Jumlah Kelas', value: stats.kelas, icon: DoorOpen, theme: 'ink' },
     { label: 'Pengumuman', value: stats.pengumuman, icon: Megaphone, theme: 'terracotta' },
+    {
+      label: 'Presensi Hari Ini',
+      value: `${presensiHariIni.terisi}/${stats.siswa}`,
+      sublabel: `${presensiHariIni.hadir} hadir · ${presensiHariIni.izin} izin · ${presensiHariIni.alpa} alpa`,
+      icon: ClipboardCheck,
+      theme: 'blue',
+    },
+    {
+      label: 'Pengajuan Menunggu',
+      value: pengajuanMenunggu,
+      sublabel: pengajuanMenunggu > 0 ? 'menunggu persetujuan Anda' : 'tidak ada yang menunggu',
+      icon: FileClock,
+      theme: pengajuanMenunggu > 0 ? 'terracotta' : 'sage',
+    },
   ]
 
   return (
@@ -217,8 +254,8 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        {cards.map(({ label, value, icon: Icon, theme }, i) => {
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 mb-8">
+        {cards.map(({ label, value, icon: Icon, theme, sublabel }, i) => {
           const t = CARD_THEME[theme]
           return (
             <div
@@ -244,6 +281,9 @@ export default function Dashboard() {
                 <p className="text-3xl font-display font-extrabold text-ink-950 mt-1">
                   {loading ? '—' : value}
                 </p>
+                {sublabel && !loading && (
+                  <p className="text-[11px] text-ink-700/50 mt-1">{sublabel}</p>
+                )}
               </div>
             </div>
           )
