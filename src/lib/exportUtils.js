@@ -1,184 +1,430 @@
-import * as XLSX from 'xlsx'
-import jsPDF from 'jspdf'
-import autoTable from 'jspdf-autotable'
+import { useEffect, useState } from 'react'
+import { supabase } from '../lib/supabaseClient'
+import Layout from '../components/Layout'
+import { eksporExcel, eksporPDF, eksporPDFDaftarHadir } from '../lib/exportUtils'
+import { susunDaftarHadir, apakahHariMinggu, kodeSel, jumlahHariDalamBulan } from '../lib/daftarHadirUtils'
+import { Printer, FileDown, FileSpreadsheet, Loader2 } from 'lucide-react'
 
-/**
- * Ekspor array of object ke file Excel (.xlsx)
- * @param {Array<Object>} rows - data, tiap object jadi satu baris
- * @param {string} namaFile - tanpa ekstensi, contoh "data-siswa"
- * @param {string} namaSheet - nama sheet, contoh "Siswa"
- */
-export function eksporExcel(rows, namaFile, namaSheet = 'Data') {
-  const ws = XLSX.utils.json_to_sheet(rows)
-  const wb = XLSX.utils.book_new()
-  XLSX.utils.book_append_sheet(wb, ws, namaSheet)
-  XLSX.writeFile(wb, `${namaFile}.xlsx`)
+const NAMA_BULAN = [
+  'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+  'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember',
+]
+
+const JENIS_LAPORAN = [
+  { value: 'presensi_siswa', label: 'Rekap Presensi Siswa' },
+  { value: 'presensi_guru', label: 'Rekap Presensi Guru' },
+  { value: 'surat', label: 'Rekap Surat Masuk/Keluar' },
+  { value: 'agenda', label: 'Rekap Agenda Kegiatan' },
+]
+
+function rentangBulan(tahun, bulan) {
+  const awal = `${tahun}-${String(bulan).padStart(2, '0')}-01`
+  const akhirDate = new Date(tahun, bulan, 0)
+  const akhir = `${tahun}-${String(bulan).padStart(2, '0')}-${String(akhirDate.getDate()).padStart(2, '0')}`
+  return { awal, akhir }
 }
 
-/**
- * Ekspor BEBERAPA tabel sekaligus ke satu file Excel (.xlsx),
- * satu sheet per tabel. Dipakai untuk fitur Backup Data.
- * @param {Array<{ nama: string, rows: Array<Object> }>} daftarTabel
- * @param {string} namaFile - tanpa ekstensi
- */
-export function eksporExcelMultiSheet(daftarTabel, namaFile) {
-  const wb = XLSX.utils.book_new()
-  for (const { nama, rows } of daftarTabel) {
-    // Sheet Excel maksimal 31 karakter untuk nama sheet
-    const namaSheet = nama.slice(0, 31)
-    const dataAman = rows && rows.length > 0 ? rows : [{ info: 'Tidak ada data' }]
-    const ws = XLSX.utils.json_to_sheet(dataAman)
-    XLSX.utils.book_append_sheet(wb, ws, namaSheet)
-  }
-  XLSX.writeFile(wb, `${namaFile}.xlsx`)
-}
+export default function LaporanBulanan() {
+  const now = new Date()
+  const [tahun, setTahun] = useState(now.getFullYear())
+  const [bulan, setBulan] = useState(now.getMonth() + 1)
+  const [jenis, setJenis] = useState('presensi_siswa')
+  const [tampilanGuru, setTampilanGuru] = useState('ringkasan') // 'ringkasan' | 'daftar_hadir'
+  const [loading, setLoading] = useState(false)
+  const [dataLaporan, setDataLaporan] = useState(null)
+  const [daftarHadirGuru, setDaftarHadirGuru] = useState(null) // { baris, totalHari }
+  const [tanggalLibur, setTanggalLibur] = useState('') // input manual tambahan, contoh: "16,21"
+  const [hariLiburDB, setHariLiburDB] = useState(new Set()) // dari tabel hari_libur, untuk bulan aktif
+  const [profilSekolah, setProfilSekolah] = useState(null)
+  const [logoUrl, setLogoUrl] = useState('')
+  const [mengeksporPDF, setMengeksporPDF] = useState(false)
 
-/**
- * Ekspor tabel ke file PDF.
- * @param {string} judul - judul di atas tabel, misal "Rekap Presensi - Kelas 5A"
- * @param {string[]} kolom - header kolom, misal ['Nama', 'NIS', 'Status']
- * @param {Array<Array>} baris - array of array, tiap array = satu baris
- * @param {string} namaFile - tanpa ekstensi
- * @param {string} [subjudul] - teks kecil di bawah judul, misal tanggal/periode
- */
-export function eksporPDF(judul, kolom, baris, namaFile, subjudul = '') {
-  const doc = new jsPDF()
-  doc.setFontSize(14)
-  doc.text(judul, 14, 16)
-  if (subjudul) {
-    doc.setFontSize(10)
-    doc.setTextColor(100)
-    doc.text(subjudul, 14, 22)
-  }
-  autoTable(doc, {
-    head: [kolom],
-    body: baris,
-    startY: subjudul ? 27 : 22,
-    styles: { fontSize: 9 },
-    headStyles: { fillColor: [17, 26, 46] }, // ink-950
-  })
-  doc.save(`${namaFile}.pdf`)
-}
-
-/**
- * Ekspor Daftar Hadir bulanan (format kertas absensi: NO/NAMA/JABATAN + kolom
- * tanggal 1..31 + rekap S/I/TK/JML) sebagai PDF landscape, kolom Minggu/libur
- * diwarnai merah, ditutup blok tanda tangan Kepala Sekolah.
- *
- * @param {Object} opsi
- * @param {Object} opsi.profilSekolah - baris dari tabel profil_sekolah (id=1)
- * @param {string} opsi.bulanLabel - contoh 'Juni'
- * @param {number} opsi.tahun
- * @param {Array} opsi.baris - hasil dari susunDaftarHadir(...).baris
- * @param {number} opsi.totalHari
- * @param {(tanggal:number)=>boolean} opsi.isHariLibur
- * @param {string} opsi.tanggalCetak - contoh '30 Juni 2026'
- * @param {string} opsi.namaFile - tanpa ekstensi
- */
-export function eksporPDFDaftarHadir({
-  profilSekolah = {},
-  bulanLabel,
-  tahun,
-  baris,
-  totalHari,
-  isHariLibur,
-  tanggalCetak,
-  namaFile,
-}) {
-  // import kode singkat sel di sini agar file ini tidak perlu bergantung ke daftarHadirUtils
-  const kodeSel = (status) => {
-    if (status === 'sakit') return 'S'
-    if (status === 'izin') return 'I'
-    if (status === 'alpa') return 'A'
-    return ''
-  }
-
-  const doc = new jsPDF({ orientation: 'landscape', format: 'a4' })
-  const pageWidth = doc.internal.pageSize.getWidth()
-
-  const teksTengah = (text, y, size = 10, bold = true) => {
-    if (!text) return
-    doc.setFontSize(size)
-    doc.setFont(undefined, bold ? 'bold' : 'normal')
-    doc.text(text, pageWidth / 2, y, { align: 'center' })
-  }
-
-  teksTengah(profilSekolah.dinas_pendidikan, 10, 11, true)
-  teksTengah(profilSekolah.kabupaten, 15, 10, false)
-  teksTengah(profilSekolah.nama_sekolah, 21, 12, true)
-  teksTengah(profilSekolah.kecamatan, 26, 10, false)
-  teksTengah(profilSekolah.alamat, 31, 8, false)
-
-  doc.setFont(undefined, 'bold')
-  doc.setFontSize(9)
-  doc.text(`BULAN: ${(bulanLabel || '').toUpperCase()} ${tahun}`, 14, 40)
-  doc.setFont(undefined, 'normal')
-
-  const kolomTanggal = Array.from({ length: totalHari }, (_, i) => String(i + 1))
-  const head = [['NO', 'NAMA/NIP', 'JABATAN', ...kolomTanggal, 'S', 'I', 'TK', 'JML']]
-  const body = baris.map((b) => [
-    b.no,
-    `${b.nama}\nNIP. ${b.nip}`,
-    b.jabatan,
-    ...b.statusHarian.map((s, i) => (isHariLibur(i + 1) ? '' : kodeSel(s))),
-    b.sakit || '',
-    b.izin || '',
-    b.tanpaKeterangan || '',
-    b.jumlahTidakHadir || '',
-  ])
-
-  autoTable(doc, {
-    head,
-    body,
-    startY: 44,
-    styles: { fontSize: 6, halign: 'center', cellPadding: 1, valign: 'middle' },
-    headStyles: { fillColor: [17, 26, 46], fontSize: 6 },
-    columnStyles: {
-      0: { cellWidth: 7 },
-      1: { cellWidth: 34, halign: 'left' },
-      2: { cellWidth: 10 },
-    },
-    didParseCell: (data) => {
-      const colIdx = data.column.index
-      if (colIdx >= 3 && colIdx < 3 + totalHari) {
-        const tgl = colIdx - 3 + 1
-        if (isHariLibur(tgl)) {
-          data.cell.styles.fillColor = [225, 29, 46]
-          data.cell.styles.textColor = [255, 255, 255]
-        }
+  useEffect(() => {
+    supabase.from('profil_sekolah').select('*').eq('id', 1).maybeSingle().then(({ data }) => {
+      setProfilSekolah(data || {})
+      if (data?.logo_path) {
+        const { data: pub } = supabase.storage.from('profil-sekolah').getPublicUrl(data.logo_path)
+        setLogoUrl(pub.publicUrl)
+      } else {
+        setLogoUrl('')
       }
-    },
-  })
+    })
+  }, [])
 
-  const finalY = doc.lastAutoTable.finalY + 15
-  const xKanan = pageWidth - 80
-  doc.setFontSize(9)
-  // DIPERBAIKI: nama tempat sekarang diambil dari profilSekolah.tempat_ttd, bukan hardcode "Masidang"
-  doc.text(`${profilSekolah.tempat_ttd || '(isi Nama Tempat di Profil Sekolah)'}, ${tanggalCetak}`, xKanan, finalY)
-  doc.text('KEPALA SEKOLAH', xKanan, finalY + 5)
-  doc.setFont(undefined, 'bold')
-  doc.text(profilSekolah.kepala_sekolah || '________________', xKanan, finalY + 25)
-  doc.setFont(undefined, 'normal')
-  doc.text(`NIP. ${profilSekolah.nip_kepala_sekolah || '-'}`, xKanan, finalY + 30)
+  async function muatLaporan() {
+    setLoading(true)
+    const { awal, akhir } = rentangBulan(tahun, bulan)
 
-  doc.save(`${namaFile}.pdf`)
-}
+    if (jenis === 'presensi_siswa') {
+      const { data } = await supabase
+        .from('presensi_siswa')
+        .select('status, siswa:siswa_id(nama_lengkap, kelas:kelas_id(nama_kelas))')
+        .gte('tanggal', awal)
+        .lte('tanggal', akhir)
+      const rekap = {}
+      for (const row of data || []) {
+        const nama = row.siswa?.nama_lengkap || 'Tanpa nama'
+        const kelas = row.siswa?.kelas?.nama_kelas || '-'
+        const kunci = `${nama}||${kelas}`
+        if (!rekap[kunci]) rekap[kunci] = { nama, kelas, hadir: 0, izin: 0, sakit: 0, alpa: 0 }
+        if (rekap[kunci][row.status] !== undefined) rekap[kunci][row.status]++
+      }
+      setDataLaporan(Object.values(rekap).sort((a, b) => a.nama.localeCompare(b.nama)))
+    }
 
-/**
- * Unduh data mentah (array of object per tabel) sebagai satu file JSON.
- * Berguna sebagai backup teknis yang bisa dipulihkan kembali nanti.
- * @param {Object} objekData - { namaTabel: [...rows], ... }
- * @param {string} namaFile - tanpa ekstensi
- */
-export function unduhJSON(objekData, namaFile) {
-  const teks = JSON.stringify(objekData, null, 2)
-  const blob = new Blob([teks], { type: 'application/json' })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = `${namaFile}.json`
-  document.body.appendChild(a)
-  a.click()
-  document.body.removeChild(a)
-  URL.revokeObjectURL(url)
+    if (jenis === 'presensi_guru') {
+      const { data: guru } = await supabase
+        .from('guru')
+        .select('id, nip, nama_lengkap, mata_pelajaran')
+        .eq('status', 'aktif')
+
+      const { data: presensi } = await supabase
+        .from('presensi_guru')
+        .select('guru_id, tanggal, status')
+        .gte('tanggal', awal)
+        .lte('tanggal', akhir)
+
+      // Rekap ringkas (tampilan lama, tetap dipertahankan)
+      const rekap = {}
+      for (const row of presensi || []) {
+        const g = (guru || []).find((x) => x.id === row.guru_id)
+        const nama = g?.nama_lengkap || 'Tanpa nama'
+        if (!rekap[nama]) rekap[nama] = { nama, hadir: 0, izin: 0, sakit: 0, alpa: 0 }
+        if (rekap[nama][row.status] !== undefined) rekap[nama][row.status]++
+      }
+      setDataLaporan(Object.values(rekap).sort((a, b) => a.nama.localeCompare(b.nama)))
+
+      // Data untuk tampilan Daftar Hadir (grid kalender)
+      setDaftarHadirGuru(susunDaftarHadir(guru || [], presensi || [], tahun, bulan))
+
+      // Tanggal libur (nasional/sekolah) untuk bulan aktif, dari tabel hari_libur
+      const { data: libur } = await supabase
+        .from('hari_libur')
+        .select('tanggal')
+        .gte('tanggal', awal)
+        .lte('tanggal', akhir)
+      setHariLiburDB(new Set((libur || []).map((r) => Number(r.tanggal.slice(8, 10)))))
+    }
+
+    if (jenis === 'surat') {
+      const { data } = await supabase
+        .from('surat')
+        .select('*')
+        .gte('tanggal', awal)
+        .lte('tanggal', akhir)
+        .order('tanggal')
+      setDataLaporan(data || [])
+    }
+
+    if (jenis === 'agenda') {
+      const { data } = await supabase
+        .from('agenda')
+        .select('*')
+        .gte('tanggal_mulai', awal)
+        .lte('tanggal_mulai', akhir + 'T23:59:59')
+        .order('tanggal_mulai')
+      setDataLaporan(data || [])
+    }
+
+    setLoading(false)
+  }
+
+  useEffect(() => {
+    muatLaporan()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  const judulLaporan =
+    jenis === 'presensi_guru' && tampilanGuru === 'daftar_hadir'
+      ? `DAFTAR HADIR — BULAN: ${NAMA_BULAN[bulan - 1].toUpperCase()} ${tahun}`
+      : `${JENIS_LAPORAN.find((j) => j.value === jenis)?.label} — ${NAMA_BULAN[bulan - 1]} ${tahun}`
+
+  function siapkanTabel() {
+    if (!dataLaporan) return { kolom: [], baris: [] }
+    if (jenis === 'presensi_siswa') {
+      return {
+        kolom: ['Nama Siswa', 'Kelas', 'Hadir', 'Izin', 'Sakit', 'Alpa'],
+        baris: dataLaporan.map((d) => [d.nama, d.kelas, d.hadir, d.izin, d.sakit, d.alpa]),
+      }
+    }
+    if (jenis === 'presensi_guru') {
+      return {
+        kolom: ['Nama Guru', 'Hadir', 'Izin', 'Sakit', 'Alpa'],
+        baris: dataLaporan.map((d) => [d.nama, d.hadir, d.izin, d.sakit, d.alpa]),
+      }
+    }
+    if (jenis === 'surat') {
+      return {
+        kolom: ['Jenis', 'Nomor Surat', 'Perihal', 'Pengirim/Tujuan', 'Tanggal'],
+        baris: dataLaporan.map((d) => [
+          d.jenis === 'masuk' ? 'Masuk' : 'Keluar',
+          d.nomor_surat || '-',
+          d.perihal,
+          d.pengirim_tujuan || '-',
+          d.tanggal,
+        ]),
+      }
+    }
+    if (jenis === 'agenda') {
+      return {
+        kolom: ['Judul Kegiatan', 'Tanggal Mulai', 'Lokasi', 'Penanggung Jawab'],
+        baris: dataLaporan.map((d) => [
+          d.judul,
+          new Date(d.tanggal_mulai).toLocaleDateString('id-ID'),
+          d.lokasi || '-',
+          d.penanggung_jawab || '-',
+        ]),
+      }
+    }
+    return { kolom: [], baris: [] }
+  }
+
+  // parse input manual "16,21" -> Set([16, 21])
+  const hariLiburManual = new Set(
+    tanggalLibur.split(',').map((s) => parseInt(s.trim(), 10)).filter((n) => !isNaN(n))
+  )
+  const isHariLibur = (tgl) =>
+    apakahHariMinggu(tahun, bulan, tgl) || hariLiburDB.has(tgl) || hariLiburManual.has(tgl)
+
+  async function handleExportPDF() {
+    if (jenis === 'presensi_guru' && tampilanGuru === 'daftar_hadir' && daftarHadirGuru) {
+      const akhirBulan = jumlahHariDalamBulan(tahun, bulan)
+      setMengeksporPDF(true)
+      try {
+        await eksporPDFDaftarHadir({
+          profilSekolah: profilSekolah || {},
+          logoUrl,
+          bulanLabel: NAMA_BULAN[bulan - 1],
+          tahun,
+          baris: daftarHadirGuru.baris,
+          totalHari: daftarHadirGuru.totalHari,
+          isHariLibur,
+          tanggalCetak: `${akhirBulan} ${NAMA_BULAN[bulan - 1]} ${tahun}`,
+          namaFile: `daftar-hadir-guru-${tahun}-${bulan}`,
+        })
+      } finally {
+        setMengeksporPDF(false)
+      }
+      return
+    }
+    const { kolom, baris } = siapkanTabel()
+    if (baris.length === 0) return
+    eksporPDF(judulLaporan, kolom, baris, `laporan-${jenis}-${tahun}-${bulan}`)
+  }
+
+  function handleExportExcel() {
+    if (jenis === 'presensi_guru' && tampilanGuru === 'daftar_hadir' && daftarHadirGuru) {
+      const totalHari = daftarHadirGuru.totalHari
+      const rows = daftarHadirGuru.baris.map((b) => {
+        const row = { No: b.no, 'Nama Guru': b.nama, NIP: b.nip, Jabatan: b.jabatan }
+        for (let t = 1; t <= totalHari; t++) row[t] = isHariLibur(t) ? '' : kodeSel(b.statusHarian[t - 1])
+        row['S'] = b.sakit
+        row['I'] = b.izin
+        row['TK'] = b.tanpaKeterangan
+        row['JML'] = b.jumlahTidakHadir
+        return row
+      })
+      eksporExcel(rows, `daftar-hadir-guru-${tahun}-${bulan}`, 'Daftar Hadir')
+      return
+    }
+    const { kolom, baris } = siapkanTabel()
+    if (baris.length === 0) return
+    const rows = baris.map((b) => Object.fromEntries(kolom.map((k, i) => [k, b[i]])))
+    eksporExcel(rows, `laporan-${jenis}-${tahun}-${bulan}`, 'Laporan')
+  }
+
+  function handleCetak() {
+    window.print()
+  }
+
+  const { kolom, baris } = siapkanTabel()
+  const modeGridAktif = jenis === 'presensi_guru' && tampilanGuru === 'daftar_hadir'
+  const totalHari = daftarHadirGuru?.totalHari || 0
+
+  return (
+    <Layout title="Laporan Bulanan" subtitle="Rekap data siap cetak untuk laporan akhir bulan">
+      <style>{`
+        @media print {
+          body * { visibility: hidden; }
+          #area-cetak, #area-cetak * { visibility: visible; }
+          #area-cetak { position: absolute; top: 0; left: 0; width: 100%; }
+          .sembunyikan-saat-cetak { display: none !important; }
+          @page { size: landscape; margin: 10mm; }
+        }
+        .tabel-hadir { border-collapse: collapse; width: 100%; font-size: 10px; }
+        .tabel-hadir th, .tabel-hadir td { border: 1px solid #333; text-align: center; padding: 2px; }
+        .tabel-hadir td.nama { text-align: left; white-space: nowrap; }
+        .kolom-libur { background: #e11d2e; color: #fff; font-weight: 600; }
+        .kop-sekolah { display: flex; align-items: center; justify-content: center; gap: 12px; }
+        .kop-sekolah img { width: 56px; height: 56px; object-fit: contain; flex-shrink: 0; }
+      `}</style>
+
+      <div className="card p-5 mb-5 sembunyikan-saat-cetak">
+        <div className="grid sm:grid-cols-4 gap-3">
+          <div className="sm:col-span-2">
+            <label className="label-field">Jenis Laporan</label>
+            <select className="input-field" value={jenis} onChange={(e) => setJenis(e.target.value)}>
+              {JENIS_LAPORAN.map((j) => (
+                <option key={j.value} value={j.value}>{j.label}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="label-field">Bulan</label>
+            <select className="input-field" value={bulan} onChange={(e) => setBulan(Number(e.target.value))}>
+              {NAMA_BULAN.map((nama, i) => (
+                <option key={nama} value={i + 1}>{nama}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="label-field">Tahun</label>
+            <input
+              type="number"
+              className="input-field"
+              value={tahun}
+              onChange={(e) => setTahun(Number(e.target.value))}
+            />
+          </div>
+        </div>
+
+        {jenis === 'presensi_guru' && (
+          <div className="mt-4 flex flex-wrap items-end gap-3">
+            <div>
+              <label className="label-field">Tampilan</label>
+              <select className="input-field" value={tampilanGuru} onChange={(e) => setTampilanGuru(e.target.value)}>
+                <option value="ringkasan">Ringkasan (Hadir/Izin/Sakit/Alpa)</option>
+                <option value="daftar_hadir">Daftar Hadir (format kertas absensi)</option>
+              </select>
+            </div>
+            {tampilanGuru === 'daftar_hadir' && (
+              <div>
+                <label className="label-field">Libur mendadak tambahan (pisah koma) — untuk yang tetap belum sempat didaftarkan di menu Hari Libur</label>
+                <input
+                  type="text"
+                  className="input-field"
+                  placeholder="contoh: 16,21"
+                  value={tanggalLibur}
+                  onChange={(e) => setTanggalLibur(e.target.value)}
+                />
+              </div>
+            )}
+          </div>
+        )}
+
+        <div className="mt-4 flex flex-wrap gap-3">
+          <button className="btn-primary" onClick={muatLaporan} disabled={loading}>
+            {loading && <Loader2 size={16} className="animate-spin" />}
+            Tampilkan Laporan
+          </button>
+          <button className="btn-secondary" onClick={handleCetak} disabled={!modeGridAktif && baris.length === 0}>
+            <Printer size={16} /> Cetak
+          </button>
+          <button className="btn-secondary" onClick={handleExportPDF} disabled={mengeksporPDF || (!modeGridAktif && baris.length === 0)}>
+            {mengeksporPDF ? <Loader2 size={16} className="animate-spin" /> : <FileDown size={16} />}
+            {mengeksporPDF ? 'Menyiapkan PDF...' : 'Unduh PDF'}
+          </button>
+          <button className="btn-secondary" onClick={handleExportExcel} disabled={!modeGridAktif && baris.length === 0}>
+            <FileSpreadsheet size={16} /> Unduh Excel
+          </button>
+        </div>
+      </div>
+
+      <div id="area-cetak" className="card p-6">
+        {!modeGridAktif && (
+          <div className="mb-4">
+            <h2 className="font-display text-lg font-semibold text-ink-950">{judulLaporan}</h2>
+            <p className="text-sm text-ink-700/50">
+              Dicetak pada {new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}
+            </p>
+          </div>
+        )}
+
+        {loading && <p className="text-center py-8 text-ink-700/50 text-sm">Memuat data...</p>}
+
+        {!loading && !modeGridAktif && baris.length === 0 && (
+          <p className="text-center py-8 text-ink-700/50 text-sm">Tidak ada data untuk periode ini.</p>
+        )}
+        {!loading && !modeGridAktif && baris.length > 0 && (
+          <table className="table-shell">
+            <thead>
+              <tr>{kolom.map((k) => <th key={k}>{k}</th>)}</tr>
+            </thead>
+            <tbody>
+              {baris.map((b, i) => (
+                <tr key={i}>{b.map((cell, j) => <td key={j}>{cell}</td>)}</tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+
+        {/* ---------- Tampilan Daftar Hadir (grid kalender, format kertas absensi) ---------- */}
+        {!loading && modeGridAktif && daftarHadirGuru && (
+          <div>
+            <div className="kop-sekolah mb-3">
+              {logoUrl && <img src={logoUrl} alt="Logo sekolah" />}
+              <div className="text-center">
+                <p className="font-semibold uppercase">{profilSekolah?.dinas_pendidikan}</p>
+                <p className="uppercase">{profilSekolah?.kabupaten}</p>
+                <p className="font-semibold uppercase">{profilSekolah?.nama_sekolah}</p>
+                <p className="uppercase">{profilSekolah?.kecamatan}</p>
+                <p className="text-xs">{profilSekolah?.alamat}</p>
+              </div>
+            </div>
+            <p className="text-sm font-medium mb-1">BULAN: {NAMA_BULAN[bulan - 1].toUpperCase()} {tahun}</p>
+
+            <table className="tabel-hadir">
+              <thead>
+                <tr>
+                  <th rowSpan={2}>NO</th>
+                  <th rowSpan={2}>NAMA/NIP</th>
+                  <th rowSpan={2}>JABATAN</th>
+                  <th colSpan={totalHari}>TANGGAL</th>
+                  <th colSpan={4}>TIDAK HADIR</th>
+                </tr>
+                <tr>
+                  {Array.from({ length: totalHari }, (_, i) => i + 1).map((tgl) => (
+                    <th key={tgl} className={isHariLibur(tgl) ? 'kolom-libur' : ''}>{tgl}</th>
+                  ))}
+                  <th>S</th>
+                  <th>I</th>
+                  <th>TK</th>
+                  <th>JML</th>
+                </tr>
+              </thead>
+              <tbody>
+                {daftarHadirGuru.baris.map((b) => (
+                  <tr key={b.id}>
+                    <td>{b.no}</td>
+                    <td className="nama">{b.nama}<br /><span style={{ fontWeight: 400 }}>NIP. {b.nip}</span></td>
+                    <td>{b.jabatan}</td>
+                    {b.statusHarian.map((status, i) => {
+                      const tgl = i + 1
+                      return (
+                        <td key={tgl} className={isHariLibur(tgl) ? 'kolom-libur' : ''}>
+                          {isHariLibur(tgl) ? '' : kodeSel(status)}
+                        </td>
+                      )
+                    })}
+                    <td>{b.sakit || ''}</td>
+                    <td>{b.izin || ''}</td>
+                    <td>{b.tanpaKeterangan || ''}</td>
+                    <td>{b.jumlahTidakHadir || ''}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+
+            <div className="mt-8 text-sm" style={{ textAlign: 'right' }}>
+              <p>{profilSekolah?.tempat_ttd || '(isi Nama Tempat di Profil Sekolah)'}, {jumlahHariDalamBulan(tahun, bulan)} {NAMA_BULAN[bulan - 1].toUpperCase()} {tahun}</p>
+              <p>KEPALA SEKOLAH</p>
+              <div style={{ height: 48 }} />
+              <p style={{ fontWeight: 600 }}>{profilSekolah?.kepala_sekolah || '________________'}</p>
+              <p>NIP. {profilSekolah?.nip_kepala_sekolah || '-'}</p>
+            </div>
+          </div>
+        )}
+      </div>
+    </Layout>
+  )
 }
