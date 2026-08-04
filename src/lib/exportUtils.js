@@ -153,7 +153,8 @@ export function eksporPDFDaftarHadir({
   const finalY = doc.lastAutoTable.finalY + 15
   const xKanan = pageWidth - 80
   doc.setFontSize(9)
-  doc.text(`Masidang, ${tanggalCetak}`, xKanan, finalY)
+  // DIPERBAIKI: nama tempat sekarang diambil dari profilSekolah.tempat_ttd, bukan hardcode "Masidang"
+  doc.text(`${profilSekolah.tempat_ttd || '(isi Nama Tempat di Profil Sekolah)'}, ${tanggalCetak}`, xKanan, finalY)
   doc.text('KEPALA SEKOLAH', xKanan, finalY + 5)
   doc.setFont(undefined, 'bold')
   doc.text(profilSekolah.kepala_sekolah || '________________', xKanan, finalY + 25)
