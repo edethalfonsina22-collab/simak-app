@@ -60,7 +60,7 @@ const SuratKeteranganPrintTemplate = React.forwardRef(function SuratKeteranganPr
 
       <div style={{ textAlign: "right", marginTop: 48 }}>
         <p style={{ margin: 0 }}>
-          {sekolah?.kota || "Warialau"}, {tanggal}
+          {sekolah?.kota || "Warial"}, {tanggal}
         </p>
         <p style={{ margin: 0 }}>Kepala Sekolah</p>
         <div style={{ height: 70 }} />
