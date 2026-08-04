@@ -45,7 +45,7 @@ export default function SuratKeteranganForm({ onSaved }) {
     async function loadSiswa() {
       const { data, error } = await supabase
         .from("siswa")
-        .select("id, nama, nisn, tempat_lahir, tanggal_lahir, kelas:kelas_id(nama)")
+        .select("id, nama, nisn, tempat_lahir, tanggal_lahir, kelas:kelas_id(nama_kelas)")
         .order("nama", { ascending: true });
 
       if (error) {
@@ -102,7 +102,7 @@ export default function SuratKeteranganForm({ onSaved }) {
             ? new Date(siswa.tanggal_lahir).toLocaleDateString("id-ID")
             : "-"
         }`,
-        kelas: siswa.kelas?.nama || "-",
+        kelas: siswa.kelas?.nama_kelas || "-",
         alasan: alasan || "-",
         tujuan: tujuan || "-",
         tanggal: tanggalPindah
@@ -188,7 +188,7 @@ export default function SuratKeteranganForm({ onSaved }) {
             <option value="">Pilih Siswa</option>
             {siswaList.map((s) => (
               <option key={s.id} value={s.id}>
-                {s.nama} — {s.kelas?.nama || "-"}
+                {s.nama} — Kelas {s.kelas?.nama_kelas || "-"}
               </option>
             ))}
           </select>
