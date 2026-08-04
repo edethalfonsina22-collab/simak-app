@@ -1,5 +1,4 @@
 import React from "react";
-
 // forwardRef supaya elemen ini bisa di-capture oleh html2canvas di exportSuratToPDF
 const SuratKeteranganPrintTemplate = React.forwardRef(function SuratKeteranganPrintTemplate(
   { surat, sekolah },
@@ -12,7 +11,6 @@ const SuratKeteranganPrintTemplate = React.forwardRef(function SuratKeteranganPr
         year: "numeric",
       })
     : "";
-
   return (
     <div
       ref={ref}
@@ -46,18 +44,15 @@ const SuratKeteranganPrintTemplate = React.forwardRef(function SuratKeteranganPr
           {sekolah?.alamat}
         </p>
       </div>
-
       <div style={{ textAlign: "center", marginBottom: 24 }}>
         <p style={{ fontWeight: "bold", textDecoration: "underline", margin: 0 }}>
           {surat?.judul || "SURAT KETERANGAN"}
         </p>
         <p style={{ margin: 0 }}>Nomor: {surat?.nomor_surat}</p>
       </div>
-
       <div style={{ textAlign: "justify", whiteSpace: "pre-line" }}>
         {surat?.isi}
       </div>
-
       <div style={{ textAlign: "right", marginTop: 48 }}>
         <p style={{ margin: 0 }}>
           {sekolah?.kota || "Warial"}, {tanggal}
@@ -67,10 +62,9 @@ const SuratKeteranganPrintTemplate = React.forwardRef(function SuratKeteranganPr
         <p style={{ fontWeight: "bold", textDecoration: "underline", margin: 0 }}>
           {sekolah?.nama_kepala_sekolah}
         </p>
-        <p style={{ margin: 0 }}>NIP. {sekolah?.nip_kepla_sekolah || "-"}</p>
+        <p style={{ margin: 0 }}>NIP. {sekolah?.nip_kepala_sekolah || "-"}</p>
       </div>
     </div>
   );
 });
-
 export default SuratKeteranganPrintTemplate;
