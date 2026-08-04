@@ -37,6 +37,7 @@ export default function LaporanBulanan() {
   const [hariLiburDB, setHariLiburDB] = useState(new Set()) // dari tabel hari_libur, untuk bulan aktif
   const [profilSekolah, setProfilSekolah] = useState(null)
   const [logoUrl, setLogoUrl] = useState('')
+  const [ttdUrl, setTtdUrl] = useState('') // <-- TAMBAHAN: tanda tangan elektronik kepala sekolah
   const [mengeksporPDF, setMengeksporPDF] = useState(false)
 
   useEffect(() => {
@@ -47,6 +48,13 @@ export default function LaporanBulanan() {
         setLogoUrl(pub.publicUrl)
       } else {
         setLogoUrl('')
+      }
+      // TAMBAHAN: ambil URL tanda tangan elektronik kepala sekolah dari profil sekolah
+      if (data?.ttd_kepala_sekolah_path) {
+        const { data: pubTtd } = supabase.storage.from('profil-sekolah').getPublicUrl(data.ttd_kepala_sekolah_path)
+        setTtdUrl(pubTtd.publicUrl)
+      } else {
+        setTtdUrl('')
       }
     })
   }, [])
@@ -198,6 +206,7 @@ export default function LaporanBulanan() {
         await eksporPDFDaftarHadir({
           profilSekolah: profilSekolah || {},
           logoUrl,
+          ttdUrl, // <-- TAMBAHAN: teruskan URL tanda tangan ke fungsi pembuat PDF
           bulanLabel: NAMA_BULAN[bulan - 1],
           tahun,
           baris: daftarHadirGuru.baris,
@@ -270,9 +279,19 @@ export default function LaporanBulanan() {
         .tabel-hadir { border-collapse: collapse; width: 100%; font-size: 10px; }
         .tabel-hadir th, .tabel-hadir td { border: 1px solid #333; text-align: center; padding: 2px; }
         .tabel-hadir td.nama { text-align: left; white-space: nowrap; }
-        .kolom-libur { background: #e11d2e; color: #fff; font-weight: 600; }
+        /* FIX: browser tidak mencetak background-color secara default.
+           print-color-adjust: exact memaksa browser tetap mencetak warna latar ini. */
+        .kolom-libur {
+          background: #e11d2e;
+          color: #fff;
+          font-weight: 600;
+          print-color-adjust: exact;
+          -webkit-print-color-adjust: exact;
+          color-adjust: exact;
+        }
         .kop-sekolah { display: flex; align-items: center; justify-content: center; gap: 12px; }
         .kop-sekolah img { width: 56px; height: 56px; object-fit: contain; flex-shrink: 0; }
+        .ttd-elektronik { height: 64px; object-fit: contain; }
       `}</style>
 
       <div className="card p-5 mb-5 sembunyikan-saat-cetak">
@@ -434,7 +453,11 @@ export default function LaporanBulanan() {
             <div className="mt-8 text-sm" style={{ textAlign: 'right' }}>
               <p>{profilSekolah?.tempat_ttd || '(isi Nama Tempat di Profil Sekolah)'}, {jumlahHariDalamBulan(tahun, bulan)} {NAMA_BULAN[bulan - 1].toUpperCase()} {tahun}</p>
               <p>KEPALA SEKOLAH</p>
-              <div style={{ height: 48 }} />
+              {/* TAMBAHAN: tanda tangan elektronik, diambil otomatis dari Profil Sekolah.
+                  Kalau belum diupload di Profil Sekolah, tetap tampil ruang kosong seperti semula. */}
+              <div style={{ height: 64, display: 'flex', justifyContent: 'flex-end', alignItems: 'center' }}>
+                {ttdUrl && <img src={ttdUrl} alt="Tanda tangan kepala sekolah" className="ttd-elektronik" />}
+              </div>
               <p style={{ fontWeight: 600 }}>{profilSekolah?.kepala_sekolah || '________________'}</p>
               <p>NIP. {profilSekolah?.nip_kepala_sekolah || '-'}</p>
             </div>
