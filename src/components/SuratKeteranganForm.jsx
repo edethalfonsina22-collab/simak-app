@@ -37,20 +37,53 @@ export default function SuratKeteranganForm({ onSaved }) {
   const [sekolah, setSekolah] = useState(null);
   const [suratTersimpan, setSuratTersimpan] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [loadError, setLoadError] = useState("");
   const printRef = useRef(null);
 
   // Ambil data siswa (untuk jenis "pindah") dan profil sekolah (kop + penandatangan)
   useEffect(() => {
-    supabase
-      .from("siswa")
-      .select("id, nama, nisn, tempat_lahir, tanggal_lahir, kelas:kelas_id(nama)")
-      .then(({ data }) => setSiswaList(data || []));
+    async function loadSiswa() {
+      const { data, error } = await supabase
+        .from("siswa")
+        .select("id, nama, nisn, tempat_lahir, tanggal_lahir, kelas:kelas_id(nama)")
+        .order("nama", { ascending: true });
 
-    supabase
-      .from("profil_sekolah")
-      .select("*")
-      .single()
-      .then(({ data }) => setSekolah(data || null));
+      if (error) {
+        // Penyebab paling umum: RLS policy memblokir SELECT, atau relasi
+        // kelas_id -> kelas belum di-set dengan benar di Supabase.
+        console.error("Gagal memuat data siswa:", error);
+        setLoadError(
+          "Gagal memuat daftar siswa: " + error.message + " (cek Console browser untuk detail)"
+        );
+        setSiswaList([]);
+        return;
+      }
+
+      setSiswaList(data || []);
+      if (!data || data.length === 0) {
+        setLoadError(
+          "Daftar siswa kosong. Pastikan tabel 'siswa' sudah berisi data dan RLS mengizinkan akses baca."
+        );
+      } else {
+        setLoadError("");
+      }
+    }
+
+    async function loadSekolah() {
+      const { data, error } = await supabase
+        .from("profil_sekolah")
+        .select("*")
+        .maybeSingle(); // aman walau baris 0 atau lebih dari 1
+
+      if (error) {
+        console.error("Gagal memuat profil sekolah:", error);
+        return;
+      }
+      setSekolah(data || null);
+    }
+
+    loadSiswa();
+    loadSekolah();
   }, []);
 
   // Auto-generate isi surat saat jenis "pindah" dan field terkait berubah
@@ -159,6 +192,9 @@ export default function SuratKeteranganForm({ onSaved }) {
               </option>
             ))}
           </select>
+          {loadError && (
+            <p className="col-span-2 text-sm text-red-600">{loadError}</p>
+          )}
           <input
             className="border rounded px-3 py-2"
             placeholder="Alasan pindah"
