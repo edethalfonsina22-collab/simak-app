@@ -11,6 +11,7 @@ const SuratKeteranganPrintTemplate = React.forwardRef(function SuratKeteranganPr
         year: "numeric",
       })
     : "";
+
   return (
     <div
       ref={ref}
@@ -28,43 +29,71 @@ const SuratKeteranganPrintTemplate = React.forwardRef(function SuratKeteranganPr
     >
       <div
         style={{
-          textAlign: "center",
+          display: "flex",
+          alignItems: "center",
+          gap: 12,
           borderBottom: "2px solid #000",
           paddingBottom: 8,
           marginBottom: 24,
         }}
       >
-        <p style={{ fontWeight: "bold", margin: 0 }}>
-          {sekolah?.nama_dinas || "PEMERINTAH DAERAH"}
-        </p>
-        <p style={{ fontWeight: "bold", margin: 0, fontSize: "14pt" }}>
-          {sekolah?.nama_sekolah || "NAMA SEKOLAH"}
-        </p>
-        <p style={{ fontStyle: "italic", fontSize: "10pt", margin: 0 }}>
-          {sekolah?.alamat}
-        </p>
+        {sekolah?.logo_url && (
+          <img
+            src={sekolah.logo_url}
+            alt="Logo"
+            style={{ width: 64, height: 64, objectFit: "contain" }}
+          />
+        )}
+        <div style={{ flex: 1, textAlign: "center" }}>
+          {sekolah?.dinas_pendidikan && (
+            <p style={{ fontWeight: "bold", margin: 0 }}>{sekolah.dinas_pendidikan}</p>
+          )}
+          {sekolah?.kabupaten && (
+            <p style={{ fontWeight: "bold", margin: 0 }}>{sekolah.kabupaten}</p>
+          )}
+          <p style={{ fontWeight: "bold", margin: 0, fontSize: "14pt" }}>
+            {sekolah?.nama_sekolah || "NAMA SEKOLAH"}
+          </p>
+          <p style={{ fontStyle: "italic", fontSize: "10pt", margin: 0 }}>
+            {sekolah?.alamat}
+          </p>
+        </div>
       </div>
+
       <div style={{ textAlign: "center", marginBottom: 24 }}>
         <p style={{ fontWeight: "bold", textDecoration: "underline", margin: 0 }}>
           {surat?.judul || "SURAT KETERANGAN"}
         </p>
         <p style={{ margin: 0 }}>Nomor: {surat?.nomor_surat}</p>
       </div>
+
       <div style={{ textAlign: "justify", whiteSpace: "pre-line" }}>
         {surat?.isi}
       </div>
+
       <div style={{ textAlign: "right", marginTop: 48 }}>
         <p style={{ margin: 0 }}>
-          {sekolah?.kota || "Warial"}, {tanggal}
+          {sekolah?.tempat_ttd || sekolah?.kecamatan || "Warial"}, {tanggal}
         </p>
         <p style={{ margin: 0 }}>Kepala Sekolah</p>
-        <div style={{ height: 70 }} />
+
+        {sekolah?.ttd_url ? (
+          <img
+            src={sekolah.ttd_url}
+            alt="Tanda tangan"
+            style={{ height: 70, objectFit: "contain", margin: "0 auto" }}
+          />
+        ) : (
+          <div style={{ height: 70 }} />
+        )}
+
         <p style={{ fontWeight: "bold", textDecoration: "underline", margin: 0 }}>
-          {sekolah?.nama_kepala_sekolah}
+          {sekolah?.kepala_sekolah}
         </p>
         <p style={{ margin: 0 }}>NIP. {sekolah?.nip_kepala_sekolah || "-"}</p>
       </div>
     </div>
   );
 });
+
 export default SuratKeteranganPrintTemplate;
