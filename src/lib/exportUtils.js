@@ -61,6 +61,109 @@ export function eksporPDF(judul, kolom, baris, namaFile, subjudul = '') {
 }
 
 /**
+ * Ekspor Daftar Hadir bulanan (format kertas absensi: NO/NAMA/JABATAN + kolom
+ * tanggal 1..31 + rekap S/I/TK/JML) sebagai PDF landscape, kolom Minggu/libur
+ * diwarnai merah, ditutup blok tanda tangan Kepala Sekolah.
+ *
+ * @param {Object} opsi
+ * @param {Object} opsi.profilSekolah - baris dari tabel profil_sekolah (id=1)
+ * @param {string} opsi.bulanLabel - contoh 'Juni'
+ * @param {number} opsi.tahun
+ * @param {Array} opsi.baris - hasil dari susunDaftarHadir(...).baris
+ * @param {number} opsi.totalHari
+ * @param {(tanggal:number)=>boolean} opsi.isHariLibur
+ * @param {string} opsi.tanggalCetak - contoh '30 Juni 2026'
+ * @param {string} opsi.namaFile - tanpa ekstensi
+ */
+export function eksporPDFDaftarHadir({
+  profilSekolah = {},
+  bulanLabel,
+  tahun,
+  baris,
+  totalHari,
+  isHariLibur,
+  tanggalCetak,
+  namaFile,
+}) {
+  // import kode singkat sel di sini agar file ini tidak perlu bergantung ke daftarHadirUtils
+  const kodeSel = (status) => {
+    if (status === 'sakit') return 'S'
+    if (status === 'izin') return 'I'
+    if (status === 'alpa') return 'A'
+    return ''
+  }
+
+  const doc = new jsPDF({ orientation: 'landscape', format: 'a4' })
+  const pageWidth = doc.internal.pageSize.getWidth()
+
+  const teksTengah = (text, y, size = 10, bold = true) => {
+    if (!text) return
+    doc.setFontSize(size)
+    doc.setFont(undefined, bold ? 'bold' : 'normal')
+    doc.text(text, pageWidth / 2, y, { align: 'center' })
+  }
+
+  teksTengah(profilSekolah.dinas_pendidikan, 10, 11, true)
+  teksTengah(profilSekolah.kabupaten, 15, 10, false)
+  teksTengah(profilSekolah.nama_sekolah, 21, 12, true)
+  teksTengah(profilSekolah.kecamatan, 26, 10, false)
+  teksTengah(profilSekolah.alamat, 31, 8, false)
+
+  doc.setFont(undefined, 'bold')
+  doc.setFontSize(9)
+  doc.text(`BULAN: ${(bulanLabel || '').toUpperCase()} ${tahun}`, 14, 40)
+  doc.setFont(undefined, 'normal')
+
+  const kolomTanggal = Array.from({ length: totalHari }, (_, i) => String(i + 1))
+  const head = [['NO', 'NAMA/NIP', 'JABATAN', ...kolomTanggal, 'S', 'I', 'TK', 'JML']]
+  const body = baris.map((b) => [
+    b.no,
+    `${b.nama}\nNIP. ${b.nip}`,
+    b.jabatan,
+    ...b.statusHarian.map((s, i) => (isHariLibur(i + 1) ? '' : kodeSel(s))),
+    b.sakit || '',
+    b.izin || '',
+    b.tanpaKeterangan || '',
+    b.jumlahTidakHadir || '',
+  ])
+
+  autoTable(doc, {
+    head,
+    body,
+    startY: 44,
+    styles: { fontSize: 6, halign: 'center', cellPadding: 1, valign: 'middle' },
+    headStyles: { fillColor: [17, 26, 46], fontSize: 6 },
+    columnStyles: {
+      0: { cellWidth: 7 },
+      1: { cellWidth: 34, halign: 'left' },
+      2: { cellWidth: 10 },
+    },
+    didParseCell: (data) => {
+      const colIdx = data.column.index
+      if (colIdx >= 3 && colIdx < 3 + totalHari) {
+        const tgl = colIdx - 3 + 1
+        if (isHariLibur(tgl)) {
+          data.cell.styles.fillColor = [225, 29, 46]
+          data.cell.styles.textColor = [255, 255, 255]
+        }
+      }
+    },
+  })
+
+  const finalY = doc.lastAutoTable.finalY + 15
+  const xKanan = pageWidth - 80
+  doc.setFontSize(9)
+  doc.text(`Masidang, ${tanggalCetak}`, xKanan, finalY)
+  doc.text('KEPALA SEKOLAH', xKanan, finalY + 5)
+  doc.setFont(undefined, 'bold')
+  doc.text(profilSekolah.kepala_sekolah || '________________', xKanan, finalY + 25)
+  doc.setFont(undefined, 'normal')
+  doc.text(`NIP. ${profilSekolah.nip_kepala_sekolah || '-'}`, xKanan, finalY + 30)
+
+  doc.save(`${namaFile}.pdf`)
+}
+
+/**
  * Unduh data mentah (array of object per tabel) sebagai satu file JSON.
  * Berguna sebagai backup teknis yang bisa dipulihkan kembali nanti.
  * @param {Object} objekData - { namaTabel: [...rows], ... }
