@@ -236,7 +236,7 @@ export default function Guru() {
               <X size={18} />
             </button>
 
-            <div className="relative bg-gradient-to-br from-blue-900 to-blue-950 pt-8 pb-14 flex flex-col items-center">
+            <div className="relative bg-gradient-to-br from-blue-900 to-blue-950 pt-8 pb-16 flex flex-col items-center">
               <div className="w-24 h-24 rounded-full overflow-hidden ring-4 ring-white/20 bg-white/10 flex items-center justify-center shrink-0">
                 {fotoUrl(profilLihat.foto_profil_path) ? (
                   <img src={fotoUrl(profilLihat.foto_profil_path)} alt="" className="w-full h-full object-cover" />
@@ -250,7 +250,7 @@ export default function Guru() {
               </span>
             </div>
 
-            <div className="px-6 -mt-8 pb-6">
+            <div className="px-6 -mt-12 pb-6">
               <div className="card p-4 space-y-3 bg-white shadow-md">
                 <ProfilRow label="NIP" value={profilLihat.nip} />
                 <ProfilRow label="NUPTK" value={profilLihat.nuptk} />
