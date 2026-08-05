@@ -31,6 +31,7 @@ import {
   FilePlus,
   FileClock,
   CalendarOff,
+  FileCheck2,
 } from 'lucide-react'
 import { useAuth } from '../lib/AuthContext'
 
@@ -72,21 +73,22 @@ const groupsAdmin = [
     ],
   },
   {
-    label: 'Administrasi',
-    links: [
-      { to: '/pengajuan-izin', label: 'Pengajuan Izin', icon: FileClock },
-      { to: '/agenda', label: 'Agenda Sekolah', icon: CalendarDays },
-      { to: '/surat', label: 'Surat Masuk/Keluar', icon: Mail },
-      { to: '/surat-keterangan', label: 'Surat Keterangan', icon: FileSignature },
-      { to: '/ppdb-admin', label: 'PPDB Siswa Baru', icon: UserPlus },
-      { to: '/laporan', label: 'Laporan Bulanan', icon: FileText },
-      { to: '/hari-libur', label: 'Hari Libur', icon: CalendarOff },
-      { to: '/backup', label: 'Backup Data', icon: DatabaseBackup },
-      { to: '/profil-sekolah', label: 'Profil Sekolah', icon: Landmark },
-      { to: '/kartu', label: 'Cetak Kartu', icon: IdCard },
-    ],
-  },
-]
+    {
+  label: 'Administrasi',
+  links: [
+    { to: '/pengajuan-izin', label: 'Pengajuan Izin', icon: FileClock },
+    { to: '/pengajuan-surat-aktif', label: 'Pengajuan Surat Aktif', icon: FileCheck2 },
+    { to: '/agenda', label: 'Agenda Sekolah', icon: CalendarDays },
+    { to: '/surat', label: 'Surat Masuk/Keluar', icon: Mail },
+    { to: '/surat-keterangan', label: 'Surat Keterangan', icon: FileSignature },
+    { to: '/ppdb-admin', label: 'PPDB Siswa Baru', icon: UserPlus },
+    { to: '/laporan', label: 'Laporan Bulanan', icon: FileText },
+    { to: '/hari-libur', label: 'Hari Libur', icon: CalendarOff },
+    { to: '/backup', label: 'Backup Data', icon: DatabaseBackup },
+    { to: '/profil-sekolah', label: 'Profil Sekolah', icon: Landmark },
+    { to: '/kartu', label: 'Cetak Kartu', icon: IdCard },
+  ],
+},
 
 // Menu GURU: tetap ringkas, tidak perlu dikelompokkan
 const linksGuru = [
@@ -101,6 +103,7 @@ const linksGuru = [
   { to: '/rpp', label: 'RPP', icon: NotebookPen },
   { to: '/arsip-rpp', label: 'Arsip RPP', icon: Archive },
   { to: '/pengajuan-izin', label: 'Pengajuan Izin', icon: FileClock },
+  { to: '/pengajuan-surat-aktif', label: 'Pengajuan Surat Aktif', icon: FileCheck2 },
   { to: '/buat-ujian', label: 'Buat Ujian', icon: FilePlus },
   { to: '/hasil-ujian', label: 'Hasil Ujian', icon: ClipboardList },
   { to: '/bank-soal', label: 'Bank Soal', icon: Database },
