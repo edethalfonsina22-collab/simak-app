@@ -4,8 +4,8 @@ import { useAuth } from '../lib/AuthContext'
 import Layout from '../components/Layout'
 import { FileUp, Loader2, FileText, Download, Trash2, HardDrive, Eye, X } from 'lucide-react'
 
-const CARD_BORDER = ['border-t-brass-400', 'border-t-sage-500', 'border-t-ink-950', 'border-t-red-400']
-const ICON_BG = ['bg-brass-400/15 text-brass-600', 'bg-sage-500/15 text-sage-500', 'bg-ink-950/10 text-ink-950', 'bg-red-100 text-red-500']
+const CARD_BORDER = ['border-t-blue-500', 'border-t-emerald-500', 'border-t-purple-500', 'border-t-orange-400']
+const ICON_BG = ['bg-blue-500/15 text-blue-600', 'bg-emerald-500/15 text-emerald-600', 'bg-purple-500/15 text-purple-600', 'bg-orange-100 text-orange-500']
 
 const IMAGE_EXT = ['jpg', 'jpeg', 'png', 'gif', 'webp']
 const OFFICE_EXT = ['doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx']
@@ -30,14 +30,14 @@ function PreviewModal({ url, fileName, onClose }) {
   return (
     <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
       <div className="bg-white rounded-xl w-full max-w-4xl h-[85vh] flex flex-col overflow-hidden">
-        <div className="flex items-center justify-between px-4 py-3 border-b border-ink-900/[0.08]">
-          <p className="text-sm font-medium text-ink-900 truncate pr-4">{fileName}</p>
-          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-ink-900/[0.05] shrink-0">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200">
+          <p className="text-sm font-medium text-slate-900 truncate pr-4">{fileName}</p>
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-slate-100 shrink-0">
             <X size={18} />
           </button>
         </div>
         {isImage ? (
-          <div className="flex-1 overflow-auto flex items-center justify-center bg-ink-950/[0.03] p-4">
+          <div className="flex-1 overflow-auto flex items-center justify-center bg-slate-50 p-4">
             <img src={url} alt={fileName} className="max-w-full max-h-full object-contain" />
           </div>
         ) : (
@@ -152,24 +152,24 @@ export default function Dokumen() {
   return (
     <Layout title="Dokumen Penting" subtitle="Berkas dan dokumen bersama untuk seluruh warga sekolah">
       {/* Banner sambutan */}
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-ink-950 to-[#22315B] p-6 mb-6">
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-indigo-600 to-purple-600 p-6 mb-6">
         <div className="relative z-10 flex items-center gap-4">
           <div className="w-11 h-11 rounded-full bg-white/15 flex items-center justify-center shrink-0">
-            <HardDrive size={20} className="text-paper" />
+            <HardDrive size={20} className="text-white" />
           </div>
           <div>
-            <p className="font-display font-semibold text-lg text-paper">Dokumen Penting</p>
-            <p className="text-sm text-paper/70 mt-0.5">Semua berkas resmi sekolah tersimpan rapi di sini.</p>
+            <p className="font-display font-semibold text-lg text-white">Dokumen Penting</p>
+            <p className="text-sm text-white/70 mt-0.5">Semua berkas resmi sekolah tersimpan rapi di sini.</p>
           </div>
         </div>
-        <HardDrive size={120} className="absolute -right-4 -bottom-6 text-white/5 rotate-12" />
+        <HardDrive size={120} className="absolute -right-4 -bottom-6 text-white/10 rotate-12" />
       </div>
 
       <div className="flex items-center justify-between mb-6">
-        <p className="text-sm text-ink-700/50">{items.length} dokumen</p>
+        <p className="text-sm text-slate-500">{items.length} dokumen</p>
         <button
           onClick={() => setShowForm(!showForm)}
-          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-brass-400 text-ink-950 text-sm font-medium"
+          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 transition-colors shadow"
         >
           <FileUp size={16} />
           Upload Dokumen
@@ -179,21 +179,21 @@ export default function Dokumen() {
       {showForm && (
         <form onSubmit={handleUpload} className="card p-6 mb-6 space-y-3">
           <input
-            className="input w-full"
+            className="input w-full border-slate-200"
             placeholder="Judul dokumen (mis. SK Kepala Sekolah 2026)"
             value={form.judul}
             onChange={(e) => setForm({ ...form, judul: e.target.value })}
             required
           />
           <textarea
-            className="input w-full"
+            className="input w-full border-slate-200"
             rows={2}
             placeholder="Deskripsi singkat (opsional)"
             value={form.deskripsi}
             onChange={(e) => setForm({ ...form, deskripsi: e.target.value })}
           />
           <input
-            className="input w-full"
+            className="input w-full border-slate-200"
             type="file"
             onChange={(e) => setForm({ ...form, file: e.target.files?.[0] || null })}
             required
@@ -201,7 +201,7 @@ export default function Dokumen() {
           <button
             type="submit"
             disabled={uploading}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-brass-400 text-ink-950 text-sm font-medium disabled:opacity-50"
+            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors"
           >
             {uploading ? <Loader2 size={16} className="animate-spin" /> : <FileUp size={16} />}
             {uploading ? 'Mengunggah...' : 'Upload'}
@@ -210,10 +210,10 @@ export default function Dokumen() {
       )}
 
       {loading ? (
-        <p className="text-sm text-ink-700/50">Memuat...</p>
+        <p className="text-sm text-slate-500">Memuat...</p>
       ) : items.length === 0 ? (
         <div className="card p-6">
-          <p className="text-sm text-ink-700/50">Belum ada dokumen diupload.</p>
+          <p className="text-sm text-slate-500">Belum ada dokumen diupload.</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -225,27 +225,27 @@ export default function Dokumen() {
               <div className={`w-10 h-10 rounded-full flex items-center justify-center mb-3 ${ICON_BG[i % ICON_BG.length]}`}>
                 <FileText size={18} />
               </div>
-              <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-ink-900/[0.06] text-ink-700/60 w-fit mb-1.5">
+              <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 w-fit mb-1.5">
                 {extBadge(item.file_nama)}
               </span>
-              <p className="text-sm font-medium text-ink-950 leading-snug">{item.judul}</p>
-              {item.deskripsi && <p className="text-xs text-ink-700/50 mt-1 line-clamp-2">{item.deskripsi}</p>}
-              <p className="text-xs text-ink-700/40 mt-2">
+              <p className="text-sm font-medium text-slate-900 leading-snug">{item.judul}</p>
+              {item.deskripsi && <p className="text-xs text-slate-500 mt-1 line-clamp-2">{item.deskripsi}</p>}
+              <p className="text-xs text-slate-400 mt-2">
                 {item.guru?.nama_lengkap || 'Admin'} · {new Date(item.dibuat_pada).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}
               </p>
 
-              <div className="flex items-center gap-2 mt-4 pt-3 border-t border-ink-900/[0.06] flex-wrap">
+              <div className="flex items-center gap-2 mt-4 pt-3 border-t border-slate-100 flex-wrap">
                 {isPreviewable(item.file_nama) && (
                   <button
                     onClick={() => handlePreview(item)}
-                    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-ink-700 hover:bg-ink-900/[0.05]"
+                    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-slate-600 hover:bg-slate-100"
                   >
                     <Eye size={14} /> Lihat
                   </button>
                 )}
                 <button
                   onClick={() => handleDownload(item)}
-                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-ink-700 hover:bg-ink-900/[0.05]"
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-slate-600 hover:bg-slate-100"
                 >
                   <Download size={14} /> Unduh
                 </button>
@@ -259,7 +259,7 @@ export default function Dokumen() {
                 )}
               </div>
 
-              <FileText size={72} className="absolute -right-3 -bottom-4 text-ink-950/[0.03]" />
+              <FileText size={72} className="absolute -right-3 -bottom-4 text-slate-900/[0.04]" />
             </div>
           ))}
         </div>
