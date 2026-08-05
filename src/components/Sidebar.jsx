@@ -33,6 +33,7 @@ import {
   FileCheck2,
 } from 'lucide-react'
 import { useAuth } from '../lib/AuthContext'
+import { supabase } from '../lib/supabaseClient'
 
 // Menu ADMIN dikelompokkan per kategori supaya tidak jadi satu daftar panjang
 const groupsAdmin = [
@@ -129,20 +130,53 @@ function NavItem({ to, label, icon: Icon, end }) {
   )
 }
 
+// Ambil URL foto guru dari kolom foto_profil_path (isinya path storage,
+// bukan URL lengkap) di bucket "foto-profil".
+function getFotoUrl(fotoProfilPath) {
+  if (!fotoProfilPath) return null
+  if (fotoProfilPath.startsWith('http')) return fotoProfilPath
+  const { data } = supabase.storage.from('foto-profil').getPublicUrl(fotoProfilPath)
+  return data?.publicUrl || null
+}
+
+function getInisial(nama) {
+  if (!nama) return '?'
+  const kata = nama.trim().split(/\s+/)
+  const inisial = kata.length > 1 ? kata[0][0] + kata[1][0] : kata[0].slice(0, 2)
+  return inisial.toUpperCase()
+}
+
 export default function Sidebar() {
-  const { signOut, session, isAdmin } = useAuth()
+  const { signOut, session, profil, isAdmin } = useAuth()
+  const fotoUrl = getFotoUrl(profil?.foto_profil_path)
+  const namaTampil = profil?.nama_lengkap || session?.user?.email || 'Pengguna'
 
   return (
     <aside className="w-64 shrink-0 bg-slate-900 text-white flex flex-col h-screen sticky top-0">
-      <div className="px-6 py-6 border-b border-white/10">
+      <div className="px-4 py-5 border-b border-white/10">
         <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-md bg-blue-600 flex items-center justify-center font-display font-bold text-white text-sm">
-            S
+          {fotoUrl ? (
+            <img
+              src={fotoUrl}
+              alt={namaTampil}
+              className="w-9 h-9 rounded-full object-cover shrink-0 border border-white/15"
+            />
+          ) : (
+            <div className="w-9 h-9 rounded-full bg-blue-600 flex items-center justify-center font-display font-bold text-white text-xs shrink-0">
+              {getInisial(namaTampil)}
+            </div>
+          )}
+          <div className="min-w-0 flex-1">
+            <p className="font-display font-semibold text-[13px] leading-tight truncate">{namaTampil}</p>
+            <p className="text-[11px] text-white/40 mt-0.5">{isAdmin ? 'Admin' : 'Guru'}</p>
           </div>
-          <div>
-            <p className="font-display font-semibold text-[15px] leading-none">SIMAK</p>
-            <p className="text-[11px] text-white/40 mt-1">{isAdmin ? 'Admin' : 'Guru'}</p>
-          </div>
+          <button
+            onClick={signOut}
+            title="Keluar"
+            className="w-8 h-8 rounded-lg flex items-center justify-center text-white/60 hover:bg-white/[0.08] hover:text-white transition-colors shrink-0"
+          >
+            <LogOut size={16} />
+          </button>
         </div>
       </div>
 
@@ -170,17 +204,6 @@ export default function Sidebar() {
           </div>
         )}
       </nav>
-
-      <div className="px-4 py-4 border-t border-white/10">
-        <p className="text-xs text-white/40 truncate mb-2 px-1">{session?.user?.email}</p>
-        <button
-          onClick={signOut}
-          className="flex w-full items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-white/70 hover:bg-white/[0.06] hover:text-white transition-colors"
-        >
-          <LogOut size={17} />
-          Keluar
-        </button>
-      </div>
     </aside>
   )
 }
