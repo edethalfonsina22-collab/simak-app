@@ -34,7 +34,6 @@ import BuatUjian from './pages/BuatUjian'
 import UjianOnline from './pages/UjianOnline'
 import ProfilSaya from './pages/ProfilSaya'
 import PengajuanIzin from './pages/PengajuanIzin'
-import PengajuanIzin from './pages/PengajuanIzin'
 import PengajuanSuratAktif from './pages/PengajuanSuratAktif'
 import HariLibur from './pages/HariLibur'
 import Loader from './components/Loader'
@@ -65,7 +64,7 @@ export default function App() {
     <Routes>
       {/* Halaman publik — TIDAK perlu login, dibagikan ke orang tua calon siswa */}
       <Route path="/ppdb" element={<PPDBPublik />} />
-<Route path="/ujian-online" element={<UjianOnline />} />
+      <Route path="/ujian-online" element={<UjianOnline />} />
       <Route path="/login" element={<Login />} />
       <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
       <Route path="/siswa" element={<ProtectedRoute><Siswa /></ProtectedRoute>} />
@@ -94,10 +93,9 @@ export default function App() {
       <Route path="/rpp" element={<ProtectedRoute><RPP /></ProtectedRoute>} />
       <Route path="/arsip-rpp" element={<ProtectedRoute><ArsipRPP /></ProtectedRoute>} />
       <Route path="/pengajuan-izin" element={<ProtectedRoute><PengajuanIzin /></ProtectedRoute>} />
-      <Route path="/pengajuan-izin" element={<ProtectedRoute><PengajuanIzin /></ProtectedRoute>} />
-<Route path="/pengajuan-surat-aktif" element={<ProtectedRoute><PengajuanSuratAktif /></ProtectedRoute>} />
+      <Route path="/pengajuan-surat-aktif" element={<ProtectedRoute><PengajuanSuratAktif /></ProtectedRoute>} />
       <Route path="/bank-soal" element={<ProtectedRoute><BankSoal /></ProtectedRoute>} />
-<Route path="/kartu" element={<ProtectedRoute adminOnly><KartuSiswa /></ProtectedRoute>} />
+      <Route path="/kartu" element={<ProtectedRoute adminOnly><KartuSiswa /></ProtectedRoute>} />
       <Route path="/buat-ujian" element={<ProtectedRoute><BuatUjian /></ProtectedRoute>} />
       <Route path="/profil-saya" element={<ProtectedRoute><ProfilSaya /></ProtectedRoute>} />
       <Route path="*" element={<Navigate to="/" replace />} />
