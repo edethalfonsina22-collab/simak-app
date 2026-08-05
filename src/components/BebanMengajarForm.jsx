@@ -200,19 +200,27 @@ export default function BebanMengajarForm({ sekolah }) {
     }
 
     // 3) Simpan rincian beban mengajar
+    // Kolom angka wajib dikirim sebagai integer — field yang dikosongkan user
+    // (string "") harus dijadikan 0 dulu, kalau tidak Postgres menolak insert
+    // dengan error "invalid input syntax for type integer".
+    const angka = (v) => {
+      const n = Number(v);
+      return Number.isFinite(n) ? n : 0;
+    };
+
     const payload = rows.map((r) => ({
       sk_id: sk.id,
       guru_id: r.guru_id,
       jabatan: r.jabatan,
-      kelas_1: r.kelas_1,
-      kelas_2: r.kelas_2,
-      kelas_3: r.kelas_3,
-      kelas_4: r.kelas_4,
-      kelas_5: r.kelas_5,
-      kelas_6: r.kelas_6,
-      mengajar_sekolah_lain: r.mengajar_sekolah_lain,
+      kelas_1: angka(r.kelas_1),
+      kelas_2: angka(r.kelas_2),
+      kelas_3: angka(r.kelas_3),
+      kelas_4: angka(r.kelas_4),
+      kelas_5: angka(r.kelas_5),
+      kelas_6: angka(r.kelas_6),
+      mengajar_sekolah_lain: angka(r.mengajar_sekolah_lain),
       tugas_tambahan: r.tugas_tambahan,
-      tugas_tambahan_jam: r.tugas_tambahan_jam,
+      tugas_tambahan_jam: angka(r.tugas_tambahan_jam),
       keterangan: r.keterangan,
       urutan: r.urutan,
     }));
