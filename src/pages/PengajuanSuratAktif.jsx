@@ -184,6 +184,23 @@ export default function PengajuanSuratAktif() {
         })
         .eq('id', item.id)
       if (error) throw error
+
+      // Sinkron otomatis: catat surat yang baru disetujui ke arsip Surat Keluar,
+      // supaya tidak perlu diinput manual lagi di halaman Surat Masuk & Keluar.
+      const { error: errArsip } = await supabase.from('surat').insert({
+        jenis: 'keluar',
+        nomor_surat: nomorSurat,
+        perihal: `Surat Keterangan ${item.jenis_surat || 'Aktif Mengajar'} a.n. ${item.guru?.nama_lengkap || '-'}`,
+        pengirim_tujuan: item.guru?.nama_lengkap || '-',
+        tanggal: new Date().toISOString().slice(0, 10),
+        catatan: item.keperluan ? `Keperluan: ${item.keperluan} (tercatat otomatis dari pengajuan Surat Keterangan)` : 'Tercatat otomatis dari pengajuan Surat Keterangan',
+      })
+      if (errArsip) {
+        // Persetujuan surat tetap berhasil walau pencatatan arsip gagal; cukup dicatat di console
+        // supaya admin bisa menambahkannya manual di halaman Surat Masuk & Keluar bila perlu.
+        console.error('[surat] gagal mencatat otomatis ke arsip surat keluar:', errArsip)
+      }
+
       await load()
     } catch (err) {
       alert('Gagal menyetujui pengajuan: ' + err.message)
