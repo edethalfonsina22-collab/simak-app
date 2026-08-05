@@ -6,7 +6,7 @@ const templates = [
     grade: 3,
     phase: "B",
     type: "Presentasi",
-    thumbnail: "/template/perkalian.jpg",
+    thumbnail: "/template/perkalian.png",
     description: "Template presentasi untuk mengenalkan konsep perkalian kelas 3."
   },
   {
@@ -16,7 +16,7 @@ const templates = [
     grade: 5,
     phase: "C",
     type: "Infografis",
-    thumbnail: "/template/siklus-air.jpg",
+    thumbnail: "/template/siklus-air.png",
     description: "Infografis proses siklus air yang siap digunakan."
   },
   {
@@ -26,7 +26,7 @@ const templates = [
     grade: 2,
     phase: "A",
     type: "LKPD",
-    thumbnail: "/template/membaca.jpg",
+    thumbnail: "/template/membaca.png",
     description: "LKPD latihan membaca nyaring."
   }
 ];
