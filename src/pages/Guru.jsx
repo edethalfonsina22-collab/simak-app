@@ -13,6 +13,8 @@ const emptyForm = {
   no_hp: '',
   email: '',
   status: 'aktif',
+  tempat_lahir: '',
+  tanggal_lahir: '',
 }
 
 function formatTanggal(tgl) {
@@ -62,7 +64,7 @@ export default function Guru() {
   }
 
   function openEdit(row) {
-    setForm({ ...emptyForm, ...row })
+    setForm({ ...emptyForm, ...row, tanggal_lahir: row.tanggal_lahir ? String(row.tanggal_lahir).slice(0, 10) : '' })
     setEditingId(row.id)
     setShowForm(true)
   }
@@ -70,9 +72,10 @@ export default function Guru() {
   async function handleSubmit(e) {
     e.preventDefault()
     setSaving(true)
+    const payload = { ...form, tanggal_lahir: form.tanggal_lahir || null }
     const { error } = editingId
-      ? await supabase.from('guru').update(form).eq('id', editingId)
-      : await supabase.from('guru').insert(form)
+      ? await supabase.from('guru').update(payload).eq('id', editingId)
+      : await supabase.from('guru').insert(payload)
     setSaving(false)
     if (!error) { setShowForm(false); loadData() }
     else alert('Gagal menyimpan: ' + error.message)
@@ -198,6 +201,12 @@ export default function Guru() {
                   <option value="P">Perempuan</option>
                 </select>
               </Field>
+              <Field label="Tempat Lahir">
+                <input className="input-field" value={form.tempat_lahir} onChange={(e) => setForm({ ...form, tempat_lahir: e.target.value })} />
+              </Field>
+              <Field label="Tanggal Lahir">
+                <input type="date" className="input-field" value={form.tanggal_lahir} onChange={(e) => setForm({ ...form, tanggal_lahir: e.target.value })} />
+              </Field>
               <Field label="Mata Pelajaran" full>
                 <input className="input-field" value={form.mata_pelajaran} onChange={(e) => setForm({ ...form, mata_pelajaran: e.target.value })} />
               </Field>
@@ -253,75 +262,3 @@ export default function Guru() {
             <div className="px-6 -mt-12 pb-6">
               <div className="card p-4 space-y-3 bg-white shadow-md">
                 <ProfilRow label="NIP" value={profilLihat.nip} />
-                <ProfilRow label="NUPTK" value={profilLihat.nuptk} />
-                <ProfilRow label="Mata Pelajaran" value={profilLihat.mata_pelajaran} />
-                <ProfilRow label="Jenis Kelamin" value={profilLihat.jenis_kelamin === 'L' ? 'Laki-laki' : 'Perempuan'} />
-                <ProfilRow label="Pangkat / Golongan" value={profilLihat.pangkat_golongan} />
-                <ProfilRow label="Pendidikan Terakhir" value={profilLihat.pendidikan_terakhir} />
-                <ProfilRow label="Tanggal Lahir" value={formatTanggal(profilLihat.tanggal_lahir)} />
-                <ProfilRow label="No. HP" value={profilLihat.no_hp} telepon />
-                <ProfilRow label="Email" value={profilLihat.email} />
-                <ProfilRow label="Alamat" value={profilLihat.alamat} />
-              </div>
-
-              <div className="flex gap-2 mt-4">
-                <button
-                  type="button"
-                  onClick={() => { setProfilLihat(null); openEdit(profilLihat) }}
-                  className="btn-secondary flex-1 justify-center"
-                >
-                  <Pencil size={15} /> Ubah Data
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      <BulkImportModal
-        open={showImport}
-        onClose={() => { setShowImport(false); loadData() }}
-        title="Impor Data Guru"
-        templateHeaders={['nama_lengkap', 'nip', 'jenis_kelamin(L/P)', 'mata_pelajaran', 'no_hp', 'email']}
-        mapRow={(row) => {
-          if (!row.nama_lengkap) return null
-          return {
-            nama_lengkap: String(row.nama_lengkap).trim(),
-            nip: String(row.nip || '').trim(),
-            jenis_kelamin: String(row['jenis_kelamin(L/P)'] || row.jenis_kelamin || 'L').trim().toUpperCase(),
-            mata_pelajaran: String(row.mata_pelajaran || '').trim(),
-            no_hp: String(row.no_hp || '').trim(),
-            email: String(row.email || '').trim(),
-            status: 'aktif',
-          }
-        }}
-        onImport={async (rows) => {
-          const { error } = await supabase.from('guru').insert(rows)
-          if (error) throw error
-          return { count: rows.length }
-        }}
-      />
-    </Layout>
-  )
-}
-
-function Field({ label, children, full }) {
-  return (
-    <div className={full ? 'col-span-2' : ''}>
-      <label className="eyebrow mb-1.5 block">{label}</label>
-      {children}
-    </div>
-  )
-}
-
-function ProfilRow({ label, value, telepon }) {
-  return (
-    <div className="flex items-start justify-between gap-4 text-sm">
-      <span className="text-ink-700/50 shrink-0">{label}</span>
-      <span className="text-ink-950 font-medium text-right inline-flex items-center gap-1.5">
-        {value || '—'}
-        {telepon && <TeleponLink nomor={value} />}
-      </span>
-    </div>
-  )
-}
