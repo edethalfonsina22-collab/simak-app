@@ -25,8 +25,17 @@ export default function TemplateEditor() {
     );
   }
 
-  const [judul, setJudul] = useState(template.title);
-  const [deskripsi, setDeskripsi] = useState(template.description);
+const [judul, setJudul] = useState(template.title);
+const [mapel, setMapel] = useState(template.subject);
+const [kelas, setKelas] = useState(template.grade);
+const [fase, setFase] = useState(template.phase);
+
+const [tujuan, setTujuan] = useState("");
+const [materi, setMateri] = useState("");
+const [kegiatan, setKegiatan] = useState("");
+const [asesmen, setAsesmen] = useState("");
+
+const [deskripsi, setDeskripsi] = useState(template.description);
 
   return (
     <div className="max-w-5xl mx-auto p-6">
@@ -50,53 +59,123 @@ export default function TemplateEditor() {
           className="w-full h-72 object-cover rounded-lg mb-6"
         />
 
-        <div className="space-y-5">
+       <div className="space-y-5">
 
-          <div>
-            <label className="font-semibold">
-              Judul
-            </label>
+  <div>
+    <label className="font-semibold">
+      Judul Materi
+    </label>
 
-            <input
-              value={judul}
-              onChange={(e)=>setJudul(e.target.value)}
-              className="w-full border rounded-lg px-4 py-2 mt-2"
-            />
-          </div>
+    <input
+      value={judul}
+      onChange={(e) => setJudul(e.target.value)}
+      className="w-full border rounded-lg px-4 py-2 mt-2"
+    />
+  </div>
 
-          <div>
-            <label className="font-semibold">
-              Deskripsi
-            </label>
+  <div className="grid md:grid-cols-3 gap-4">
 
-            <textarea
-              rows={8}
-              value={deskripsi}
-              onChange={(e)=>setDeskripsi(e.target.value)}
-              className="w-full border rounded-lg px-4 py-2 mt-2"
-            />
-          </div>
+    <div>
+      <label className="font-semibold">
+        Mata Pelajaran
+      </label>
 
-          <div className="flex gap-3">
-
-            <button
-              className="bg-blue-600 text-white px-6 py-3 rounded-lg"
-            >
-              Simpan
-            </button>
-
-            <button
-              className="border px-6 py-3 rounded-lg"
-            >
-              Cetak PDF
-            </button>
-
-          </div>
-
-        </div>
-
-      </div>
-
+      <input
+        value={mapel}
+        onChange={(e) => setMapel(e.target.value)}
+        className="w-full border rounded-lg px-4 py-2 mt-2"
+      />
     </div>
-  );
-}
+
+    <div>
+      <label className="font-semibold">
+        Kelas
+      </label>
+
+      <input
+        value={kelas}
+        onChange={(e) => setKelas(e.target.value)}
+        className="w-full border rounded-lg px-4 py-2 mt-2"
+      />
+    </div>
+
+    <div>
+      <label className="font-semibold">
+        Fase
+      </label>
+
+      <input
+        value={fase}
+        onChange={(e) => setFase(e.target.value)}
+        className="w-full border rounded-lg px-4 py-2 mt-2"
+      />
+    </div>
+
+  </div>
+
+  <div>
+    <label className="font-semibold">
+      Tujuan Pembelajaran
+    </label>
+
+    <textarea
+      rows={4}
+      value={tujuan}
+      onChange={(e) => setTujuan(e.target.value)}
+      className="w-full border rounded-lg px-4 py-2 mt-2"
+    />
+  </div>
+
+  <div>
+    <label className="font-semibold">
+      Materi Pembelajaran
+    </label>
+
+    <textarea
+      rows={8}
+      value={materi}
+      onChange={(e) => setMateri(e.target.value)}
+      className="w-full border rounded-lg px-4 py-2 mt-2"
+    />
+  </div>
+
+  <div>
+    <label className="font-semibold">
+      Kegiatan Pembelajaran
+    </label>
+
+    <textarea
+      rows={6}
+      value={kegiatan}
+      onChange={(e) => setKegiatan(e.target.value)}
+      className="w-full border rounded-lg px-4 py-2 mt-2"
+    />
+  </div>
+
+  <div>
+    <label className="font-semibold">
+      Asesmen / Penilaian
+    </label>
+
+    <textarea
+      rows={5}
+      value={asesmen}
+      onChange={(e) => setAsesmen(e.target.value)}
+      className="w-full border rounded-lg px-4 py-2 mt-2"
+    />
+  </div>
+
+  <div>
+    <label className="font-semibold">
+      Deskripsi Singkat
+    </label>
+
+    <textarea
+      rows={3}
+      value={deskripsi}
+      onChange={(e) => setDeskripsi(e.target.value)}
+      className="w-full border rounded-lg px-4 py-2 mt-2"
+    />
+  </div>
+
+</div>
