@@ -5,6 +5,7 @@ import {
   Packer,
   Paragraph,
   TextRun,
+  ImageRun,
   Table,
   TableRow,
   TableCell,
@@ -13,6 +14,7 @@ import {
   VerticalMergeType,
   BorderStyle,
 } from "docx";
+import { supabase } from "../lib/supabaseClient";
 
 function jumlahJamMengajar(row) {
   return (
@@ -37,6 +39,28 @@ function formatTanggalIndo(tgl) {
     month: "long",
     year: "numeric",
   });
+}
+
+// Bangun public URL dari path storage kalau field *_url belum ada di objek sekolah
+function getPublicUrl(path) {
+  if (!path) return null;
+  const { data } = supabase.storage.from("profil-sekolah").getPublicUrl(path);
+  return data?.publicUrl || null;
+}
+
+// Ambil gambar (logo/ttd) sebagai ArrayBuffer untuk dipakai ImageRun di docx.
+// Kalau gagal (network/CORS/bucket privat), kembalikan null supaya DOCX tetap
+// bisa ter-generate tanpa gambar, tidak melempar error ke user.
+async function fetchImageBuffer(url) {
+  if (!url) return null;
+  try {
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    return await res.arrayBuffer();
+  } catch (err) {
+    console.warn("Gagal memuat gambar untuk DOCX:", err);
+    return null;
+  }
 }
 
 // ================= PDF (rasterisasi tiap halaman via html2canvas, lalu print) =================
@@ -97,8 +121,30 @@ export async function exportBebanMengajarToDocx(sk, sekolah) {
   const namaKepsek = sekolah?.kepala_sekolah || "____________________";
   const nipKepsek = sekolah?.nip_kepala_sekolah || "-";
 
+  // Resolve URL logo & ttd (fallback dari path storage), lalu ambil bytes-nya
+  const logoUrl = sekolah?.logo_url || getPublicUrl(sekolah?.logo_path);
+  const ttdUrl = sekolah?.ttd_url || getPublicUrl(sekolah?.ttd_kepala_sekolah_path);
+
+  const [logoBuffer, ttdBuffer] = await Promise.all([
+    fetchImageBuffer(logoUrl),
+    fetchImageBuffer(ttdUrl),
+  ]);
+
   // --- Halaman 1: naskah SK ---
   const naskahParagraphs = [
+    ...(logoBuffer
+      ? [
+          new Paragraph({
+            alignment: AlignmentType.CENTER,
+            children: [
+              new ImageRun({
+                data: logoBuffer,
+                transformation: { width: 60, height: 60 },
+              }),
+            ],
+          }),
+        ]
+      : []),
     new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: "DINAS PENDIDIKAN DAN KEBUDAYAAN", bold: true })] }),
     new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: namaSekolah.toUpperCase(), bold: true, size: 28 })] }),
     new Paragraph({ text: "" }),
@@ -181,9 +227,19 @@ export async function exportBebanMengajarToDocx(sk, sekolah) {
       children: [new TextRun({ text: `Pada Tanggal : ${formatTanggalIndo(sk?.tanggal_sk)}` })],
     }),
     new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: "Kepala Sekolah" })] }),
-    new Paragraph({ text: "" }),
-    new Paragraph({ text: "" }),
-    new Paragraph({ text: "" }),
+    ...(ttdBuffer
+      ? [
+          new Paragraph({
+            alignment: AlignmentType.RIGHT,
+            children: [
+              new ImageRun({
+                data: ttdBuffer,
+                transformation: { width: 130, height: 70 },
+              }),
+            ],
+          }),
+        ]
+      : [new Paragraph({ text: "" }), new Paragraph({ text: "" }), new Paragraph({ text: "" })]),
     new Paragraph({
       alignment: AlignmentType.RIGHT,
       children: [new TextRun({ text: namaKepsek, bold: true, underline: {} })],
