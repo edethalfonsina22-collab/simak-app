@@ -1,8 +1,8 @@
 import { useParams, useNavigate } from "react-router-dom";
 import { useState } from "react";
+import templates from "../data/templates";
 import { supabase } from "../lib/supabaseClient";
 import { useAuth } from "../lib/AuthContext";
-import templates from "../data/templates";
 
 export default function TemplateEditor() {
   const { id } = useParams();
@@ -205,8 +205,37 @@ const { session } = useAuth();
 
           <div className="flex flex-wrap gap-3 pt-4">
 
-            <button
-  onClick={handleSave}
+<button
+  onClick={async () => {
+
+    const { error } = await supabase
+      .from("materi_saya")
+      .insert([
+        {
+          user_id: session.user.id,
+          template_id: template.id,
+          judul,
+          mapel,
+          kelas,
+          fase,
+          tujuan,
+          materi,
+          kegiatan,
+          asesmen,
+          deskripsi,
+        },
+      ]);
+
+    if (error) {
+      alert(error.message);
+      return;
+    }
+
+    alert("Materi berhasil disimpan");
+
+    navigate("/materi-saya");
+
+  }}
   className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg"
 >
   💾 Simpan
