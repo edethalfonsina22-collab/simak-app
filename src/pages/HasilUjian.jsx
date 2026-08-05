@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabaseClient'; // sesuaikan kalau nama/lokasi file berbeda
 import { useAuth } from '../lib/AuthContext';
+import Layout from '../components/Layout';
 
 export default function HasilUjian() {
   const { session } = useAuth();
@@ -113,15 +114,15 @@ export default function HasilUjian() {
 
   if (memuat) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-[#fdf3f1] to-[#f7e6e3] flex items-center justify-center p-6">
+      <Layout title="Hasil Ujian" subtitle="Lihat hasil pengerjaan siswa">
         <div className="text-[#6b0f1a]/60 text-sm">Memuat...</div>
-      </div>
+      </Layout>
     );
   }
 
   if (daftarUjian.length === 0) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-[#fdf3f1] to-[#f7e6e3] flex items-start justify-center p-6">
+      <Layout title="Hasil Ujian" subtitle="Lihat hasil pengerjaan siswa">
         <div className="w-full max-w-3xl bg-white rounded-xl border border-[#6b0f1a]/15 shadow-sm p-6">
           <h3 className="text-lg font-semibold mb-2 text-[#3b0a0a] flex items-center gap-2">
             <span className="w-1.5 h-5 rounded-full bg-[#d4a017]"></span>
@@ -131,12 +132,12 @@ export default function HasilUjian() {
             Anda belum membuat ujian apa pun. Buat ujian dulu di menu "Buat Ujian".
           </p>
         </div>
-      </div>
+      </Layout>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-[#fdf3f1] to-[#f7e6e3] flex items-start justify-center p-6">
+    <Layout title="Hasil Ujian" subtitle="Lihat hasil pengerjaan siswa">
       <div className="w-full max-w-5xl space-y-5 bg-white rounded-xl border border-[#6b0f1a]/15 shadow-sm p-6">
         <h3 className="text-lg font-semibold text-[#3b0a0a] flex items-center gap-2">
           <span className="w-1.5 h-5 rounded-full bg-[#d4a017]"></span>
@@ -300,6 +301,6 @@ export default function HasilUjian() {
           </div>
         )}
       </div>
-    </div>
+    </Layout>
   );
 }
