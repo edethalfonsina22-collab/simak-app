@@ -1,4 +1,11 @@
 import React from "react";
+import { supabase } from "../lib/supabaseClient";
+
+function getPublicUrl(path) {
+  if (!path) return null;
+  const { data } = supabase.storage.from("profil-sekolah").getPublicUrl(path);
+  return data?.publicUrl || null;
+}
 
 function jumlahJamMengajar(row) {
   return (
@@ -49,6 +56,11 @@ const BebanMengajarPrintTemplate = React.forwardRef(function BebanMengajarPrintT
   const rows = sk?.rows || [];
   const tanggalSk = formatTanggalIndo(sk?.tanggal_sk);
 
+  // Fallback: kalau sekolah.logo_url / ttd_url tidak dikirim langsung,
+  // bangun dari logo_path / ttd_kepala_sekolah_path yang tersimpan di tabel profil_sekolah
+  const logoUrl = sekolah?.logo_url || getPublicUrl(sekolah?.logo_path);
+  const ttdUrl = sekolah?.ttd_url || getPublicUrl(sekolah?.ttd_kepala_sekolah_path);
+
   const totalPerKolom = rows.reduce(
     (acc, r) => {
       acc.kelas_1 += Number(r.kelas_1 || 0);
@@ -95,9 +107,9 @@ const BebanMengajarPrintTemplate = React.forwardRef(function BebanMengajarPrintT
             marginBottom: 24,
           }}
         >
-          {sekolah?.logo_url && (
+          {logoUrl && (
             <img
-              src={sekolah.logo_url}
+              src={logoUrl}
               alt="Logo"
               style={{ width: 64, height: 64, objectFit: "contain" }}
             />
@@ -220,9 +232,9 @@ const BebanMengajarPrintTemplate = React.forwardRef(function BebanMengajarPrintT
           </p>
           <p style={{ margin: 0 }}>Pada Tanggal : {tanggalSk}</p>
           <p style={{ margin: "8px 0 0 0" }}>Kepala Sekolah</p>
-          {sekolah?.ttd_url ? (
+          {ttdUrl ? (
             <img
-              src={sekolah.ttd_url}
+              src={ttdUrl}
               alt="Tanda tangan"
               style={{ height: 70, objectFit: "contain", margin: "0 0 0 auto" }}
             />
@@ -342,9 +354,9 @@ const BebanMengajarPrintTemplate = React.forwardRef(function BebanMengajarPrintT
         <div style={{ textAlign: "right", marginTop: 30 }}>
           <p style={{ margin: 0 }}>Mengetahui</p>
           <p style={{ margin: 0 }}>Kepala Sekolah</p>
-          {sekolah?.ttd_url ? (
+          {ttdUrl ? (
             <img
-              src={sekolah.ttd_url}
+              src={ttdUrl}
               alt="Tanda tangan"
               style={{ height: 70, objectFit: "contain", margin: "0 0 0 auto" }}
             />
