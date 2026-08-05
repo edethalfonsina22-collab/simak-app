@@ -171,8 +171,8 @@ export default function PengajuanSuratAktif() {
     const font = await pdfDoc.embedFont(StandardFonts.Helvetica)
     const bold = await pdfDoc.embedFont(StandardFonts.HelveticaBold)
     const tanggalCetak = new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })
-    const tempatTanggalCetak = sekolah?.kabupaten
-      ? `${sekolah.kabupaten}, ${tanggalCetak}`
+    const tempatTanggalCetak = sekolah?.tempat_ttd
+      ? `${sekolah.tempat_ttd}, ${tanggalCetak}`
       : tanggalCetak
     const logoImage = await embedGambarSekolah(pdfDoc, sekolah?.logo_path)
     const ttdImage = await embedGambarSekolah(pdfDoc, sekolah?.ttd_kepala_sekolah_path)
