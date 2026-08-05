@@ -1,8 +1,11 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import templates from "../data/templates";
 import TemplateCard from "../components/TemplateCard";
 
 export default function TemplateMateri() {
+  const navigate = useNavigate();
+
   const [search, setSearch] = useState("");
   const [selectedTemplate, setSelectedTemplate] = useState(null);
 
@@ -45,8 +48,7 @@ export default function TemplateMateri() {
               key={template.id}
               template={template}
               onPreview={() => setSelectedTemplate(template)}
-              onUse={(item) => window.location.href = `/template-materi/${item.id}`}
-/>
+              onUse={(item) => navigate(`/template-materi/${item.id}`)}
             />
           ))
         )}
@@ -55,6 +57,7 @@ export default function TemplateMateri() {
       {selectedTemplate && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-white rounded-xl shadow-xl w-full max-w-xl p-6">
+
             <h2 className="text-2xl font-bold mb-4">
               {selectedTemplate.title}
             </h2>
@@ -88,18 +91,28 @@ export default function TemplateMateri() {
             </div>
 
             <div className="flex justify-end gap-3 mt-6">
+
               <button
                 onClick={() => setSelectedTemplate(null)}
-                className="px-4 py-2 border rounded-lg"
+                className="px-4 py-2 border rounded-lg hover:bg-gray-100"
               >
                 Tutup
               </button>
 
-            <button
-  onClick={() => {
-    window.location.href = `/template-materi/${selectedTemplate.id}`;
-  }}
-  className="bg-blue-600 text-white px-4 py-2 rounded-lg"
->
-  Gunakan Template
-</button>
+              <button
+                onClick={() =>
+                  navigate(`/template-materi/${selectedTemplate.id}`)
+                }
+                className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg"
+              >
+                Gunakan Template
+              </button>
+
+            </div>
+
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
