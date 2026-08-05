@@ -31,6 +31,7 @@ import Perpustakaan from './pages/Perpustakaan'
 import RPP from './pages/RPP'
 import ArsipRPP from './pages/ArsipRPP'
 import TemplateMateri from './pages/TemplateMateri'
+import MateriSaya from './pages/MateriSaya'
 import TemplateEditor from './pages/TemplateEditor'
 import BuatUjian from './pages/BuatUjian'
 import UjianOnline from './pages/UjianOnline'
@@ -99,6 +100,14 @@ export default function App() {
   element={
     <ProtectedRoute>
       <TemplateMateri />
+    </ProtectedRoute>
+  }
+/>
+      <Route
+  path="/materi-saya"
+  element={
+    <ProtectedRoute>
+      <MateriSaya />
     </ProtectedRoute>
   }
 />
