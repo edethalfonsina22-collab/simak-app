@@ -124,12 +124,12 @@ export default function Galeri() {
 
   return (
     <Layout title="Galeri Kegiatan" subtitle="Dokumentasi foto kegiatan sekolah">
-      <div className="bg-sage-500/10 rounded-2xl p-5 -m-1">
+      <div className="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-2xl p-5 -m-1 shadow-sm">
         <div className="flex items-center justify-between mb-4">
-          <p className="text-sm text-ink-700/50">{kegiatanTerfilter.length} album kegiatan</p>
+          <p className="text-sm text-white/70">{kegiatanTerfilter.length} album kegiatan</p>
           <button
             onClick={() => setShowForm(!showForm)}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-brass-400 text-ink-950 text-sm font-medium"
+            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 transition-colors shadow"
           >
             <ImagePlus size={16} />
             Album Baru
@@ -144,8 +144,8 @@ export default function Galeri() {
               onClick={() => setFilterKategori(kat)}
               className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
                 filterKategori === kat
-                  ? 'bg-ink-950 text-paper'
-                  : 'bg-ink-900/[0.06] text-ink-700 hover:bg-ink-900/[0.1]'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-white/15 text-white hover:bg-white/25'
               }`}
             >
               {kat}
@@ -154,16 +154,16 @@ export default function Galeri() {
         </div>
 
         {showForm && (
-          <form onSubmit={handleUpload} className="card p-6 mb-6 space-y-3">
+          <form onSubmit={handleUpload} className="bg-white rounded-xl p-6 mb-6 space-y-3 shadow">
             <input
-              className="input w-full"
+              className="input w-full border-slate-200"
               placeholder="Judul kegiatan (mis. Perayaan Hari Kemerdekaan)"
               value={form.judul}
               onChange={(e) => setForm({ ...form, judul: e.target.value })}
               required
             />
             <select
-              className="input w-full"
+              className="input w-full border-slate-200"
               value={form.kategori}
               onChange={(e) => setForm({ ...form, kategori: e.target.value })}
             >
@@ -172,14 +172,14 @@ export default function Galeri() {
               ))}
             </select>
             <textarea
-              className="input w-full"
+              className="input w-full border-slate-200"
               rows={2}
               placeholder="Deskripsi singkat (opsional)"
               value={form.deskripsi}
               onChange={(e) => setForm({ ...form, deskripsi: e.target.value })}
             />
             <input
-              className="input w-full"
+              className="input w-full border-slate-200"
               type="file"
               accept="image/*"
               multiple
@@ -187,12 +187,12 @@ export default function Galeri() {
               required
             />
             {form.files.length > 0 && (
-              <p className="text-xs text-ink-700/50">{form.files.length} foto dipilih</p>
+              <p className="text-xs text-slate-500">{form.files.length} foto dipilih</p>
             )}
             <button
               type="submit"
               disabled={uploading}
-              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-brass-400 text-ink-950 text-sm font-medium disabled:opacity-50"
+              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors"
             >
               {uploading ? <Loader2 size={16} className="animate-spin" /> : <ImagePlus size={16} />}
               {uploading ? 'Mengunggah...' : 'Upload Album'}
@@ -201,10 +201,10 @@ export default function Galeri() {
         )}
 
         {loading ? (
-          <p className="text-sm text-ink-700/50">Memuat...</p>
+          <p className="text-sm text-white/70">Memuat...</p>
         ) : kegiatanTerfilter.length === 0 ? (
-          <div className="card p-6">
-            <p className="text-sm text-ink-700/50">Belum ada album kegiatan di kategori ini.</p>
+          <div className="bg-white rounded-xl p-6 shadow">
+            <p className="text-sm text-slate-500">Belum ada album kegiatan di kategori ini.</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
@@ -214,26 +214,26 @@ export default function Galeri() {
                 <button
                   key={item.id}
                   onClick={() => setOpenAlbum(item)}
-                  className="card overflow-hidden text-left hover:shadow-sm transition-shadow"
+                  className="bg-white rounded-xl overflow-hidden text-left hover:shadow-lg transition-shadow border border-slate-100"
                 >
-                  <div className="aspect-video bg-ink-900/[0.06] relative">
+                  <div className="aspect-video bg-slate-100 relative">
                     {foto[0] ? (
                       <img src={fotoUrl(foto[0].foto_path)} alt={item.judul} className="w-full h-full object-cover" />
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center text-ink-700/30">
+                      <div className="w-full h-full flex items-center justify-center text-slate-300">
                         <Images size={28} />
                       </div>
                     )}
-                    <span className="absolute top-2 left-2 text-[11px] font-medium px-2 py-0.5 rounded-md bg-ink-950/70 text-paper">
+                    <span className="absolute top-2 left-2 text-[11px] font-medium px-2 py-0.5 rounded-md bg-indigo-600/90 text-white">
                       {item.kategori || 'Umum'}
                     </span>
-                    <span className="absolute bottom-2 right-2 text-[11px] font-medium px-2 py-0.5 rounded-md bg-ink-950/70 text-paper">
+                    <span className="absolute bottom-2 right-2 text-[11px] font-medium px-2 py-0.5 rounded-md bg-emerald-600/90 text-white">
                       {foto.length} foto
                     </span>
                   </div>
                   <div className="p-4">
-                    <p className="font-medium text-sm text-ink-950 truncate">{item.judul}</p>
-                    <p className="text-xs text-ink-700/50 mt-0.5">
+                    <p className="font-medium text-sm text-slate-900 truncate">{item.judul}</p>
+                    <p className="text-xs text-slate-500 mt-0.5">
                       {item.guru?.nama_lengkap || 'Admin'} · {new Date(item.dibuat_pada).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}
                     </p>
                   </div>
@@ -246,13 +246,13 @@ export default function Galeri() {
 
       {/* Modal Album (grid foto) */}
       {openAlbum && (
-        <div className="fixed inset-0 bg-ink-950/70 flex items-center justify-center p-4 z-50" onClick={() => setOpenAlbum(null)}>
-          <div className="bg-paper rounded-xl max-w-3xl w-full max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-            <div className="p-5 border-b border-ink-900/10 flex items-start justify-between sticky top-0 bg-paper">
+        <div className="fixed inset-0 bg-slate-900/70 flex items-center justify-center p-4 z-50" onClick={() => setOpenAlbum(null)}>
+          <div className="bg-white rounded-xl max-w-3xl w-full max-h-[85vh] overflow-y-auto shadow-xl" onClick={(e) => e.stopPropagation()}>
+            <div className="p-5 border-b border-slate-200 flex items-start justify-between sticky top-0 bg-white">
               <div>
-                <p className="font-display font-semibold text-lg text-ink-950">{openAlbum.judul}</p>
-                {openAlbum.deskripsi && <p className="text-sm text-ink-700/60 mt-1">{openAlbum.deskripsi}</p>}
-                <p className="text-xs text-ink-700/40 mt-1">
+                <p className="font-display font-semibold text-lg text-slate-900">{openAlbum.judul}</p>
+                {openAlbum.deskripsi && <p className="text-sm text-slate-600 mt-1">{openAlbum.deskripsi}</p>}
+                <p className="text-xs text-slate-400 mt-1">
                   {openAlbum.guru?.nama_lengkap || 'Admin'} · {new Date(openAlbum.dibuat_pada).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}
                 </p>
               </div>
@@ -267,7 +267,7 @@ export default function Galeri() {
                 )}
                 <button
                   onClick={() => setOpenAlbum(null)}
-                  className="w-8 h-8 rounded-lg flex items-center justify-center text-ink-700 hover:bg-ink-900/[0.05]"
+                  className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-500 hover:bg-slate-100"
                 >
                   <X size={16} />
                 </button>
@@ -291,19 +291,19 @@ export default function Galeri() {
       {/* Lightbox foto (klik foto, geser next/prev) */}
       {openAlbum && lightboxIndex !== null && (
         <div
-          className="fixed inset-0 bg-ink-950/90 flex items-center justify-center z-[60]"
+          className="fixed inset-0 bg-slate-900/90 flex items-center justify-center z-[60]"
           onClick={closeLightbox}
         >
           <button
             onClick={closeLightbox}
-            className="absolute top-4 right-4 w-10 h-10 rounded-full flex items-center justify-center text-paper bg-white/10 hover:bg-white/20"
+            className="absolute top-4 right-4 w-10 h-10 rounded-full flex items-center justify-center text-white bg-white/10 hover:bg-white/20"
           >
             <X size={20} />
           </button>
 
           <button
             onClick={(e) => { e.stopPropagation(); prevFoto() }}
-            className="absolute left-2 sm:left-6 w-10 h-10 sm:w-12 sm:h-12 rounded-full flex items-center justify-center text-paper bg-white/10 hover:bg-white/20"
+            className="absolute left-2 sm:left-6 w-10 h-10 sm:w-12 sm:h-12 rounded-full flex items-center justify-center text-white bg-white/10 hover:bg-white/20"
           >
             <ChevronLeft size={24} />
           </button>
@@ -317,12 +317,12 @@ export default function Galeri() {
 
           <button
             onClick={(e) => { e.stopPropagation(); nextFoto() }}
-            className="absolute right-2 sm:right-6 w-10 h-10 sm:w-12 sm:h-12 rounded-full flex items-center justify-center text-paper bg-white/10 hover:bg-white/20"
+            className="absolute right-2 sm:right-6 w-10 h-10 sm:w-12 sm:h-12 rounded-full flex items-center justify-center text-white bg-white/10 hover:bg-white/20"
           >
             <ChevronRight size={24} />
           </button>
 
-          <span className="absolute bottom-4 left-1/2 -translate-x-1/2 text-xs text-paper/70">
+          <span className="absolute bottom-4 left-1/2 -translate-x-1/2 text-xs text-white/70">
             {lightboxIndex + 1} / {openAlbum.galeri_foto.length}
           </span>
         </div>
