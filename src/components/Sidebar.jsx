@@ -118,8 +118,8 @@ function NavItem({ to, label, icon: Icon, end }) {
       className={({ isActive }) =>
         `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
           isActive
-            ? 'bg-brass-400 text-ink-950'
-            : 'text-paper/70 hover:bg-white/[0.06] hover:text-paper'
+            ? 'bg-blue-600 text-white'
+            : 'text-white/70 hover:bg-white/[0.06] hover:text-white'
         }`
       }
     >
@@ -133,15 +133,15 @@ export default function Sidebar() {
   const { signOut, session, isAdmin } = useAuth()
 
   return (
-    <aside className="w-64 shrink-0 bg-ink-950 text-paper flex flex-col h-screen sticky top-0">
+    <aside className="w-64 shrink-0 bg-slate-900 text-white flex flex-col h-screen sticky top-0">
       <div className="px-6 py-6 border-b border-white/10">
         <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-md bg-brass-400 flex items-center justify-center font-display font-bold text-ink-950 text-sm">
+          <div className="w-8 h-8 rounded-md bg-blue-600 flex items-center justify-center font-display font-bold text-white text-sm">
             S
           </div>
           <div>
             <p className="font-display font-semibold text-[15px] leading-none">SIMAK</p>
-            <p className="text-[11px] text-paper/40 mt-1">{isAdmin ? 'Admin' : 'Guru'}</p>
+            <p className="text-[11px] text-white/40 mt-1">{isAdmin ? 'Admin' : 'Guru'}</p>
           </div>
         </div>
       </div>
@@ -151,7 +151,7 @@ export default function Sidebar() {
           groupsAdmin.map((group, i) => (
             <div key={group.label ?? `top-${i}`} className={i > 0 ? 'mt-5' : ''}>
               {group.label && (
-                <p className="px-3 mb-1.5 text-[10px] font-semibold tracking-wider uppercase text-paper/35">
+                <p className="px-3 mb-1.5 text-[10px] font-semibold tracking-wider uppercase text-white/35">
                   {group.label}
                 </p>
               )}
@@ -172,10 +172,10 @@ export default function Sidebar() {
       </nav>
 
       <div className="px-4 py-4 border-t border-white/10">
-        <p className="text-xs text-paper/40 truncate mb-2 px-1">{session?.user?.email}</p>
+        <p className="text-xs text-white/40 truncate mb-2 px-1">{session?.user?.email}</p>
         <button
           onClick={signOut}
-          className="flex w-full items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-paper/70 hover:bg-white/[0.06] hover:text-paper transition-colors"
+          className="flex w-full items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-white/70 hover:bg-white/[0.06] hover:text-white transition-colors"
         >
           <LogOut size={17} />
           Keluar
