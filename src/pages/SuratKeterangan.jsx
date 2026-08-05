@@ -1,13 +1,13 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
 import SuratKeteranganForm from "../components/SuratKeteranganForm";
+import Layout from "../components/Layout";
 
 export default function SuratKeterangan() {
   const [showForm, setShowForm] = useState(false);
   const [list, setList] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
-
   async function loadList() {
     setLoading(true);
     setLoadError("");
@@ -17,7 +17,6 @@ export default function SuratKeterangan() {
         "*, siswa:siswa_id(nama_lengkap), guru:guru_id(nama_lengkap)"
       )
       .order("created_at", { ascending: false });
-
     if (error) {
       console.error("[surat_keterangan] gagal dimuat:", error);
       setLoadError("Gagal memuat daftar surat: " + error.message);
@@ -25,33 +24,30 @@ export default function SuratKeterangan() {
       setLoading(false);
       return;
     }
-
     setList(data || []);
     setLoading(false);
   }
-
   useEffect(() => {
     loadList();
   }, []);
-
   return (
-    <div className="p-6">
-      <div className="flex justify-between items-center mb-4">
-        <h1 className="text-xl font-semibold">Surat Keterangan</h1>
+    <Layout
+      title="Surat Keterangan"
+      subtitle="Buat dan kelola surat keterangan siswa/guru"
+      actions={
         <button
           onClick={() => setShowForm((v) => !v)}
           className="bg-blue-600 text-white px-4 py-2 rounded"
         >
           {showForm ? "Tutup Form" : "+ Buat Surat Baru"}
         </button>
-      </div>
-
+      }
+    >
       {loadError && (
         <div className="bg-yellow-50 border border-yellow-300 text-yellow-800 text-sm p-3 rounded mb-4">
           {loadError}
         </div>
       )}
-
       {showForm && (
         <div className="bg-white border rounded p-4 mb-6">
           <SuratKeteranganForm
@@ -61,7 +57,6 @@ export default function SuratKeterangan() {
           />
         </div>
       )}
-
       {loading ? (
         <p>Memuat...</p>
       ) : (
@@ -97,6 +92,6 @@ export default function SuratKeterangan() {
           </tbody>
         </table>
       )}
-    </div>
+    </Layout>
   );
 }
