@@ -79,7 +79,7 @@ export default function PengajuanSuratAktif() {
     setLoading(true)
     const { data } = await supabase
       .from('pengajuan_surat_aktif')
-      .select('*, guru(nama_lengkap, nip, mata_pelajaran)')
+      .select('*, guru(nama_lengkap, nip, mata_pelajaran, nuptk, tempat_lahir, tanggal_lahir)')
       .order('dibuat_pada', { ascending: false })
     setItems(data || [])
     setLoading(false)
@@ -171,6 +171,9 @@ export default function PengajuanSuratAktif() {
     const font = await pdfDoc.embedFont(StandardFonts.Helvetica)
     const bold = await pdfDoc.embedFont(StandardFonts.HelveticaBold)
     const tanggalCetak = new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })
+    const tempatTanggalCetak = sekolah?.kabupaten
+      ? `${sekolah.kabupaten}, ${tanggalCetak}`
+      : tanggalCetak
     const logoImage = await embedGambarSekolah(pdfDoc, sekolah?.logo_path)
     const ttdImage = await embedGambarSekolah(pdfDoc, sekolah?.ttd_kepala_sekolah_path)
 
@@ -233,6 +236,17 @@ export default function PengajuanSuratAktif() {
     draw(`: ${item.guru?.nama_lengkap || '-'}`, { x: 180, gap: 20 })
     draw(`NIP`, { x: 60, gap: 0 })
     draw(`: ${item.guru?.nip || '-'}`, { x: 180, gap: 20 })
+    draw(`NUPTK`, { x: 60, gap: 0 })
+    draw(`: ${item.guru?.nuptk || '-'}`, { x: 180, gap: 20 })
+    draw(`Tempat, Tgl Lahir`, { x: 60, gap: 0 })
+    draw(
+      `: ${item.guru?.tempat_lahir || '-'}, ${
+        item.guru?.tanggal_lahir
+          ? new Date(item.guru.tanggal_lahir).toLocaleDateString('id-ID')
+          : '-'
+      }`,
+      { x: 180, gap: 20 }
+    )
     draw(`Jabatan / Mapel`, { x: 60, gap: 0 })
     draw(`: ${item.guru?.mata_pelajaran || '-'}`, { x: 180, gap: 34 })
 
@@ -242,15 +256,19 @@ export default function PengajuanSuratAktif() {
     draw('sebagaimana mestinya.', { gap: 50 })
 
     // ---------- TANDA TANGAN ----------
-    draw(`${tanggalCetak}`, { x: 340, gap: 20 })
-    draw(sekolah?.kepala_sekolah ? 'Kepala Sekolah,' : 'Mengetahui,', { x: 340, gap: ttdImage ? 8 : 60 })
+    draw(tempatTanggalCetak, { x: 340, gap: 20 })
+    draw(sekolah?.kepala_sekolah ? 'Kepala Sekolah,' : 'Mengetahui,', { x: 340, gap: 4 })
 
     if (ttdImage) {
-      const ttdTinggi = 42
+      const ttdTinggi = 40
       const ttdDims = ttdImage.scale(ttdTinggi / ttdImage.height)
-      page.drawImage(ttdImage, { x: 340, y: y - ttdTinggi + 6, width: ttdDims.width, height: ttdTinggi })
-      y -= ttdTinggi
-      draw('*Ditandatangani secara elektronik', { x: 340, size: 7, gap: 6 })
+      const imgTopY = y
+      const imgBottomY = imgTopY - ttdTinggi
+      page.drawImage(ttdImage, { x: 340, y: imgBottomY, width: ttdDims.width, height: ttdTinggi })
+      y = imgBottomY - 10
+      draw('*Ditandatangani secara elektronik', { x: 340, size: 7, gap: 10 })
+    } else {
+      y -= 40
     }
 
     draw(sekolah?.kepala_sekolah || '(.........................)', { x: 340, bold: true, gap: 18 })
