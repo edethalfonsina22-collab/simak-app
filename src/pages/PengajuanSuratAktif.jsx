@@ -14,13 +14,43 @@ const STATUS_LABEL = { menunggu: 'Menunggu', disetujui: 'Disetujui', ditolak: 'D
 
 const BULAN_ROMAWI = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII']
 
+// Preset jenis surat + kalimat pernyataan bawaan (bisa diedit oleh guru saat mengajukan).
+const JENIS_SURAT_PRESET = [
+  {
+    value: 'Aktif Mengajar',
+    template: 'adalah benar merupakan guru yang masih aktif mengajar di sekolah kami hingga saat surat ini diterbitkan',
+  },
+  {
+    value: 'Kelakuan Baik',
+    template: 'adalah benar berkelakuan baik selama bertugas di sekolah kami dan tidak pernah terlibat pelanggaran disiplin',
+  },
+  {
+    value: 'Masa Kerja',
+    template: 'adalah benar telah bekerja sebagai guru di sekolah kami',
+  },
+  {
+    value: 'Cuti',
+    template: 'adalah benar sedang menjalani cuti sesuai ketentuan yang berlaku di sekolah kami',
+  },
+  {
+    value: 'Lainnya',
+    template: '',
+  },
+]
+
 function formatTanggal(tgl) {
   if (!tgl) return '-'
   return new Date(tgl).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })
 }
 
-// Nomor surat otomatis, format: 001/SK-AKTIF/VIII/2026
-async function buatNomorSurat() {
+// Kode singkat untuk nomor surat, diturunkan dari jenis surat. Contoh: "Aktif Mengajar" -> "SK-AKTIF"
+function kodeJenisSurat(jenis) {
+  const kataPertama = (jenis || 'Umum').trim().split(/\s+/)[0] || 'UMUM'
+  return 'SK-' + kataPertama.toUpperCase().replace(/[^A-Z0-9]/g, '')
+}
+
+// Nomor surat otomatis, format: 001/SK-AKTIF/VIII/2026 (kode menyesuaikan jenis surat)
+async function buatNomorSurat(jenisSurat) {
   const sekarang = new Date()
   const tahun = sekarang.getFullYear()
   const bulanRomawi = BULAN_ROMAWI[sekarang.getMonth()]
@@ -38,7 +68,7 @@ async function buatNomorSurat() {
 
   const urutan = (count || 0) + 1
   const nomorUrut = String(urutan).padStart(3, '0')
-  return `${nomorUrut}/SK-AKTIF/${bulanRomawi}/${tahun}`
+  return `${nomorUrut}/${kodeJenisSurat(jenisSurat)}/${bulanRomawi}/${tahun}`
 }
 
 // Ambil gambar (logo / tanda tangan) dari Supabase Storage lalu embed ke PDF (PNG/JPG)
@@ -58,6 +88,24 @@ async function embedGambarSekolah(pdfDoc, path) {
   }
 }
 
+// Pecah teks panjang menjadi beberapa baris agar muat di lebar halaman PDF.
+function bungkusTeks(text, font, size, maxWidth) {
+  const kata = (text || '').split(/\s+/).filter(Boolean)
+  const baris = []
+  let baris_saat_ini = ''
+  for (const kata_ini of kata) {
+    const percobaan = baris_saat_ini ? `${baris_saat_ini} ${kata_ini}` : kata_ini
+    if (font.widthOfTextAtSize(percobaan, size) > maxWidth && baris_saat_ini) {
+      baris.push(baris_saat_ini)
+      baris_saat_ini = kata_ini
+    } else {
+      baris_saat_ini = percobaan
+    }
+  }
+  if (baris_saat_ini) baris.push(baris_saat_ini)
+  return baris
+}
+
 export default function PengajuanSuratAktif() {
   const { profil, isAdmin, session } = useAuth()
   const [items, setItems] = useState([])
@@ -66,6 +114,9 @@ export default function PengajuanSuratAktif() {
   const [processingId, setProcessingId] = useState(null)
 
   // Form pengajuan (guru)
+  const [jenisSurat, setJenisSurat] = useState(JENIS_SURAT_PRESET[0].value)
+  const [jenisSuratLainnya, setJenisSuratLainnya] = useState('')
+  const [isiKeterangan, setIsiKeterangan] = useState(JENIS_SURAT_PRESET[0].template)
   const [keperluan, setKeperluan] = useState('')
 
   // Form penolakan admin, per baris
@@ -89,18 +140,31 @@ export default function PengajuanSuratAktif() {
     load()
   }, [])
 
+  function handleUbahJenisSurat(value) {
+    setJenisSurat(value)
+    const preset = JENIS_SURAT_PRESET.find((j) => j.value === value)
+    if (preset) setIsiKeterangan(preset.template)
+  }
+
   async function handleAjukan(e) {
     e.preventDefault()
-    if (!keperluan.trim()) return
+    const jenisFinal = jenisSurat === 'Lainnya' ? jenisSuratLainnya.trim() : jenisSurat
+    if (!jenisFinal || !isiKeterangan.trim() || !keperluan.trim()) return
+
     setMengajukan(true)
     const { error } = await supabase.from('pengajuan_surat_aktif').insert({
       guru_id: profil.guru_id,
+      jenis_surat: jenisFinal,
+      isi_keterangan: isiKeterangan.trim(),
       keperluan: keperluan.trim(),
     })
     setMengajukan(false)
     if (error) {
       alert('Gagal mengirim pengajuan: ' + error.message)
     } else {
+      setJenisSurat(JENIS_SURAT_PRESET[0].value)
+      setJenisSuratLainnya('')
+      setIsiKeterangan(JENIS_SURAT_PRESET[0].template)
       setKeperluan('')
       await load()
     }
@@ -109,7 +173,7 @@ export default function PengajuanSuratAktif() {
   async function handleApprove(item) {
     setProcessingId(item.id)
     try {
-      const nomorSurat = await buatNomorSurat()
+      const nomorSurat = await buatNomorSurat(item.jenis_surat)
       const { error } = await supabase
         .from('pengajuan_surat_aktif')
         .update({
@@ -146,8 +210,9 @@ export default function PengajuanSuratAktif() {
   }
 
   async function handleHapus(item) {
+    const namaJenis = item.jenis_surat || 'Aktif Mengajar'
     const konfirmasi = window.confirm(
-      `Hapus pengajuan surat aktif mengajar ${isAdmin && item.guru?.nama_lengkap ? `milik ${item.guru.nama_lengkap} ` : ''}ini? Tindakan ini tidak bisa dibatalkan.`
+      `Hapus pengajuan surat keterangan ${namaJenis}${isAdmin && item.guru?.nama_lengkap ? ` milik ${item.guru.nama_lengkap}` : ''} ini? Tindakan ini tidak bisa dibatalkan.`
     )
     if (!konfirmasi) return
 
@@ -162,9 +227,13 @@ export default function PengajuanSuratAktif() {
     setDeletingId(null)
   }
 
-  // Susun PDF Surat Keterangan Aktif Mengajar dan kembalikan bytes-nya.
+  // Susun PDF Surat Keterangan (jenis menyesuaikan pengajuan) dan kembalikan bytes-nya.
   async function buatPdfSurat(item) {
     const { data: sekolah } = await supabase.from('profil_sekolah').select('*').eq('id', 1).maybeSingle()
+
+    const jenisSuratItem = item.jenis_surat || 'Aktif Mengajar'
+    const isiKeteranganItem =
+      item.isi_keterangan || JENIS_SURAT_PRESET.find((j) => j.value === jenisSuratItem)?.template || 'adalah benar sebagaimana keterangan berikut'
 
     const pdfDoc = await PDFDocument.create()
     const page = pdfDoc.addPage([595, 842]) // A4
@@ -228,7 +297,7 @@ export default function PengajuanSuratAktif() {
     y -= 26
 
     // ---------- JUDUL & NOMOR SURAT ----------
-    draw('SURAT KETERANGAN AKTIF MENGAJAR', { bold: true, size: 13, center: true, gap: 16 })
+    draw(`SURAT KETERANGAN ${jenisSuratItem.toUpperCase()}`, { bold: true, size: 13, center: true, gap: 16 })
     draw(`Nomor: ${item.nomor_surat || '-'}`, { size: 10, center: true, gap: 34 })
 
     draw(`Yang bertanda tangan di bawah ini Kepala Sekolah menerangkan bahwa:`, { gap: 26 })
@@ -250,8 +319,11 @@ export default function PengajuanSuratAktif() {
     draw(`Jabatan / Mapel`, { x: 60, gap: 0 })
     draw(`: ${item.guru?.mata_pelajaran || '-'}`, { x: 180, gap: 34 })
 
-    draw('adalah benar guru yang masih aktif mengajar di sekolah kami', { gap: 18 })
-    draw(`hingga saat surat ini diterbitkan, ${item.keperluan ? 'untuk keperluan ' + item.keperluan + '.' : '.'}`, { gap: 18 })
+    // ---------- PERNYATAAN (dinamis sesuai jenis surat, dibungkus otomatis) ----------
+    const kalimatPernyataan = `${isiKeteranganItem}${item.keperluan ? `, untuk keperluan ${item.keperluan}.` : '.'}`
+    const barisPernyataan = bungkusTeks(kalimatPernyataan, font, 11, 475)
+    barisPernyataan.forEach((baris) => draw(baris, { gap: 18 }))
+
     draw('Demikian surat keterangan ini dibuat untuk dipergunakan', { gap: 18 })
     draw('sebagaimana mestinya.', { gap: 50 })
 
@@ -281,7 +353,8 @@ export default function PengajuanSuratAktif() {
 
   function namaFileSurat(item) {
     const namaFileNomor = (item.nomor_surat || '').replace(/\//g, '-')
-    return `Surat-Aktif-Mengajar-${namaFileNomor ? namaFileNomor + '-' : ''}${(item.guru?.nama_lengkap || 'guru').replace(/\s+/g, '-')}.pdf`
+    const namaJenis = (item.jenis_surat || 'Aktif-Mengajar').replace(/\s+/g, '-')
+    return `Surat-${namaJenis}-${namaFileNomor ? namaFileNomor + '-' : ''}${(item.guru?.nama_lengkap || 'guru').replace(/\s+/g, '-')}.pdf`
   }
 
   async function handleLihatSurat(item) {
@@ -323,8 +396,8 @@ export default function PengajuanSuratAktif() {
 
   return (
     <Layout
-      title="Surat Keterangan Aktif Mengajar"
-      subtitle={isAdmin ? 'Tinjau dan proses pengajuan surat aktif mengajar dari guru' : 'Ajukan surat keterangan aktif mengajar dan pantau statusnya'}
+      title="Surat Keterangan"
+      subtitle={isAdmin ? 'Tinjau dan proses pengajuan surat keterangan dari guru' : 'Ajukan surat keterangan dan pantau statusnya'}
     >
       <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-ink-950 to-[#22315B] p-6 mb-6">
         <div className="relative z-10 flex items-center gap-4">
@@ -332,13 +405,13 @@ export default function PengajuanSuratAktif() {
             <FileCheck2 size={20} className="text-paper" />
           </div>
           <div>
-            <p className="font-display font-semibold text-lg text-paper">Surat Keterangan Aktif Mengajar</p>
+            <p className="font-display font-semibold text-lg text-paper">Surat Keterangan</p>
             <p className="text-sm text-paper/70 mt-0.5">
               {isAdmin
                 ? menungguCount > 0
                   ? `${menungguCount} pengajuan menunggu persetujuan`
                   : 'Semua pengajuan sudah diproses'
-                : 'Ajukan surat keterangan aktif mengajar dan pantau statusnya di sini'}
+                : 'Ajukan surat keterangan dan pantau statusnya di sini'}
             </p>
           </div>
         </div>
@@ -347,15 +420,60 @@ export default function PengajuanSuratAktif() {
 
       {!isAdmin && (
         <form onSubmit={handleAjukan} className="card p-6 mb-6 space-y-3">
-          <h3 className="font-display text-lg font-semibold mb-1">Ajukan Surat Aktif Mengajar Baru</h3>
-          <textarea
-            className="input-field w-full"
-            rows={3}
-            placeholder="Keperluan surat (mis. untuk syarat KPR, tunjangan, dll)"
-            value={keperluan}
-            onChange={(e) => setKeperluan(e.target.value)}
-            required
-          />
+          <h3 className="font-display text-lg font-semibold mb-1">Ajukan Surat Keterangan Baru</h3>
+
+          <div>
+            <label className="label-field">Jenis Surat *</label>
+            <select
+              className="input-field w-full"
+              value={jenisSurat}
+              onChange={(e) => handleUbahJenisSurat(e.target.value)}
+            >
+              {JENIS_SURAT_PRESET.map((j) => (
+                <option key={j.value} value={j.value}>
+                  {j.value === 'Lainnya' ? 'Lainnya (isi manual)' : j.value}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {jenisSurat === 'Lainnya' && (
+            <div>
+              <label className="label-field">Nama Jenis Surat *</label>
+              <input
+                required
+                className="input-field w-full"
+                placeholder="mis. Bebas Pustaka, Rekomendasi, dll"
+                value={jenisSuratLainnya}
+                onChange={(e) => setJenisSuratLainnya(e.target.value)}
+              />
+            </div>
+          )}
+
+          <div>
+            <label className="label-field">Isi Pernyataan *</label>
+            <textarea
+              required
+              className="input-field w-full"
+              rows={2}
+              placeholder="Kalimat keterangan yang akan tertulis di surat"
+              value={isiKeterangan}
+              onChange={(e) => setIsiKeterangan(e.target.value)}
+            />
+          </div>
+
+          <div>
+            <label className="label-field">Keperluan *</label>
+            <textarea
+              required
+              className="input-field w-full"
+              rows={2}
+              placeholder="Keperluan surat (mis. untuk syarat KPR, tunjangan, dll)"
+              value={keperluan}
+              onChange={(e) => setKeperluan(e.target.value)}
+            />
+          </div>
+
           <button type="submit" disabled={mengajukan} className="btn-primary">
             {mengajukan ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
             {mengajukan ? 'Mengirim...' : 'Kirim Pengajuan'}
@@ -380,7 +498,7 @@ export default function PengajuanSuratAktif() {
                     <span className={`text-[11px] font-medium px-2 py-0.5 rounded-md ${STATUS_STYLE[item.status]}`}>
                       {STATUS_LABEL[item.status]}
                     </span>
-                    <span className="text-sm font-medium text-ink-900">Aktif Mengajar</span>
+                    <span className="text-sm font-medium text-ink-900">{item.jenis_surat || 'Aktif Mengajar'}</span>
                     {item.nomor_surat && (
                       <span className="flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-md bg-ink-900/[0.05] text-ink-700/70">
                         <FileText size={11} /> {item.nomor_surat}
