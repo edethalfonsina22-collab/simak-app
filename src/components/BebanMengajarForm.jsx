@@ -74,8 +74,17 @@ export default function BebanMengajarForm({ sekolah }) {
         return;
       }
 
+      // Kepala Sekolah selalu ditaruh di baris nomor 1, sisanya urut abjad nama
+      const sorted = [...(data || [])].sort((a, b) => {
+        const aKS = (a.mata_pelajaran || "").toLowerCase().includes("kepala sekolah");
+        const bKS = (b.mata_pelajaran || "").toLowerCase().includes("kepala sekolah");
+        if (aKS && !bKS) return -1;
+        if (!aKS && bKS) return 1;
+        return a.nama_lengkap.localeCompare(b.nama_lengkap);
+      });
+
       setRows(
-        (data || []).map((g, idx) => ({
+        sorted.map((g, idx) => ({
           guru_id: g.id,
           nip: g.nip,
           nama_lengkap: g.nama_lengkap,
