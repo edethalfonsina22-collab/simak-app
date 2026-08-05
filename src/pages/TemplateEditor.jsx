@@ -1,10 +1,13 @@
 import { useParams, useNavigate } from "react-router-dom";
 import { useState } from "react";
+import { supabase } from "../lib/supabaseClient";
+import { useAuth } from "../lib/AuthContext";
 import templates from "../data/templates";
 
 export default function TemplateEditor() {
   const { id } = useParams();
   const navigate = useNavigate();
+const { session } = useAuth();
 
   const template = templates.find((t) => t.id === Number(id));
 
@@ -35,7 +38,30 @@ export default function TemplateEditor() {
   const [kegiatan, setKegiatan] = useState("");
   const [asesmen, setAsesmen] = useState("");
   const [deskripsi, setDeskripsi] = useState(template.description);
+  const handleSave = async () => {
+  const { error } = await supabase
+    .from("materi_pembelajaran")
+    .insert([
+      {
+        judul,
+        deskripsi,
+        isi: materi,
+        thumbnail: template.thumbnail,
+        mapel,
+        kelas,
+        fase,
+        jenis: template.type,
+        created_by: session.user.id,
+      },
+    ]);
 
+  if (error) {
+    alert("❌ Gagal menyimpan: " + error.message);
+    return;
+  }
+
+  alert("✅ Materi berhasil disimpan!");
+};
   return (
     <div className="max-w-6xl mx-auto p-6">
 
@@ -180,10 +206,11 @@ export default function TemplateEditor() {
           <div className="flex flex-wrap gap-3 pt-4">
 
             <button
-              className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg"
-            >
-              💾 Simpan
-            </button>
+  onClick={handleSave}
+  className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg"
+>
+  💾 Simpan
+</button>
 
             <button
               className="border px-6 py-3 rounded-lg hover:bg-gray-100"
