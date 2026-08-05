@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
 import SuratKeteranganPrintTemplate from "./SuratKeteranganPrintTemplate";
 import { exportSuratToPDF, exportSuratToDocx } from "../utils/suratKeteranganExport";
+import BebanMengajarForm from "./BebanMengajarForm";
 
 // Daftar jenis surat yang didukung tombol "Generate Otomatis".
 // Tambah jenis baru cukup: (1) tambah entri di sini, (2) buat fungsi templateXxx di bawah,
@@ -13,6 +14,10 @@ const JENIS_SURAT = [
   { key: "lulus", label: "Keterangan Lulus", judul: "Surat Keterangan Lulus" },
   { key: "bebas", label: "Template Bebas", judul: "" },
 ];
+
+// Mode "beban_mengajar" ditangani terpisah dari JENIS_SURAT di atas karena
+// strukturnya beda total (bukan surat per-siswa/guru, tapi SK + tabel semua guru).
+const MODE_BEBAN_MENGAJAR = "beban_mengajar";
 
 function templatePindah({ nama, nisn, ttl, kelas, alasan, tujuan, tanggal }) {
   return `Yang bertanda tangan di bawah ini Kepala Sekolah menerangkan bahwa:
@@ -161,7 +166,7 @@ export default function SuratKeteranganForm({ onSaved }) {
 
   // Auto-generate isi surat setiap kali jenis atau field terkait berubah
   useEffect(() => {
-    if (jenis === "bebas") return;
+    if (jenis === "bebas" || jenis === MODE_BEBAN_MENGAJAR) return;
 
     const siswa = siswaList.find((s) => s.id === siswaId);
     if (!siswa) return;
@@ -304,149 +309,165 @@ export default function SuratKeteranganForm({ onSaved }) {
             {j.label}
           </button>
         ))}
-      </div>
-
-      {butuhSiswa && (
-        <div className="grid grid-cols-2 gap-3">
-          <select
-            className="border rounded px-3 py-2 col-span-2"
-            value={siswaId}
-            onChange={(e) => setSiswaId(e.target.value)}
-          >
-            <option value="">Pilih Siswa</option>
-            {siswaList.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.nama_lengkap} — Kelas {s.kelas?.nama_kelas || "-"}
-              </option>
-            ))}
-          </select>
-          {loadError && (
-            <p className="col-span-2 text-sm text-red-600">{loadError}</p>
-          )}
-
-          {butuhAlasanTanggal && (
-            <>
-              <input
-                className="border rounded px-3 py-2"
-                placeholder={jenis === "pindah" ? "Alasan pindah" : "Alasan izin"}
-                value={alasan}
-                onChange={(e) => setAlasan(e.target.value)}
-              />
-              <input
-                type="date"
-                className="border rounded px-3 py-2"
-                value={tanggalPindah}
-                onChange={(e) => setTanggalPindah(e.target.value)}
-              />
-            </>
-          )}
-
-          {butuhTujuan && (
-            <input
-              className="border rounded px-3 py-2 col-span-2"
-              placeholder="Sekolah tujuan"
-              value={tujuan}
-              onChange={(e) => setTujuan(e.target.value)}
-            />
-          )}
-        </div>
-      )}
-
-      {jenis === "bebas" && (
-        <input
-          className="border rounded px-3 py-2 w-full"
-          placeholder="Judul surat (mis. Surat Keterangan Berkelakuan Baik)"
-          value={judul}
-          onChange={(e) => setJudul(e.target.value)}
-        />
-      )}
-
-      {/* Dropdown pilih Guru — manual, berlaku untuk semua jenis surat */}
-      <div>
-        <label className="block text-sm text-gray-600 mb-1">
-          Guru (penanggung jawab / pembuat surat)
-        </label>
-        <select
-          className="border rounded px-3 py-2 w-full"
-          value={guruId}
-          onChange={(e) => setGuruId(e.target.value)}
+        {/* Tombol baru: Generate Beban Mengajar */}
+        <button
+          type="button"
+          onClick={() => gantiJenis(MODE_BEBAN_MENGAJAR)}
+          className={`px-4 py-2 rounded ${
+            jenis === MODE_BEBAN_MENGAJAR ? "bg-blue-600 text-white" : "bg-gray-100"
+          }`}
         >
-          <option value="">— Pilih Guru —</option>
-          {guruList.map((g) => (
-            <option key={g.id} value={g.id}>
-              {g.nama_lengkap}
-            </option>
-          ))}
-        </select>
-        {loadErrorGuru && (
-          <p className="text-sm text-red-600 mt-1">{loadErrorGuru}</p>
-        )}
+          Generate Beban Mengajar
+        </button>
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
-        <input
-          className="border rounded px-3 py-2"
-          placeholder="Nomor surat (mis. 421.2/10/2026)"
-          value={nomorSurat}
-          onChange={(e) => setNomorSurat(e.target.value)}
-        />
-        <input
-          type="date"
-          className="border rounded px-3 py-2"
-          value={tanggalSurat}
-          onChange={(e) => setTanggalSurat(e.target.value)}
-        />
-      </div>
+      {jenis === MODE_BEBAN_MENGAJAR ? (
+        <BebanMengajarForm sekolah={sekolah} />
+      ) : (
+        <>
+          {butuhSiswa && (
+            <div className="grid grid-cols-2 gap-3">
+              <select
+                className="border rounded px-3 py-2 col-span-2"
+                value={siswaId}
+                onChange={(e) => setSiswaId(e.target.value)}
+              >
+                <option value="">Pilih Siswa</option>
+                {siswaList.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.nama_lengkap} — Kelas {s.kelas?.nama_kelas || "-"}
+                  </option>
+                ))}
+              </select>
+              {loadError && (
+                <p className="col-span-2 text-sm text-red-600">{loadError}</p>
+              )}
 
-      <textarea
-        className="border rounded px-3 py-2 w-full h-56 font-serif"
-        placeholder="Isi surat (bisa diedit bebas sebelum disimpan)"
-        value={isi}
-        onChange={(e) => setIsi(e.target.value)}
-      />
+              {butuhAlasanTanggal && (
+                <>
+                  <input
+                    className="border rounded px-3 py-2"
+                    placeholder={jenis === "pindah" ? "Alasan pindah" : "Alasan izin"}
+                    value={alasan}
+                    onChange={(e) => setAlasan(e.target.value)}
+                  />
+                  <input
+                    type="date"
+                    className="border rounded px-3 py-2"
+                    value={tanggalPindah}
+                    onChange={(e) => setTanggalPindah(e.target.value)}
+                  />
+                </>
+              )}
 
-      <button
-        type="button"
-        disabled={saving}
-        onClick={handleSimpan}
-        className="bg-green-600 text-white px-4 py-2 rounded disabled:opacity-50"
-      >
-        {saving ? "Menyimpan..." : "Simpan Surat"}
-      </button>
+              {butuhTujuan && (
+                <input
+                  className="border rounded px-3 py-2 col-span-2"
+                  placeholder="Sekolah tujuan"
+                  value={tujuan}
+                  onChange={(e) => setTujuan(e.target.value)}
+                />
+              )}
+            </div>
+          )}
 
-      {suratTersimpan && (
-        <div className="mt-6 border-t pt-4 space-y-3">
-          <p className="font-medium">Surat tersimpan — unduh:</p>
-          <div className="flex gap-3">
-            <button
-              type="button"
-              onClick={() =>
-                exportSuratToPDF(
-                  printRef,
-                  suratTersimpan.nomor_surat.replace(/\//g, "-")
-                )
-              }
-              className="bg-red-600 text-white px-4 py-2 rounded"
+          {jenis === "bebas" && (
+            <input
+              className="border rounded px-3 py-2 w-full"
+              placeholder="Judul surat (mis. Surat Keterangan Berkelakuan Baik)"
+              value={judul}
+              onChange={(e) => setJudul(e.target.value)}
+            />
+          )}
+
+          {/* Dropdown pilih Guru — manual, berlaku untuk semua jenis surat */}
+          <div>
+            <label className="block text-sm text-gray-600 mb-1">
+              Guru (penanggung jawab / pembuat surat)
+            </label>
+            <select
+              className="border rounded px-3 py-2 w-full"
+              value={guruId}
+              onChange={(e) => setGuruId(e.target.value)}
             >
-              Unduh PDF
-            </button>
-            <button
-              type="button"
-              onClick={() => exportSuratToDocx(suratTersimpan, sekolah)}
-              className="bg-blue-600 text-white px-4 py-2 rounded"
-            >
-              Unduh DOCX
-            </button>
+              <option value="">— Pilih Guru —</option>
+              {guruList.map((g) => (
+                <option key={g.id} value={g.id}>
+                  {g.nama_lengkap}
+                </option>
+              ))}
+            </select>
+            {loadErrorGuru && (
+              <p className="text-sm text-red-600 mt-1">{loadErrorGuru}</p>
+            )}
           </div>
 
-          <div className="overflow-auto border" style={{ maxHeight: 500 }}>
-            <SuratKeteranganPrintTemplate
-              ref={printRef}
-              surat={suratTersimpan}
-              sekolah={sekolah}
+          <div className="grid grid-cols-2 gap-3">
+            <input
+              className="border rounded px-3 py-2"
+              placeholder="Nomor surat (mis. 421.2/10/2026)"
+              value={nomorSurat}
+              onChange={(e) => setNomorSurat(e.target.value)}
+            />
+            <input
+              type="date"
+              className="border rounded px-3 py-2"
+              value={tanggalSurat}
+              onChange={(e) => setTanggalSurat(e.target.value)}
             />
           </div>
-        </div>
+
+          <textarea
+            className="border rounded px-3 py-2 w-full h-56 font-serif"
+            placeholder="Isi surat (bisa diedit bebas sebelum disimpan)"
+            value={isi}
+            onChange={(e) => setIsi(e.target.value)}
+          />
+
+          <button
+            type="button"
+            disabled={saving}
+            onClick={handleSimpan}
+            className="bg-green-600 text-white px-4 py-2 rounded disabled:opacity-50"
+          >
+            {saving ? "Menyimpan..." : "Simpan Surat"}
+          </button>
+
+          {suratTersimpan && (
+            <div className="mt-6 border-t pt-4 space-y-3">
+              <p className="font-medium">Surat tersimpan — unduh:</p>
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={() =>
+                    exportSuratToPDF(
+                      printRef,
+                      suratTersimpan.nomor_surat.replace(/\//g, "-")
+                    )
+                  }
+                  className="bg-red-600 text-white px-4 py-2 rounded"
+                >
+                  Unduh PDF
+                </button>
+                <button
+                  type="button"
+                  onClick={() => exportSuratToDocx(suratTersimpan, sekolah)}
+                  className="bg-blue-600 text-white px-4 py-2 rounded"
+                >
+                  Unduh DOCX
+                </button>
+              </div>
+
+              <div className="overflow-auto border" style={{ maxHeight: 500 }}>
+                <SuratKeteranganPrintTemplate
+                  ref={printRef}
+                  surat={suratTersimpan}
+                  sekolah={sekolah}
+                />
+              </div>
+            </div>
+          )}
+        </>
       )}
     </div>
   );
