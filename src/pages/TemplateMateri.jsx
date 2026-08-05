@@ -45,6 +45,8 @@ export default function TemplateMateri() {
               key={template.id}
               template={template}
               onPreview={() => setSelectedTemplate(template)}
+              onUse={(item) => window.location.href = `/template-materi/${item.id}`}
+/>
             />
           ))
         )}
@@ -93,13 +95,11 @@ export default function TemplateMateri() {
                 Tutup
               </button>
 
-              <button className="bg-blue-600 text-white px-4 py-2 rounded-lg">
-                Gunakan Template
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
+            <button
+  onClick={() => {
+    window.location.href = `/template-materi/${selectedTemplate.id}`;
+  }}
+  className="bg-blue-600 text-white px-4 py-2 rounded-lg"
+>
+  Gunakan Template
+</button>
