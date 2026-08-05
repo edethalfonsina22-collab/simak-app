@@ -4,6 +4,7 @@ import { Loader2, CheckCircle2, School } from 'lucide-react'
 
 const emptyForm = {
   nama_lengkap: '',
+  nik_siswa: '',
   tempat_lahir: '',
   tanggal_lahir: '',
   jenis_kelamin: 'L',
@@ -27,8 +28,14 @@ export default function PPDBPublik() {
 
   async function handleSubmit(e) {
     e.preventDefault()
-    setMengirim(true)
     setError('')
+
+    if (form.nik_siswa.length !== 16) {
+      setError('NIK Siswa harus terdiri dari 16 digit angka.')
+      return
+    }
+
+    setMengirim(true)
     const { error: err } = await supabase.from('ppdb_pendaftar').insert(form)
     setMengirim(false)
     if (err) {
@@ -78,6 +85,20 @@ export default function PPDBPublik() {
           <div>
             <label className="label-field">Nama Lengkap Calon Siswa *</label>
             <input required className="input-field" value={form.nama_lengkap} onChange={(e) => ubah('nama_lengkap', e.target.value)} />
+          </div>
+
+          <div>
+            <label className="label-field">NIK Siswa *</label>
+            <input
+              required
+              className="input-field"
+              placeholder="16 digit sesuai KK/KTP"
+              inputMode="numeric"
+              pattern="\d{16}"
+              maxLength={16}
+              value={form.nik_siswa}
+              onChange={(e) => ubah('nik_siswa', e.target.value.replace(/\D/g, ''))}
+            />
           </div>
 
           <div className="grid sm:grid-cols-2 gap-4">
