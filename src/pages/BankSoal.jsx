@@ -13,6 +13,7 @@ export default function BankSoal() {
   const [mapelUpload, setMapelUpload] = useState('')
   const [mapelFilter, setMapelFilter] = useState('')
   const [expanded, setExpanded] = useState({})
+  const [deletingMapel, setDeletingMapel] = useState('')
 
   async function load() {
     setLoading(true)
@@ -119,6 +120,34 @@ export default function BankSoal() {
     await load()
   }
 
+  // Hapus seluruh soal dalam satu folder mata pelajaran sekaligus.
+  // Kalau ada soal milik guru lain yang tidak boleh dihapus user ini (bukan admin),
+  // soal tersebut dilewati dan user diberi tahu jumlahnya sebelum konfirmasi.
+  async function handleDeleteMapel(mapel, soalMapel) {
+    const idsBolehHapus = soalMapel.filter(canDelete).map((item) => item.id)
+
+    if (idsBolehHapus.length === 0) {
+      alert(`Tidak ada soal yang bisa Anda hapus di mata pelajaran "${mapel}".`)
+      return
+    }
+
+    const semuaBisaDihapus = idsBolehHapus.length === soalMapel.length
+    const pesanKonfirmasi = semuaBisaDihapus
+      ? `Hapus seluruh ${idsBolehHapus.length} soal pada mata pelajaran "${mapel}"? Tindakan ini tidak bisa dibatalkan.`
+      : `Anda hanya bisa menghapus ${idsBolehHapus.length} dari ${soalMapel.length} soal di mata pelajaran "${mapel}" (sisanya milik guru lain). Lanjutkan menghapus yang bisa dihapus?`
+
+    if (!confirm(pesanKonfirmasi)) return
+
+    setDeletingMapel(mapel)
+    const { error } = await supabase.from('bank_soal').delete().in('id', idsBolehHapus)
+    setDeletingMapel('')
+
+    if (error) {
+      alert('Gagal menghapus folder mata pelajaran: ' + error.message)
+    }
+    await load()
+  }
+
   const canDelete = (item) => isAdmin || item.guru_id === profil?.guru_id
 
   const grouped = items.reduce((acc, item) => {
@@ -204,18 +233,36 @@ export default function BankSoal() {
         <div className="space-y-4">
           {mapelTampil.map((mapel) => {
             const isOpen = expanded[mapel]
+            const soalMapel = grouped[mapel]
+            const adaYangBolehDihapus = soalMapel.some(canDelete)
+            const sedangHapusFolder = deletingMapel === mapel
             return (
               <div key={mapel} className="card overflow-hidden">
-                <button
-                  onClick={() => setExpanded({ ...expanded, [mapel]: !isOpen })}
-                  className="w-full flex items-center justify-between p-4"
-                >
-                  <p className="text-sm font-medium text-ink-950">{mapel} <span className="text-ink-700/40 font-normal">({grouped[mapel].length} soal)</span></p>
-                  {isOpen ? <ChevronUp size={16} className="text-ink-700/50" /> : <ChevronDown size={16} className="text-ink-700/50" />}
-                </button>
+                <div className="w-full flex items-center justify-between p-4 gap-3">
+                  <button
+                    onClick={() => setExpanded({ ...expanded, [mapel]: !isOpen })}
+                    className="flex-1 flex items-center justify-between min-w-0"
+                  >
+                    <p className="text-sm font-medium text-ink-950">{mapel} <span className="text-ink-700/40 font-normal">({soalMapel.length} soal)</span></p>
+                    {isOpen ? <ChevronUp size={16} className="text-ink-700/50 shrink-0" /> : <ChevronDown size={16} className="text-ink-700/50 shrink-0" />}
+                  </button>
+                  {adaYangBolehDihapus && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleDeleteMapel(mapel, soalMapel)
+                      }}
+                      disabled={sedangHapusFolder}
+                      title={`Hapus seluruh soal mata pelajaran ${mapel}`}
+                      className="w-7 h-7 rounded-lg flex items-center justify-center text-red-600 hover:bg-red-50 shrink-0 disabled:opacity-50"
+                    >
+                      {sedangHapusFolder ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                    </button>
+                  )}
+                </div>
                 {isOpen && (
                   <ul className="divide-y divide-ink-900/[0.06] border-t border-ink-900/[0.06]">
-                    {grouped[mapel].map((item, i) => (
+                    {soalMapel.map((item, i) => (
                       <li key={item.id} className="p-4 flex items-start justify-between gap-3">
                         <div className="min-w-0">
                           <p className="text-sm text-ink-900">{i + 1}. {item.soal}</p>
