@@ -92,6 +92,14 @@ export default function App() {
       <Route path="/dokumen" element={<ProtectedRoute><Dokumen /></ProtectedRoute>} />
       <Route path="/rpp" element={<ProtectedRoute><RPP /></ProtectedRoute>} />
       <Route path="/arsip-rpp" element={<ProtectedRoute><ArsipRPP /></ProtectedRoute>} />
+      <Route
+  path="/template-materi"
+  element={
+    <ProtectedRoute>
+      <TemplateMateri />
+    </ProtectedRoute>
+  }
+/>
       <Route path="/pengajuan-surat-aktif" element={<ProtectedRoute><PengajuanSuratAktif /></ProtectedRoute>} />
       <Route path="/bank-soal" element={<ProtectedRoute><BankSoal /></ProtectedRoute>} />
       <Route path="/kartu" element={<ProtectedRoute adminOnly><KartuSiswa /></ProtectedRoute>} />
