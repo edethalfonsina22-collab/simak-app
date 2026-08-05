@@ -1,30 +1,34 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabaseClient";
+import { useAuth } from "../lib/AuthContext";
 
 export default function MateriSaya() {
-  const [materi, setMateri] = useState([]);
-  const [loading, setLoading] = useState(true);
+const navigate = useNavigate();
+const { session } = useAuth();
+
+const [materi, setMateri] = useState([]);
+const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     loadMateri();
   }, []);
 
-  async function loadMateri() {
-    setLoading(true);
+async function loadMateri() {
+  setLoading(true);
 
-    const { data, error } = await supabase
-      .from("materi_pembelajaran")
-      .select("*")
-      .order("created_at", { ascending: false });
+  const { data, error } = await supabase
+    .from("materi_saya")
+    .select("*")
+    .eq("user_id", session.user.id)
+    .order("created_at", { ascending: false });
 
-    if (error) {
-      console.error(error);
-    } else {
-      setMateri(data);
-    }
-
-    setLoading(false);
+  if (!error) {
+    setMateri(data);
   }
+
+  setLoading(false);
+}
 
   async function hapusMateri(id) {
     if (!confirm("Yakin ingin menghapus materi ini?")) return;
@@ -75,9 +79,72 @@ export default function MateriSaya() {
 
             </thead>
 
-            <tbody>
+<tbody>
 
-              {materi.map((item) => (
+{loading ? (
+
+<tr>
+<td colSpan="6" className="text-center py-8">
+Memuat data...
+</td>
+</tr>
+
+) : materi.length === 0 ? (
+
+<tr>
+<td colSpan="6" className="text-center py-8">
+Belum ada materi.
+</td>
+</tr>
+
+) : (
+
+materi.map((item) => (
+
+<tr key={item.id} className="border-t">
+
+<td className="p-3">{item.judul}</td>
+
+<td>{item.mapel}</td>
+
+<td>{item.kelas}</td>
+
+<td>{item.fase}</td>
+
+<td>
+{new Date(item.created_at).toLocaleDateString("id-ID")}
+</td>
+
+<td className="space-x-2">
+
+<button
+onClick={() => navigate(`/template-materi/${item.template_id}`)}
+className="bg-blue-600 text-white px-3 py-1 rounded"
+>
+Lihat
+</button>
+
+<button
+className="bg-yellow-500 text-white px-3 py-1 rounded"
+>
+Edit
+</button>
+
+<button
+className="bg-red-600 text-white px-3 py-1 rounded"
+>
+Hapus
+</button>
+
+</td>
+
+</tr>
+
+))
+
+)}
+
+</tbody>
 
                 <tr
                   key={item.id}
