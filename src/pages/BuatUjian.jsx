@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import * as XLSX from 'xlsx';
 import { supabase } from '../lib/supabaseClient'; // sesuaikan kalau nama/lokasi file berbeda
 import { useAuth } from '../lib/AuthContext';
+import Layout from '../components/Layout';
 
 // Membuat kode ujian acak 6 karakter, misal: X7K2QP
 function buatKodeUjian() {
@@ -248,7 +249,7 @@ export default function BuatUjian() {
   if (status === 'selesai' && ujianDibuat) {
     const namaKelasDibuat = daftarKelas.find((k) => k.id === ujianDibuat.kelas_id)?.nama_kelas;
     return (
-      <div className="min-h-screen bg-gradient-to-b from-[#fdf3f1] to-[#f7e6e3] flex items-start justify-center p-6">
+      <Layout title="Buat Ujian" subtitle="Ujian baru berhasil dibuat">
         <div className="w-full max-w-xl p-6 rounded-xl border border-[#6b0f1a]/15 bg-white shadow-sm">
           <h3 className="text-lg font-semibold text-[#3b0a0a] flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-[#d4a017]"></span>
@@ -290,12 +291,12 @@ export default function BuatUjian() {
             </button>
           )}
         </div>
-      </div>
+      </Layout>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-[#fdf3f1] to-[#f7e6e3] flex items-start justify-center p-6">
+    <Layout title="Buat Ujian" subtitle="Buat ujian online baru dari Excel atau Bank Soal">
       <div className="w-full max-w-xl space-y-4 bg-white rounded-xl border border-[#6b0f1a]/15 shadow-sm p-6">
         <h3 className="text-lg font-semibold text-[#3b0a0a] flex items-center gap-2">
           <span className="w-1.5 h-5 rounded-full bg-[#d4a017]"></span>
@@ -473,6 +474,6 @@ export default function BuatUjian() {
           {status === 'menyimpan' ? 'Menyimpan...' : 'Simpan Ujian'}
         </button>
       </div>
-    </div>
+    </Layout>
   );
 }
