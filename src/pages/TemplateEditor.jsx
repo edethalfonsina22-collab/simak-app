@@ -375,7 +375,5 @@ const [activeTab, setActiveTab] = useState("materi");
         </div>
 
       </div>
-
-    </div>
   );
 }
