@@ -8,14 +8,14 @@ export default function TemplateCard({
 
       <img
         src={template.thumbnail}
-        alt={template.title}
+        alt={template.judul}
         className="w-full h-48 object-cover"
       />
 
       <div className="p-4">
 
         <h2 className="text-lg font-bold text-gray-800">
-          {template.title}
+          {template.judul}
         </h2>
 
         <p className="text-sm text-gray-500 mt-1">
