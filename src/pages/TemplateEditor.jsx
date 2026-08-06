@@ -202,6 +202,8 @@ const { session } = useAuth();
           deskripsi,
         },
       ]);
+    alert("Materi berhasil disimpan");
+navigate("/materi-saya");
 
     if (error) {
       alert(error.message);
