@@ -30,9 +30,6 @@ import PPDBAdmin from './pages/PPDBAdmin'
 import Perpustakaan from './pages/Perpustakaan'
 import RPP from './pages/RPP'
 import ArsipRPP from './pages/ArsipRPP'
-import TemplateMateri from './pages/TemplateMateri'
-import MateriSaya from './pages/MateriSaya'
-import TemplateEditor from './pages/TemplateEditor'
 import BuatUjian from './pages/BuatUjian'
 import UjianOnline from './pages/UjianOnline'
 import ProfilSaya from './pages/ProfilSaya'
@@ -94,31 +91,6 @@ export default function App() {
       <Route path="/dokumen" element={<ProtectedRoute><Dokumen /></ProtectedRoute>} />
      <Route path="/rpp" element={<ProtectedRoute><RPP /></ProtectedRoute>} />
 <Route path="/arsip-rpp" element={<ProtectedRoute><ArsipRPP /></ProtectedRoute>} />
-
-<Route
-  path="/template-materi"
-  element={
-    <ProtectedRoute>
-      <TemplateMateri />
-    </ProtectedRoute>
-  }
-/>
-      <Route
-  path="/materi-saya"
-  element={
-    <ProtectedRoute>
-      <MateriSaya />
-    </ProtectedRoute>
-  }
-/>
-      <Route
-  path="/template-materi/:id"
-  element={
-    <ProtectedRoute>
-      <TemplateEditor />
-    </ProtectedRoute>
-  }
-/>
       <Route path="/pengajuan-surat-aktif" element={<ProtectedRoute><PengajuanSuratAktif /></ProtectedRoute>} />
       <Route path="/bank-soal" element={<ProtectedRoute><BankSoal /></ProtectedRoute>} />
       <Route path="/kartu" element={<ProtectedRoute adminOnly><KartuSiswa /></ProtectedRoute>} />
