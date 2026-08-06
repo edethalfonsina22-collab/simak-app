@@ -8,21 +8,21 @@ export default function TemplateEditor() {
   const navigate = useNavigate();
   const { session } = useAuth();
 
-  const [loading, setLoading] = useState(true);
-  const [template, setTemplate] = useState(null);
-  const [activeTab, setActiveTab] = useState("materi");
+const [loading, setLoading] = useState(true);
+const [template, setTemplate] = useState(null);
 
-  const [judul, setJudul] = useState("");
-  const [mapel, setMapel] = useState("");
-  const [kelas, setKelas] = useState("");
-  const [fase, setFase] = useState("");
+const [judul, setJudul] = useState("");
+const [mapel, setMapel] = useState("");
+const [kelas, setKelas] = useState("");
+const [fase, setFase] = useState("");
 
-  const [tujuan, setTujuan] = useState("");
-  const [materi, setMateri] = useState("");
-  const [kegiatan, setKegiatan] = useState("");
-  const [asesmen, setAsesmen] = useState("");
-  const [deskripsi, setDeskripsi] = useState("");
+const [tujuan, setTujuan] = useState("");
+const [materi, setMateri] = useState("");
+const [kegiatan, setKegiatan] = useState("");
+const [asesmen, setAsesmen] = useState("");
+const [deskripsi, setDeskripsi] = useState("");
 
+const [activeTab, setActiveTab] = useState("materi");
   useEffect(() => {
     loadTemplate();
   }, []);
