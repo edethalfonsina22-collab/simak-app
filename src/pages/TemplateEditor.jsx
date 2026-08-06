@@ -183,45 +183,24 @@ const { session } = useAuth();
           <div className="flex flex-wrap gap-3 pt-4">
 
 <button
-onClick={async () => {
-  console.log({
-    judul,
-    mapel,
-    kelas,
-    fase,
-    tujuan,
-    materi,
-    kegiatan,
-    asesmen,
-    deskripsi,
-  });
-
-  const { error } = await supabase
-    .from("materi_saya")
-    .insert([
-      {
-        user_id: session.user.id,
-        template_id: null,
-        judul,
-        mapel,
-        kelas,
-        fase,
-        tujuan,
-        materi,
-        kegiatan,
-        asesmen,
-        deskripsi,
-      },
-    ]);
-
-  if (error) {
-    alert(error.message);
-    return;
-  }
-
-  alert("Materi berhasil disimpan");
-  navigate("/materi-saya");
-}}
+  onClick={async () => {
+    const { error } = await supabase
+      .from("materi_saya")
+      .insert([
+        {
+          user_id: session.user.id,
+          template_id: null,
+          judul,
+          mapel,
+          kelas,
+          fase,
+          tujuan,
+          materi,
+          kegiatan,
+          asesmen,
+          deskripsi,
+        },
+      ]);
 
     if (error) {
       alert(error.message);
@@ -229,9 +208,7 @@ onClick={async () => {
     }
 
     alert("Materi berhasil disimpan");
-
     navigate("/materi-saya");
-
   }}
   className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg"
 >
