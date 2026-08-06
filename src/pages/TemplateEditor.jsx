@@ -8,19 +8,19 @@ export default function TemplateEditor() {
   const navigate = useNavigate();
   const { session } = useAuth();
 
-  const [loading, setLoading] = useState(true);
-  const [template, setTemplate] = useState(null);
+  const [loading, setLoading] = useState("materi");
+  const [template, setTemplate] = useState("materi");
 
-  const [judul, setJudul] = useState("");
-  const [mapel, setMapel] = useState("");
-  const [kelas, setKelas] = useState("");
-  const [fase, setFase] = useState("");
+  const [judul, setJudul] = useState("materi");
+  const [mapel, setMapel] = useState("materi");
+  const [kelas, setKelas] = useState("materi");
+  const [fase, setFase] = useState("materi");
 
-  const [tujuan, setTujuan] = useState("");
-  const [materi, setMateri] = useState("");
-  const [kegiatan, setKegiatan] = useState("");
-  const [asesmen, setAsesmen] = useState("");
-  const [deskripsi, setDeskripsi] = useState("");
+  const [tujuan, setTujuan] = useState("materi");
+  const [materi, setMateri] = useState("materi");
+  const [kegiatan, setKegiatan] = useState("materi");
+  const [asesmen, setAsesmen] = useState("materi");
+  const [deskripsi, setDeskripsi] = useState("materi");
 
   useEffect(() => {
     loadTemplate();
@@ -110,6 +110,66 @@ export default function TemplateEditor() {
           alt={judul}
           className="w-full h-72 object-cover rounded-lg mb-8"
         />
+        <div className="border-b mb-6">
+  <div className="flex flex-wrap gap-2">
+
+    <button
+      onClick={() => setActiveTab("materi")}
+      className={`px-4 py-2 rounded-t-lg ${
+        activeTab === "materi"
+          ? "bg-blue-600 text-white"
+          : "bg-gray-100"
+      }`}
+    >
+      📖 Materi
+    </button>
+
+    <button
+      onClick={() => setActiveTab("tujuan")}
+      className={`px-4 py-2 rounded-t-lg ${
+        activeTab === "tujuan"
+          ? "bg-blue-600 text-white"
+          : "bg-gray-100"
+      }`}
+    >
+      🎯 Tujuan
+    </button>
+
+    <button
+      onClick={() => setActiveTab("kegiatan")}
+      className={`px-4 py-2 rounded-t-lg ${
+        activeTab === "kegiatan"
+          ? "bg-blue-600 text-white"
+          : "bg-gray-100"
+      }`}
+    >
+      📝 Kegiatan
+    </button>
+
+    <button
+      onClick={() => setActiveTab("asesmen")}
+      className={`px-4 py-2 rounded-t-lg ${
+        activeTab === "asesmen"
+          ? "bg-blue-600 text-white"
+          : "bg-gray-100"
+      }`}
+    >
+      ✅ Asesmen
+    </button>
+
+    <button
+      onClick={() => setActiveTab("lampiran")}
+      className={`px-4 py-2 rounded-t-lg ${
+        activeTab === "lampiran"
+          ? "bg-blue-600 text-white"
+          : "bg-gray-100"
+      }`}
+    >
+      📎 Lampiran
+    </button>
+
+  </div>
+</div>
 
         <div className="space-y-6">
 
