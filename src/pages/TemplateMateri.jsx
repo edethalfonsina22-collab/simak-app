@@ -1,6 +1,5 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabaseClient";
 import TemplateCard from "../components/TemplateCard";
 
@@ -25,11 +24,11 @@ async function loadTemplates() {
   }
 }
 
-  const filtered = templates.filter(
-    (item) =>
-      item.title.toLowerCase().includes(search.toLowerCase()) ||
-      item.subject.toLowerCase().includes(search.toLowerCase())
-  );
+const filtered = templates.filter(
+  (item) =>
+    item.judul.toLowerCase().includes(search.toLowerCase()) ||
+    item.mapel.toLowerCase().includes(search.toLowerCase())
+);
 
   return (
     <div className="p-6">
@@ -90,11 +89,11 @@ async function loadTemplates() {
               </p>
 
               <p>
-                <strong>Kelas:</strong> {selectedTemplate.grade}
+                <strong>Kelas:</strong> {selectedTemplate.kelas}
               </p>
 
               <p>
-                <strong>Fase:</strong> {selectedTemplate.phase}
+                <strong>Fase:</strong> {selectedTemplate.fase}
               </p>
 
               <p>
@@ -102,7 +101,7 @@ async function loadTemplates() {
               </p>
 
               <p className="text-gray-600 mt-3">
-                {selectedTemplate.description}
+                {selectedTemplate.deskripsi}
               </p>
             </div>
 
