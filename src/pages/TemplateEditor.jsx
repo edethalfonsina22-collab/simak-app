@@ -1,44 +1,94 @@
 import { useParams, useNavigate } from "react-router-dom";
-import { useState } from "react";
-import templates from "../data/templates";
+import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
 import { useAuth } from "../lib/AuthContext";
 
 export default function TemplateEditor() {
   const { id } = useParams();
   const navigate = useNavigate();
-const { session } = useAuth();
+  const { session } = useAuth();
 
-  const template = templates.find((t) => t.id === Number(id));
+  const [loading, setLoading] = useState(true);
+  const [template, setTemplate] = useState(null);
 
-  if (!template) {
-    return (
-      <div className="p-8">
-        <h1 className="text-2xl font-bold">
-          Template tidak ditemukan
-        </h1>
-
-        <button
-          onClick={() => navigate("/template-materi")}
-          className="mt-4 bg-blue-600 text-white px-4 py-2 rounded-lg"
-        >
-          Kembali
-        </button>
-      </div>
-    );
-  }
-
-  const [judul, setJudul] = useState(template.title);
-  const [mapel, setMapel] = useState(template.subject);
-  const [kelas, setKelas] = useState(template.grade);
-  const [fase, setFase] = useState(template.phase);
+  const [judul, setJudul] = useState("");
+  const [mapel, setMapel] = useState("");
+  const [kelas, setKelas] = useState("");
+  const [fase, setFase] = useState("");
 
   const [tujuan, setTujuan] = useState("");
   const [materi, setMateri] = useState("");
   const [kegiatan, setKegiatan] = useState("");
   const [asesmen, setAsesmen] = useState("");
-  const [deskripsi, setDeskripsi] = useState(template.description);
-  
+  const [deskripsi, setDeskripsi] = useState("");
+
+  useEffect(() => {
+    loadTemplate();
+  }, []);
+
+  async function loadTemplate() {
+    setLoading(true);
+
+    const { data, error } = await supabase
+      .from("materi_pembelajaran")
+      .select("*")
+      .eq("id", id)
+      .single();
+
+    if (error) {
+      alert(error.message);
+      navigate("/template-materi");
+      return;
+    }
+
+    setTemplate(data);
+
+    setJudul(data.judul || "");
+    setMapel(data.mapel || "");
+    setKelas(data.kelas || "");
+    setFase(data.fase || "");
+    setDeskripsi(data.deskripsi || "");
+
+    setLoading(false);
+  }
+
+  async function simpanMateri() {
+    const { error } = await supabase
+      .from("materi_saya")
+      .insert([
+        {
+          user_id: session.user.id,
+          template_id: template.id,
+          judul,
+          mapel,
+          kelas,
+          fase,
+          tujuan,
+          materi,
+          kegiatan,
+          asesmen,
+          deskripsi,
+        },
+      ]);
+
+    if (error) {
+      alert(error.message);
+      return;
+    }
+
+    alert("✅ Materi berhasil disimpan");
+
+    navigate("/materi-saya");
+  }
+
+  if (loading) {
+    return (
+      <div className="p-10 text-center">
+        Memuat template...
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-6xl mx-auto p-6">
 
@@ -57,7 +107,7 @@ const { session } = useAuth();
 
         <img
           src={template.thumbnail}
-          alt={template.title}
+          alt={judul}
           className="w-full h-72 object-cover rounded-lg mb-8"
         />
 
@@ -182,38 +232,12 @@ const { session } = useAuth();
 
           <div className="flex flex-wrap gap-3 pt-4">
 
-<button
-  onClick={async () => {
-    const { error } = await supabase
-      .from("materi_saya")
-      .insert([
-        {
-          user_id: session.user.id,
-          template_id: null,
-          judul,
-          mapel,
-          kelas,
-          fase,
-          tujuan,
-          materi,
-          kegiatan,
-          asesmen,
-          deskripsi,
-        },
-      ]);
-
-    if (error) {
-      alert(error.message);
-      return;
-    }
-
-    alert("Materi berhasil disimpan");
-    navigate("/materi-saya");
-  }}
-  className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg"
->
-  💾 Simpan
-</button>
+            <button
+              onClick={simpanMateri}
+              className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg"
+            >
+              💾 Simpan
+            </button>
 
             <button
               className="border px-6 py-3 rounded-lg hover:bg-gray-100"
