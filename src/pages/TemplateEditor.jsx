@@ -2,6 +2,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
 import { useAuth } from "../lib/AuthContext";
+import Layout from "../components/Layout";
 
 export default function TemplateEditor() {
   const { id } = useParams();
@@ -88,13 +89,16 @@ const [activeTab, setActiveTab] = useState("materi");
 
   if (loading) {
     return (
-      <div className="p-10 text-center">
-        Memuat template...
-      </div>
+      <Layout title="Editor Materi Pembelajaran">
+        <div className="p-10 text-center">
+          Memuat template...
+        </div>
+      </Layout>
     );
   }
 
   return (
+    <Layout title="Editor Materi Pembelajaran">
     <div className="max-w-6xl mx-auto p-6">
 
       <button
@@ -375,5 +379,6 @@ const [activeTab, setActiveTab] = useState("materi");
         </div>
 
       </div>
+    </Layout>
   );
 }
