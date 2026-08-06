@@ -190,7 +190,7 @@ const { session } = useAuth();
       .insert([
         {
           user_id: session.user.id,
-          template_id: template.id,
+          template_id: null,
           judul,
           mapel,
           kelas,
