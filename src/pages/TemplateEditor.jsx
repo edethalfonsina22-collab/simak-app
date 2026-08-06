@@ -38,30 +38,7 @@ const { session } = useAuth();
   const [kegiatan, setKegiatan] = useState("");
   const [asesmen, setAsesmen] = useState("");
   const [deskripsi, setDeskripsi] = useState(template.description);
-  const handleSave = async () => {
-  const { error } = await supabase
-    .from("materi_pembelajaran")
-    .insert([
-      {
-        judul,
-        deskripsi,
-        isi: materi,
-        thumbnail: template.thumbnail,
-        mapel,
-        kelas,
-        fase,
-        jenis: template.type,
-        created_by: session.user.id,
-      },
-    ]);
-
-  if (error) {
-    alert("❌ Gagal menyimpan: " + error.message);
-    return;
-  }
-
-  alert("✅ Materi berhasil disimpan!");
-};
+  
   return (
     <div className="max-w-6xl mx-auto p-6">
 
