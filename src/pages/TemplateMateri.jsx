@@ -1,13 +1,29 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import templates from "../data/templates";
+import { useEffect, useState } from "react";
+import { supabase } from "../lib/supabaseClient";
 import TemplateCard from "../components/TemplateCard";
 
 export default function TemplateMateri() {
   const navigate = useNavigate();
 
-  const [search, setSearch] = useState("");
-  const [selectedTemplate, setSelectedTemplate] = useState(null);
+const [templates, setTemplates] = useState([]);
+const [search, setSearch] = useState("");
+const [selectedTemplate, setSelectedTemplate] = useState(null);
+  useEffect(() => {
+  loadTemplates();
+}, []);
+
+async function loadTemplates() {
+  const { data, error } = await supabase
+    .from("materi_pembelajaran")
+    .select("*")
+    .order("judul");
+
+  if (!error) {
+    setTemplates(data);
+  }
+}
 
   const filtered = templates.filter(
     (item) =>
