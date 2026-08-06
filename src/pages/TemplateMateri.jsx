@@ -75,18 +75,18 @@ async function loadTemplates() {
           <div className="bg-white rounded-xl shadow-xl w-full max-w-xl p-6">
 
             <h2 className="text-2xl font-bold mb-4">
-              {selectedTemplate.title}
+              {selectedTemplate.judul}
             </h2>
 
             <img
               src={selectedTemplate.thumbnail}
-              alt={selectedTemplate.title}
+              alt={selectedTemplate.judul}
               className="w-full h-60 object-cover rounded-lg mb-4"
             />
 
             <div className="space-y-2">
               <p>
-                <strong>Mapel:</strong> {selectedTemplate.subject}
+                <strong>Mapel:</strong> {selectedTemplate.mapel}
               </p>
 
               <p>
@@ -98,7 +98,7 @@ async function loadTemplates() {
               </p>
 
               <p>
-                <strong>Jenis:</strong> {selectedTemplate.type}
+                <strong>Jenis:</strong> {selectedTemplate.jenis}
               </p>
 
               <p className="text-gray-600 mt-3">
