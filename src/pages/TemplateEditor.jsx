@@ -101,9 +101,54 @@ export default function TemplateEditor() {
 
       <div className="bg-white rounded-xl shadow-lg p-8">
 
-        <h1 className="text-3xl font-bold mb-6">
-          📚 Editor Template Materi
-        </h1>
+<div className="flex flex-col lg:flex-row lg:items-center lg:justify-between mb-8">
+
+  <div>
+    <h1 className="text-3xl font-bold">
+      📚 Editor Materi Pembelajaran
+    </h1>
+
+    <p className="text-gray-500 mt-1">
+      Buat, edit, dan simpan materi pembelajaran.
+    </p>
+  </div>
+
+  <div className="flex flex-wrap gap-3 mt-5 lg:mt-0">
+
+    <button
+      onClick={simpanMateri}
+      className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg"
+    >
+      💾 Simpan
+    </button>
+
+    <button
+      className="border px-5 py-2 rounded-lg hover:bg-gray-100"
+    >
+      📄 PDF
+    </button>
+
+    <button
+      className="border px-5 py-2 rounded-lg hover:bg-gray-100"
+    >
+      📘 Word
+    </button>
+
+    <button
+      className="border px-5 py-2 rounded-lg hover:bg-gray-100"
+    >
+      🎞 PPT
+    </button>
+
+    <button
+      className="bg-purple-600 hover:bg-purple-700 text-white px-5 py-2 rounded-lg"
+    >
+      🤖 AI
+    </button>
+
+  </div>
+
+</div>
 
         <img
           src={template.thumbnail}
@@ -289,8 +334,6 @@ export default function TemplateEditor() {
               className="w-full border rounded-lg px-4 py-3"
             />
           </div>
-
-          <div className="flex flex-wrap gap-3 pt-4">
 
             <button
               onClick={simpanMateri}
