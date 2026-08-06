@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../lib/AuthContext'
 import Layout from '../components/Layout'
-import { Loader2, Save, ClipboardCheck } from 'lucide-react'
+import { Loader2, Save, ClipboardCheck, WifiOff } from 'lucide-react'
+import { tambahAntrian, ambilAntrian, sinkronAntrian } from '../lib/offlineQueue'
 
 const STATUS_OPTS = [
   { value: 'hadir', label: 'Hadir', color: 'bg-sage-500/15 text-sage-500' },
@@ -28,6 +29,9 @@ export default function Presensi() {
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [savedOffline, setSavedOffline] = useState(false)
+  const [isOffline, setIsOffline] = useState(!navigator.onLine)
+  const [queueCount, setQueueCount] = useState(0)
 
   useEffect(() => {
     supabase.from('kelas').select('id, nama_kelas').order('nama_kelas').then(({ data }) => {
@@ -35,6 +39,30 @@ export default function Presensi() {
       if (data?.length) setKelasId(data[0].id)
     })
     supabase.from('guru').select('id, nama_lengkap, foto_profil_path').eq('status', 'aktif').order('nama_lengkap').then(({ data }) => setGuruList(data || []))
+  }, [])
+
+  // Pantau status koneksi & sinkronkan antrian otomatis saat online kembali
+  useEffect(() => {
+    ambilAntrian().then((items) => setQueueCount(items.length))
+
+    async function handleOnline() {
+      setIsOffline(false)
+      const jumlahTerkirim = await sinkronAntrian(supabase)
+      if (jumlahTerkirim > 0) {
+        const sisa = await ambilAntrian()
+        setQueueCount(sisa.length)
+      }
+    }
+    function handleOffline() {
+      setIsOffline(true)
+    }
+
+    window.addEventListener('online', handleOnline)
+    window.addEventListener('offline', handleOffline)
+    return () => {
+      window.removeEventListener('online', handleOnline)
+      window.removeEventListener('offline', handleOffline)
+    }
   }, [])
 
   useEffect(() => {
@@ -46,6 +74,7 @@ export default function Presensi() {
   async function loadSiswaPresensi() {
     setLoading(true)
     setSaved(false)
+    setSavedOffline(false)
     const { data: siswa } = await supabase.from('siswa').select('id, nama_lengkap').eq('kelas_id', kelasId).eq('status', 'aktif').order('nama_lengkap')
     const { data: existing } = await supabase.from('presensi_siswa').select('siswa_id, status').eq('tanggal', tanggal).in('siswa_id', (siswa || []).map((s) => s.id))
     const map = {}
@@ -59,6 +88,7 @@ export default function Presensi() {
   async function loadGuruPresensi() {
     setLoading(true)
     setSaved(false)
+    setSavedOffline(false)
     const { data: existing } = await supabase.from('presensi_guru').select('guru_id, status').eq('tanggal', tanggal)
     const map = {}
     ;(existing || []).forEach((e) => { map[e.guru_id] = e.status })
@@ -69,16 +99,38 @@ export default function Presensi() {
 
   async function handleSave() {
     setSaving(true)
+    setSaved(false)
+    setSavedOffline(false)
+
     const rows = tab === 'siswa'
       ? siswaList.map((s) => ({ siswa_id: s.id, tanggal, status: statusMap[s.id] || 'hadir', diisi_oleh: profil?.guru_id || null }))
       : guruList.map((g) => ({ guru_id: g.id, tanggal, status: statusMap[g.id] || 'hadir' }))
 
     const table = tab === 'siswa' ? 'presensi_siswa' : 'presensi_guru'
     const conflictCol = tab === 'siswa' ? 'siswa_id,tanggal' : 'guru_id,tanggal'
+
+    // Kalau memang sedang offline, langsung simpan ke antrian lokal
+    if (!navigator.onLine) {
+      await tambahAntrian({ table, conflictCol, rows })
+      const sisa = await ambilAntrian()
+      setQueueCount(sisa.length)
+      setSaving(false)
+      setSavedOffline(true)
+      return
+    }
+
     const { error } = await supabase.from(table).upsert(rows, { onConflict: conflictCol })
+    if (!error) {
+      setSaved(true)
+    } else {
+      // Kadang navigator.onLine bilang online tapi request tetap gagal (koneksi tidak stabil)
+      // — amankan datanya ke antrian lokal supaya tidak hilang
+      await tambahAntrian({ table, conflictCol, rows })
+      const sisa = await ambilAntrian()
+      setQueueCount(sisa.length)
+      setSavedOffline(true)
+    }
     setSaving(false)
-    if (!error) setSaved(true)
-    else alert('Gagal menyimpan presensi: ' + error.message)
   }
 
   const list = tab === 'siswa' ? siswaList : guruList
@@ -103,6 +155,17 @@ export default function Presensi() {
         </div>
         <ClipboardCheck size={120} className="absolute -right-4 -bottom-6 text-white/5 rotate-12" />
       </div>
+
+      {/* Indikator status koneksi & antrian */}
+      {(isOffline || queueCount > 0) && (
+        <div className="flex items-center gap-2 mb-4 px-3 py-2 rounded-lg bg-brass-400/15 text-brass-600 text-sm w-fit">
+          <WifiOff size={15} />
+          {isOffline
+            ? 'Sedang offline — presensi akan tersimpan sementara di perangkat ini.'
+            : `Menyinkronkan ${queueCount} data presensi yang tertunda...`}
+          {!isOffline && queueCount > 0 && <span className="font-medium">({queueCount} tersisa)</span>}
+        </div>
+      )}
 
       <div className="flex items-center gap-4 mb-5">
         <div className="inline-flex rounded-lg bg-white border border-ink-900/10 p-1">
@@ -175,6 +238,7 @@ export default function Presensi() {
             Simpan Presensi
           </button>
           {saved && <span className="text-sm text-sage-500">Tersimpan.</span>}
+          {savedOffline && <span className="text-sm text-brass-600">Tersimpan lokal — akan dikirim otomatis saat online.</span>}
         </div>
       )}
     </Layout>
