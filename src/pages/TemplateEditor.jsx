@@ -8,19 +8,20 @@ export default function TemplateEditor() {
   const navigate = useNavigate();
   const { session } = useAuth();
 
-  const [loading, setLoading] = useState("materi");
-  const [template, setTemplate] = useState("materi");
+  const [loading, setLoading] = useState(true);
+  const [template, setTemplate] = useState(null);
+  const [activeTab, setActiveTab] = useState("materi");
 
-  const [judul, setJudul] = useState("materi");
-  const [mapel, setMapel] = useState("materi");
-  const [kelas, setKelas] = useState("materi");
-  const [fase, setFase] = useState("materi");
+  const [judul, setJudul] = useState("");
+  const [mapel, setMapel] = useState("");
+  const [kelas, setKelas] = useState("");
+  const [fase, setFase] = useState("");
 
-  const [tujuan, setTujuan] = useState("materi");
-  const [materi, setMateri] = useState("materi");
-  const [kegiatan, setKegiatan] = useState("materi");
-  const [asesmen, setAsesmen] = useState("materi");
-  const [deskripsi, setDeskripsi] = useState("materi");
+  const [tujuan, setTujuan] = useState("");
+  const [materi, setMateri] = useState("");
+  const [kegiatan, setKegiatan] = useState("");
+  const [asesmen, setAsesmen] = useState("");
+  const [deskripsi, setDeskripsi] = useState("");
 
   useEffect(() => {
     loadTemplate();
@@ -47,6 +48,10 @@ export default function TemplateEditor() {
     setMapel(data.mapel || "");
     setKelas(data.kelas || "");
     setFase(data.fase || "");
+    setTujuan(data.tujuan || "");
+    setMateri(data.materi || "");
+    setKegiatan(data.kegiatan || "");
+    setAsesmen(data.asesmen || "");
     setDeskripsi(data.deskripsi || "");
 
     setLoading(false);
@@ -270,70 +275,80 @@ export default function TemplateEditor() {
 
           </div>
 
-          <div>
-            <label className="block font-semibold mb-2">
-              Tujuan Pembelajaran
-            </label>
+          {activeTab === "tujuan" && (
+            <div>
+              <label className="block font-semibold mb-2">
+                Tujuan Pembelajaran
+              </label>
 
-            <textarea
-              rows="4"
-              value={tujuan}
-              onChange={(e) => setTujuan(e.target.value)}
-              className="w-full border rounded-lg px-4 py-3"
-            />
-          </div>
+              <textarea
+                rows="4"
+                value={tujuan}
+                onChange={(e) => setTujuan(e.target.value)}
+                className="w-full border rounded-lg px-4 py-3"
+              />
+            </div>
+          )}
 
-          <div>
-            <label className="block font-semibold mb-2">
-              Materi Pembelajaran
-            </label>
+          {activeTab === "materi" && (
+            <div>
+              <label className="block font-semibold mb-2">
+                Materi Pembelajaran
+              </label>
 
-            <textarea
-              rows="8"
-              value={materi}
-              onChange={(e) => setMateri(e.target.value)}
-              className="w-full border rounded-lg px-4 py-3"
-            />
-          </div>
+              <textarea
+                rows="8"
+                value={materi}
+                onChange={(e) => setMateri(e.target.value)}
+                className="w-full border rounded-lg px-4 py-3"
+              />
+            </div>
+          )}
 
-          <div>
-            <label className="block font-semibold mb-2">
-              Kegiatan Pembelajaran
-            </label>
+          {activeTab === "kegiatan" && (
+            <div>
+              <label className="block font-semibold mb-2">
+                Kegiatan Pembelajaran
+              </label>
 
-            <textarea
-              rows="6"
-              value={kegiatan}
-              onChange={(e) => setKegiatan(e.target.value)}
-              className="w-full border rounded-lg px-4 py-3"
-            />
-          </div>
+              <textarea
+                rows="6"
+                value={kegiatan}
+                onChange={(e) => setKegiatan(e.target.value)}
+                className="w-full border rounded-lg px-4 py-3"
+              />
+            </div>
+          )}
 
-          <div>
-            <label className="block font-semibold mb-2">
-              Asesmen / Penilaian
-            </label>
+          {activeTab === "asesmen" && (
+            <div>
+              <label className="block font-semibold mb-2">
+                Asesmen / Penilaian
+              </label>
 
-            <textarea
-              rows="5"
-              value={asesmen}
-              onChange={(e) => setAsesmen(e.target.value)}
-              className="w-full border rounded-lg px-4 py-3"
-            />
-          </div>
+              <textarea
+                rows="5"
+                value={asesmen}
+                onChange={(e) => setAsesmen(e.target.value)}
+                className="w-full border rounded-lg px-4 py-3"
+              />
+            </div>
+          )}
 
-          <div>
-            <label className="block font-semibold mb-2">
-              Deskripsi Singkat
-            </label>
+          {activeTab === "lampiran" && (
+            <div>
+              <label className="block font-semibold mb-2">
+                Deskripsi Singkat
+              </label>
 
-            <textarea
-              rows="3"
-              value={deskripsi}
-              onChange={(e) => setDeskripsi(e.target.value)}
-              className="w-full border rounded-lg px-4 py-3"
-            />
-          </div>
+              <textarea
+                rows="3"
+                value={deskripsi}
+                onChange={(e) => setDeskripsi(e.target.value)}
+                className="w-full border rounded-lg px-4 py-3"
+              />
+            </div>
+          )}
 
             <button
               onClick={simpanMateri}
