@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabaseClient'
 import Layout from '../components/Layout'
-import { Check, X, Loader2, Copy, Printer } from 'lucide-react'
+import { Check, X, Loader2, Copy, Printer, Trash2 } from 'lucide-react'
 
 const TAB = [
   { value: 'menunggu', label: 'Menunggu' },
@@ -89,6 +89,19 @@ export default function PPDBAdmin() {
     setProsesId(null)
     if (!error) muatData()
     else alert('Gagal: ' + error.message)
+  }
+
+  async function hapus(pendaftar) {
+    const pesan =
+      tab === 'diterima'
+        ? `Hapus data pendaftaran ${pendaftar.nama_lengkap} dari daftar ini? (Data siswa yang sudah masuk ke Data Siswa tidak akan terhapus)`
+        : `Hapus data pendaftaran ${pendaftar.nama_lengkap} yang ditolak ini secara permanen?`
+    if (!confirm(pesan)) return
+    setProsesId(pendaftar.id)
+    const { error } = await supabase.from('ppdb_pendaftar').delete().eq('id', pendaftar.id)
+    setProsesId(null)
+    if (!error) muatData()
+    else alert('Gagal menghapus: ' + error.message)
   }
 
   const linkPublik = `${window.location.origin}/ppdb`
@@ -251,7 +264,7 @@ export default function PPDBAdmin() {
               <th>Nama Ibu</th>
               <th>No. HP</th>
               <th>Tanggal Daftar</th>
-              {tab === 'menunggu' && <th></th>}
+              {(tab === 'menunggu' || tab === 'diterima' || tab === 'ditolak') && <th></th>}
             </tr>
           </thead>
           <tbody>
@@ -286,6 +299,20 @@ export default function PPDBAdmin() {
                         title="Tolak"
                       >
                         <X size={15} />
+                      </button>
+                    </div>
+                  </td>
+                )}
+                {(tab === 'diterima' || tab === 'ditolak') && (
+                  <td>
+                    <div className="flex items-center gap-1 justify-end">
+                      <button
+                        className="icon-btn text-red-600"
+                        onClick={() => hapus(d)}
+                        disabled={prosesId === d.id}
+                        title="Hapus"
+                      >
+                        {prosesId === d.id ? <Loader2 size={15} className="animate-spin" /> : <Trash2 size={15} />}
                       </button>
                     </div>
                   </td>
