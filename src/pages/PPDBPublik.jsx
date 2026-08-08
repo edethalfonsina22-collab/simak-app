@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabaseClient'
 import { Loader2, CheckCircle2, School } from 'lucide-react'
 
+const AGAMA_OPTIONS = ['Islam', 'Kristen', 'Katolik', 'Hindu', 'Buddha', 'Khonghucu', 'Lainnya']
+
 const emptyForm = {
   nama_lengkap: '',
   nik_siswa: '',
@@ -9,9 +11,11 @@ const emptyForm = {
   tempat_lahir: '',
   tanggal_lahir: '',
   jenis_kelamin: 'L',
+  agama: '',
   nama_ayah: '',
   nama_ibu: '',
   alamat: '',
+  alamat_tinggal: '',
   no_hp_orang_tua: '',
   asal_sekolah: '',
 }
@@ -250,12 +254,21 @@ export default function PPDBPublik() {
             </div>
           </div>
 
-          <div>
-            <label className="label-field">Jenis Kelamin</label>
-            <select className="input-field" value={form.jenis_kelamin} onChange={(e) => ubah('jenis_kelamin', e.target.value)}>
-              <option value="L">Laki-laki</option>
-              <option value="P">Perempuan</option>
-            </select>
+          <div className="grid sm:grid-cols-2 gap-4">
+            <div>
+              <label className="label-field">Jenis Kelamin</label>
+              <select className="input-field" value={form.jenis_kelamin} onChange={(e) => ubah('jenis_kelamin', e.target.value)}>
+                <option value="L">Laki-laki</option>
+                <option value="P">Perempuan</option>
+              </select>
+            </div>
+            <div>
+              <label className="label-field">Agama</label>
+              <select className="input-field" value={form.agama} onChange={(e) => ubah('agama', e.target.value)}>
+                <option value="">— Pilih Agama —</option>
+                {AGAMA_OPTIONS.map((a) => <option key={a} value={a}>{a}</option>)}
+              </select>
+            </div>
           </div>
 
           <div className="grid sm:grid-cols-2 gap-4">
@@ -270,8 +283,13 @@ export default function PPDBPublik() {
           </div>
 
           <div>
-            <label className="label-field">Alamat</label>
+            <label className="label-field">Alamat (sesuai KTP/KK)</label>
             <textarea className="input-field" rows={2} value={form.alamat} onChange={(e) => ubah('alamat', e.target.value)} />
+          </div>
+
+          <div>
+            <label className="label-field">Alamat Tempat Tinggal (domisili saat ini)</label>
+            <textarea className="input-field" rows={2} value={form.alamat_tinggal} onChange={(e) => ubah('alamat_tinggal', e.target.value)} />
           </div>
 
           <div className="grid sm:grid-cols-2 gap-4">
