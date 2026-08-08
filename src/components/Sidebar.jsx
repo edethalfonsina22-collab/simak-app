@@ -170,15 +170,15 @@ export default function Sidebar() {
       <div className="relative overflow-hidden px-4 py-5 border-b border-white/10 bg-gradient-to-br from-blue-950 via-blue-900 to-indigo-900">
         {/* Motif batik dekoratif (senada dengan banner dashboard) */}
         <svg
-          className="absolute inset-0 w-full h-full opacity-[0.15] pointer-events-none"
+          className="absolute inset-0 w-full h-full opacity-[0.35] pointer-events-none"
           xmlns="http://www.w3.org/2000/svg"
         >
           <defs>
             <pattern id="batikSidebar" width="46" height="46" patternUnits="userSpaceOnUse">
-              <circle cx="23" cy="23" r="12" fill="none" stroke="#facc15" strokeWidth="1" />
-              <circle cx="23" cy="23" r="4" fill="none" stroke="#facc15" strokeWidth="1" />
-              <path d="M23 5 v8 M23 33 v8 M5 23 h8 M33 23 h8" stroke="#facc15" strokeWidth="1" />
-              <path d="M10 10 l4 4 M32 10 l-4 4 M10 36 l4 -4 M32 36 l-4 -4" stroke="#facc15" strokeWidth="0.75" />
+              <circle cx="23" cy="23" r="12" fill="none" stroke="#fbbf24" strokeWidth="1.4" />
+              <circle cx="23" cy="23" r="4" fill="none" stroke="#fbbf24" strokeWidth="1.4" />
+              <path d="M23 5 v8 M23 33 v8 M5 23 h8 M33 23 h8" stroke="#fbbf24" strokeWidth="1.4" />
+              <path d="M10 10 l4 4 M32 10 l-4 4 M10 36 l4 -4 M32 36 l-4 -4" stroke="#fbbf24" strokeWidth="1" />
             </pattern>
           </defs>
           <rect width="100%" height="100%" fill="url(#batikSidebar)" />
@@ -213,7 +213,7 @@ export default function Sidebar() {
       <nav className="relative flex-1 overflow-y-auto py-4 px-3 bg-gradient-to-b from-blue-950 via-blue-900 to-indigo-950">
         {/* Motif batik area menu — gaya berbeda dari header (kawung/diamond, bukan lingkaran) */}
         <svg
-          className="absolute inset-0 w-full h-full opacity-[0.08] pointer-events-none"
+          className="absolute inset-0 w-full h-full opacity-[0.22] pointer-events-none"
           xmlns="http://www.w3.org/2000/svg"
         >
           <defs>
@@ -224,9 +224,9 @@ export default function Sidebar() {
               patternUnits="userSpaceOnUse"
               patternTransform="rotate(45)"
             >
-              <rect x="12" y="0" width="12" height="12" fill="none" stroke="#facc15" strokeWidth="0.75" />
-              <circle cx="18" cy="6" r="2.2" fill="#facc15" />
-              <path d="M0 18 L18 0 M18 36 L36 18" stroke="#facc15" strokeWidth="0.5" />
+              <rect x="12" y="0" width="12" height="12" fill="none" stroke="#fbbf24" strokeWidth="1.2" />
+              <circle cx="18" cy="6" r="2.6" fill="#fbbf24" />
+              <path d="M0 18 L18 0 M18 36 L36 18" stroke="#fbbf24" strokeWidth="1" />
             </pattern>
           </defs>
           <rect width="100%" height="100%" fill="url(#batikMenu)" />
