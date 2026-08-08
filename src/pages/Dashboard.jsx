@@ -34,6 +34,59 @@ const CARD_THEME = {
   rose: { gradient: 'from-rose-500 to-rose-600' },
 }
 
+// Motif batik (kawung + parang) yang dipakai konsisten di seluruh tema —
+// motif sama persis dengan kartu identitas di halaman Profil Saya, hanya
+// warna garis yang menyesuaikan latar (emas di atas navy, putih di atas kartu warna-warni).
+function BatikOverlay({ patternId, strokeColor = '#d4af37', opacity = 1, size = 72 }) {
+  return (
+    <svg
+      className="absolute inset-0 w-full h-full pointer-events-none"
+      preserveAspectRatio="xMidYMid slice"
+      aria-hidden="true"
+    >
+      <defs>
+        <pattern
+          id={patternId}
+          x="0"
+          y="0"
+          width={size}
+          height={size}
+          patternUnits="userSpaceOnUse"
+          patternTransform="rotate(8)"
+        >
+          {/* motif kawung: empat lengkung elips mengelilingi titik pusat */}
+          <g fill="none" stroke={strokeColor} strokeWidth="1.1" opacity={opacity}>
+            <ellipse cx={size / 2} cy={size * 0.333} rx={size * 0.125} ry={size * 0.194} opacity="0.55" />
+            <ellipse cx={size / 2} cy={size * 0.667} rx={size * 0.125} ry={size * 0.194} opacity="0.55" />
+            <ellipse cx={size * 0.333} cy={size / 2} rx={size * 0.194} ry={size * 0.125} opacity="0.55" />
+            <ellipse cx={size * 0.667} cy={size / 2} rx={size * 0.194} ry={size * 0.125} opacity="0.55" />
+            <circle cx={size / 2} cy={size / 2} r={size * 0.042} opacity="0.7" />
+          </g>
+          {/* garis parang halus di sela-sela motif kawung */}
+          <path
+            d={`M0 ${size} L${size * 0.25} ${size * 0.75} L${size * 0.5} ${size} L${size * 0.75} ${size * 0.75} L${size} ${size}`}
+            fill="none"
+            stroke={strokeColor}
+            strokeWidth="0.8"
+            opacity={opacity * 0.35}
+          />
+          <path
+            d={`M0 0 L${size * 0.25} ${size * 0.25} L0 ${size * 0.5}`}
+            fill="none"
+            stroke={strokeColor}
+            strokeWidth="0.8"
+            opacity={opacity * 0.3}
+          />
+          <circle cx={size * 0.11} cy={size * 0.11} r="1.3" fill={strokeColor} opacity={opacity * 0.4} />
+          <circle cx={size * 0.89} cy={size * 0.22} r="1.3" fill={strokeColor} opacity={opacity * 0.4} />
+          <circle cx={size * 0.22} cy={size * 0.89} r="1.3" fill={strokeColor} opacity={opacity * 0.4} />
+        </pattern>
+      </defs>
+      <rect x="0" y="0" width="100%" height="100%" fill={`url(#${patternId})`} />
+    </svg>
+  )
+}
+
 function formatRelativeDate(iso) {
   const date = new Date(iso)
   const today = new Date()
@@ -179,194 +232,164 @@ export default function Dashboard() {
       `}</style>
 
       <div className="relative">
-        {/* Motif batik (gaya kawung) sebagai lapisan background samar, tidak mengganggu keterbacaan konten */}
-        <svg
-          className="absolute inset-0 -z-10 w-full h-full opacity-[0.08] pointer-events-none"
-          preserveAspectRatio="xMidYMid slice"
-          aria-hidden="true"
-        >
-          <defs>
-            <pattern
-              id="batikKawung"
-              width="76"
-              height="76"
-              patternUnits="userSpaceOnUse"
-              patternTransform="rotate(12)"
-            >
-              <g fill="none" stroke="#22315B" strokeWidth="1.1">
-                <circle cx="38" cy="38" r="11" />
-                <circle cx="0" cy="0" r="11" />
-                <circle cx="76" cy="0" r="11" />
-                <circle cx="0" cy="76" r="11" />
-                <circle cx="76" cy="76" r="11" />
-                <path d="M38 24 C46 30 46 46 38 52 C30 46 30 30 38 24 Z" />
-                <path d="M24 38 C30 30 46 30 52 38 C46 46 30 46 24 38 Z" />
-              </g>
-              <circle cx="38" cy="38" r="2.5" fill="#D9A441" />
-              <circle cx="0" cy="38" r="2" fill="#D9A441" />
-              <circle cx="76" cy="38" r="2" fill="#D9A441" />
-              <circle cx="38" cy="0" r="2" fill="#D9A441" />
-              <circle cx="38" cy="76" r="2" fill="#D9A441" />
-            </pattern>
-          </defs>
-          <rect width="100%" height="100%" fill="url(#batikKawung)" />
-        </svg>
-
-      {/* Banner navy — background biru tua sama seperti kartu identitas di Profil Saya */}
-      <div className="dash-fade-in opacity-0 relative overflow-hidden rounded-xl p-6 mb-6 flex items-center gap-4 bg-gradient-to-br from-blue-900 to-blue-950">
-        <div className="absolute -top-10 -right-10 w-40 h-40 rounded-full bg-white/5 pointer-events-none" />
-        <div className="absolute -bottom-14 -left-6 w-32 h-32 rounded-full bg-white/5 pointer-events-none" />
-        <div className="relative w-12 h-12 rounded-full bg-white/10 ring-2 ring-white/20 text-white flex items-center justify-center shrink-0">
-          <LayoutDashboard size={22} />
+        {/* Banner navy — corak batik emas yang sama persis dengan kartu identitas di Profil Saya */}
+        <div className="dash-fade-in opacity-0 relative overflow-hidden rounded-xl p-6 mb-6 flex items-center gap-4 bg-gradient-to-br from-blue-900 to-blue-950">
+          <div className="absolute -top-10 -right-10 w-40 h-40 rounded-full bg-white/5 pointer-events-none" />
+          <div className="absolute -bottom-14 -left-6 w-32 h-32 rounded-full bg-white/5 pointer-events-none" />
+          <BatikOverlay patternId="batikBanner" strokeColor="#d4af37" />
+          <div className="relative w-12 h-12 rounded-full bg-white/10 ring-2 ring-white/20 text-white flex items-center justify-center shrink-0">
+            <LayoutDashboard size={22} />
+          </div>
+          <div className="relative">
+            <p className="font-display font-semibold text-lg text-white">Selamat datang kembali di SIMAK</p>
+            <p className="text-sm text-blue-200/70">Semua ringkasan data sekolah ada di bawah ini.</p>
+          </div>
         </div>
-        <div className="relative">
-          <p className="font-display font-semibold text-lg text-white">Selamat datang kembali di SIMAK</p>
-          <p className="text-sm text-blue-200/70">Semua ringkasan data sekolah ada di bawah ini.</p>
-        </div>
-      </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 mb-8">
-        {cards.map(({ label, value, icon: Icon, theme, sublabel }, i) => {
-          const t = CARD_THEME[theme]
-          return (
-            <div
-              key={label}
-              className={`dash-fade-in opacity-0 rounded-2xl p-5 text-white shadow-md bg-gradient-to-br ${t.gradient} transition-transform duration-300 ease-out hover:-translate-y-1`}
-              style={{ animationDelay: `${i * 90}ms` }}
-            >
-              <div className="flex items-start justify-between mb-4">
-                <p className="text-sm font-medium text-white/90">{label}</p>
-                <div className="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center shrink-0">
-                  <Icon size={18} />
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 mb-8">
+          {cards.map(({ label, value, icon: Icon, theme, sublabel }, i) => {
+            const t = CARD_THEME[theme]
+            return (
+              <div
+                key={label}
+                className={`dash-fade-in opacity-0 relative overflow-hidden rounded-2xl p-5 text-white shadow-md bg-gradient-to-br ${t.gradient} transition-transform duration-300 ease-out hover:-translate-y-1`}
+                style={{ animationDelay: `${i * 90}ms` }}
+              >
+                {/* Motif batik yang sama, versi putih tipis supaya tetap kontras di atas warna solid */}
+                <BatikOverlay patternId={`batikCard-${theme}-${i}`} strokeColor="#ffffff" opacity={0.5} size={56} />
+                <div className="relative flex items-start justify-between mb-4">
+                  <p className="text-sm font-medium text-white/90">{label}</p>
+                  <div className="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center shrink-0">
+                    <Icon size={18} />
+                  </div>
+                </div>
+                <p className="relative text-3xl font-display font-bold">
+                  {loading ? '—' : value}
+                </p>
+                {sublabel && !loading && (
+                  <p className="relative text-xs text-white/80 mt-1.5">{sublabel}</p>
+                )}
+              </div>
+            )
+          })}
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-5">
+          <div className="card p-6 lg:col-span-2">
+            <h3 className="font-display text-lg font-semibold mb-4">Komposisi Siswa</h3>
+            {stats.siswa === 0 ? (
+              <p className="text-sm text-ink-700/50">Belum ada data siswa.</p>
+            ) : (
+              <div className="relative">
+                <ResponsiveContainer width="100%" height={220}>
+                  <PieChart>
+                    <Pie data={genderData} dataKey="value" nameKey="name" innerRadius={55} outerRadius={80} paddingAngle={3}>
+                      {genderData.map((_, i) => (
+                        <Cell key={i} fill={COLORS[i % COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip />
+                    <Legend />
+                  </PieChart>
+                </ResponsiveContainer>
+                <div className="absolute top-[92px] left-1/2 -translate-x-1/2 text-center pointer-events-none">
+                  <p className="text-xl font-display font-semibold text-ink-950">{stats.siswa}</p>
+                  <p className="text-[11px] text-ink-700/50">siswa</p>
                 </div>
               </div>
-              <p className="text-3xl font-display font-bold">
-                {loading ? '—' : value}
-              </p>
-              {sublabel && !loading && (
-                <p className="text-xs text-white/80 mt-1.5">{sublabel}</p>
-              )}
-            </div>
-          )
-        })}
-      </div>
+            )}
+          </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-5">
-        <div className="card p-6 lg:col-span-2">
-          <h3 className="font-display text-lg font-semibold mb-4">Komposisi Siswa</h3>
-          {stats.siswa === 0 ? (
-            <p className="text-sm text-ink-700/50">Belum ada data siswa.</p>
-          ) : (
-            <div className="relative">
+          <div className="card p-6 lg:col-span-3">
+            <h3 className="font-display text-lg font-semibold mb-4">Pengumuman Terbaru</h3>
+            {pengumuman.length === 0 ? (
+              <p className="text-sm text-ink-700/50">Belum ada pengumuman.</p>
+            ) : (
+              <ul className="divide-y divide-ink-900/[0.06]">
+                {pengumuman.map((p) => (
+                  <li key={p.id} className="py-3 flex items-center gap-3">
+                    <span
+                      className={`text-[11px] font-medium px-2 py-0.5 rounded-md shrink-0 ${
+                        KATEGORI_STYLE[p.kategori] || KATEGORI_STYLE.Informasi
+                      }`}
+                    >
+                      {p.kategori || 'Informasi'}
+                    </span>
+                    <span className="text-sm text-ink-900 truncate flex-1">{p.judul}</span>
+                    <span className="text-xs text-ink-700/40 shrink-0">
+                      {formatRelativeDate(p.dibuat_pada)}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
+
+        <h2 className="font-display text-xl font-semibold text-ink-950 mt-8 mb-4">Analitik</h2>
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-5">
+          <div className="card p-6 lg:col-span-3">
+            <h3 className="font-display text-lg font-semibold mb-4">Tren Kehadiran Siswa (14 Hari Terakhir)</h3>
+            {attendanceTrend.length === 0 ? (
+              <p className="text-sm text-ink-700/50">Belum ada data presensi.</p>
+            ) : (
               <ResponsiveContainer width="100%" height={220}>
-                <PieChart>
-                  <Pie data={genderData} dataKey="value" nameKey="name" innerRadius={55} outerRadius={80} paddingAngle={3}>
-                    {genderData.map((_, i) => (
-                      <Cell key={i} fill={COLORS[i % COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip />
-                  <Legend />
-                </PieChart>
+                <LineChart data={attendanceTrend}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.06)" />
+                  <XAxis dataKey="tanggal" tick={{ fontSize: 11 }} />
+                  <YAxis domain={[0, 100]} tick={{ fontSize: 11 }} unit="%" width={40} />
+                  <Tooltip formatter={(v) => [`${v}%`, 'Kehadiran']} />
+                  <Line type="monotone" dataKey="persen" stroke="#4C7A6E" strokeWidth={2} dot={{ r: 3 }} />
+                </LineChart>
               </ResponsiveContainer>
-              <div className="absolute top-[92px] left-1/2 -translate-x-1/2 text-center pointer-events-none">
-                <p className="text-xl font-display font-semibold text-ink-950">{stats.siswa}</p>
-                <p className="text-[11px] text-ink-700/50">siswa</p>
+            )}
+          </div>
+
+          <div className="card p-6 lg:col-span-2">
+            <h3 className="font-display text-lg font-semibold mb-4">Status RPP</h3>
+            {rppStatus.menunggu + rppStatus.disetujui + rppStatus.ditolak === 0 ? (
+              <p className="text-sm text-ink-700/50">Belum ada RPP diupload.</p>
+            ) : (
+              <div className="space-y-3 pt-1">
+                {Object.entries(rppStatus).map(([key, value]) => {
+                  const total = rppStatus.menunggu + rppStatus.disetujui + rppStatus.ditolak
+                  const pct = total ? (value / total) * 100 : 0
+                  return (
+                    <div key={key}>
+                      <div className="flex items-center justify-between text-sm mb-1">
+                        <span className="text-ink-700">{RPP_STATUS_LABEL[key]}</span>
+                        <span className="font-medium text-ink-950">{value}</span>
+                      </div>
+                      <div className="h-2 rounded-full bg-ink-900/[0.06] overflow-hidden">
+                        <div
+                          className="h-full rounded-full"
+                          style={{ width: `${pct}%`, backgroundColor: RPP_STATUS_COLOR[key] }}
+                        />
+                      </div>
+                    </div>
+                  )
+                })}
               </div>
-            </div>
-          )}
-        </div>
+            )}
+          </div>
 
-        <div className="card p-6 lg:col-span-3">
-          <h3 className="font-display text-lg font-semibold mb-4">Pengumuman Terbaru</h3>
-          {pengumuman.length === 0 ? (
-            <p className="text-sm text-ink-700/50">Belum ada pengumuman.</p>
-          ) : (
-            <ul className="divide-y divide-ink-900/[0.06]">
-              {pengumuman.map((p) => (
-                <li key={p.id} className="py-3 flex items-center gap-3">
-                  <span
-                    className={`text-[11px] font-medium px-2 py-0.5 rounded-md shrink-0 ${
-                      KATEGORI_STYLE[p.kategori] || KATEGORI_STYLE.Informasi
-                    }`}
-                  >
-                    {p.kategori || 'Informasi'}
-                  </span>
-                  <span className="text-sm text-ink-900 truncate flex-1">{p.judul}</span>
-                  <span className="text-xs text-ink-700/40 shrink-0">
-                    {formatRelativeDate(p.dibuat_pada)}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          )}
+          <div className="card p-6 lg:col-span-5">
+            <h3 className="font-display text-lg font-semibold mb-4">Rata-rata Nilai per Mata Pelajaran</h3>
+            {nilaiPerMapel.length === 0 ? (
+              <p className="text-sm text-ink-700/50">Belum ada data nilai.</p>
+            ) : (
+              <ResponsiveContainer width="100%" height={240}>
+                <BarChart data={nilaiPerMapel}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.06)" />
+                  <XAxis dataKey="mapel" tick={{ fontSize: 11 }} interval={0} angle={-15} textAnchor="end" height={50} />
+                  <YAxis domain={[0, 100]} tick={{ fontSize: 11 }} width={30} />
+                  <Tooltip />
+                  <Bar dataKey="rata" fill="#D9A441" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            )}
+          </div>
         </div>
-      </div>
-
-      <h2 className="font-display text-xl font-semibold text-ink-950 mt-8 mb-4">Analitik</h2>
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-5">
-        <div className="card p-6 lg:col-span-3">
-          <h3 className="font-display text-lg font-semibold mb-4">Tren Kehadiran Siswa (14 Hari Terakhir)</h3>
-          {attendanceTrend.length === 0 ? (
-            <p className="text-sm text-ink-700/50">Belum ada data presensi.</p>
-          ) : (
-            <ResponsiveContainer width="100%" height={220}>
-              <LineChart data={attendanceTrend}>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.06)" />
-                <XAxis dataKey="tanggal" tick={{ fontSize: 11 }} />
-                <YAxis domain={[0, 100]} tick={{ fontSize: 11 }} unit="%" width={40} />
-                <Tooltip formatter={(v) => [`${v}%`, 'Kehadiran']} />
-                <Line type="monotone" dataKey="persen" stroke="#4C7A6E" strokeWidth={2} dot={{ r: 3 }} />
-              </LineChart>
-            </ResponsiveContainer>
-          )}
-        </div>
-
-        <div className="card p-6 lg:col-span-2">
-          <h3 className="font-display text-lg font-semibold mb-4">Status RPP</h3>
-          {rppStatus.menunggu + rppStatus.disetujui + rppStatus.ditolak === 0 ? (
-            <p className="text-sm text-ink-700/50">Belum ada RPP diupload.</p>
-          ) : (
-            <div className="space-y-3 pt-1">
-              {Object.entries(rppStatus).map(([key, value]) => {
-                const total = rppStatus.menunggu + rppStatus.disetujui + rppStatus.ditolak
-                const pct = total ? (value / total) * 100 : 0
-                return (
-                  <div key={key}>
-                    <div className="flex items-center justify-between text-sm mb-1">
-                      <span className="text-ink-700">{RPP_STATUS_LABEL[key]}</span>
-                      <span className="font-medium text-ink-950">{value}</span>
-                    </div>
-                    <div className="h-2 rounded-full bg-ink-900/[0.06] overflow-hidden">
-                      <div
-                        className="h-full rounded-full"
-                        style={{ width: `${pct}%`, backgroundColor: RPP_STATUS_COLOR[key] }}
-                      />
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          )}
-        </div>
-
-        <div className="card p-6 lg:col-span-5">
-          <h3 className="font-display text-lg font-semibold mb-4">Rata-rata Nilai per Mata Pelajaran</h3>
-          {nilaiPerMapel.length === 0 ? (
-            <p className="text-sm text-ink-700/50">Belum ada data nilai.</p>
-          ) : (
-            <ResponsiveContainer width="100%" height={240}>
-              <BarChart data={nilaiPerMapel}>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.06)" />
-                <XAxis dataKey="mapel" tick={{ fontSize: 11 }} interval={0} angle={-15} textAnchor="end" height={50} />
-                <YAxis domain={[0, 100]} tick={{ fontSize: 11 }} width={30} />
-                <Tooltip />
-                <Bar dataKey="rata" fill="#D9A441" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          )}
-        </div>
-      </div>
       </div>
     </Layout>
   )
