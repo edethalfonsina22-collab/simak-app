@@ -45,13 +45,17 @@ export default function PPDBAdmin() {
     if (!confirm(`Terima ${pendaftar.nama_lengkap} dan tambahkan ke Data Siswa?`)) return
     setProsesId(pendaftar.id)
 
-    // 1. Masukkan ke tabel siswa
+    // 1. Masukkan ke tabel siswa — field disesuaikan dengan skema Data Siswa terbaru
     const { error: errSiswa } = await supabase.from('siswa').insert({
       nama_lengkap: pendaftar.nama_lengkap,
       jenis_kelamin: pendaftar.jenis_kelamin,
+      agama: pendaftar.agama,
       tempat_lahir: pendaftar.tempat_lahir,
       tanggal_lahir: pendaftar.tanggal_lahir,
       alamat: pendaftar.alamat,
+      alamat_tinggal: pendaftar.alamat_tinggal,
+      nama_ayah: pendaftar.nama_ayah,
+      nama_ibu: pendaftar.nama_ibu,
       nama_orang_tua: pendaftar.nama_ayah || pendaftar.nama_ibu,
       no_hp_orang_tua: pendaftar.no_hp_orang_tua,
       nik: pendaftar.nik_siswa,
@@ -115,10 +119,12 @@ export default function PPDBAdmin() {
           <td style="text-align:center">${i + 1}</td>
           <td>${d.nama_lengkap || '-'}</td>
           <td>${d.jenis_kelamin === 'P' ? 'Perempuan' : 'Laki-laki'}</td>
+          <td>${d.agama || '-'}</td>
           <td>${d.tempat_lahir || '-'}, ${formatTanggal(d.tanggal_lahir)}</td>
           <td>${d.nik_siswa || '-'}</td>
           <td>${d.nomor_kk || '-'}</td>
-          <td>${d.nama_ayah || d.nama_ibu || '-'}</td>
+          <td>${d.nama_ayah || '-'}</td>
+          <td>${d.nama_ibu || '-'}</td>
           <td>${d.no_hp_orang_tua || '-'}</td>
           <td>${d.alamat || '-'}</td>
         </tr>`
@@ -159,10 +165,12 @@ export default function PPDBAdmin() {
               <th>No</th>
               <th>Nama Lengkap</th>
               <th>Jenis Kelamin</th>
+              <th>Agama</th>
               <th>Tempat, Tanggal Lahir</th>
               <th>NIK</th>
               <th>No. KK</th>
-              <th>Nama Orang Tua</th>
+              <th>Nama Ayah</th>
+              <th>Nama Ibu</th>
               <th>No. HP</th>
               <th>Alamat</th>
             </tr>
@@ -238,22 +246,26 @@ export default function PPDBAdmin() {
             <tr>
               <th>Nama Calon Siswa</th>
               <th>Tanggal Lahir</th>
-              <th>Orang Tua</th>
+              <th>Agama</th>
+              <th>Nama Ayah</th>
+              <th>Nama Ibu</th>
               <th>No. HP</th>
               <th>Tanggal Daftar</th>
               {tab === 'menunggu' && <th></th>}
             </tr>
           </thead>
           <tbody>
-            {loading && <tr><td colSpan={5} className="text-center py-8 text-ink-700/50">Memuat data...</td></tr>}
+            {loading && <tr><td colSpan={8} className="text-center py-8 text-ink-700/50">Memuat data...</td></tr>}
             {!loading && data.length === 0 && (
-              <tr><td colSpan={5} className="text-center py-8 text-ink-700/50">Tidak ada pendaftar di status ini.</td></tr>
+              <tr><td colSpan={8} className="text-center py-8 text-ink-700/50">Tidak ada pendaftar di status ini.</td></tr>
             )}
             {data.map((d) => (
               <tr key={d.id}>
                 <td className="font-medium">{d.nama_lengkap}</td>
                 <td>{formatTanggal(d.tanggal_lahir)}</td>
-                <td>{d.nama_ayah || d.nama_ibu || '-'}</td>
+                <td>{d.agama || '-'}</td>
+                <td>{d.nama_ayah || '-'}</td>
+                <td>{d.nama_ibu || '-'}</td>
                 <td>{d.no_hp_orang_tua}</td>
                 <td>{formatTanggal(d.dibuat_pada)}</td>
                 {tab === 'menunggu' && (
