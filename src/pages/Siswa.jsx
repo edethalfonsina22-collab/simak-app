@@ -36,6 +36,56 @@ const EXCEL_HEADERS = [
   'no_hp_orang_tua', 'alamat', 'alamat_tinggal',
 ]
 
+// Motif batik (kawung + parang) — sama persis dengan Profil Saya, Dasbor, Galeri & Dokumen,
+// warna garis menyesuaikan latar (emas di atas navy).
+function BatikOverlay({ patternId, strokeColor = '#d4af37', opacity = 1, size = 72 }) {
+  return (
+    <svg
+      className="absolute inset-0 w-full h-full pointer-events-none"
+      preserveAspectRatio="xMidYMid slice"
+      aria-hidden="true"
+    >
+      <defs>
+        <pattern
+          id={patternId}
+          x="0"
+          y="0"
+          width={size}
+          height={size}
+          patternUnits="userSpaceOnUse"
+          patternTransform="rotate(8)"
+        >
+          <g fill="none" stroke={strokeColor} strokeWidth="1.1" opacity={opacity}>
+            <ellipse cx={size / 2} cy={size * 0.333} rx={size * 0.125} ry={size * 0.194} opacity="0.55" />
+            <ellipse cx={size / 2} cy={size * 0.667} rx={size * 0.125} ry={size * 0.194} opacity="0.55" />
+            <ellipse cx={size * 0.333} cy={size / 2} rx={size * 0.194} ry={size * 0.125} opacity="0.55" />
+            <ellipse cx={size * 0.667} cy={size / 2} rx={size * 0.194} ry={size * 0.125} opacity="0.55" />
+            <circle cx={size / 2} cy={size / 2} r={size * 0.042} opacity="0.7" />
+          </g>
+          <path
+            d={`M0 ${size} L${size * 0.25} ${size * 0.75} L${size * 0.5} ${size} L${size * 0.75} ${size * 0.75} L${size} ${size}`}
+            fill="none"
+            stroke={strokeColor}
+            strokeWidth="0.8"
+            opacity={opacity * 0.35}
+          />
+          <path
+            d={`M0 0 L${size * 0.25} ${size * 0.25} L0 ${size * 0.5}`}
+            fill="none"
+            stroke={strokeColor}
+            strokeWidth="0.8"
+            opacity={opacity * 0.3}
+          />
+          <circle cx={size * 0.11} cy={size * 0.11} r="1.3" fill={strokeColor} opacity={opacity * 0.4} />
+          <circle cx={size * 0.89} cy={size * 0.22} r="1.3" fill={strokeColor} opacity={opacity * 0.4} />
+          <circle cx={size * 0.22} cy={size * 0.89} r="1.3" fill={strokeColor} opacity={opacity * 0.4} />
+        </pattern>
+      </defs>
+      <rect x="0" y="0" width="100%" height="100%" fill={`url(#${patternId})`} />
+    </svg>
+  )
+}
+
 function formatTanggalLahir(tgl) {
   if (!tgl) return null
   try {
@@ -358,10 +408,11 @@ export default function Siswa() {
         </>
       }
     >
-      {/* Kartu pencarian — background biru tua (navy), sama seperti kartu identitas di Profil Saya */}
+      {/* Kartu pencarian — background biru tua (navy), sama seperti kartu identitas di Profil Saya, dengan corak batik emas */}
       <div className="relative overflow-hidden rounded-xl p-6 mb-4 flex items-center gap-4 bg-gradient-to-br from-blue-900 to-blue-950">
         <div className="absolute -top-10 -right-10 w-40 h-40 rounded-full bg-white/5 pointer-events-none" />
         <div className="absolute -bottom-14 -left-6 w-32 h-32 rounded-full bg-white/5 pointer-events-none" />
+        <BatikOverlay patternId="batikSiswaBanner" strokeColor="#d4af37" />
 
         <div className="relative w-10 h-10 rounded-full bg-white/10 ring-2 ring-white/20 text-white flex items-center justify-center shrink-0">
           <Search size={18} />
@@ -607,16 +658,19 @@ export default function Siswa() {
               <X size={18} />
             </button>
 
-            <div className="relative bg-gradient-to-br from-blue-900 to-blue-950 pt-8 pb-14 flex flex-col items-center">
-              <div className="w-24 h-24 rounded-full overflow-hidden ring-4 ring-white/20 bg-white/10 flex items-center justify-center shrink-0">
+            <div className="relative overflow-hidden bg-gradient-to-br from-blue-900 to-blue-950 pt-8 pb-14 flex flex-col items-center">
+              <div className="absolute -top-10 -right-10 w-40 h-40 rounded-full bg-white/5 pointer-events-none" />
+              <div className="absolute -bottom-14 -left-6 w-32 h-32 rounded-full bg-white/5 pointer-events-none" />
+              <BatikOverlay patternId="batikSiswaModal" strokeColor="#d4af37" />
+              <div className="relative w-24 h-24 rounded-full overflow-hidden ring-4 ring-white/20 bg-white/10 flex items-center justify-center shrink-0">
                 {fotoUrl(profilLihat.foto_path) ? (
                   <img src={fotoUrl(profilLihat.foto_path)} alt="" className="w-full h-full object-cover" />
                 ) : (
                   <span className="text-3xl font-semibold text-white/60">{profilLihat.nama_lengkap?.[0]}</span>
                 )}
               </div>
-              <p className="font-display font-semibold text-lg text-white mt-3 text-center px-6">{profilLihat.nama_lengkap}</p>
-              <span className={`badge mt-1.5 ${profilLihat.status === 'aktif' ? 'bg-sage-500/20 text-sage-100' : 'bg-white/10 text-white/70'}`}>
+              <p className="relative font-display font-semibold text-lg text-white mt-3 text-center px-6">{profilLihat.nama_lengkap}</p>
+              <span className={`relative badge mt-1.5 ${profilLihat.status === 'aktif' ? 'bg-sage-500/20 text-sage-100' : 'bg-white/10 text-white/70'}`}>
                 {profilLihat.status}
               </span>
             </div>
