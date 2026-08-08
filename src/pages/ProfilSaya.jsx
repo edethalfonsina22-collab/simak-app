@@ -7,9 +7,8 @@ import { Camera, Loader2, Save, Users, School } from 'lucide-react'
 // ASUMSI: menggunakan library `react-barcode` untuk membuat kode batang (linear barcode) di sisi klien.
 // Install dulu kalau belum ada: npm install react-barcode
 import Barcode from 'react-barcode'
-// ASUMSI: menggunakan library `qrcode.react` untuk membuat QR code di sisi klien.
-// Install dulu kalau belum ada: npm install qrcode.react
-import { QRCodeSVG } from 'qrcode.react'
+// Menggunakan library `qrcode` (sudah ada di package.json) untuk membuat QR code sebagai data URL PNG.
+import QRCode from 'qrcode'
 
 export default function ProfilSaya() {
   const { profil } = useAuth()
@@ -22,6 +21,9 @@ export default function ProfilSaya() {
   // Kelas & siswa yang diampu (sebagai wali kelas)
   const [kelasAsuh, setKelasAsuh] = useState([]) // [{ id, nama_kelas, siswa: [...] }]
   const [loadingSiswa, setLoadingSiswa] = useState(true)
+
+  // QR code identitas guru (dibuat dari qrcode -> data URL PNG)
+  const [qrDataUrl, setQrDataUrl] = useState('')
 
   useEffect(() => {
     async function load() {
@@ -78,6 +80,21 @@ export default function ProfilSaya() {
     }
     loadSiswaAsuh()
   }, [profil])
+
+  // Buat QR code setiap kali id guru berubah/tersedia
+  useEffect(() => {
+    if (!data?.id) {
+      setQrDataUrl('')
+      return
+    }
+    QRCode.toDataURL(String(data.id), {
+      width: 144,
+      margin: 1,
+      color: { dark: '#1e3a5f', light: '#ffffff' },
+    })
+      .then(setQrDataUrl)
+      .catch(() => setQrDataUrl(''))
+  }, [data?.id])
 
   function fotoUrl() {
     if (!data?.foto_profil_path) return null
@@ -204,8 +221,12 @@ export default function ProfilSaya() {
           </div>
 
           {/* QR code — berseberangan (sisi kanan) dengan foto profil di sisi kiri */}
-          <div className="relative shrink-0 p-2 rounded-lg bg-white shadow-md">
-            <QRCodeSVG value={String(data.id)} size={72} bgColor="#ffffff" fgColor="#1e3a5f" />
+          <div className="relative shrink-0 w-[88px] h-[88px] p-2 rounded-lg bg-white shadow-md flex items-center justify-center">
+            {qrDataUrl ? (
+              <img src={qrDataUrl} alt="QR Code identitas guru" width={72} height={72} />
+            ) : (
+              <Loader2 size={18} className="animate-spin text-ink-700/30" />
+            )}
           </div>
         </div>
 
