@@ -113,6 +113,28 @@ const CATATAN_KOSONG = {
   keputusan: '',
 }
 
+// PERBAIKAN: menghitung rentang tanggal dari kombinasi tahun ajaran + semester,
+// supaya rekap presensi di rapor benar-benar hanya mengambil data pada periode
+// yang sedang dipilih (bukan seluruh riwayat presensi siswa sepanjang masa).
+// Format tahunAjaran yang didukung: "2025/2026".
+//   Semester Ganjil -> 1 Juli s/d 31 Desember tahun awal (2025-07-01 s/d 2025-12-31)
+//   Semester Genap  -> 1 Januari s/d 30 Juni tahun akhir (2026-01-01 s/d 2026-06-30)
+function rentangTanggalPeriode(tahunAjaran, semester) {
+  if (!tahunAjaran) return null
+  const bagian = tahunAjaran.split('/')
+  if (bagian.length !== 2) return null
+
+  const tahunAwal = parseInt(bagian[0], 10)
+  const tahunAkhir = parseInt(bagian[1], 10)
+  if (isNaN(tahunAwal) || isNaN(tahunAkhir)) return null
+
+  if (semester === 'Genap') {
+    return { mulai: `${tahunAkhir}-01-01`, selesai: `${tahunAkhir}-06-30` }
+  }
+  // Default / Ganjil
+  return { mulai: `${tahunAwal}-07-01`, selesai: `${tahunAwal}-12-31` }
+}
+
 export default function Rapor() {
   const navigate = useNavigate()
 
@@ -159,6 +181,14 @@ export default function Rapor() {
     if (!siswaId || !tahunAjaran) return
     setLoading(true)
 
+    // PERBAIKAN: bangun query presensi dengan filter rentang tanggal sesuai
+    // semester & tahun ajaran yang dipilih, bukan .eq('siswa_id', siswaId) saja.
+    const periode = rentangTanggalPeriode(tahunAjaran, semester)
+    let queryPresensi = supabase.from('presensi_siswa').select('status').eq('siswa_id', siswaId)
+    if (periode) {
+      queryPresensi = queryPresensi.gte('tanggal', periode.mulai).lte('tanggal', periode.selesai)
+    }
+
     const [
       { data: nilaiRows },
       { data: presensiRows },
@@ -173,7 +203,7 @@ export default function Rapor() {
         .eq('siswa_id', siswaId)
         .eq('semester', semester)
         .eq('tahun_ajaran', tahunAjaran),
-      supabase.from('presensi_siswa').select('status').eq('siswa_id', siswaId),
+      queryPresensi,
       supabase
         .from('capaian_mapel')
         .select('id, mata_pelajaran, deskripsi_capaian')
