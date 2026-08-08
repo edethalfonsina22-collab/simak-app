@@ -6,6 +6,65 @@ import { ImagePlus, Loader2, X, Trash2, Images, ChevronLeft, ChevronRight } from
 
 const KATEGORI_LIST = ['Semua', 'Akademik', 'Ekstrakurikuler', 'Perayaan', 'Umum']
 
+// Warna badge kategori per album — senada dengan palet kartu ringkasan di Dasbor,
+// supaya tiap kategori punya identitas visual sendiri di grid galeri.
+const KATEGORI_BADGE = {
+  Akademik: 'bg-blue-600/90',
+  Ekstrakurikuler: 'bg-emerald-600/90',
+  Perayaan: 'bg-rose-600/90',
+  Umum: 'bg-purple-600/90',
+}
+
+// Motif batik (kawung + parang) — sama persis dengan Profil Saya & Dasbor,
+// warna garis menyesuaikan latar (emas di atas navy).
+function BatikOverlay({ patternId, strokeColor = '#d4af37', opacity = 1, size = 72 }) {
+  return (
+    <svg
+      className="absolute inset-0 w-full h-full pointer-events-none"
+      preserveAspectRatio="xMidYMid slice"
+      aria-hidden="true"
+    >
+      <defs>
+        <pattern
+          id={patternId}
+          x="0"
+          y="0"
+          width={size}
+          height={size}
+          patternUnits="userSpaceOnUse"
+          patternTransform="rotate(8)"
+        >
+          <g fill="none" stroke={strokeColor} strokeWidth="1.1" opacity={opacity}>
+            <ellipse cx={size / 2} cy={size * 0.333} rx={size * 0.125} ry={size * 0.194} opacity="0.55" />
+            <ellipse cx={size / 2} cy={size * 0.667} rx={size * 0.125} ry={size * 0.194} opacity="0.55" />
+            <ellipse cx={size * 0.333} cy={size / 2} rx={size * 0.194} ry={size * 0.125} opacity="0.55" />
+            <ellipse cx={size * 0.667} cy={size / 2} rx={size * 0.194} ry={size * 0.125} opacity="0.55" />
+            <circle cx={size / 2} cy={size / 2} r={size * 0.042} opacity="0.7" />
+          </g>
+          <path
+            d={`M0 ${size} L${size * 0.25} ${size * 0.75} L${size * 0.5} ${size} L${size * 0.75} ${size * 0.75} L${size} ${size}`}
+            fill="none"
+            stroke={strokeColor}
+            strokeWidth="0.8"
+            opacity={opacity * 0.35}
+          />
+          <path
+            d={`M0 0 L${size * 0.25} ${size * 0.25} L0 ${size * 0.5}`}
+            fill="none"
+            stroke={strokeColor}
+            strokeWidth="0.8"
+            opacity={opacity * 0.3}
+          />
+          <circle cx={size * 0.11} cy={size * 0.11} r="1.3" fill={strokeColor} opacity={opacity * 0.4} />
+          <circle cx={size * 0.89} cy={size * 0.22} r="1.3" fill={strokeColor} opacity={opacity * 0.4} />
+          <circle cx={size * 0.22} cy={size * 0.89} r="1.3" fill={strokeColor} opacity={opacity * 0.4} />
+        </pattern>
+      </defs>
+      <rect x="0" y="0" width="100%" height="100%" fill={`url(#${patternId})`} />
+    </svg>
+  )
+}
+
 export default function Galeri() {
   const { profil, isAdmin } = useAuth()
   const [kegiatan, setKegiatan] = useState([])
@@ -124,12 +183,38 @@ export default function Galeri() {
 
   return (
     <Layout title="Galeri Kegiatan" subtitle="Dokumentasi foto kegiatan sekolah">
-      <div className="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-2xl p-5 -m-1 shadow-sm">
-        <div className="flex items-center justify-between mb-4">
-          <p className="text-sm text-white/70">{kegiatanTerfilter.length} album kegiatan</p>
+      {/* Keyframe animasi muncul bertahap, senada dengan Dasbor & Login */}
+      <style>{`
+        @keyframes galeriFadeInUp {
+          from { opacity: 0; transform: translateY(10px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        .galeri-fade-in {
+          animation: galeriFadeInUp 0.5s ease-out forwards;
+        }
+      `}</style>
+
+      {/* Banner navy — sama seperti Dasbor & Profil Saya, dengan corak batik emas */}
+      <div className="relative overflow-hidden rounded-xl p-6 mb-6 bg-gradient-to-br from-blue-900 to-blue-950">
+        <div className="absolute -top-10 -right-10 w-40 h-40 rounded-full bg-white/5 pointer-events-none" />
+        <div className="absolute -bottom-14 -left-6 w-32 h-32 rounded-full bg-white/5 pointer-events-none" />
+        <BatikOverlay patternId="batikGaleriBanner" strokeColor="#d4af37" />
+
+        <div className="relative flex items-center justify-between mb-4 flex-wrap gap-3">
+          <div className="flex items-center gap-3">
+            <div className="w-11 h-11 rounded-full bg-white/10 ring-2 ring-white/20 text-white flex items-center justify-center shrink-0">
+              <Images size={20} />
+            </div>
+            <div>
+              <p className="font-display font-semibold text-lg text-white">
+                {kegiatanTerfilter.length} Album Kegiatan
+              </p>
+              <p className="text-sm text-blue-200/70">Dokumentasi momen sekolah dari waktu ke waktu.</p>
+            </div>
+          </div>
           <button
             onClick={() => setShowForm(!showForm)}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 transition-colors shadow"
+            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-brass-400 text-ink-950 text-sm font-medium hover:brightness-95 transition shadow"
           >
             <ImagePlus size={16} />
             Album Baru
@@ -137,15 +222,15 @@ export default function Galeri() {
         </div>
 
         {/* Filter kategori */}
-        <div className="flex flex-wrap gap-2 mb-6">
+        <div className="relative flex flex-wrap gap-2 mb-1">
           {KATEGORI_LIST.map((kat) => (
             <button
               key={kat}
               onClick={() => setFilterKategori(kat)}
               className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
                 filterKategori === kat
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-white/15 text-white hover:bg-white/25'
+                  ? 'bg-brass-400 text-ink-950'
+                  : 'bg-white/10 text-white hover:bg-white/20'
               }`}
             >
               {kat}
@@ -154,7 +239,7 @@ export default function Galeri() {
         </div>
 
         {showForm && (
-          <form onSubmit={handleUpload} className="bg-white rounded-xl p-6 mb-6 space-y-3 shadow">
+          <form onSubmit={handleUpload} className="relative bg-white rounded-xl p-6 mt-5 space-y-3 shadow">
             <input
               className="input w-full border-slate-200"
               placeholder="Judul kegiatan (mis. Perayaan Hari Kemerdekaan)"
@@ -192,63 +277,66 @@ export default function Galeri() {
             <button
               type="submit"
               disabled={uploading}
-              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors"
+              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-brass-400 text-ink-950 text-sm font-medium hover:brightness-95 disabled:opacity-50 transition"
             >
               {uploading ? <Loader2 size={16} className="animate-spin" /> : <ImagePlus size={16} />}
               {uploading ? 'Mengunggah...' : 'Upload Album'}
             </button>
           </form>
         )}
-
-        {loading ? (
-          <p className="text-sm text-white/70">Memuat...</p>
-        ) : kegiatanTerfilter.length === 0 ? (
-          <div className="bg-white rounded-xl p-6 shadow">
-            <p className="text-sm text-slate-500">Belum ada album kegiatan di kategori ini.</p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-            {kegiatanTerfilter.map((item) => {
-              const foto = item.galeri_foto || []
-              return (
-                <button
-                  key={item.id}
-                  onClick={() => setOpenAlbum(item)}
-                  className="bg-white rounded-xl overflow-hidden text-left hover:shadow-lg transition-shadow border border-slate-100"
-                >
-                  <div className="aspect-video bg-slate-100 relative">
-                    {foto[0] ? (
-                      <img src={fotoUrl(foto[0].foto_path)} alt={item.judul} className="w-full h-full object-cover" />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center text-slate-300">
-                        <Images size={28} />
-                      </div>
-                    )}
-                    <span className="absolute top-2 left-2 text-[11px] font-medium px-2 py-0.5 rounded-md bg-indigo-600/90 text-white">
-                      {item.kategori || 'Umum'}
-                    </span>
-                    <span className="absolute bottom-2 right-2 text-[11px] font-medium px-2 py-0.5 rounded-md bg-emerald-600/90 text-white">
-                      {foto.length} foto
-                    </span>
-                  </div>
-                  <div className="p-4">
-                    <p className="font-medium text-sm text-slate-900 truncate">{item.judul}</p>
-                    <p className="text-xs text-slate-500 mt-0.5">
-                      {item.guru?.nama_lengkap || 'Admin'} · {new Date(item.dibuat_pada).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}
-                    </p>
-                  </div>
-                </button>
-              )
-            })}
-          </div>
-        )}
       </div>
+
+      {loading ? (
+        <p className="text-sm text-ink-700/50">Memuat...</p>
+      ) : kegiatanTerfilter.length === 0 ? (
+        <div className="card p-6">
+          <p className="text-sm text-ink-700/50">Belum ada album kegiatan di kategori ini.</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+          {kegiatanTerfilter.map((item, i) => {
+            const foto = item.galeri_foto || []
+            return (
+              <button
+                key={item.id}
+                onClick={() => setOpenAlbum(item)}
+                style={{ animationDelay: `${i * 60}ms` }}
+                className="galeri-fade-in opacity-0 relative overflow-hidden bg-white rounded-2xl text-left shadow-sm hover:shadow-lg transition-all duration-300 ease-out hover:-translate-y-1 border border-ink-900/[0.06]"
+              >
+                <span className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-900 to-brass-400 z-10" />
+                <div className="aspect-video bg-slate-100 relative">
+                  {foto[0] ? (
+                    <img src={fotoUrl(foto[0].foto_path)} alt={item.judul} className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-slate-300">
+                      <Images size={28} />
+                    </div>
+                  )}
+                  <span className={`absolute top-3 left-2 text-[11px] font-medium px-2 py-0.5 rounded-md text-white ${KATEGORI_BADGE[item.kategori] || KATEGORI_BADGE.Umum}`}>
+                    {item.kategori || 'Umum'}
+                  </span>
+                  <span className="absolute bottom-2 right-2 text-[11px] font-medium px-2 py-0.5 rounded-md bg-ink-950/80 text-white">
+                    {foto.length} foto
+                  </span>
+                </div>
+                <div className="p-4">
+                  <p className="font-medium text-sm text-ink-950 truncate">{item.judul}</p>
+                  <p className="text-xs text-ink-700/50 mt-0.5">
+                    {item.guru?.nama_lengkap || 'Admin'} · {new Date(item.dibuat_pada).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}
+                  </p>
+                </div>
+              </button>
+            )
+          })}
+        </div>
+      )}
 
       {/* Modal Album (grid foto) */}
       {openAlbum && (
         <div className="fixed inset-0 bg-slate-900/70 flex items-center justify-center p-4 z-50" onClick={() => setOpenAlbum(null)}>
           <div className="bg-white rounded-xl max-w-3xl w-full max-h-[85vh] overflow-y-auto shadow-xl" onClick={(e) => e.stopPropagation()}>
-            <div className="p-5 border-b border-slate-200 flex items-start justify-between sticky top-0 bg-white">
+            <div className="relative p-5 border-b border-slate-200 flex items-start justify-between sticky top-0 bg-white overflow-hidden">
+              <span className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-900 to-brass-400" />
               <div>
                 <p className="font-display font-semibold text-lg text-slate-900">{openAlbum.judul}</p>
                 {openAlbum.deskripsi && <p className="text-sm text-slate-600 mt-1">{openAlbum.deskripsi}</p>}
