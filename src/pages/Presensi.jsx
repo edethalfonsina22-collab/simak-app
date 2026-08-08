@@ -12,6 +12,56 @@ const STATUS_OPTS = [
   { value: 'alpa', label: 'Alpa', color: 'bg-red-100 text-red-700' },
 ]
 
+// Motif batik (kawung + parang) — sama persis dengan Profil Saya, Dasbor, Galeri, Dokumen & Data Siswa,
+// warna garis menyesuaikan latar (emas di atas navy).
+function BatikOverlay({ patternId, strokeColor = '#d4af37', opacity = 1, size = 72 }) {
+  return (
+    <svg
+      className="absolute inset-0 w-full h-full pointer-events-none"
+      preserveAspectRatio="xMidYMid slice"
+      aria-hidden="true"
+    >
+      <defs>
+        <pattern
+          id={patternId}
+          x="0"
+          y="0"
+          width={size}
+          height={size}
+          patternUnits="userSpaceOnUse"
+          patternTransform="rotate(8)"
+        >
+          <g fill="none" stroke={strokeColor} strokeWidth="1.1" opacity={opacity}>
+            <ellipse cx={size / 2} cy={size * 0.333} rx={size * 0.125} ry={size * 0.194} opacity="0.55" />
+            <ellipse cx={size / 2} cy={size * 0.667} rx={size * 0.125} ry={size * 0.194} opacity="0.55" />
+            <ellipse cx={size * 0.333} cy={size / 2} rx={size * 0.194} ry={size * 0.125} opacity="0.55" />
+            <ellipse cx={size * 0.667} cy={size / 2} rx={size * 0.194} ry={size * 0.125} opacity="0.55" />
+            <circle cx={size / 2} cy={size / 2} r={size * 0.042} opacity="0.7" />
+          </g>
+          <path
+            d={`M0 ${size} L${size * 0.25} ${size * 0.75} L${size * 0.5} ${size} L${size * 0.75} ${size * 0.75} L${size} ${size}`}
+            fill="none"
+            stroke={strokeColor}
+            strokeWidth="0.8"
+            opacity={opacity * 0.35}
+          />
+          <path
+            d={`M0 0 L${size * 0.25} ${size * 0.25} L0 ${size * 0.5}`}
+            fill="none"
+            stroke={strokeColor}
+            strokeWidth="0.8"
+            opacity={opacity * 0.3}
+          />
+          <circle cx={size * 0.11} cy={size * 0.11} r="1.3" fill={strokeColor} opacity={opacity * 0.4} />
+          <circle cx={size * 0.89} cy={size * 0.22} r="1.3" fill={strokeColor} opacity={opacity * 0.4} />
+          <circle cx={size * 0.22} cy={size * 0.89} r="1.3" fill={strokeColor} opacity={opacity * 0.4} />
+        </pattern>
+      </defs>
+      <rect x="0" y="0" width="100%" height="100%" fill={`url(#${patternId})`} />
+    </svg>
+  )
+}
+
 function fotoGuruUrl(path) {
   if (!path) return null
   return supabase.storage.from('foto-profil').getPublicUrl(path).data.publicUrl
@@ -139,21 +189,24 @@ export default function Presensi() {
 
   return (
     <Layout title="Presensi" subtitle="Catat kehadiran siswa dan guru harian">
-      {/* Banner biru — senada dengan halaman Dokumen/Profil */}
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-ink-950 to-[#22315B] p-6 mb-6">
-        <div className="relative z-10 flex items-center gap-4">
-          <div className="w-11 h-11 rounded-full bg-white/15 flex items-center justify-center shrink-0">
-            <ClipboardCheck size={20} className="text-paper" />
+      {/* Banner navy — sama seperti Dasbor, Profil Saya, Galeri, Dokumen & Data Siswa, dengan corak batik emas */}
+      <div className="relative overflow-hidden rounded-xl p-6 mb-6 bg-gradient-to-br from-blue-900 to-blue-950">
+        <div className="absolute -top-10 -right-10 w-40 h-40 rounded-full bg-white/5 pointer-events-none" />
+        <div className="absolute -bottom-14 -left-6 w-32 h-32 rounded-full bg-white/5 pointer-events-none" />
+        <BatikOverlay patternId="batikPresensiBanner" strokeColor="#d4af37" />
+
+        <div className="relative flex items-center gap-4">
+          <div className="w-11 h-11 rounded-full bg-white/10 ring-2 ring-white/20 flex items-center justify-center shrink-0">
+            <ClipboardCheck size={20} className="text-white" />
           </div>
           <div>
-            <p className="font-display font-semibold text-lg text-paper">Presensi</p>
-            <p className="text-sm text-paper/70 mt-0.5">
+            <p className="font-display font-semibold text-lg text-white">Presensi</p>
+            <p className="text-sm text-blue-200/70 mt-0.5">
               {tab === 'siswa' && kelasAktif ? `Kelas ${kelasAktif.nama_kelas} · ` : tab === 'guru' ? 'Presensi guru · ' : ''}
               {tanggalLabel}
             </p>
           </div>
         </div>
-        <ClipboardCheck size={120} className="absolute -right-4 -bottom-6 text-white/5 rotate-12" />
       </div>
 
       {/* Indikator status koneksi & antrian */}
@@ -184,7 +237,8 @@ export default function Presensi() {
         )}
       </div>
 
-      <div className="card overflow-x-auto">
+      <div className="card relative overflow-hidden overflow-x-auto">
+        <span className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-900 to-brass-400" />
         <table className="table-shell">
           <thead>
             <tr><th>Nama</th><th>Status Kehadiran</th></tr>
