@@ -103,6 +103,9 @@ export default function PPDBAdmin() {
     const namaSekolah = profil?.nama_sekolah || ''
     const npsn = profil?.npsn ? `NPSN: ${profil.npsn}` : ''
     const alamatSekolah = profil?.alamat || ''
+    const namaKepsek = profil?.kepala_sekolah || ''
+    const nipKepsek = profil?.nip_kepala_sekolah ? `NIP. ${profil.nip_kepala_sekolah}` : ''
+    const tempatTtd = profil?.tempat_ttd || ''
     const tanggalCetak = new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })
 
     const baris = data
@@ -139,8 +142,8 @@ export default function PPDBAdmin() {
           th, td { border: 1px solid #333; padding: 4px 6px; }
           th { background: #eee; text-align: center; }
           .footer { margin-top: 40px; display: flex; justify-content: flex-end; }
-          .ttd { text-align: center; width: 220px; }
-          .ttd .garis { margin-top: 60px; border-top: 1px solid #111; }
+          .ttd { text-align: center; width: 240px; }
+          .ttd .garis { margin-top: 60px; border-top: 1px solid #111; margin-bottom: 2px; }
         </style>
       </head>
       <body>
@@ -170,10 +173,11 @@ export default function PPDBAdmin() {
         </table>
         <div class="footer">
           <div class="ttd">
-            <p>Manokwari, ${tanggalCetak}</p>
+            <p>${tempatTtd}${tempatTtd ? ', ' : ''}${tanggalCetak}</p>
             <p>Kepala Sekolah</p>
             <div class="garis"></div>
-            <p>${profil?.nama_kepsek || ''}</p>
+            <p><strong>${namaKepsek}</strong></p>
+            <p>${nipKepsek}</p>
           </div>
         </div>
       </body>
