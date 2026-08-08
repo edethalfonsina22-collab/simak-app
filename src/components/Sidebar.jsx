@@ -8,7 +8,7 @@ import {
   ClipboardCheck,
   BookOpenCheck,
   Megaphone,
-  LogOut,
+  Power,
   Boxes,
   CalendarDays,
   Mail,
@@ -167,29 +167,45 @@ export default function Sidebar() {
 
   return (
     <aside className="w-64 shrink-0 bg-white text-slate-700 flex flex-col h-screen sticky top-0 border-r border-slate-200">
-      <div className="px-4 py-5 border-b border-slate-200">
-        <div className="flex items-center gap-2.5">
+      <div className="relative overflow-hidden px-4 py-5 border-b border-slate-200 bg-gradient-to-br from-blue-950 via-blue-900 to-indigo-900">
+        {/* Motif batik dekoratif (senada dengan banner dashboard) */}
+        <svg
+          className="absolute inset-0 w-full h-full opacity-[0.15] pointer-events-none"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <defs>
+            <pattern id="batikSidebar" width="46" height="46" patternUnits="userSpaceOnUse">
+              <circle cx="23" cy="23" r="12" fill="none" stroke="#facc15" strokeWidth="1" />
+              <circle cx="23" cy="23" r="4" fill="none" stroke="#facc15" strokeWidth="1" />
+              <path d="M23 5 v8 M23 33 v8 M5 23 h8 M33 23 h8" stroke="#facc15" strokeWidth="1" />
+              <path d="M10 10 l4 4 M32 10 l-4 4 M10 36 l4 -4 M32 36 l-4 -4" stroke="#facc15" strokeWidth="0.75" />
+            </pattern>
+          </defs>
+          <rect width="100%" height="100%" fill="url(#batikSidebar)" />
+        </svg>
+
+        <div className="relative flex items-center gap-3">
           {fotoUrl ? (
             <img
               src={fotoUrl}
               alt={namaTampil}
-              className="w-9 h-9 rounded-full object-cover shrink-0 border border-slate-200"
+              className="w-11 h-11 rounded-full object-cover shrink-0 border-2 border-white/20"
             />
           ) : (
-            <div className="w-9 h-9 rounded-full bg-gradient-to-br from-blue-600 to-indigo-500 flex items-center justify-center font-display font-bold text-white text-xs shrink-0">
+            <div className="w-11 h-11 rounded-full bg-gradient-to-br from-blue-500 to-indigo-400 flex items-center justify-center font-display font-bold text-white text-sm shrink-0 border-2 border-white/20">
               {getInisial(namaTampil)}
             </div>
           )}
           <div className="min-w-0 flex-1">
-            <p className="font-display font-semibold text-[13px] leading-tight truncate text-slate-800">{namaTampil}</p>
-            <p className="text-[11px] text-slate-400 mt-0.5">{isAdmin ? 'Admin' : 'Guru'}</p>
+            <p className="font-display font-semibold text-[13px] leading-tight truncate text-white">{namaTampil}</p>
+            <p className="text-[11px] text-white/50 mt-0.5">{isAdmin ? 'Admin' : 'Guru'}</p>
           </div>
           <button
             onClick={signOut}
             title="Keluar"
-            className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors shrink-0"
+            className="w-10 h-10 rounded-lg flex items-center justify-center text-red-400 hover:bg-red-500/15 hover:text-red-300 transition-colors shrink-0"
           >
-            <LogOut size={16} />
+            <Power size={20} strokeWidth={2.2} />
           </button>
         </div>
       </div>
