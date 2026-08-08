@@ -7,16 +7,22 @@ import BulkImportModal from '../components/BulkImportModal'
 import TeleponLink from '../components/TeleponLink'
 import { Plus, UploadCloud, Pencil, Trash2, Search, X, Loader2, Download, FileSpreadsheet, Printer, ChevronDown, Camera, IdCard } from 'lucide-react'
 
+const AGAMA_OPTIONS = ['Islam', 'Kristen', 'Katolik', 'Hindu', 'Buddha', 'Khonghucu', 'Lainnya']
+
 const emptyForm = {
   nis: '',
   nisn: '',
   nik: '',
   nama_lengkap: '',
   jenis_kelamin: 'L',
+  agama: '',
   tempat_lahir: '',
   tanggal_lahir: '',
   alamat: '',
+  alamat_tinggal: '',
   nama_orang_tua: '',
+  nama_ayah: '',
+  nama_ibu: '',
   no_hp_orang_tua: '',
   kelas_id: '',
   status: 'aktif',
@@ -25,8 +31,9 @@ const emptyForm = {
 // Header ini HARUS sama persis dengan templateHeaders di BulkImportModal (Impor Massal)
 // supaya file yang diunduh dari sini bisa langsung diupload ulang tanpa perlu diubah nama kolomnya.
 const EXCEL_HEADERS = [
-  'nama_lengkap', 'nis', 'nisn', 'nik', 'kelas', 'jenis_kelamin(L/P)',
-  'tempat_lahir', 'tanggal_lahir(YYYY-MM-DD)', 'nama_orang_tua', 'no_hp_orang_tua', 'alamat',
+  'nama_lengkap', 'nis', 'nisn', 'nik', 'kelas', 'jenis_kelamin(L/P)', 'agama',
+  'tempat_lahir', 'tanggal_lahir(YYYY-MM-DD)', 'nama_ayah', 'nama_ibu', 'nama_orang_tua',
+  'no_hp_orang_tua', 'alamat', 'alamat_tinggal',
 ]
 
 function formatTanggalLahir(tgl) {
@@ -170,17 +177,22 @@ export default function Siswa() {
       nik: s.nik || '',
       kelas: s.kelas?.nama_kelas || '',
       'jenis_kelamin(L/P)': s.jenis_kelamin || '',
+      agama: s.agama || '',
       tempat_lahir: s.tempat_lahir || '',
       'tanggal_lahir(YYYY-MM-DD)': s.tanggal_lahir || '',
+      nama_ayah: s.nama_ayah || '',
+      nama_ibu: s.nama_ibu || '',
       nama_orang_tua: s.nama_orang_tua || '',
       no_hp_orang_tua: s.no_hp_orang_tua || '',
       alamat: s.alamat || '',
+      alamat_tinggal: s.alamat_tinggal || '',
     }))
 
     const ws = XLSX.utils.json_to_sheet(rows, { header: EXCEL_HEADERS })
     ws['!cols'] = [
-      { wch: 24 }, { wch: 10 }, { wch: 12 }, { wch: 18 }, { wch: 10 }, { wch: 16 },
-      { wch: 16 }, { wch: 20 }, { wch: 22 }, { wch: 16 }, { wch: 30 },
+      { wch: 24 }, { wch: 10 }, { wch: 12 }, { wch: 18 }, { wch: 10 }, { wch: 16 }, { wch: 12 },
+      { wch: 16 }, { wch: 20 }, { wch: 20 }, { wch: 20 }, { wch: 22 },
+      { wch: 16 }, { wch: 30 }, { wch: 30 },
     ]
     const wb = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(wb, ws, 'Data Siswa')
@@ -190,7 +202,7 @@ export default function Siswa() {
   // --- Export: Excel (CSV) ---
   function handleExportCSV() {
     setShowExportMenu(false)
-    const headers = ['Nama Lengkap', 'NIS', 'NISN', 'NIK', 'Kelas', 'Jenis Kelamin', 'Status', 'Tempat Lahir', 'Tanggal Lahir', 'Nama Orang Tua/Wali', 'No. HP Orang Tua', 'Alamat']
+    const headers = ['Nama Lengkap', 'NIS', 'NISN', 'NIK', 'Kelas', 'Jenis Kelamin', 'Agama', 'Status', 'Tempat Lahir', 'Tanggal Lahir', 'Nama Ayah', 'Nama Ibu', 'Nama Orang Tua/Wali', 'No. HP Orang Tua', 'Alamat', 'Alamat Tempat Tinggal']
     const rows = filtered.map((s) => [
       s.nama_lengkap || '',
       s.nis || '',
@@ -198,12 +210,16 @@ export default function Siswa() {
       s.nik || '',
       s.kelas?.nama_kelas || '',
       s.jenis_kelamin === 'L' ? 'Laki-laki' : 'Perempuan',
+      s.agama || '',
       s.status || '',
       s.tempat_lahir || '',
       s.tanggal_lahir || '',
+      s.nama_ayah || '',
+      s.nama_ibu || '',
       s.nama_orang_tua || '',
       s.no_hp_orang_tua || '',
       s.alamat || '',
+      s.alamat_tinggal || '',
     ])
 
     const escapeCell = (val) => {
@@ -237,6 +253,7 @@ export default function Siswa() {
           <td>${s.nik || '-'}</td>
           <td>${s.kelas?.nama_kelas || '-'}</td>
           <td>${s.jenis_kelamin === 'L' ? 'Laki-laki' : 'Perempuan'}</td>
+          <td>${s.agama || '-'}</td>
           <td>${s.status || '-'}</td>
         </tr>`
       )
@@ -273,6 +290,7 @@ export default function Siswa() {
               <th>NIK</th>
               <th>Kelas</th>
               <th>Jenis Kelamin</th>
+              <th>Agama</th>
               <th>Status</th>
             </tr>
           </thead>
@@ -510,6 +528,13 @@ export default function Siswa() {
                   <option value="P">Perempuan</option>
                 </select>
               </Field>
+              <Field label="Agama">
+                <select className="input-field" value={form.agama}
+                  onChange={(e) => setForm({ ...form, agama: e.target.value })}>
+                  <option value="">— Pilih Agama —</option>
+                  {AGAMA_OPTIONS.map((a) => <option key={a} value={a}>{a}</option>)}
+                </select>
+              </Field>
               <Field label="Kelas">
                 <select className="input-field" value={form.kelas_id}
                   onChange={(e) => setForm({ ...form, kelas_id: e.target.value })}>
@@ -524,6 +549,14 @@ export default function Siswa() {
               <Field label="Tanggal Lahir">
                 <input type="date" className="input-field" value={form.tanggal_lahir || ''}
                   onChange={(e) => setForm({ ...form, tanggal_lahir: e.target.value })} />
+              </Field>
+              <Field label="Nama Ayah">
+                <input className="input-field" value={form.nama_ayah}
+                  onChange={(e) => setForm({ ...form, nama_ayah: e.target.value })} />
+              </Field>
+              <Field label="Nama Ibu">
+                <input className="input-field" value={form.nama_ibu}
+                  onChange={(e) => setForm({ ...form, nama_ibu: e.target.value })} />
               </Field>
               <Field label="Nama Orang Tua/Wali" full>
                 <input className="input-field" value={form.nama_orang_tua}
@@ -541,9 +574,13 @@ export default function Siswa() {
                   <option value="pindah">Pindah</option>
                 </select>
               </Field>
-              <Field label="Alamat" full>
+              <Field label="Alamat (sesuai KTP/KK)" full>
                 <textarea className="input-field" rows={2} value={form.alamat}
                   onChange={(e) => setForm({ ...form, alamat: e.target.value })} />
+              </Field>
+              <Field label="Alamat Tempat Tinggal (domisili saat ini)" full>
+                <textarea className="input-field" rows={2} value={form.alamat_tinggal}
+                  onChange={(e) => setForm({ ...form, alamat_tinggal: e.target.value })} />
               </Field>
             </div>
 
@@ -591,8 +628,12 @@ export default function Siswa() {
                 <ProfilRow label="NIK" value={profilLihat.nik} />
                 <ProfilRow label="Kelas" value={profilLihat.kelas?.nama_kelas} />
                 <ProfilRow label="Jenis Kelamin" value={profilLihat.jenis_kelamin === 'L' ? 'Laki-laki' : 'Perempuan'} />
+                <ProfilRow label="Agama" value={profilLihat.agama} />
                 <ProfilRow label="Tempat, Tanggal Lahir" value={tempatTanggalLahir(profilLihat)} />
                 <ProfilRow label="Alamat" value={profilLihat.alamat} />
+                <ProfilRow label="Alamat Tempat Tinggal" value={profilLihat.alamat_tinggal} />
+                <ProfilRow label="Nama Ayah" value={profilLihat.nama_ayah} />
+                <ProfilRow label="Nama Ibu" value={profilLihat.nama_ibu} />
                 <ProfilRow label="Nama Orang Tua/Wali" value={profilLihat.nama_orang_tua} />
                 <ProfilRow label="No. HP Orang Tua/Wali" value={profilLihat.no_hp_orang_tua} telepon />
               </div>
@@ -623,7 +664,7 @@ export default function Siswa() {
         open={showImport}
         onClose={() => { setShowImport(false); loadData() }}
         title="Impor Data Siswa"
-        templateHeaders={['nama_lengkap', 'nis', 'nisn', 'nik', 'kelas', 'jenis_kelamin(L/P)', 'tempat_lahir', 'tanggal_lahir(YYYY-MM-DD)', 'nama_orang_tua', 'no_hp_orang_tua', 'alamat']}
+        templateHeaders={['nama_lengkap', 'nis', 'nisn', 'nik', 'kelas', 'jenis_kelamin(L/P)', 'agama', 'tempat_lahir', 'tanggal_lahir(YYYY-MM-DD)', 'nama_ayah', 'nama_ibu', 'nama_orang_tua', 'no_hp_orang_tua', 'alamat', 'alamat_tinggal']}
         mapRow={(row) => {
           if (!row.nama_lengkap) return null
           const namaKelas = String(row.kelas || '').trim()
@@ -637,11 +678,15 @@ export default function Siswa() {
             nik: String(row.nik || '').trim(),
             kelas_id: matchedKelas ? matchedKelas.id : null,
             jenis_kelamin: String(row['jenis_kelamin(L/P)'] || row.jenis_kelamin || 'L').trim().toUpperCase(),
+            agama: String(row.agama || '').trim(),
             tempat_lahir: String(row.tempat_lahir || '').trim(),
             tanggal_lahir: row['tanggal_lahir(YYYY-MM-DD)'] || row.tanggal_lahir || null,
+            nama_ayah: String(row.nama_ayah || '').trim(),
+            nama_ibu: String(row.nama_ibu || '').trim(),
             nama_orang_tua: String(row.nama_orang_tua || '').trim(),
             no_hp_orang_tua: String(row.no_hp_orang_tua || '').trim(),
             alamat: String(row.alamat || '').trim(),
+            alamat_tinggal: String(row.alamat_tinggal || '').trim(),
             status: 'aktif',
           }
         }}
