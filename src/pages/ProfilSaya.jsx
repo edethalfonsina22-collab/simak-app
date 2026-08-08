@@ -194,6 +194,58 @@ export default function ProfilSaya() {
           <div className="absolute -top-10 -right-10 w-40 h-40 rounded-full bg-white/5 pointer-events-none" />
           <div className="absolute -bottom-14 -left-6 w-32 h-32 rounded-full bg-white/5 pointer-events-none" />
 
+          {/* Corak batik abstrak emas — motif kawung/parang disederhanakan, ditumpuk tipis di atas gradasi navy */}
+          <svg
+            className="absolute inset-0 w-full h-full pointer-events-none"
+            preserveAspectRatio="xMidYMid slice"
+            aria-hidden="true"
+          >
+            <defs>
+              <pattern
+                id="batikEmas"
+                x="0"
+                y="0"
+                width="72"
+                height="72"
+                patternUnits="userSpaceOnUse"
+                patternTransform="rotate(8)"
+              >
+                {/* motif kawung: empat lengkung elips mengelilingi titik pusat */}
+                <g fill="none" stroke="#d4af37" strokeWidth="1.1">
+                  <ellipse cx="36" cy="24" rx="9" ry="14" opacity="0.55" />
+                  <ellipse cx="36" cy="48" rx="9" ry="14" opacity="0.55" />
+                  <ellipse cx="24" cy="36" rx="14" ry="9" opacity="0.55" />
+                  <ellipse cx="48" cy="36" rx="14" ry="9" opacity="0.55" />
+                  <circle cx="36" cy="36" r="3" opacity="0.7" />
+                </g>
+                {/* garis parang halus di sela-sela motif kawung */}
+                <path
+                  d="M0 72 L18 54 L36 72 L54 54 L72 72"
+                  fill="none"
+                  stroke="#d4af37"
+                  strokeWidth="0.8"
+                  opacity="0.35"
+                />
+                <path
+                  d="M0 0 L18 18 L0 36"
+                  fill="none"
+                  stroke="#d4af37"
+                  strokeWidth="0.8"
+                  opacity="0.3"
+                />
+                <circle cx="8" cy="8" r="1.3" fill="#d4af37" opacity="0.4" />
+                <circle cx="64" cy="16" r="1.3" fill="#d4af37" opacity="0.4" />
+                <circle cx="16" cy="64" r="1.3" fill="#d4af37" opacity="0.4" />
+              </pattern>
+              <linearGradient id="batikFade" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0%" stopColor="#000000" stopOpacity="0" />
+                <stop offset="100%" stopColor="#000000" stopOpacity="0.15" />
+              </linearGradient>
+            </defs>
+            <rect x="0" y="0" width="100%" height="100%" fill="url(#batikEmas)" />
+            <rect x="0" y="0" width="100%" height="100%" fill="url(#batikFade)" />
+          </svg>
+
           <div className="relative flex items-center gap-5 min-w-0">
             <div className="relative shrink-0">
               <div className="w-20 h-20 rounded-full bg-white/10 ring-2 ring-white/20 overflow-hidden flex items-center justify-center">
