@@ -19,6 +19,56 @@ function isPreviewable(fileName) {
   return ext === 'pdf' || IMAGE_EXT.includes(ext) || OFFICE_EXT.includes(ext)
 }
 
+// Motif batik (kawung + parang) — sama persis dengan Profil Saya, Dasbor & Galeri,
+// warna garis menyesuaikan latar (emas di atas navy).
+function BatikOverlay({ patternId, strokeColor = '#d4af37', opacity = 1, size = 72 }) {
+  return (
+    <svg
+      className="absolute inset-0 w-full h-full pointer-events-none"
+      preserveAspectRatio="xMidYMid slice"
+      aria-hidden="true"
+    >
+      <defs>
+        <pattern
+          id={patternId}
+          x="0"
+          y="0"
+          width={size}
+          height={size}
+          patternUnits="userSpaceOnUse"
+          patternTransform="rotate(8)"
+        >
+          <g fill="none" stroke={strokeColor} strokeWidth="1.1" opacity={opacity}>
+            <ellipse cx={size / 2} cy={size * 0.333} rx={size * 0.125} ry={size * 0.194} opacity="0.55" />
+            <ellipse cx={size / 2} cy={size * 0.667} rx={size * 0.125} ry={size * 0.194} opacity="0.55" />
+            <ellipse cx={size * 0.333} cy={size / 2} rx={size * 0.194} ry={size * 0.125} opacity="0.55" />
+            <ellipse cx={size * 0.667} cy={size / 2} rx={size * 0.194} ry={size * 0.125} opacity="0.55" />
+            <circle cx={size / 2} cy={size / 2} r={size * 0.042} opacity="0.7" />
+          </g>
+          <path
+            d={`M0 ${size} L${size * 0.25} ${size * 0.75} L${size * 0.5} ${size} L${size * 0.75} ${size * 0.75} L${size} ${size}`}
+            fill="none"
+            stroke={strokeColor}
+            strokeWidth="0.8"
+            opacity={opacity * 0.35}
+          />
+          <path
+            d={`M0 0 L${size * 0.25} ${size * 0.25} L0 ${size * 0.5}`}
+            fill="none"
+            stroke={strokeColor}
+            strokeWidth="0.8"
+            opacity={opacity * 0.3}
+          />
+          <circle cx={size * 0.11} cy={size * 0.11} r="1.3" fill={strokeColor} opacity={opacity * 0.4} />
+          <circle cx={size * 0.89} cy={size * 0.22} r="1.3" fill={strokeColor} opacity={opacity * 0.4} />
+          <circle cx={size * 0.22} cy={size * 0.89} r="1.3" fill={strokeColor} opacity={opacity * 0.4} />
+        </pattern>
+      </defs>
+      <rect x="0" y="0" width="100%" height="100%" fill={`url(#${patternId})`} />
+    </svg>
+  )
+}
+
 // Modal preview: PDF & gambar dibuka langsung, dokumen Office lewat Google Docs Viewer
 function PreviewModal({ url, fileName, onClose }) {
   if (!url) return null
@@ -30,7 +80,8 @@ function PreviewModal({ url, fileName, onClose }) {
   return (
     <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
       <div className="bg-white rounded-xl w-full max-w-4xl h-[85vh] flex flex-col overflow-hidden">
-        <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200">
+        <div className="relative flex items-center justify-between px-4 py-3 border-b border-slate-200 overflow-hidden">
+          <span className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-900 to-brass-400" />
           <p className="text-sm font-medium text-slate-900 truncate pr-4">{fileName}</p>
           <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-slate-100 shrink-0">
             <X size={18} />
@@ -151,33 +202,47 @@ export default function Dokumen() {
 
   return (
     <Layout title="Dokumen Penting" subtitle="Berkas dan dokumen bersama untuk seluruh warga sekolah">
-      {/* Banner sambutan */}
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-indigo-600 to-purple-600 p-6 mb-6">
-        <div className="relative z-10 flex items-center gap-4">
-          <div className="w-11 h-11 rounded-full bg-white/15 flex items-center justify-center shrink-0">
+      {/* Keyframe animasi muncul bertahap, senada dengan Dasbor & Galeri */}
+      <style>{`
+        @keyframes dokumenFadeInUp {
+          from { opacity: 0; transform: translateY(10px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        .dokumen-fade-in {
+          animation: dokumenFadeInUp 0.5s ease-out forwards;
+        }
+      `}</style>
+
+      {/* Banner navy — sama seperti Dasbor, Profil Saya & Galeri, dengan corak batik emas */}
+      <div className="relative overflow-hidden rounded-xl p-6 mb-6 flex items-center justify-between gap-4 flex-wrap bg-gradient-to-br from-blue-900 to-blue-950">
+        <div className="absolute -top-10 -right-10 w-40 h-40 rounded-full bg-white/5 pointer-events-none" />
+        <div className="absolute -bottom-14 -left-6 w-32 h-32 rounded-full bg-white/5 pointer-events-none" />
+        <BatikOverlay patternId="batikDokumenBanner" strokeColor="#d4af37" />
+
+        <div className="relative flex items-center gap-4">
+          <div className="w-11 h-11 rounded-full bg-white/10 ring-2 ring-white/20 flex items-center justify-center shrink-0">
             <HardDrive size={20} className="text-white" />
           </div>
           <div>
             <p className="font-display font-semibold text-lg text-white">Dokumen Penting</p>
-            <p className="text-sm text-white/70 mt-0.5">Semua berkas resmi sekolah tersimpan rapi di sini.</p>
+            <p className="text-sm text-blue-200/70 mt-0.5">Semua berkas resmi sekolah tersimpan rapi di sini.</p>
           </div>
         </div>
-        <HardDrive size={120} className="absolute -right-4 -bottom-6 text-white/10 rotate-12" />
-      </div>
 
-      <div className="flex items-center justify-between mb-6">
-        <p className="text-sm text-slate-500">{items.length} dokumen</p>
         <button
           onClick={() => setShowForm(!showForm)}
-          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 transition-colors shadow"
+          className="relative flex items-center gap-2 px-4 py-2 rounded-lg bg-brass-400 text-ink-950 text-sm font-medium hover:brightness-95 transition shadow"
         >
           <FileUp size={16} />
           Upload Dokumen
         </button>
       </div>
 
+      <p className="text-sm text-ink-700/50 mb-4">{items.length} dokumen</p>
+
       {showForm && (
-        <form onSubmit={handleUpload} className="card p-6 mb-6 space-y-3">
+        <form onSubmit={handleUpload} className="card relative overflow-hidden p-6 mb-6 space-y-3">
+          <span className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-900 to-brass-400" />
           <input
             className="input w-full border-slate-200"
             placeholder="Judul dokumen (mis. SK Kepala Sekolah 2026)"
@@ -201,7 +266,7 @@ export default function Dokumen() {
           <button
             type="submit"
             disabled={uploading}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors"
+            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-brass-400 text-ink-950 text-sm font-medium hover:brightness-95 disabled:opacity-50 transition"
           >
             {uploading ? <Loader2 size={16} className="animate-spin" /> : <FileUp size={16} />}
             {uploading ? 'Mengunggah...' : 'Upload'}
@@ -210,17 +275,18 @@ export default function Dokumen() {
       )}
 
       {loading ? (
-        <p className="text-sm text-slate-500">Memuat...</p>
+        <p className="text-sm text-ink-700/50">Memuat...</p>
       ) : items.length === 0 ? (
         <div className="card p-6">
-          <p className="text-sm text-slate-500">Belum ada dokumen diupload.</p>
+          <p className="text-sm text-ink-700/50">Belum ada dokumen diupload.</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {items.map((item, i) => (
             <div
               key={item.id}
-              className={`relative overflow-hidden card border-t-4 ${CARD_BORDER[i % CARD_BORDER.length]} p-5 flex flex-col`}
+              style={{ animationDelay: `${i * 60}ms` }}
+              className={`dokumen-fade-in opacity-0 relative overflow-hidden card border-t-4 ${CARD_BORDER[i % CARD_BORDER.length]} p-5 flex flex-col transition-transform duration-300 ease-out hover:-translate-y-1`}
             >
               <div className={`w-10 h-10 rounded-full flex items-center justify-center mb-3 ${ICON_BG[i % ICON_BG.length]}`}>
                 <FileText size={18} />
