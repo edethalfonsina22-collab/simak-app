@@ -124,8 +124,8 @@ function NavItem({ to, label, icon: Icon, end }) {
       className={({ isActive }) =>
         `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
           isActive
-            ? 'bg-gradient-to-r from-blue-600 to-indigo-500 text-white shadow-sm shadow-blue-200'
-            : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+            ? 'bg-gradient-to-r from-blue-500 to-indigo-400 text-white shadow-sm shadow-black/20'
+            : 'text-white/70 hover:bg-white/[0.08] hover:text-white'
         }`
       }
     >
@@ -166,8 +166,8 @@ export default function Sidebar() {
   const namaTampil = profil?.nama_lengkap || session?.user?.email || 'Pengguna'
 
   return (
-    <aside className="w-64 shrink-0 bg-white text-slate-700 flex flex-col h-screen sticky top-0 border-r border-slate-200">
-      <div className="relative overflow-hidden px-4 py-5 border-b border-slate-200 bg-gradient-to-br from-blue-950 via-blue-900 to-indigo-900">
+    <aside className="w-64 shrink-0 bg-blue-950 text-white flex flex-col h-screen sticky top-0 border-r border-blue-900/50">
+      <div className="relative overflow-hidden px-4 py-5 border-b border-white/10 bg-gradient-to-br from-blue-950 via-blue-900 to-indigo-900">
         {/* Motif batik dekoratif (senada dengan banner dashboard) */}
         <svg
           className="absolute inset-0 w-full h-full opacity-[0.15] pointer-events-none"
@@ -210,12 +210,34 @@ export default function Sidebar() {
         </div>
       </div>
 
-      <nav className="flex-1 overflow-y-auto py-4 px-3">
+      <nav className="relative flex-1 overflow-y-auto py-4 px-3 bg-gradient-to-b from-blue-950 via-blue-900 to-indigo-950">
+        {/* Motif batik area menu — gaya berbeda dari header (kawung/diamond, bukan lingkaran) */}
+        <svg
+          className="absolute inset-0 w-full h-full opacity-[0.08] pointer-events-none"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <defs>
+            <pattern
+              id="batikMenu"
+              width="36"
+              height="36"
+              patternUnits="userSpaceOnUse"
+              patternTransform="rotate(45)"
+            >
+              <rect x="12" y="0" width="12" height="12" fill="none" stroke="#facc15" strokeWidth="0.75" />
+              <circle cx="18" cy="6" r="2.2" fill="#facc15" />
+              <path d="M0 18 L18 0 M18 36 L36 18" stroke="#facc15" strokeWidth="0.5" />
+            </pattern>
+          </defs>
+          <rect width="100%" height="100%" fill="url(#batikMenu)" />
+        </svg>
+
+        <div className="relative">
         {isAdmin ? (
           groupsAdmin.map((group, i) => (
             <div key={group.label ?? `top-${i}`} className={i > 0 ? 'mt-5' : ''}>
               {group.label && (
-                <p className="px-3 mb-1.5 text-[10px] font-semibold tracking-wider uppercase text-slate-400">
+                <p className="px-3 mb-1.5 text-[10px] font-semibold tracking-wider uppercase text-white/35">
                   {group.label}
                 </p>
               )}
@@ -233,6 +255,7 @@ export default function Sidebar() {
             ))}
           </div>
         )}
+        </div>
       </nav>
     </aside>
   )
