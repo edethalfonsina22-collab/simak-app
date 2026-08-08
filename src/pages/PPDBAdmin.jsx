@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabaseClient'
 import Layout from '../components/Layout'
-import { Check, X, Loader2, Copy } from 'lucide-react'
+import { Check, X, Loader2, Copy, Printer } from 'lucide-react'
 
 const TAB = [
   { value: 'menunggu', label: 'Menunggu' },
@@ -19,6 +19,11 @@ export default function PPDBAdmin() {
   const [data, setData] = useState([])
   const [loading, setLoading] = useState(true)
   const [prosesId, setProsesId] = useState(null)
+  const [profil, setProfil] = useState(null)
+
+  useEffect(() => {
+    supabase.from('profil_sekolah').select('*').eq('id', 1).maybeSingle().then(({ data }) => setProfil(data))
+  }, [])
 
   async function muatData() {
     setLoading(true)
@@ -89,6 +94,101 @@ export default function PPDBAdmin() {
     alert('Link pendaftaran disalin: ' + linkPublik)
   }
 
+  function cetakDaftarSiswaBaru() {
+    if (data.length === 0) {
+      alert('Belum ada siswa baru yang diterima untuk dicetak.')
+      return
+    }
+
+    const namaSekolah = profil?.nama_sekolah || ''
+    const npsn = profil?.npsn ? `NPSN: ${profil.npsn}` : ''
+    const alamatSekolah = profil?.alamat || ''
+    const tanggalCetak = new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })
+
+    const baris = data
+      .map(
+        (d, i) => `
+        <tr>
+          <td style="text-align:center">${i + 1}</td>
+          <td>${d.nama_lengkap || '-'}</td>
+          <td>${d.jenis_kelamin === 'P' ? 'Perempuan' : 'Laki-laki'}</td>
+          <td>${d.tempat_lahir || '-'}, ${formatTanggal(d.tanggal_lahir)}</td>
+          <td>${d.nik_siswa || '-'}</td>
+          <td>${d.nomor_kk || '-'}</td>
+          <td>${d.nama_ayah || d.nama_ibu || '-'}</td>
+          <td>${d.no_hp_orang_tua || '-'}</td>
+          <td>${d.alamat || '-'}</td>
+        </tr>`
+      )
+      .join('')
+
+    const html = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8" />
+        <title>Daftar Nama Siswa Baru</title>
+        <style>
+          @page { size: A4 landscape; margin: 15mm; }
+          body { font-family: Arial, Helvetica, sans-serif; color: #111; font-size: 11px; }
+          .kop { text-align: center; border-bottom: 2px solid #111; padding-bottom: 8px; margin-bottom: 16px; }
+          .kop h1 { font-size: 16px; margin: 0; text-transform: uppercase; }
+          .kop p { font-size: 11px; margin: 2px 0 0; }
+          h2.judul { text-align: center; font-size: 13px; text-decoration: underline; margin: 0 0 16px; }
+          table { width: 100%; border-collapse: collapse; }
+          th, td { border: 1px solid #333; padding: 4px 6px; }
+          th { background: #eee; text-align: center; }
+          .footer { margin-top: 40px; display: flex; justify-content: flex-end; }
+          .ttd { text-align: center; width: 220px; }
+          .ttd .garis { margin-top: 60px; border-top: 1px solid #111; }
+        </style>
+      </head>
+      <body>
+        <div class="kop">
+          <h1>${namaSekolah}</h1>
+          <p>${alamatSekolah}</p>
+          <p>${npsn}</p>
+        </div>
+        <h2 class="judul">DAFTAR NAMA SISWA BARU (PPDB)</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>No</th>
+              <th>Nama Lengkap</th>
+              <th>Jenis Kelamin</th>
+              <th>Tempat, Tanggal Lahir</th>
+              <th>NIK</th>
+              <th>No. KK</th>
+              <th>Nama Orang Tua</th>
+              <th>No. HP</th>
+              <th>Alamat</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${baris}
+          </tbody>
+        </table>
+        <div class="footer">
+          <div class="ttd">
+            <p>Manokwari, ${tanggalCetak}</p>
+            <p>Kepala Sekolah</p>
+            <div class="garis"></div>
+            <p>${profil?.nama_kepsek || ''}</p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `
+
+    const jendela = window.open('', '_blank')
+    jendela.document.write(html)
+    jendela.document.close()
+    jendela.onload = () => {
+      jendela.focus()
+      jendela.print()
+    }
+  }
+
   return (
     <Layout
       title="PPDB — Pendaftaran Siswa Baru"
@@ -106,18 +206,26 @@ export default function PPDBAdmin() {
         <p className="text-sm font-medium text-ink-950 mt-1 break-all">{linkPublik}</p>
       </div>
 
-      <div className="flex gap-2 mb-4">
-        {TAB.map((t) => (
-          <button
-            key={t.value}
-            onClick={() => setTab(t.value)}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-              tab === t.value ? 'bg-ink-950 text-paper' : 'bg-white text-ink-700/60 hover:bg-ink-900/5'
-            }`}
-          >
-            {t.label}
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex gap-2">
+          {TAB.map((t) => (
+            <button
+              key={t.value}
+              onClick={() => setTab(t.value)}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                tab === t.value ? 'bg-ink-950 text-paper' : 'bg-white text-ink-700/60 hover:bg-ink-900/5'
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+
+        {tab === 'diterima' && (
+          <button className="btn-secondary" onClick={cetakDaftarSiswaBaru}>
+            <Printer size={16} /> Cetak Daftar Nama Siswa Baru
           </button>
-        ))}
+        )}
       </div>
 
       <div className="card overflow-x-auto">
