@@ -49,6 +49,8 @@ export default function PPDBAdmin() {
       alamat: pendaftar.alamat,
       nama_orang_tua: pendaftar.nama_ayah || pendaftar.nama_ibu,
       no_hp_orang_tua: pendaftar.no_hp_orang_tua,
+      nik: pendaftar.nik_siswa,
+      nomor_kk: pendaftar.nomor_kk,
       status: 'aktif',
     })
 
