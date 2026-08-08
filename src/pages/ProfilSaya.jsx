@@ -7,6 +7,9 @@ import { Camera, Loader2, Save, Users, School } from 'lucide-react'
 // ASUMSI: menggunakan library `react-barcode` untuk membuat kode batang (linear barcode) di sisi klien.
 // Install dulu kalau belum ada: npm install react-barcode
 import Barcode from 'react-barcode'
+// ASUMSI: menggunakan library `qrcode.react` untuk membuat QR code di sisi klien.
+// Install dulu kalau belum ada: npm install qrcode.react
+import { QRCodeSVG } from 'qrcode.react'
 
 export default function ProfilSaya() {
   const { profil } = useAuth()
@@ -169,33 +172,40 @@ export default function ProfilSaya() {
     <Layout title="Profil Saya" subtitle="Data diri dan foto profil Anda">
       <form onSubmit={handleSave} className="max-w-2xl space-y-5">
         {/* Kartu identitas — background biru tua (navy), kontras elegan dengan aksen emas */}
-        <div className="relative overflow-hidden rounded-xl p-6 flex items-center gap-5 bg-gradient-to-br from-blue-900 to-blue-950">
+        <div className="relative overflow-hidden rounded-xl p-6 flex items-center justify-between gap-5 bg-gradient-to-br from-blue-900 to-blue-950">
           {/* Dekorasi lingkaran samar di background, senada dengan aksen bulat di identitas guru */}
           <div className="absolute -top-10 -right-10 w-40 h-40 rounded-full bg-white/5 pointer-events-none" />
           <div className="absolute -bottom-14 -left-6 w-32 h-32 rounded-full bg-white/5 pointer-events-none" />
 
-          <div className="relative shrink-0">
-            <div className="w-20 h-20 rounded-full bg-white/10 ring-2 ring-white/20 overflow-hidden flex items-center justify-center">
-              {fotoUrl() ? (
-                <img src={fotoUrl()} alt="Foto profil" className="w-full h-full object-cover" />
-              ) : (
-                <span className="text-2xl font-display font-semibold text-white/70">
-                  {data.nama_lengkap?.[0] || '?'}
-                </span>
-              )}
+          <div className="relative flex items-center gap-5 min-w-0">
+            <div className="relative shrink-0">
+              <div className="w-20 h-20 rounded-full bg-white/10 ring-2 ring-white/20 overflow-hidden flex items-center justify-center">
+                {fotoUrl() ? (
+                  <img src={fotoUrl()} alt="Foto profil" className="w-full h-full object-cover" />
+                ) : (
+                  <span className="text-2xl font-display font-semibold text-white/70">
+                    {data.nama_lengkap?.[0] || '?'}
+                  </span>
+                )}
+              </div>
+              <label className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full bg-brass-400 flex items-center justify-center cursor-pointer shadow-md">
+                {uploadingFoto ? (
+                  <Loader2 size={13} className="animate-spin text-ink-950" />
+                ) : (
+                  <Camera size={13} className="text-ink-950" />
+                )}
+                <input type="file" accept="image/*" className="hidden" onChange={handleFotoChange} disabled={uploadingFoto} />
+              </label>
             </div>
-            <label className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full bg-brass-400 flex items-center justify-center cursor-pointer shadow-md">
-              {uploadingFoto ? (
-                <Loader2 size={13} className="animate-spin text-ink-950" />
-              ) : (
-                <Camera size={13} className="text-ink-950" />
-              )}
-              <input type="file" accept="image/*" className="hidden" onChange={handleFotoChange} disabled={uploadingFoto} />
-            </label>
+            <div className="min-w-0">
+              <p className="font-display font-semibold text-lg text-white truncate">{data.nama_lengkap}</p>
+              <p className="text-sm text-blue-200/70">{data.nip ? `NIP ${data.nip}` : 'NIP belum diisi'}</p>
+            </div>
           </div>
-          <div className="relative">
-            <p className="font-display font-semibold text-lg text-white">{data.nama_lengkap}</p>
-            <p className="text-sm text-blue-200/70">{data.nip ? `NIP ${data.nip}` : 'NIP belum diisi'}</p>
+
+          {/* QR code — berseberangan (sisi kanan) dengan foto profil di sisi kiri */}
+          <div className="relative shrink-0 p-2 rounded-lg bg-white shadow-md">
+            <QRCodeSVG value={String(data.id)} size={72} bgColor="#ffffff" fgColor="#1e3a5f" />
           </div>
         </div>
 
