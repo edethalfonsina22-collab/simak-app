@@ -6,6 +6,28 @@ import { Loader2, Save, BookOpenCheck } from 'lucide-react'
 
 const JENIS_OPTS = ['Tugas', 'UH', 'UTS', 'UAS']
 
+// Motif dekoratif garis tipis (quatrefoil + titik permata), senada dengan pola pada banner Dasbor.
+// Dibuat sebagai SVG <pattern> asli (bukan gambar/foto) agar ringan dan bebas hak cipta.
+function PolaDekoratif({ patternId }) {
+  return (
+    <svg className="absolute inset-0 w-full h-full opacity-[0.12] pointer-events-none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <defs>
+        <pattern id={patternId} width="72" height="72" patternUnits="userSpaceOnUse">
+          <g stroke="#D9A441" strokeWidth="1" fill="none">
+            <circle cx="18" cy="18" r="11" />
+            <circle cx="36" cy="18" r="11" />
+            <circle cx="18" cy="36" r="11" />
+            <circle cx="36" cy="36" r="11" />
+          </g>
+          <circle cx="60" cy="60" r="1.6" fill="#D9A441" />
+          <circle cx="8" cy="60" r="1.6" fill="#D9A441" />
+        </pattern>
+      </defs>
+      <rect width="100%" height="100%" fill={`url(#${patternId})`} />
+    </svg>
+  )
+}
+
 export default function Nilai() {
   const { profil } = useAuth()
   const [kelasList, setKelasList] = useState([])
@@ -74,8 +96,9 @@ export default function Nilai() {
 
   return (
     <Layout title="Nilai Siswa" subtitle="Input nilai per kelas dan mata pelajaran">
-      {/* Banner sambutan — senada dengan gaya kartu Kelas */}
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#4a0e0e] to-[#7a1515] p-6 mb-6">
+      {/* Banner sambutan — tema biru navy dengan motif dekoratif, senada dengan banner Dasbor */}
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-blue-900 to-blue-950 p-6 mb-6">
+        <PolaDekoratif patternId="pola-nilai" />
         <div className="relative z-10 flex items-center gap-4">
           <div className="w-11 h-11 rounded-full bg-white/15 flex items-center justify-center shrink-0">
             <BookOpenCheck size={20} className="text-paper" />
@@ -87,7 +110,6 @@ export default function Nilai() {
             </p>
           </div>
         </div>
-        <BookOpenCheck size={120} className="absolute -right-4 -bottom-6 text-white/5 rotate-12" />
       </div>
 
       <div className="card p-5 mb-5 grid grid-cols-2 md:grid-cols-5 gap-3">
