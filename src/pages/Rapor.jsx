@@ -7,6 +7,7 @@ import {
   Save,
   Plus,
   Trash2,
+  Pencil,
   ClipboardList,
   Sparkles,
   Dumbbell,
@@ -141,8 +142,19 @@ function rataRataArr(arr) {
   return (arr.reduce((a, b) => a + b, 0) / arr.length).toFixed(1)
 }
 
+// Dropdown Tahun Ajaran otomatis: 2 tahun ke belakang s.d. 2 tahun ke depan
+// dari tahun berjalan, jadi tidak perlu diketik manual dan selalu relevan.
+const TAHUN_SEKARANG = new Date().getFullYear()
+const DAFTAR_TAHUN_AJARAN = Array.from({ length: 5 }, (_, i) => {
+  const awal = TAHUN_SEKARANG - 2 + i
+  return `${awal}/${awal + 1}`
+})
+
 export default function Rapor() {
   const navigate = useNavigate()
+
+  const [kelasList, setKelasList] = useState([])
+  const [kelasId, setKelasId] = useState('')
 
   const [siswaList, setSiswaList] = useState([])
   const [siswaId, setSiswaId] = useState('')
@@ -179,18 +191,28 @@ export default function Rapor() {
 
   useEffect(() => {
     supabase
+      .from('kelas')
+      .select('id, nama_kelas')
+      .order('nama_kelas')
+      .then(({ data }) => setKelasList(data || []))
+  }, [])
+
+  useEffect(() => {
+    supabase
       .from('siswa')
-      .select('id, nama_lengkap, nis, kelas(nama_kelas)')
+      // + kelas_id, supaya daftar siswa bisa difilter otomatis per kelas
+      .select('id, nama_lengkap, nis, kelas_id, kelas(nama_kelas)')
       .order('nama_lengkap')
       .then(({ data }) => setSiswaList(data || []))
   }, [])
 
-  async function muatRapor() {
-    if (!siswaId || !tahunAjaran) return
+  async function muatRapor(idOverride) {
+    const idSiswa = idOverride || siswaId
+    if (!idSiswa || !tahunAjaran) return
     setLoading(true)
 
     const periode = rentangTanggalPeriode(tahunAjaran, semester)
-    let queryPresensi = supabase.from('presensi_siswa').select('status').eq('siswa_id', siswaId)
+    let queryPresensi = supabase.from('presensi_siswa').select('status').eq('siswa_id', idSiswa)
     if (periode) {
       queryPresensi = queryPresensi.gte('tanggal', periode.mulai).lte('tanggal', periode.selesai)
     }
@@ -207,7 +229,7 @@ export default function Rapor() {
         .from('nilai')
         // + kompetensi, supaya rata-rata bisa dipecah Pengetahuan/Keterampilan
         .select('mata_pelajaran, kompetensi, jenis, nilai')
-        .eq('siswa_id', siswaId)
+        .eq('siswa_id', idSiswa)
         .eq('semester', semester)
         .eq('tahun_ajaran', tahunAjaran),
       queryPresensi,
@@ -215,26 +237,26 @@ export default function Rapor() {
         .from('capaian_mapel')
         // + jenis, untuk memisahkan baris Pengetahuan vs Keterampilan
         .select('id, mata_pelajaran, jenis, deskripsi_capaian')
-        .eq('siswa_id', siswaId)
+        .eq('siswa_id', idSiswa)
         .eq('semester', semester)
         .eq('tahun_ajaran', tahunAjaran),
       supabase
         .from('rapor_p5')
         .select('id, tema, dimensi, sub_elemen, capaian')
-        .eq('siswa_id', siswaId)
+        .eq('siswa_id', idSiswa)
         .eq('semester', semester)
         .eq('tahun_ajaran', tahunAjaran)
         .order('tema'),
       supabase
         .from('ekstrakurikuler_nilai')
         .select('id, nama_ekstrakurikuler, predikat, keterangan')
-        .eq('siswa_id', siswaId)
+        .eq('siswa_id', idSiswa)
         .eq('semester', semester)
         .eq('tahun_ajaran', tahunAjaran),
       supabase
         .from('catatan_siswa')
         .select('id, catatan, tinggi_badan, berat_badan, kondisi_kesehatan, keputusan')
-        .eq('siswa_id', siswaId)
+        .eq('siswa_id', idSiswa)
         .eq('semester', semester)
         .eq('tahun_ajaran', tahunAjaran)
         .maybeSingle(),
@@ -277,6 +299,10 @@ export default function Rapor() {
   }
 
   const siswaTerpilih = siswaList.find((s) => s.id === siswaId)
+
+  // Daftar siswa yang tampil di dropdown & tabel — otomatis terfilter kalau
+  // sebuah kelas dipilih, kalau tidak tampilkan semua siswa.
+  const siswaTerfilter = kelasId ? siswaList.filter((s) => s.kelas_id === kelasId) : siswaList
 
   // ---------- Ringkasan nilai — kini dipecah per kompetensi ----------
   const rekapPerMapelKompetensi = {}
@@ -518,6 +544,68 @@ export default function Rapor() {
     navigate(`/rapor/cetak?${params.toString()}`)
   }
 
+  // Tombol "Edit" di daftar siswa per kelas — pilih siswa itu lalu langsung
+  // muat rapornya (kalau tahun ajaran sudah dipilih).
+  function editSiswaRapor(target) {
+    setSiswaId(target.id)
+    setActiveTab('ringkasan')
+    if (tahunAjaran) {
+      muatRapor(target.id)
+    }
+  }
+
+  // Tombol "Hapus" di daftar siswa per kelas — hapus semua data rapor siswa
+  // itu (capaian, P5, ekstrakurikuler, catatan) untuk semester & tahun ajaran
+  // yang sedang dipilih. Nilai angka (tabel nilai) tidak ikut terhapus karena
+  // dikelola dari halaman input nilai, bukan dari sini.
+  async function hapusRaporSiswa(target) {
+    if (!tahunAjaran) {
+      alert('Pilih tahun ajaran terlebih dahulu sebelum menghapus rapor.')
+      return
+    }
+    const konfirmasi = window.confirm(
+      `Hapus seluruh data rapor ${target.nama_lengkap} untuk Semester ${semester} ${tahunAjaran}? Data capaian, P5, ekstrakurikuler, dan catatan wali kelas akan terhapus permanen.`
+    )
+    if (!konfirmasi) return
+
+    setSaving(true)
+    await Promise.all([
+      supabase
+        .from('capaian_mapel')
+        .delete()
+        .eq('siswa_id', target.id)
+        .eq('semester', semester)
+        .eq('tahun_ajaran', tahunAjaran),
+      supabase
+        .from('rapor_p5')
+        .delete()
+        .eq('siswa_id', target.id)
+        .eq('semester', semester)
+        .eq('tahun_ajaran', tahunAjaran),
+      supabase
+        .from('ekstrakurikuler_nilai')
+        .delete()
+        .eq('siswa_id', target.id)
+        .eq('semester', semester)
+        .eq('tahun_ajaran', tahunAjaran),
+      supabase
+        .from('catatan_siswa')
+        .delete()
+        .eq('siswa_id', target.id)
+        .eq('semester', semester)
+        .eq('tahun_ajaran', tahunAjaran),
+    ])
+
+    if (siswaId === target.id) {
+      setCapaianList([])
+      setP5List([])
+      setEkskulList([])
+      setCatatan(CATATAN_KOSONG)
+    }
+    setSaving(false)
+    alert('Data rapor siswa berhasil dihapus.')
+  }
+
   return (
     <Layout title="Rapor Siswa" subtitle="Kelola nilai, deskripsi capaian, P5, ekstrakurikuler & catatan wali kelas">
       <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#4a0e0e] to-[#7a1515] p-6 mb-6">
@@ -538,12 +626,30 @@ export default function Rapor() {
       </div>
 
       <div className="card p-5 mb-5">
-        <div className="grid sm:grid-cols-4 gap-3">
+        <div className="grid sm:grid-cols-5 gap-3">
+          <div>
+            <label className="label-field">Pilih Kelas</label>
+            <select
+              className="input-field"
+              value={kelasId}
+              onChange={(e) => {
+                setKelasId(e.target.value)
+                setSiswaId('')
+              }}
+            >
+              <option value="">-- Semua kelas --</option>
+              {kelasList.map((k) => (
+                <option key={k.id} value={k.id}>
+                  {k.nama_kelas}
+                </option>
+              ))}
+            </select>
+          </div>
           <div className="sm:col-span-2">
             <label className="label-field">Pilih Siswa</label>
             <select className="input-field" value={siswaId} onChange={(e) => setSiswaId(e.target.value)}>
               <option value="">-- Pilih siswa --</option>
-              {siswaList.map((s) => (
+              {siswaTerfilter.map((s) => (
                 <option key={s.id} value={s.id}>
                   {s.nama_lengkap} {s.kelas?.nama_kelas ? `(${s.kelas.nama_kelas})` : ''}
                 </option>
@@ -559,16 +665,18 @@ export default function Rapor() {
           </div>
           <div>
             <label className="label-field">Tahun Ajaran</label>
-            <input
-              className="input-field"
-              placeholder="2025/2026"
-              value={tahunAjaran}
-              onChange={(e) => setTahunAjaran(e.target.value)}
-            />
+            <select className="input-field" value={tahunAjaran} onChange={(e) => setTahunAjaran(e.target.value)}>
+              <option value="">-- Pilih tahun ajaran --</option>
+              {DAFTAR_TAHUN_AJARAN.map((ta) => (
+                <option key={ta} value={ta}>
+                  {ta}
+                </option>
+              ))}
+            </select>
           </div>
         </div>
         <div className="mt-4 flex flex-wrap gap-3">
-          <button className="btn-primary" onClick={muatRapor} disabled={!siswaId || !tahunAjaran || loading}>
+          <button className="btn-primary" onClick={() => muatRapor()} disabled={!siswaId || !tahunAjaran || loading}>
             {loading && <Loader2 size={16} className="animate-spin" />}
             Tampilkan Rapor
           </button>
@@ -579,6 +687,53 @@ export default function Rapor() {
           )}
         </div>
       </div>
+
+      {kelasId && (
+        <div className="card p-5 mb-5">
+          <h4 className="font-display font-semibold text-ink-950 mb-3">
+            Daftar Siswa · {kelasList.find((k) => k.id === kelasId)?.nama_kelas || ''}
+          </h4>
+          {siswaTerfilter.length > 0 ? (
+            <table className="table-shell">
+              <thead>
+                <tr>
+                  <th>Nama</th>
+                  <th>NIS</th>
+                  <th className="text-right">Aksi</th>
+                </tr>
+              </thead>
+              <tbody>
+                {siswaTerfilter.map((s) => (
+                  <tr key={s.id}>
+                    <td className="font-medium">{s.nama_lengkap}</td>
+                    <td>{s.nis || '-'}</td>
+                    <td className="text-right">
+                      <div className="flex justify-end gap-2">
+                        <button
+                          className="btn-secondary !px-3 !py-1.5 text-xs"
+                          onClick={() => editSiswaRapor(s)}
+                          title="Edit rapor siswa ini"
+                        >
+                          <Pencil size={14} /> Edit
+                        </button>
+                        <button
+                          className="btn-secondary !px-3 !py-1.5 text-xs text-red-700"
+                          onClick={() => hapusRaporSiswa(s)}
+                          title="Hapus semua data rapor siswa ini"
+                        >
+                          <Trash2 size={14} /> Hapus
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : (
+            <p className="text-sm text-ink-700/50">Belum ada siswa di kelas ini.</p>
+          )}
+        </div>
+      )}
 
       {siswaTerpilih && (
         <div className="card p-0">
@@ -768,6 +923,11 @@ export default function Rapor() {
 
             {activeTab === 'p5' && (
               <>
+                {p5List.length === 0 && (
+                  <p className="text-sm text-ink-700/50 mb-4">
+                    Belum ada data P5. Klik &quot;Tambah Tema P5&quot; untuk mulai isi.
+                  </p>
+                )}
                 <div className="space-y-3">
                   {p5List.map((p, i) => (
                     <div key={p.id || `baru-${i}`} className="border border-ink-950/10 rounded-lg p-3">
@@ -775,3 +935,232 @@ export default function Rapor() {
                         <input
                           className="input-field"
                           placeholder="Tema"
+                          value={p.tema}
+                          onChange={(e) => ubahBarisP5(i, 'tema', e.target.value)}
+                        />
+                        <input
+                          className="input-field"
+                          placeholder="Dimensi"
+                          value={p.dimensi}
+                          onChange={(e) => ubahBarisP5(i, 'dimensi', e.target.value)}
+                        />
+                        <input
+                          className="input-field"
+                          placeholder="Sub-elemen"
+                          value={p.sub_elemen}
+                          onChange={(e) => ubahBarisP5(i, 'sub_elemen', e.target.value)}
+                        />
+                        <button
+                          className="btn-secondary !px-3"
+                          onClick={() => hapusBarisP5(i)}
+                          title="Hapus baris P5 ini"
+                        >
+                          <Trash2 size={15} />
+                        </button>
+                      </div>
+                      <div>
+                        <label className="text-xs font-semibold text-ink-700/70 mb-1 block">Capaian</label>
+                        <select
+                          className="input-field"
+                          value={p.capaian}
+                          onChange={(e) => ubahBarisP5(i, 'capaian', e.target.value)}
+                        >
+                          {OPSI_CAPAIAN_P5.map((opsi) => (
+                            <option key={opsi} value={opsi}>
+                              {opsi}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div className="flex flex-wrap gap-3 mt-4">
+                  <button className="btn-secondary" onClick={tambahBarisP5}>
+                    <Plus size={16} /> Tambah Tema P5
+                  </button>
+                  <button className="btn-primary" onClick={simpanP5} disabled={saving}>
+                    {saving && <Loader2 size={16} className="animate-spin" />}
+                    <Save size={16} /> Simpan P5
+                  </button>
+                </div>
+              </>
+            )}
+
+            {activeTab === 'ekskul' && (
+              <>
+                {ekskulList.length === 0 && (
+                  <p className="text-sm text-ink-700/50 mb-4">
+                    Belum ada data ekstrakurikuler. Klik &quot;Tambah Ekstrakurikuler&quot; untuk mulai isi.
+                  </p>
+                )}
+                <div className="space-y-4">
+                  {ekskulList.map((row, i) => (
+                    <div key={row.id || `baru-${i}`} className="border border-ink-950/10 rounded-lg p-3">
+                      <div className="flex items-start justify-between gap-3 mb-3">
+                        <input
+                          className="input-field"
+                          placeholder="Nama ekstrakurikuler"
+                          value={row.nama_ekstrakurikuler}
+                          onChange={(e) => ubahBarisEkskul(i, 'nama_ekstrakurikuler', e.target.value)}
+                        />
+                        <button
+                          className="btn-secondary !px-3"
+                          onClick={() => hapusBarisEkskul(i)}
+                          title="Hapus ekstrakurikuler ini"
+                        >
+                          <Trash2 size={15} />
+                        </button>
+                      </div>
+                      <div className="mb-3">
+                        <label className="text-xs font-semibold text-ink-700/70 mb-1 block">Predikat</label>
+                        <input
+                          className="input-field"
+                          placeholder="mis. Sangat Baik"
+                          value={row.predikat}
+                          onChange={(e) => ubahBarisEkskul(i, 'predikat', e.target.value)}
+                        />
+                      </div>
+                      <div>
+                        <div className="flex items-center justify-between mb-1">
+                          <label className="text-xs font-semibold text-ink-700/70">Keterangan</label>
+                          <div className="relative">
+                            <button
+                              type="button"
+                              className="btn-secondary !px-3 !py-1 text-xs"
+                              onClick={() =>
+                                setRekomendasiEkskulTerbuka(rekomendasiEkskulTerbuka === i ? null : i)
+                              }
+                              title="Lihat rekomendasi keterangan"
+                            >
+                              <Lightbulb size={13} /> Rekomendasi
+                            </button>
+                            {rekomendasiEkskulTerbuka === i && (
+                              <div className="absolute right-0 bottom-full z-10 mb-2 w-72 max-h-72 overflow-y-auto rounded-lg border border-ink-950/10 bg-white shadow-lg p-2">
+                                {TEMPLATE_EKSKUL.map((tpl) => (
+                                  <button
+                                    key={tpl.kategori}
+                                    type="button"
+                                    onClick={() => pilihRekomendasiEkskul(i, tpl)}
+                                    className="w-full text-left px-2.5 py-2 rounded-md hover:bg-ink-950/5 text-sm"
+                                  >
+                                    <span className="font-medium text-ink-950">{tpl.kategori}</span>
+                                    <span className="block text-xs text-ink-700/50 mt-0.5 line-clamp-2">
+                                      {tpl.teks(row.nama_ekstrakurikuler || 'ini')}
+                                    </span>
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                        <textarea
+                          className="input-field min-h-[70px]"
+                          placeholder="Keterangan..."
+                          value={row.keterangan}
+                          onChange={(e) => ubahBarisEkskul(i, 'keterangan', e.target.value)}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div className="flex flex-wrap gap-3 mt-4">
+                  <button className="btn-secondary" onClick={tambahBarisEkskul}>
+                    <Plus size={16} /> Tambah Ekstrakurikuler
+                  </button>
+                  <button className="btn-primary" onClick={simpanEkskul} disabled={saving}>
+                    {saving && <Loader2 size={16} className="animate-spin" />}
+                    <Save size={16} /> Simpan Ekstrakurikuler
+                  </button>
+                </div>
+              </>
+            )}
+
+            {activeTab === 'catatan' && (
+              <>
+                <div className="grid sm:grid-cols-2 gap-3 mb-4">
+                  <div>
+                    <label className="label-field">Tinggi Badan (cm)</label>
+                    <input
+                      className="input-field"
+                      type="number"
+                      value={catatan.tinggi_badan}
+                      onChange={(e) => ubahCatatan('tinggi_badan', e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label className="label-field">Berat Badan (kg)</label>
+                    <input
+                      className="input-field"
+                      type="number"
+                      value={catatan.berat_badan}
+                      onChange={(e) => ubahCatatan('berat_badan', e.target.value)}
+                    />
+                  </div>
+                </div>
+                <div className="mb-4">
+                  <label className="label-field">Kondisi Kesehatan</label>
+                  <input
+                    className="input-field"
+                    value={catatan.kondisi_kesehatan}
+                    onChange={(e) => ubahCatatan('kondisi_kesehatan', e.target.value)}
+                  />
+                </div>
+                <div className="mb-4">
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="label-field !mb-0">Catatan Wali Kelas</label>
+                    <div className="relative">
+                      <button
+                        type="button"
+                        className="btn-secondary !px-3 !py-1 text-xs"
+                        onClick={() => setRekomendasiCatatanTerbuka(!rekomendasiCatatanTerbuka)}
+                        title="Lihat rekomendasi catatan"
+                      >
+                        <Lightbulb size={13} /> Rekomendasi
+                      </button>
+                      {rekomendasiCatatanTerbuka && (
+                        <div className="absolute right-0 bottom-full z-10 mb-2 w-72 max-h-72 overflow-y-auto rounded-lg border border-ink-950/10 bg-white shadow-lg p-2">
+                          {TEMPLATE_CATATAN.map((tpl) => (
+                            <button
+                              key={tpl.kategori}
+                              type="button"
+                              onClick={() => pilihRekomendasiCatatan(tpl)}
+                              className="w-full text-left px-2.5 py-2 rounded-md hover:bg-ink-950/5 text-sm"
+                            >
+                              <span className="font-medium text-ink-950">{tpl.kategori}</span>
+                              <span className="block text-xs text-ink-700/50 mt-0.5 line-clamp-2">
+                                {tpl.teks()}
+                              </span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <textarea
+                    className="input-field min-h-[100px]"
+                    value={catatan.catatan}
+                    onChange={(e) => ubahCatatan('catatan', e.target.value)}
+                  />
+                </div>
+                <div className="mb-4">
+                  <label className="label-field">Keputusan</label>
+                  <input
+                    className="input-field"
+                    placeholder="mis. Naik ke kelas berikutnya"
+                    value={catatan.keputusan}
+                    onChange={(e) => ubahCatatan('keputusan', e.target.value)}
+                  />
+                </div>
+                <button className="btn-primary" onClick={simpanCatatan} disabled={saving}>
+                  {saving && <Loader2 size={16} className="animate-spin" />}
+                  <Save size={16} /> Simpan Catatan
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+    </Layout>
+  )
+}
