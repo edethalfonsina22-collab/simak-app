@@ -22,14 +22,26 @@ export default function Loader() {
 
   return (
     <div className="loader">
+      <div className="loader-code" aria-hidden="true" />
+
       <div className="loader-spinner">
         <div className="loader-ring" />
-        <svg className="loader-boat" viewBox="0 0 24 24" fill="none">
-          <path d="M3 15 Q12 22 21 15 L19 19 Q12 24 5 19 Z" fill="#0B4F6C" />
-          <line x1="12" y1="15" x2="12" y2="4" stroke="#5C3A21" strokeWidth="1.6" strokeLinecap="round" />
-          <path d="M12 6 L18 12 L12 14 Z" fill="#E8A33D" />
+        <div className="loader-ring-inner" />
+        <div className="loader-dot d1" />
+        <div className="loader-dot d2" />
+
+        <svg className="loader-lock" viewBox="0 0 100 100" fill="none">
+          <path d="M32 44 V32 a18 18 0 0 1 36 0 v12" stroke="var(--accent)" strokeWidth="4" strokeLinecap="round" />
+          <rect x="24" y="44" width="52" height="42" rx="6" stroke="var(--accent-strong)" strokeWidth="3.2" />
+          <circle cx="50" cy="62" r="5" fill="var(--accent)" />
+          <path d="M50 67 v9" stroke="var(--accent)" strokeWidth="3.2" strokeLinecap="round" />
+          <g stroke="var(--accent)" strokeWidth="2" opacity="0.8">
+            <path d="M24 54 h-6 M24 66 h-6 M24 78 h-6 M76 54 h6 M76 66 h6 M76 78 h6" />
+            <path d="M34 44 v-6 M42 44 v-6 M58 44 v-6 M66 44 v-6" opacity="0.6" />
+          </g>
         </svg>
       </div>
+
       <p className="loader-welcome" ref={textRef} />
     </div>
   );
