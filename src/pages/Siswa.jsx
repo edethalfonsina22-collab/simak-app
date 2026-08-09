@@ -26,6 +26,19 @@ const emptyForm = {
   no_hp_orang_tua: '',
   kelas_id: '',
   status: 'aktif',
+  // TAMBAHAN: dipakai di Halaman Identitas Rapor (halaman sampul/identitas peserta didik)
+  pendidikan_sebelumnya: '',
+  pendidikan_ayah: '',
+  pendidikan_ibu: '',
+  pekerjaan_ayah: '',
+  pekerjaan_ibu: '',
+  ortu_kelurahan_desa: '',
+  ortu_kecamatan: '',
+  ortu_kabupaten_kota: '',
+  ortu_provinsi: '',
+  nama_wali: '',
+  pekerjaan_wali: '',
+  alamat_wali: '',
 }
 
 // Header ini HARUS sama persis dengan templateHeaders di BulkImportModal (Impor Massal)
@@ -601,6 +614,11 @@ export default function Siswa() {
                 <input type="date" className="input-field" value={form.tanggal_lahir || ''}
                   onChange={(e) => setForm({ ...form, tanggal_lahir: e.target.value })} />
               </Field>
+              <Field label="Pendidikan Sebelumnya" full>
+                <input className="input-field" placeholder="Contoh: TK Pertiwi Jerwatu"
+                  value={form.pendidikan_sebelumnya}
+                  onChange={(e) => setForm({ ...form, pendidikan_sebelumnya: e.target.value })} />
+              </Field>
               <Field label="Nama Ayah">
                 <input className="input-field" value={form.nama_ayah}
                   onChange={(e) => setForm({ ...form, nama_ayah: e.target.value })} />
@@ -608,6 +626,22 @@ export default function Siswa() {
               <Field label="Nama Ibu">
                 <input className="input-field" value={form.nama_ibu}
                   onChange={(e) => setForm({ ...form, nama_ibu: e.target.value })} />
+              </Field>
+              <Field label="Pendidikan Ayah">
+                <input className="input-field" value={form.pendidikan_ayah}
+                  onChange={(e) => setForm({ ...form, pendidikan_ayah: e.target.value })} />
+              </Field>
+              <Field label="Pendidikan Ibu">
+                <input className="input-field" value={form.pendidikan_ibu}
+                  onChange={(e) => setForm({ ...form, pendidikan_ibu: e.target.value })} />
+              </Field>
+              <Field label="Pekerjaan Ayah">
+                <input className="input-field" value={form.pekerjaan_ayah}
+                  onChange={(e) => setForm({ ...form, pekerjaan_ayah: e.target.value })} />
+              </Field>
+              <Field label="Pekerjaan Ibu">
+                <input className="input-field" value={form.pekerjaan_ibu}
+                  onChange={(e) => setForm({ ...form, pekerjaan_ibu: e.target.value })} />
               </Field>
               <Field label="Nama Orang Tua/Wali" full>
                 <input className="input-field" value={form.nama_orang_tua}
@@ -632,6 +666,44 @@ export default function Siswa() {
               <Field label="Alamat Tempat Tinggal (domisili saat ini)" full>
                 <textarea className="input-field" rows={2} value={form.alamat_tinggal}
                   onChange={(e) => setForm({ ...form, alamat_tinggal: e.target.value })} />
+              </Field>
+
+              {/* TAMBAHAN: khusus untuk Halaman Identitas Rapor — alamat orang tua terpisah
+                  (jalan dipakai dari field "Alamat" di atas) */}
+              <div className="col-span-2 pt-2 mt-1 border-t border-ink-900/[0.08]">
+                <p className="eyebrow mb-2">Alamat Orang Tua (untuk Halaman Identitas Rapor)</p>
+              </div>
+              <Field label="Kelurahan/Desa">
+                <input className="input-field" value={form.ortu_kelurahan_desa}
+                  onChange={(e) => setForm({ ...form, ortu_kelurahan_desa: e.target.value })} />
+              </Field>
+              <Field label="Kecamatan">
+                <input className="input-field" value={form.ortu_kecamatan}
+                  onChange={(e) => setForm({ ...form, ortu_kecamatan: e.target.value })} />
+              </Field>
+              <Field label="Kabupaten/Kota">
+                <input className="input-field" value={form.ortu_kabupaten_kota}
+                  onChange={(e) => setForm({ ...form, ortu_kabupaten_kota: e.target.value })} />
+              </Field>
+              <Field label="Provinsi">
+                <input className="input-field" value={form.ortu_provinsi}
+                  onChange={(e) => setForm({ ...form, ortu_provinsi: e.target.value })} />
+              </Field>
+
+              <div className="col-span-2 pt-2 mt-1 border-t border-ink-900/[0.08]">
+                <p className="eyebrow mb-2">Wali Peserta Didik (isi jika ada, selain orang tua)</p>
+              </div>
+              <Field label="Nama Wali">
+                <input className="input-field" value={form.nama_wali}
+                  onChange={(e) => setForm({ ...form, nama_wali: e.target.value })} />
+              </Field>
+              <Field label="Pekerjaan Wali">
+                <input className="input-field" value={form.pekerjaan_wali}
+                  onChange={(e) => setForm({ ...form, pekerjaan_wali: e.target.value })} />
+              </Field>
+              <Field label="Alamat Wali" full>
+                <textarea className="input-field" rows={2} value={form.alamat_wali}
+                  onChange={(e) => setForm({ ...form, alamat_wali: e.target.value })} />
               </Field>
             </div>
 
