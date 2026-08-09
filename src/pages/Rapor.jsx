@@ -40,6 +40,31 @@ const TEMPLATE_DESKRIPSI = [
   },
 ]
 
+// Template khusus untuk kolom Keterampilan (KI-4) — fokus pada praktik/unjuk
+// kerja, bukan pemahaman konsep seperti TEMPLATE_DESKRIPSI (Pengetahuan).
+const TEMPLATE_DESKRIPSI_KETERAMPILAN = [
+  {
+    kategori: 'Sangat Baik',
+    teks: (mapel) =>
+      `Ananda menunjukkan keterampilan yang sangat baik dalam mempraktikkan materi ${mapel}, mampu menyelesaikan tugas praktik/unjuk kerja dengan sangat terampil, kreatif, dan tepat waktu.`,
+  },
+  {
+    kategori: 'Baik',
+    teks: (mapel) =>
+      `Ananda menunjukkan keterampilan yang baik dalam mempraktikkan materi ${mapel}, mampu menyelesaikan sebagian besar tugas praktik/unjuk kerja dengan baik dan tepat waktu.`,
+  },
+  {
+    kategori: 'Cukup',
+    teks: (mapel) =>
+      `Ananda menunjukkan keterampilan yang cukup dalam mempraktikkan materi ${mapel}. Dengan latihan dan bimbingan lebih lanjut, ananda diharapkan dapat lebih terampil dalam praktik.`,
+  },
+  {
+    kategori: 'Perlu Bimbingan',
+    teks: (mapel) =>
+      `Ananda masih memerlukan bimbingan lebih lanjut dalam mempraktikkan keterampilan pada mata pelajaran ${mapel}. Diperlukan latihan dan pendampingan yang lebih intensif.`,
+  },
+]
+
 function kategoriDariNilai(rataRata) {
   if (rataRata === undefined || rataRata === null || isNaN(rataRata)) return null
   const n = Number(rataRata)
@@ -872,7 +897,10 @@ export default function Rapor() {
                                   </button>
                                   {rekomendasiTerbuka === kunciDropdown && (
                                     <div className="absolute right-0 bottom-full z-10 mb-2 w-72 max-h-72 overflow-y-auto rounded-lg border border-ink-950/10 bg-white shadow-lg p-2">
-                                      {TEMPLATE_DESKRIPSI.map((tpl) => (
+                                      {(komp.key === 'keterampilan'
+                                        ? TEMPLATE_DESKRIPSI_KETERAMPILAN
+                                        : TEMPLATE_DESKRIPSI
+                                      ).map((tpl) => (
                                         <button
                                           key={tpl.kategori}
                                           type="button"
