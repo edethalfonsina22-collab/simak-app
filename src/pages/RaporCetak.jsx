@@ -106,7 +106,7 @@ export default function RaporCetak() {
       queryPresensi,
       supabase
         .from('capaian_mapel')
-        // + jenis, untuk mencocokkan deskripsi ke tabel Pengetahuan/Keterampilan
+        // + jenis, untuk mencocokkan deskripsi ke kolom Pengetahuan/Keterampilan
         .select('mata_pelajaran, jenis, deskripsi_capaian')
         .eq('siswa_id', siswaId)
         .eq('semester', semester)
@@ -198,9 +198,6 @@ export default function RaporCetak() {
       },
     }
   })
-
-  const barisPengetahuan = barisMapel.filter((b) => b.pengetahuan.nilai !== null || b.pengetahuan.deskripsi)
-  const barisKeterampilan = barisMapel.filter((b) => b.keterampilan.nilai !== null || b.keterampilan.deskripsi)
 
   if (!siswaId || !semester || !tahunAjaran) {
     return (
@@ -405,65 +402,46 @@ export default function RaporCetak() {
           <p><span className="text-ink-700/60">NISN</span> : {siswa.nisn || '-'}</p>
         </div>
 
-        <h2 className="font-display font-semibold mb-2">A. Pengetahuan</h2>
-        <table className="w-full border-collapse mb-6 text-sm">
+        <h2 className="font-display font-semibold mb-2">A. Nilai &amp; Deskripsi Capaian</h2>
+        <table className="w-full border-collapse mb-6 text-[13px]">
           <thead>
+            <tr>
+              <th rowSpan={2} className="text-left py-1.5 pr-2 w-[4%] align-bottom border-b border-ink-950/20">No</th>
+              <th rowSpan={2} className="text-left py-1.5 pr-2 w-[15%] align-bottom border-b border-ink-950/20">Mata Pelajaran</th>
+              <th colSpan={3} className="text-center py-1 border-b border-ink-950/20">Pengetahuan</th>
+              <th colSpan={3} className="text-center py-1 border-b border-ink-950/20 border-l-2 border-dashed border-ink-950/50">Keterampilan</th>
+            </tr>
             <tr className="border-b border-ink-950/20">
-              <th className="text-left py-1.5 pr-2 w-[6%]">No</th>
-              <th className="text-left py-1.5 pr-2 w-[24%]">Mata Pelajaran</th>
-              <th className="text-center py-1.5 pr-2 w-[8%]">Nilai</th>
-              <th className="text-center py-1.5 pr-2 w-[10%]">Predikat</th>
+              <th className="text-center py-1.5 pr-2 w-[6%]">Nilai</th>
+              <th className="text-center py-1.5 pr-2 w-[7%]">Predikat</th>
+              <th className="text-left py-1.5 pr-2 w-[26%]">Deskripsi Capaian</th>
+              <th className="text-center py-1.5 pr-2 w-[6%] border-l-2 border-dashed border-ink-950/50">Nilai</th>
+              <th className="text-center py-1.5 pr-2 w-[7%]">Predikat</th>
               <th className="text-left py-1.5">Deskripsi Capaian</th>
             </tr>
           </thead>
           <tbody>
-            {barisPengetahuan.map((b, i) => (
+            {barisMapel.map((b, i) => (
               <tr key={b.mapel} className="border-b border-ink-950/10 align-top">
                 <td className="py-1.5 pr-2">{i + 1}</td>
                 <td className="py-1.5 pr-2 font-medium">{b.mapel}</td>
                 <td className="py-1.5 pr-2 text-center">{b.pengetahuan.nilai ?? '-'}</td>
                 <td className="py-1.5 pr-2 text-center">{b.pengetahuan.predikat || '-'}</td>
-                <td className="py-1.5">{b.pengetahuan.deskripsi || '-'}</td>
-              </tr>
-            ))}
-            {barisPengetahuan.length === 0 && (
-              <tr>
-                <td colSpan={5} className="py-3 text-center text-ink-700/50">Belum ada data Pengetahuan.</td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-
-        <h2 className="font-display font-semibold mb-2">B. Keterampilan</h2>
-        <table className="w-full border-collapse mb-6 text-sm">
-          <thead>
-            <tr className="border-b border-ink-950/20">
-              <th className="text-left py-1.5 pr-2 w-[6%]">No</th>
-              <th className="text-left py-1.5 pr-2 w-[24%]">Mata Pelajaran</th>
-              <th className="text-center py-1.5 pr-2 w-[8%]">Nilai</th>
-              <th className="text-center py-1.5 pr-2 w-[10%]">Predikat</th>
-              <th className="text-left py-1.5">Deskripsi Capaian</th>
-            </tr>
-          </thead>
-          <tbody>
-            {barisKeterampilan.map((b, i) => (
-              <tr key={b.mapel} className="border-b border-ink-950/10 align-top">
-                <td className="py-1.5 pr-2">{i + 1}</td>
-                <td className="py-1.5 pr-2 font-medium">{b.mapel}</td>
-                <td className="py-1.5 pr-2 text-center">{b.keterampilan.nilai ?? '-'}</td>
+                <td className="py-1.5 pr-2">{b.pengetahuan.deskripsi || '-'}</td>
+                <td className="py-1.5 pr-2 text-center border-l-2 border-dashed border-ink-950/50">{b.keterampilan.nilai ?? '-'}</td>
                 <td className="py-1.5 pr-2 text-center">{b.keterampilan.predikat || '-'}</td>
                 <td className="py-1.5">{b.keterampilan.deskripsi || '-'}</td>
               </tr>
             ))}
-            {barisKeterampilan.length === 0 && (
+            {barisMapel.length === 0 && (
               <tr>
-                <td colSpan={5} className="py-3 text-center text-ink-700/50">Belum ada data Keterampilan.</td>
+                <td colSpan={8} className="py-3 text-center text-ink-700/50">Belum ada data.</td>
               </tr>
             )}
           </tbody>
         </table>
 
-        <h2 className="font-display font-semibold mb-2">C. Profil Pelajar Pancasila (P5)</h2>
+        <h2 className="font-display font-semibold mb-2">B. Profil Pelajar Pancasila (P5)</h2>
         <table className="w-full border-collapse mb-6 text-sm">
           <thead>
             <tr className="border-b border-ink-950/20">
@@ -490,7 +468,7 @@ export default function RaporCetak() {
           </tbody>
         </table>
 
-        <h2 className="font-display font-semibold mb-2">D. Ekstrakurikuler</h2>
+        <h2 className="font-display font-semibold mb-2">C. Ekstrakurikuler</h2>
         <table className="w-full border-collapse mb-6 text-sm">
           <thead>
             <tr className="border-b border-ink-950/20">
@@ -515,7 +493,7 @@ export default function RaporCetak() {
           </tbody>
         </table>
 
-        <h2 className="font-display font-semibold mb-2">E. Kehadiran</h2>
+        <h2 className="font-display font-semibold mb-2">D. Kehadiran</h2>
         <div className="grid grid-cols-4 gap-3 mb-6 text-center">
           <div><p className="text-lg font-semibold">{presensi.hadir}</p><p className="text-xs text-ink-700/60">Hadir</p></div>
           <div><p className="text-lg font-semibold">{presensi.izin}</p><p className="text-xs text-ink-700/60">Izin</p></div>
@@ -523,7 +501,7 @@ export default function RaporCetak() {
           <div><p className="text-lg font-semibold">{presensi.alpa}</p><p className="text-xs text-ink-700/60">Alpa</p></div>
         </div>
 
-        <h2 className="font-display font-semibold mb-2">F. Kondisi & Catatan Wali Kelas</h2>
+        <h2 className="font-display font-semibold mb-2">E. Kondisi & Catatan Wali Kelas</h2>
         <div className="grid grid-cols-2 gap-x-8 gap-y-1 mb-2 text-sm">
           <p><span className="text-ink-700/60">Tinggi Badan</span> : {catatan?.tinggi_badan || '-'} cm</p>
           <p><span className="text-ink-700/60">Berat Badan</span> : {catatan?.berat_badan || '-'} kg</p>
