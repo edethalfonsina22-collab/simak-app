@@ -48,6 +48,13 @@ function kategoriDariNilai(rataRata) {
   return 'Perlu Bimbingan'
 }
 
+// Dua jenis kompetensi yang dipakai untuk memecah baik nilai maupun deskripsi
+// capaian. `jenis` adalah nilai yang disimpan ke kolom capaian_mapel.jenis.
+const KOMPETENSI_KEYS = [
+  { key: 'pengetahuan', label: 'Pengetahuan', jenis: 'Pengetahuan' },
+  { key: 'keterampilan', label: 'Keterampilan', jenis: 'Keterampilan' },
+]
+
 const OPSI_CAPAIAN_P5 = ['Belum Berkembang', 'Mulai Berkembang', 'Berkembang Sesuai Harapan', 'Sangat Berkembang']
 
 const TEMPLATE_EKSKUL = [
@@ -113,12 +120,6 @@ const CATATAN_KOSONG = {
   keputusan: '',
 }
 
-// PERBAIKAN: menghitung rentang tanggal dari kombinasi tahun ajaran + semester,
-// supaya rekap presensi di rapor benar-benar hanya mengambil data pada periode
-// yang sedang dipilih (bukan seluruh riwayat presensi siswa sepanjang masa).
-// Format tahunAjaran yang didukung: "2025/2026".
-//   Semester Ganjil -> 1 Juli s/d 31 Desember tahun awal (2025-07-01 s/d 2025-12-31)
-//   Semester Genap  -> 1 Januari s/d 30 Juni tahun akhir (2026-01-01 s/d 2026-06-30)
 function rentangTanggalPeriode(tahunAjaran, semester) {
   if (!tahunAjaran) return null
   const bagian = tahunAjaran.split('/')
@@ -131,8 +132,13 @@ function rentangTanggalPeriode(tahunAjaran, semester) {
   if (semester === 'Genap') {
     return { mulai: `${tahunAkhir}-01-01`, selesai: `${tahunAkhir}-06-30` }
   }
-  // Default / Ganjil
   return { mulai: `${tahunAwal}-07-01`, selesai: `${tahunAwal}-12-31` }
+}
+
+// Rata-rata sederhana dari sebuah array nilai angka. null jika kosong.
+function rataRataArr(arr) {
+  if (!arr || arr.length === 0) return null
+  return (arr.reduce((a, b) => a + b, 0) / arr.length).toFixed(1)
 }
 
 export default function Rapor() {
@@ -146,27 +152,29 @@ export default function Rapor() {
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
 
-  // Ringkasan (nilai angka + presensi) — tetap dari tabel nilai & presensi_siswa
+  // Ringkasan (nilai angka + presensi) — sekarang menyimpan kompetensi juga,
+  // supaya rata-rata bisa dipecah per Pengetahuan/Keterampilan.
   const [nilai, setNilai] = useState([])
   const [presensi, setPresensi] = useState({ hadir: 0, izin: 0, sakit: 0, alpa: 0 })
 
-  // Deskripsi capaian per mapel — tabel capaian_mapel
-  const [capaianList, setCapaianList] = useState([]) // [{id, mata_pelajaran, deskripsi_capaian, terkunci}]
+  // Deskripsi capaian per mapel — tabel capaian_mapel, kini 1 baris per
+  // (mapel, jenis) di mana jenis = 'Pengetahuan' atau 'Keterampilan'.
+  // capaianList di state React tetap 1 baris per mapel, tapi menyimpan
+  // dua sub-objek: pengetahuan & keterampilan.
+  const [capaianList, setCapaianList] = useState([])
 
   // P5 — tabel rapor_p5
-  const [p5List, setP5List] = useState([]) // [{id, tema, dimensi, sub_elemen, capaian}]
+  const [p5List, setP5List] = useState([])
 
   // Ekstrakurikuler — tabel ekstrakurikuler_nilai
-  const [ekskulList, setEkskulList] = useState([]) // [{id, nama_ekstrakurikuler, predikat, keterangan}]
+  const [ekskulList, setEkskulList] = useState([])
 
   // Catatan wali kelas — tabel catatan_siswa
   const [catatan, setCatatan] = useState(CATATAN_KOSONG)
 
-  // Dropdown rekomendasi deskripsi capaian — index baris yang sedang terbuka
+  // Dropdown rekomendasi deskripsi capaian — key format "index:kompetensiKey"
   const [rekomendasiTerbuka, setRekomendasiTerbuka] = useState(null)
-  // Dropdown rekomendasi keterangan ekstrakurikuler — index baris yang sedang terbuka
   const [rekomendasiEkskulTerbuka, setRekomendasiEkskulTerbuka] = useState(null)
-  // Dropdown rekomendasi catatan wali kelas — boolean, cuma satu baris
   const [rekomendasiCatatanTerbuka, setRekomendasiCatatanTerbuka] = useState(false)
 
   useEffect(() => {
@@ -181,8 +189,6 @@ export default function Rapor() {
     if (!siswaId || !tahunAjaran) return
     setLoading(true)
 
-    // PERBAIKAN: bangun query presensi dengan filter rentang tanggal sesuai
-    // semester & tahun ajaran yang dipilih, bukan .eq('siswa_id', siswaId) saja.
     const periode = rentangTanggalPeriode(tahunAjaran, semester)
     let queryPresensi = supabase.from('presensi_siswa').select('status').eq('siswa_id', siswaId)
     if (periode) {
@@ -199,14 +205,16 @@ export default function Rapor() {
     ] = await Promise.all([
       supabase
         .from('nilai')
-        .select('mata_pelajaran, jenis, nilai')
+        // + kompetensi, supaya rata-rata bisa dipecah Pengetahuan/Keterampilan
+        .select('mata_pelajaran, kompetensi, jenis, nilai')
         .eq('siswa_id', siswaId)
         .eq('semester', semester)
         .eq('tahun_ajaran', tahunAjaran),
       queryPresensi,
       supabase
         .from('capaian_mapel')
-        .select('id, mata_pelajaran, deskripsi_capaian')
+        // + jenis, untuk memisahkan baris Pengetahuan vs Keterampilan
+        .select('id, mata_pelajaran, jenis, deskripsi_capaian')
         .eq('siswa_id', siswaId)
         .eq('semester', semester)
         .eq('tahun_ajaran', tahunAjaran),
@@ -243,19 +251,24 @@ export default function Rapor() {
     setEkskulList(ekskulRows || [])
     setCatatan(catatanRows || CATATAN_KOSONG)
 
-    // Gabungkan mapel dari nilai dengan mapel yang sudah punya deskripsi capaian,
-    // supaya guru bisa isi deskripsi walau belum ada nilai angkanya.
+    // Gabungkan mapel dari nilai dengan mapel yang sudah punya deskripsi capaian
     const mapelDariNilai = [...new Set((nilaiRows || []).map((n) => n.mata_pelajaran))]
-    const mapelDariCapaian = (capaianRows || []).map((c) => c.mata_pelajaran)
+    const mapelDariCapaian = [...new Set((capaianRows || []).map((c) => c.mata_pelajaran))]
     const semuaMapel = [...new Set([...mapelDariNilai, ...mapelDariCapaian])]
+
     setCapaianList(
       semuaMapel.map((mapel) => {
-        const existing = (capaianRows || []).find((c) => c.mata_pelajaran === mapel)
+        const pengetahuan = (capaianRows || []).find(
+          (c) => c.mata_pelajaran === mapel && c.jenis === 'Pengetahuan'
+        )
+        const keterampilan = (capaianRows || []).find(
+          (c) => c.mata_pelajaran === mapel && c.jenis === 'Keterampilan'
+        )
         return {
-          id: existing?.id || null,
           mata_pelajaran: mapel,
-          deskripsi_capaian: existing?.deskripsi_capaian || '',
-          terkunci: mapelDariNilai.includes(mapel), // nama mapel dari tabel nilai, tidak diedit di sini
+          terkunci: mapelDariNilai.includes(mapel),
+          pengetahuan: { id: pengetahuan?.id || null, deskripsi_capaian: pengetahuan?.deskripsi_capaian || '' },
+          keterampilan: { id: keterampilan?.id || null, deskripsi_capaian: keterampilan?.deskripsi_capaian || '' },
         }
       })
     )
@@ -265,41 +278,57 @@ export default function Rapor() {
 
   const siswaTerpilih = siswaList.find((s) => s.id === siswaId)
 
-  // ---------- Ringkasan nilai ----------
-  const rekapPerMapel = {}
+  // ---------- Ringkasan nilai — kini dipecah per kompetensi ----------
+  const rekapPerMapelKompetensi = {}
   for (const n of nilai) {
-    if (!rekapPerMapel[n.mata_pelajaran]) rekapPerMapel[n.mata_pelajaran] = []
-    rekapPerMapel[n.mata_pelajaran].push(n.nilai)
+    if (!rekapPerMapelKompetensi[n.mata_pelajaran]) {
+      rekapPerMapelKompetensi[n.mata_pelajaran] = { Pengetahuan: [], Keterampilan: [] }
+    }
+    const kk = n.kompetensi === 'Keterampilan' ? 'Keterampilan' : 'Pengetahuan'
+    rekapPerMapelKompetensi[n.mata_pelajaran][kk].push(n.nilai)
   }
-  const barisMapel = Object.entries(rekapPerMapel).map(([mapel, nilaiArr]) => ({
+  const barisMapel = Object.entries(rekapPerMapelKompetensi).map(([mapel, kel]) => ({
     mapel,
-    rataRata: (nilaiArr.reduce((a, b) => a + b, 0) / nilaiArr.length).toFixed(1),
+    rataRataPengetahuan: rataRataArr(kel.Pengetahuan),
+    rataRataKeterampilan: rataRataArr(kel.Keterampilan),
   }))
 
-  // ---------- Deskripsi capaian ----------
-  function ubahBarisCapaian(index, field, value) {
+  // ---------- Deskripsi capaian (per kompetensi) ----------
+  function ubahBarisCapaian(index, kompKey, value) {
     setCapaianList((prev) =>
-      prev.map((c, i) => (i === index ? { ...c, [field]: value } : c))
+      prev.map((c, i) =>
+        i === index ? { ...c, [kompKey]: { ...c[kompKey], deskripsi_capaian: value } } : c
+      )
     )
   }
 
-  function pilihRekomendasi(index, template) {
+  function ubahMapelCapaian(index, value) {
+    setCapaianList((prev) => prev.map((c, i) => (i === index ? { ...c, mata_pelajaran: value } : c)))
+  }
+
+  function pilihRekomendasi(index, kompKey, template) {
     const mapel = capaianList[index].mata_pelajaran || 'mata pelajaran ini'
-    ubahBarisCapaian(index, 'deskripsi_capaian', template.teks(mapel))
+    ubahBarisCapaian(index, kompKey, template.teks(mapel))
     setRekomendasiTerbuka(null)
   }
 
   function tambahBarisCapaian() {
     setCapaianList((prev) => [
       ...prev,
-      { id: null, mata_pelajaran: '', deskripsi_capaian: '', terkunci: false },
+      {
+        mata_pelajaran: '',
+        terkunci: false,
+        pengetahuan: { id: null, deskripsi_capaian: '' },
+        keterampilan: { id: null, deskripsi_capaian: '' },
+      },
     ])
   }
 
   async function hapusBarisCapaian(index) {
     const row = capaianList[index]
-    if (row.id) {
-      await supabase.from('capaian_mapel').delete().eq('id', row.id)
+    const ids = [row.pengetahuan?.id, row.keterampilan?.id].filter(Boolean)
+    if (ids.length) {
+      await supabase.from('capaian_mapel').delete().in('id', ids)
     }
     setCapaianList((prev) => prev.filter((_, i) => i !== index))
   }
@@ -313,26 +342,30 @@ export default function Rapor() {
     let gagal = []
     for (const c of capaianList) {
       if (!c.mata_pelajaran.trim()) continue
-      if (c.id) {
-        const { error } = await supabase
-          .from('capaian_mapel')
-          .update({
+      for (const komp of KOMPETENSI_KEYS) {
+        const entri = c[komp.key]
+        if (entri.id) {
+          const { error } = await supabase
+            .from('capaian_mapel')
+            .update({
+              mata_pelajaran: c.mata_pelajaran,
+              deskripsi_capaian: entri.deskripsi_capaian,
+              diisi_oleh: user?.id,
+            })
+            .eq('id', entri.id)
+          if (error) gagal.push(error.message)
+        } else if (entri.deskripsi_capaian.trim()) {
+          const { error } = await supabase.from('capaian_mapel').insert({
+            siswa_id: siswaId,
             mata_pelajaran: c.mata_pelajaran,
-            deskripsi_capaian: c.deskripsi_capaian,
+            jenis: komp.jenis,
+            semester,
+            tahun_ajaran: tahunAjaran,
+            deskripsi_capaian: entri.deskripsi_capaian,
             diisi_oleh: user?.id,
           })
-          .eq('id', c.id)
-        if (error) gagal.push(error.message)
-      } else if (c.deskripsi_capaian.trim()) {
-        const { error } = await supabase.from('capaian_mapel').insert({
-          siswa_id: siswaId,
-          mata_pelajaran: c.mata_pelajaran,
-          semester,
-          tahun_ajaran: tahunAjaran,
-          deskripsi_capaian: c.deskripsi_capaian,
-          diisi_oleh: user?.id,
-        })
-        if (error) gagal.push(error.message)
+          if (error) gagal.push(error.message)
+        }
       }
     }
     if (gagal.length) alert('Gagal menyimpan sebagian deskripsi capaian:\n' + [...new Set(gagal)].join('\n'))
@@ -577,14 +610,16 @@ export default function Rapor() {
                     <thead>
                       <tr>
                         <th>Mata Pelajaran</th>
-                        <th>Rata-rata Nilai</th>
+                        <th>Nilai Pengetahuan</th>
+                        <th>Nilai Keterampilan</th>
                       </tr>
                     </thead>
                     <tbody>
                       {barisMapel.map((b) => (
                         <tr key={b.mapel}>
                           <td className="font-medium">{b.mapel}</td>
-                          <td>{b.rataRata}</td>
+                          <td>{b.rataRataPengetahuan ?? '-'}</td>
+                          <td>{b.rataRataKeterampilan ?? '-'}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -625,10 +660,12 @@ export default function Rapor() {
                 <div className="space-y-4">
                   {capaianList.map((c, i) => {
                     const mapelInfo = barisMapel.find((b) => b.mapel === c.mata_pelajaran)
-                    const rekomendasiKategori = kategoriDariNilai(mapelInfo?.rataRata)
                     return (
-                      <div key={c.id || `baru-${i}`} className="border border-ink-950/10 rounded-lg p-3">
-                        <div className="flex items-start justify-between gap-3 mb-2">
+                      <div
+                        key={c.pengetahuan.id || c.keterampilan.id || `baru-${i}`}
+                        className="border border-ink-950/10 rounded-lg p-3"
+                      >
+                        <div className="flex items-start justify-between gap-3 mb-3">
                           {c.terkunci ? (
                             <label className="label-field">{c.mata_pelajaran}</label>
                           ) : (
@@ -636,61 +673,83 @@ export default function Rapor() {
                               className="input-field"
                               placeholder="Nama mata pelajaran"
                               value={c.mata_pelajaran}
-                              onChange={(e) => ubahBarisCapaian(i, 'mata_pelajaran', e.target.value)}
+                              onChange={(e) => ubahMapelCapaian(i, e.target.value)}
                             />
                           )}
-                          <div className="flex items-center gap-2 shrink-0">
-                            <div className="relative">
-                              <button
-                                type="button"
-                                className="btn-secondary !px-3"
-                                onClick={() =>
-                                  setRekomendasiTerbuka(rekomendasiTerbuka === i ? null : i)
-                                }
-                                title="Lihat rekomendasi deskripsi"
-                              >
-                                <Lightbulb size={15} /> Rekomendasi
-                              </button>
-                              {rekomendasiTerbuka === i && (
-                                <div className="absolute right-0 bottom-full z-10 mb-2 w-72 max-h-72 overflow-y-auto rounded-lg border border-ink-950/10 bg-white shadow-lg p-2">
-                                  {TEMPLATE_DESKRIPSI.map((tpl) => (
-                                    <button
-                                      key={tpl.kategori}
-                                      type="button"
-                                      onClick={() => pilihRekomendasi(i, tpl)}
-                                      className="w-full text-left px-2.5 py-2 rounded-md hover:bg-ink-950/5 text-sm"
-                                    >
-                                      <span className="font-medium text-ink-950 flex items-center gap-1.5">
-                                        {tpl.kategori}
-                                        {rekomendasiKategori === tpl.kategori && (
-                                          <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-sage-500/15 text-sage-500">
-                                            disarankan
-                                          </span>
-                                        )}
-                                      </span>
-                                      <span className="block text-xs text-ink-700/50 mt-0.5 line-clamp-2">
-                                        {tpl.teks(c.mata_pelajaran || 'mapel ini')}
-                                      </span>
-                                    </button>
-                                  ))}
-                                </div>
-                              )}
-                            </div>
-                            <button
-                              className="btn-secondary !px-3"
-                              onClick={() => hapusBarisCapaian(i)}
-                              title="Hapus mapel ini"
-                            >
-                              <Trash2 size={15} />
-                            </button>
-                          </div>
+                          <button
+                            className="btn-secondary !px-3"
+                            onClick={() => hapusBarisCapaian(i)}
+                            title="Hapus mapel ini"
+                          >
+                            <Trash2 size={15} />
+                          </button>
                         </div>
-                        <textarea
-                          className="input-field min-h-[80px]"
-                          placeholder="Deskripsi capaian pembelajaran..."
-                          value={c.deskripsi_capaian}
-                          onChange={(e) => ubahBarisCapaian(i, 'deskripsi_capaian', e.target.value)}
-                        />
+
+                        {KOMPETENSI_KEYS.map((komp) => {
+                          const entri = c[komp.key]
+                          const rataRata =
+                            komp.key === 'pengetahuan'
+                              ? mapelInfo?.rataRataPengetahuan
+                              : mapelInfo?.rataRataKeterampilan
+                          const rekomendasiKategori = kategoriDariNilai(rataRata)
+                          const kunciDropdown = `${i}:${komp.key}`
+                          return (
+                            <div key={komp.key} className="mb-3 last:mb-0">
+                              <div className="flex items-center justify-between mb-1">
+                                <label className="text-xs font-semibold text-ink-700/70">
+                                  {komp.label}
+                                  {rataRata !== undefined && rataRata !== null && (
+                                    <span className="text-ink-700/40 font-normal"> · rata-rata {rataRata}</span>
+                                  )}
+                                </label>
+                                <div className="relative">
+                                  <button
+                                    type="button"
+                                    className="btn-secondary !px-3 !py-1 text-xs"
+                                    onClick={() =>
+                                      setRekomendasiTerbuka(
+                                        rekomendasiTerbuka === kunciDropdown ? null : kunciDropdown
+                                      )
+                                    }
+                                    title={`Lihat rekomendasi deskripsi ${komp.label}`}
+                                  >
+                                    <Lightbulb size={13} /> Rekomendasi
+                                  </button>
+                                  {rekomendasiTerbuka === kunciDropdown && (
+                                    <div className="absolute right-0 bottom-full z-10 mb-2 w-72 max-h-72 overflow-y-auto rounded-lg border border-ink-950/10 bg-white shadow-lg p-2">
+                                      {TEMPLATE_DESKRIPSI.map((tpl) => (
+                                        <button
+                                          key={tpl.kategori}
+                                          type="button"
+                                          onClick={() => pilihRekomendasi(i, komp.key, tpl)}
+                                          className="w-full text-left px-2.5 py-2 rounded-md hover:bg-ink-950/5 text-sm"
+                                        >
+                                          <span className="font-medium text-ink-950 flex items-center gap-1.5">
+                                            {tpl.kategori}
+                                            {rekomendasiKategori === tpl.kategori && (
+                                              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-sage-500/15 text-sage-500">
+                                                disarankan
+                                              </span>
+                                            )}
+                                          </span>
+                                          <span className="block text-xs text-ink-700/50 mt-0.5 line-clamp-2">
+                                            {tpl.teks(c.mata_pelajaran || 'mapel ini')}
+                                          </span>
+                                        </button>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                              <textarea
+                                className="input-field min-h-[70px]"
+                                placeholder={`Deskripsi capaian ${komp.label.toLowerCase()}...`}
+                                value={entri.deskripsi_capaian}
+                                onChange={(e) => ubahBarisCapaian(i, komp.key, e.target.value)}
+                              />
+                            </div>
+                          )
+                        })}
                       </div>
                     )
                   })}
