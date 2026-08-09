@@ -258,28 +258,19 @@ export default function RaporCetak() {
         <h2 className="text-center font-display font-bold text-base uppercase mb-4">
           Identitas Peserta Didik
         </h2>
-        <div className="flex gap-6 mb-2">
-          <div className="grid grid-cols-[190px_10px_1fr] gap-y-1 flex-1">
-            <span className="text-ink-700/70">1. Nama Peserta Didik</span><span>:</span><span className="font-medium">{siswa.nama_lengkap}</span>
-            <span className="text-ink-700/70">2. Nomor Induk Siswa</span><span>:</span><span className="font-medium">{siswa.nis || '-'}</span>
-            <span className="text-ink-700/70">3. N I S N</span><span>:</span><span className="font-medium">{siswa.nisn || '-'}</span>
-            <span className="text-ink-700/70">4. Tempat, Tanggal Lahir</span><span>:</span>
-            <span className="font-medium">
-              {[siswa.tempat_lahir, formatTanggalLahir(siswa.tanggal_lahir)].filter(Boolean).join(', ') || '-'}
-            </span>
-            <span className="text-ink-700/70">5. Jenis Kelamin</span><span>:</span>
-            <span className="font-medium">{siswa.jenis_kelamin === 'L' ? 'Laki-laki' : siswa.jenis_kelamin === 'P' ? 'Perempuan' : '-'}</span>
-            <span className="text-ink-700/70">6. Agama</span><span>:</span><span className="font-medium">{siswa.agama || '-'}</span>
-            <span className="text-ink-700/70">7. Pendidikan Sebelumnya</span><span>:</span><span className="font-medium">{siswa.pendidikan_sebelumnya || '-'}</span>
-            <span className="text-ink-700/70">8. Alamat Peserta Didik</span><span>:</span><span className="font-medium">{siswa.alamat || siswa.alamat_tinggal || '-'}</span>
-          </div>
-          <div className="w-24 h-32 border-2 border-ink-950 shrink-0 flex items-center justify-center overflow-hidden">
-            {fotoSiswaUrl ? (
-              <img src={fotoSiswaUrl} alt="Pas foto" className="w-full h-full object-cover" />
-            ) : (
-              <span className="text-[10px] text-center text-ink-700/50 px-1">Pas Foto<br />3 x 4</span>
-            )}
-          </div>
+        <div className="grid grid-cols-[190px_10px_1fr] gap-y-1 mb-2">
+          <span className="text-ink-700/70">1. Nama Peserta Didik</span><span>:</span><span className="font-medium">{siswa.nama_lengkap}</span>
+          <span className="text-ink-700/70">2. Nomor Induk Siswa</span><span>:</span><span className="font-medium">{siswa.nis || '-'}</span>
+          <span className="text-ink-700/70">3. N I S N</span><span>:</span><span className="font-medium">{siswa.nisn || '-'}</span>
+          <span className="text-ink-700/70">4. Tempat, Tanggal Lahir</span><span>:</span>
+          <span className="font-medium">
+            {[siswa.tempat_lahir, formatTanggalLahir(siswa.tanggal_lahir)].filter(Boolean).join(', ') || '-'}
+          </span>
+          <span className="text-ink-700/70">5. Jenis Kelamin</span><span>:</span>
+          <span className="font-medium">{siswa.jenis_kelamin === 'L' ? 'Laki-laki' : siswa.jenis_kelamin === 'P' ? 'Perempuan' : '-'}</span>
+          <span className="text-ink-700/70">6. Agama</span><span>:</span><span className="font-medium">{siswa.agama || '-'}</span>
+          <span className="text-ink-700/70">7. Pendidikan Sebelumnya</span><span>:</span><span className="font-medium">{siswa.pendidikan_sebelumnya || '-'}</span>
+          <span className="text-ink-700/70">8. Alamat Peserta Didik</span><span>:</span><span className="font-medium">{siswa.alamat || siswa.alamat_tinggal || '-'}</span>
         </div>
 
         <div className="grid grid-cols-[190px_10px_1fr] gap-y-1 mt-2">
@@ -308,13 +299,20 @@ export default function RaporCetak() {
           <span className="text-ink-700/70 pl-4">3) Alamat</span><span>:</span><span className="font-medium">{siswa.alamat_wali || '-'}</span>
         </div>
 
-        <div className="flex justify-end mt-12">
+        <div className="flex justify-between items-end mt-12">
+          <div className="w-24 h-32 border-2 border-ink-950 shrink-0 flex items-center justify-center overflow-hidden">
+            {fotoSiswaUrl ? (
+              <img src={fotoSiswaUrl} alt="Pas foto" className="w-full h-full object-cover" />
+            ) : (
+              <span className="text-[10px] text-center text-ink-700/50 px-1">Pas Foto<br />Ukuran<br />3 X 4</span>
+            )}
+          </div>
           <div className="text-center">
             <p>
               {sekolah?.tempat_ttd || '.......................'},{' '}
               {new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}
             </p>
-            <p className="mb-1">Kepala Sekolah</p>
+            <p className="mb-1 font-semibold">Kepala Sekolah</p>
             <div className="h-16" />
             <p className="font-semibold border-t border-ink-950/40 pt-1 inline-block px-6">
               {sekolah?.kepala_sekolah || '(.......................................)'}
