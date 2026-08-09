@@ -1,885 +1,939 @@
-import { useEffect, useState, useRef } from 'react'
-import * as XLSX from 'xlsx'
+import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabaseClient'
-import { useAuth } from '../lib/AuthContext'
 import Layout from '../components/Layout'
-import BulkImportModal from '../components/BulkImportModal'
-import TeleponLink from '../components/TeleponLink'
-import { Plus, UploadCloud, Pencil, Trash2, Search, X, Loader2, Download, FileSpreadsheet, Printer, ChevronDown, Camera, IdCard } from 'lucide-react'
+import {
+  FileBadge,
+  Loader2,
+  Save,
+  Plus,
+  Trash2,
+  ClipboardList,
+  Sparkles,
+  Dumbbell,
+  NotebookPen,
+  Printer,
+  Lightbulb,
+} from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 
-const AGAMA_OPTIONS = ['Islam', 'Kristen', 'Katolik', 'Hindu', 'Buddha', 'Khonghucu', 'Lainnya']
-
-const emptyForm = {
-  nis: '',
-  nisn: '',
-  nik: '',
-  nama_lengkap: '',
-  jenis_kelamin: 'L',
-  agama: '',
-  tempat_lahir: '',
-  tanggal_lahir: '',
-  alamat: '',
-  alamat_tinggal: '',
-  nama_orang_tua: '',
-  nama_ayah: '',
-  nama_ibu: '',
-  no_hp_orang_tua: '',
-  kelas_id: '',
-  status: 'aktif',
-  // TAMBAHAN: dipakai di Halaman Identitas Rapor (halaman sampul/identitas peserta didik)
-  pendidikan_sebelumnya: '',
-  pendidikan_ayah: '',
-  pendidikan_ibu: '',
-  pekerjaan_ayah: '',
-  pekerjaan_ibu: '',
-  ortu_kelurahan_desa: '',
-  ortu_kecamatan: '',
-  ortu_kabupaten_kota: '',
-  ortu_provinsi: '',
-  nama_wali: '',
-  pekerjaan_wali: '',
-  alamat_wali: '',
-}
-
-// Header ini HARUS sama persis dengan templateHeaders di BulkImportModal (Impor Massal)
-// supaya file yang diunduh dari sini bisa langsung diupload ulang tanpa perlu diubah nama kolomnya.
-const EXCEL_HEADERS = [
-  'nama_lengkap', 'nis', 'nisn', 'nik', 'kelas', 'jenis_kelamin(L/P)', 'agama',
-  'tempat_lahir', 'tanggal_lahir(YYYY-MM-DD)', 'nama_ayah', 'nama_ibu', 'nama_orang_tua',
-  'no_hp_orang_tua', 'alamat', 'alamat_tinggal',
+const TEMPLATE_DESKRIPSI = [
+  {
+    kategori: 'Sangat Baik',
+    teks: (mapel) =>
+      `Ananda menunjukkan penguasaan yang sangat baik pada mata pelajaran ${mapel}, mampu memahami dan menerapkan konsep dengan tepat, serta menunjukkan inisiatif dan rasa ingin tahu yang tinggi dalam pembelajaran.`,
+  },
+  {
+    kategori: 'Baik',
+    teks: (mapel) =>
+      `Ananda menunjukkan pemahaman yang baik pada mata pelajaran ${mapel}, mampu mengikuti pembelajaran dengan baik dan menyelesaikan sebagian besar tugas dengan tepat waktu.`,
+  },
+  {
+    kategori: 'Cukup',
+    teks: (mapel) =>
+      `Ananda menunjukkan pemahaman yang cukup pada mata pelajaran ${mapel}. Dengan bimbingan dan latihan lebih lanjut, ananda diharapkan dapat meningkatkan pemahamannya.`,
+  },
+  {
+    kategori: 'Perlu Bimbingan',
+    teks: (mapel) =>
+      `Ananda masih memerlukan bimbingan lebih lanjut pada mata pelajaran ${mapel} untuk dapat memahami materi secara optimal. Diperlukan perhatian dan pendampingan yang lebih intensif.`,
+  },
 ]
 
-// Motif batik (kawung + parang) — sama persis dengan Profil Saya, Dasbor, Galeri & Dokumen,
-// warna garis menyesuaikan latar (emas di atas navy).
-function BatikOverlay({ patternId, strokeColor = '#d4af37', opacity = 1, size = 72 }) {
-  return (
-    <svg
-      className="absolute inset-0 w-full h-full pointer-events-none"
-      preserveAspectRatio="xMidYMid slice"
-      aria-hidden="true"
-    >
-      <defs>
-        <pattern
-          id={patternId}
-          x="0"
-          y="0"
-          width={size}
-          height={size}
-          patternUnits="userSpaceOnUse"
-          patternTransform="rotate(8)"
-        >
-          <g fill="none" stroke={strokeColor} strokeWidth="1.1" opacity={opacity}>
-            <ellipse cx={size / 2} cy={size * 0.333} rx={size * 0.125} ry={size * 0.194} opacity="0.55" />
-            <ellipse cx={size / 2} cy={size * 0.667} rx={size * 0.125} ry={size * 0.194} opacity="0.55" />
-            <ellipse cx={size * 0.333} cy={size / 2} rx={size * 0.194} ry={size * 0.125} opacity="0.55" />
-            <ellipse cx={size * 0.667} cy={size / 2} rx={size * 0.194} ry={size * 0.125} opacity="0.55" />
-            <circle cx={size / 2} cy={size / 2} r={size * 0.042} opacity="0.7" />
-          </g>
-          <path
-            d={`M0 ${size} L${size * 0.25} ${size * 0.75} L${size * 0.5} ${size} L${size * 0.75} ${size * 0.75} L${size} ${size}`}
-            fill="none"
-            stroke={strokeColor}
-            strokeWidth="0.8"
-            opacity={opacity * 0.35}
-          />
-          <path
-            d={`M0 0 L${size * 0.25} ${size * 0.25} L0 ${size * 0.5}`}
-            fill="none"
-            stroke={strokeColor}
-            strokeWidth="0.8"
-            opacity={opacity * 0.3}
-          />
-          <circle cx={size * 0.11} cy={size * 0.11} r="1.3" fill={strokeColor} opacity={opacity * 0.4} />
-          <circle cx={size * 0.89} cy={size * 0.22} r="1.3" fill={strokeColor} opacity={opacity * 0.4} />
-          <circle cx={size * 0.22} cy={size * 0.89} r="1.3" fill={strokeColor} opacity={opacity * 0.4} />
-        </pattern>
-      </defs>
-      <rect x="0" y="0" width="100%" height="100%" fill={`url(#${patternId})`} />
-    </svg>
-  )
+function kategoriDariNilai(rataRata) {
+  if (rataRata === undefined || rataRata === null || isNaN(rataRata)) return null
+  const n = Number(rataRata)
+  if (n >= 90) return 'Sangat Baik'
+  if (n >= 75) return 'Baik'
+  if (n >= 60) return 'Cukup'
+  return 'Perlu Bimbingan'
 }
 
-function formatTanggalLahir(tgl) {
-  if (!tgl) return null
-  try {
-    return new Date(tgl).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })
-  } catch {
-    return tgl
+const OPSI_CAPAIAN_P5 = ['Belum Berkembang', 'Mulai Berkembang', 'Berkembang Sesuai Harapan', 'Sangat Berkembang']
+
+const TEMPLATE_EKSKUL = [
+  {
+    kategori: 'Sangat Baik',
+    teks: (nama) =>
+      `Ananda menunjukkan minat dan keaktifan yang sangat baik dalam kegiatan ${nama}, serta mampu menguasai keterampilan yang diajarkan dengan sangat baik.`,
+  },
+  {
+    kategori: 'Baik',
+    teks: (nama) =>
+      `Ananda menunjukkan keaktifan yang baik dalam kegiatan ${nama} dan mampu mengikuti setiap kegiatan dengan cukup baik.`,
+  },
+  {
+    kategori: 'Cukup',
+    teks: (nama) =>
+      `Ananda cukup aktif mengikuti kegiatan ${nama}, namun masih perlu meningkatkan konsistensi keikutsertaan.`,
+  },
+  {
+    kategori: 'Perlu Peningkatan',
+    teks: (nama) =>
+      `Ananda perlu meningkatkan minat dan keaktifan dalam mengikuti kegiatan ${nama} agar dapat mengembangkan potensi diri secara optimal.`,
+  },
+]
+
+const TEMPLATE_CATATAN = [
+  {
+    kategori: 'Sangat Baik',
+    teks: () =>
+      `Ananda menunjukkan perkembangan sikap dan perilaku yang sangat baik selama semester ini, aktif, disiplin, dan mampu bekerja sama dengan baik bersama teman-teman.`,
+  },
+  {
+    kategori: 'Baik',
+    teks: () =>
+      `Ananda menunjukkan perkembangan sikap dan perilaku yang baik selama semester ini, cukup disiplin dan mampu mengikuti kegiatan pembelajaran dengan baik.`,
+  },
+  {
+    kategori: 'Cukup',
+    teks: () =>
+      `Ananda menunjukkan perkembangan sikap dan perilaku yang cukup baik selama semester ini. Diperlukan motivasi lebih lanjut agar ananda dapat lebih berkembang.`,
+  },
+  {
+    kategori: 'Perlu Perhatian Khusus',
+    teks: () =>
+      `Ananda memerlukan perhatian khusus dari orang tua dan sekolah terkait sikap dan kedisiplinan selama semester ini, agar dapat mengikuti pembelajaran dengan lebih optimal.`,
+  },
+]
+
+const TABS = [
+  { key: 'ringkasan', label: 'Ringkasan Nilai', icon: ClipboardList },
+  { key: 'capaian', label: 'Deskripsi Capaian', icon: NotebookPen },
+  { key: 'p5', label: 'P5', icon: Sparkles },
+  { key: 'ekskul', label: 'Ekstrakurikuler', icon: Dumbbell },
+  { key: 'catatan', label: 'Catatan Wali Kelas', icon: NotebookPen },
+]
+
+const CATATAN_KOSONG = {
+  id: null,
+  catatan: '',
+  tinggi_badan: '',
+  berat_badan: '',
+  kondisi_kesehatan: '',
+  keputusan: '',
+}
+
+// PERBAIKAN: menghitung rentang tanggal dari kombinasi tahun ajaran + semester,
+// supaya rekap presensi di rapor benar-benar hanya mengambil data pada periode
+// yang sedang dipilih (bukan seluruh riwayat presensi siswa sepanjang masa).
+// Format tahunAjaran yang didukung: "2025/2026".
+//   Semester Ganjil -> 1 Juli s/d 31 Desember tahun awal (2025-07-01 s/d 2025-12-31)
+//   Semester Genap  -> 1 Januari s/d 30 Juni tahun akhir (2026-01-01 s/d 2026-06-30)
+function rentangTanggalPeriode(tahunAjaran, semester) {
+  if (!tahunAjaran) return null
+  const bagian = tahunAjaran.split('/')
+  if (bagian.length !== 2) return null
+
+  const tahunAwal = parseInt(bagian[0], 10)
+  const tahunAkhir = parseInt(bagian[1], 10)
+  if (isNaN(tahunAwal) || isNaN(tahunAkhir)) return null
+
+  if (semester === 'Genap') {
+    return { mulai: `${tahunAkhir}-01-01`, selesai: `${tahunAkhir}-06-30` }
   }
+  // Default / Ganjil
+  return { mulai: `${tahunAwal}-07-01`, selesai: `${tahunAwal}-12-31` }
 }
 
-function tempatTanggalLahir(s) {
-  const tempat = s.tempat_lahir?.trim()
-  const tanggal = formatTanggalLahir(s.tanggal_lahir)
-  if (tempat && tanggal) return `${tempat}, ${tanggal}`
-  if (tempat) return tempat
-  if (tanggal) return tanggal
-  return '—'
-}
+export default function Rapor() {
+  const navigate = useNavigate()
 
-export default function Siswa() {
-  const { isAdmin } = useAuth()
-  const [data, setData] = useState([])
-  const [kelasList, setKelasList] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [search, setSearch] = useState('')
-  const [showForm, setShowForm] = useState(false)
-  const [showImport, setShowImport] = useState(false)
-  const [editingId, setEditingId] = useState(null)
-  const [form, setForm] = useState(emptyForm)
+  const [siswaList, setSiswaList] = useState([])
+  const [siswaId, setSiswaId] = useState('')
+  const [semester, setSemester] = useState('Ganjil')
+  const [tahunAjaran, setTahunAjaran] = useState('')
+  const [activeTab, setActiveTab] = useState('ringkasan')
+  const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
-  const [showExportMenu, setShowExportMenu] = useState(false)
-  const exportMenuRef = useRef(null)
-  const [uploadingId, setUploadingId] = useState(null)
-  const [profilLihat, setProfilLihat] = useState(null) // siswa yang sedang dilihat detail profilnya
 
-  async function loadData() {
-    setLoading(true)
-    const [{ data: siswa }, { data: kelas }] = await Promise.all([
-      supabase.from('siswa').select('*, kelas(nama_kelas)').order('nama_lengkap'),
-      supabase.from('kelas').select('id, nama_kelas').order('nama_kelas'),
-    ])
-    setData(siswa || [])
-    setKelasList(kelas || [])
-    setLoading(false)
-    // Jaga agar modal profil tetap sinkron kalau datanya baru saja diubah (misal setelah upload foto)
-    if (profilLihat) {
-      const updated = (siswa || []).find((s) => s.id === profilLihat.id)
-      if (updated) setProfilLihat(updated)
-    }
-  }
+  // Ringkasan (nilai angka + presensi) — tetap dari tabel nilai & presensi_siswa
+  const [nilai, setNilai] = useState([])
+  const [presensi, setPresensi] = useState({ hadir: 0, izin: 0, sakit: 0, alpa: 0 })
+
+  // Deskripsi capaian per mapel — tabel capaian_mapel
+  const [capaianList, setCapaianList] = useState([]) // [{id, mata_pelajaran, deskripsi_capaian, terkunci}]
+
+  // P5 — tabel rapor_p5
+  const [p5List, setP5List] = useState([]) // [{id, tema, dimensi, sub_elemen, capaian}]
+
+  // Ekstrakurikuler — tabel ekstrakurikuler_nilai
+  const [ekskulList, setEkskulList] = useState([]) // [{id, nama_ekstrakurikuler, predikat, keterangan}]
+
+  // Catatan wali kelas — tabel catatan_siswa
+  const [catatan, setCatatan] = useState(CATATAN_KOSONG)
+
+  // Dropdown rekomendasi deskripsi capaian — index baris yang sedang terbuka
+  const [rekomendasiTerbuka, setRekomendasiTerbuka] = useState(null)
+  // Dropdown rekomendasi keterangan ekstrakurikuler — index baris yang sedang terbuka
+  const [rekomendasiEkskulTerbuka, setRekomendasiEkskulTerbuka] = useState(null)
+  // Dropdown rekomendasi catatan wali kelas — boolean, cuma satu baris
+  const [rekomendasiCatatanTerbuka, setRekomendasiCatatanTerbuka] = useState(false)
 
   useEffect(() => {
-    loadData()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    supabase
+      .from('siswa')
+      .select('id, nama_lengkap, nis, kelas(nama_kelas)')
+      .order('nama_lengkap')
+      .then(({ data }) => setSiswaList(data || []))
   }, [])
 
-  // Tutup dropdown export saat klik di luar area tombolnya
-  useEffect(() => {
-    function handleClickOutside(e) {
-      if (exportMenuRef.current && !exportMenuRef.current.contains(e.target)) {
-        setShowExportMenu(false)
+  async function muatRapor() {
+    if (!siswaId || !tahunAjaran) return
+    setLoading(true)
+
+    // PERBAIKAN: bangun query presensi dengan filter rentang tanggal sesuai
+    // semester & tahun ajaran yang dipilih, bukan .eq('siswa_id', siswaId) saja.
+    const periode = rentangTanggalPeriode(tahunAjaran, semester)
+    let queryPresensi = supabase.from('presensi_siswa').select('status').eq('siswa_id', siswaId)
+    if (periode) {
+      queryPresensi = queryPresensi.gte('tanggal', periode.mulai).lte('tanggal', periode.selesai)
+    }
+
+    const [
+      { data: nilaiRows },
+      { data: presensiRows },
+      { data: capaianRows },
+      { data: p5Rows },
+      { data: ekskulRows },
+      { data: catatanRows },
+    ] = await Promise.all([
+      supabase
+        .from('nilai')
+        .select('mata_pelajaran, jenis, nilai')
+        .eq('siswa_id', siswaId)
+        .eq('semester', semester)
+        .eq('tahun_ajaran', tahunAjaran),
+      queryPresensi,
+      supabase
+        .from('capaian_mapel')
+        .select('id, mata_pelajaran, deskripsi_capaian')
+        .eq('siswa_id', siswaId)
+        .eq('semester', semester)
+        .eq('tahun_ajaran', tahunAjaran),
+      supabase
+        .from('rapor_p5')
+        .select('id, tema, dimensi, sub_elemen, capaian')
+        .eq('siswa_id', siswaId)
+        .eq('semester', semester)
+        .eq('tahun_ajaran', tahunAjaran)
+        .order('tema'),
+      supabase
+        .from('ekstrakurikuler_nilai')
+        .select('id, nama_ekstrakurikuler, predikat, keterangan')
+        .eq('siswa_id', siswaId)
+        .eq('semester', semester)
+        .eq('tahun_ajaran', tahunAjaran),
+      supabase
+        .from('catatan_siswa')
+        .select('id, catatan, tinggi_badan, berat_badan, kondisi_kesehatan, keputusan')
+        .eq('siswa_id', siswaId)
+        .eq('semester', semester)
+        .eq('tahun_ajaran', tahunAjaran)
+        .maybeSingle(),
+    ])
+
+    setNilai(nilaiRows || [])
+    const rekap = { hadir: 0, izin: 0, sakit: 0, alpa: 0 }
+    for (const p of presensiRows || []) {
+      if (rekap[p.status] !== undefined) rekap[p.status]++
+    }
+    setPresensi(rekap)
+
+    setP5List(p5Rows || [])
+    setEkskulList(ekskulRows || [])
+    setCatatan(catatanRows || CATATAN_KOSONG)
+
+    // Gabungkan mapel dari nilai dengan mapel yang sudah punya deskripsi capaian,
+    // supaya guru bisa isi deskripsi walau belum ada nilai angkanya.
+    const mapelDariNilai = [...new Set((nilaiRows || []).map((n) => n.mata_pelajaran))]
+    const mapelDariCapaian = (capaianRows || []).map((c) => c.mata_pelajaran)
+    const semuaMapel = [...new Set([...mapelDariNilai, ...mapelDariCapaian])]
+    setCapaianList(
+      semuaMapel.map((mapel) => {
+        const existing = (capaianRows || []).find((c) => c.mata_pelajaran === mapel)
+        return {
+          id: existing?.id || null,
+          mata_pelajaran: mapel,
+          deskripsi_capaian: existing?.deskripsi_capaian || '',
+          terkunci: mapelDariNilai.includes(mapel), // nama mapel dari tabel nilai, tidak diedit di sini
+        }
+      })
+    )
+
+    setLoading(false)
+  }
+
+  const siswaTerpilih = siswaList.find((s) => s.id === siswaId)
+
+  // ---------- Ringkasan nilai ----------
+  const rekapPerMapel = {}
+  for (const n of nilai) {
+    if (!rekapPerMapel[n.mata_pelajaran]) rekapPerMapel[n.mata_pelajaran] = []
+    rekapPerMapel[n.mata_pelajaran].push(n.nilai)
+  }
+  const barisMapel = Object.entries(rekapPerMapel).map(([mapel, nilaiArr]) => ({
+    mapel,
+    rataRata: (nilaiArr.reduce((a, b) => a + b, 0) / nilaiArr.length).toFixed(1),
+  }))
+
+  // ---------- Deskripsi capaian ----------
+  function ubahBarisCapaian(index, field, value) {
+    setCapaianList((prev) =>
+      prev.map((c, i) => (i === index ? { ...c, [field]: value } : c))
+    )
+  }
+
+  function pilihRekomendasi(index, template) {
+    const mapel = capaianList[index].mata_pelajaran || 'mata pelajaran ini'
+    ubahBarisCapaian(index, 'deskripsi_capaian', template.teks(mapel))
+    setRekomendasiTerbuka(null)
+  }
+
+  function tambahBarisCapaian() {
+    setCapaianList((prev) => [
+      ...prev,
+      { id: null, mata_pelajaran: '', deskripsi_capaian: '', terkunci: false },
+    ])
+  }
+
+  async function hapusBarisCapaian(index) {
+    const row = capaianList[index]
+    if (row.id) {
+      await supabase.from('capaian_mapel').delete().eq('id', row.id)
+    }
+    setCapaianList((prev) => prev.filter((_, i) => i !== index))
+  }
+
+  async function simpanCapaian() {
+    setSaving(true)
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+
+    let gagal = []
+    for (const c of capaianList) {
+      if (!c.mata_pelajaran.trim()) continue
+      if (c.id) {
+        const { error } = await supabase
+          .from('capaian_mapel')
+          .update({
+            mata_pelajaran: c.mata_pelajaran,
+            deskripsi_capaian: c.deskripsi_capaian,
+            diisi_oleh: user?.id,
+          })
+          .eq('id', c.id)
+        if (error) gagal.push(error.message)
+      } else if (c.deskripsi_capaian.trim()) {
+        const { error } = await supabase.from('capaian_mapel').insert({
+          siswa_id: siswaId,
+          mata_pelajaran: c.mata_pelajaran,
+          semester,
+          tahun_ajaran: tahunAjaran,
+          deskripsi_capaian: c.deskripsi_capaian,
+          diisi_oleh: user?.id,
+        })
+        if (error) gagal.push(error.message)
       }
     }
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [])
-
-  // --- Foto profil: memakai bucket & kolom yang sama persis dengan fitur Cetak Kartu ---
-  function fotoUrl(path) {
-    if (!path) return null
-    return supabase.storage.from('foto-siswa').getPublicUrl(path).data.publicUrl
-  }
-
-  async function handleFotoUpload(siswaId, file) {
-    setUploadingId(siswaId)
-    const ext = file.name.split('.').pop()
-    const path = `${siswaId}/foto.${ext}`
-    const { error: uploadError } = await supabase.storage.from('foto-siswa').upload(path, file, { upsert: true })
-    if (uploadError) {
-      alert('Gagal upload foto: ' + uploadError.message)
-      setUploadingId(null)
-      return
-    }
-    await supabase.from('siswa').update({ foto_path: path }).eq('id', siswaId)
-    await loadData()
-    setUploadingId(null)
-  }
-
-  function openAdd() {
-    setForm(emptyForm)
-    setEditingId(null)
-    setShowForm(true)
-  }
-
-  function openEdit(row) {
-    setForm({ ...emptyForm, ...row, kelas_id: row.kelas_id || '' })
-    setEditingId(row.id)
-    setShowForm(true)
-  }
-
-  async function handleSubmit(e) {
-    e.preventDefault()
-    setSaving(true)
-    const payload = { ...form, kelas_id: form.kelas_id || null }
-    delete payload.kelas
-
-    const { error } = editingId
-      ? await supabase.from('siswa').update(payload).eq('id', editingId)
-      : await supabase.from('siswa').insert(payload)
-
+    if (gagal.length) alert('Gagal menyimpan sebagian deskripsi capaian:\n' + [...new Set(gagal)].join('\n'))
+    await muatRapor()
     setSaving(false)
-    if (!error) {
-      setShowForm(false)
-      loadData()
-    } else {
-      alert('Gagal menyimpan: ' + error.message)
-    }
   }
 
-  async function handleDelete(id) {
-    if (!confirm('Hapus data siswa ini? Tindakan ini tidak bisa dibatalkan.')) return
-    const { error } = await supabase.from('siswa').delete().eq('id', id)
-    if (!error) loadData()
-    else alert('Gagal menghapus: ' + error.message)
+  // ---------- P5 ----------
+  function ubahBarisP5(index, field, value) {
+    setP5List((prev) => prev.map((p, i) => (i === index ? { ...p, [field]: value } : p)))
   }
 
-  const filtered = data.filter((s) =>
-    `${s.nama_lengkap} ${s.nis} ${s.nisn} ${s.nik}`.toLowerCase().includes(search.toLowerCase())
-  )
-
-  // --- Export: Excel (.xlsx) siap-edit & siap-impor-ulang ---
-  // Kolomnya dibuat SAMA PERSIS dengan format Impor Massal, jadi guru/admin bisa:
-  // unduh -> edit data massal di Excel -> upload lagi lewat "Impor Massal" tanpa perlu ubah header.
-  function handleExportExcel() {
-    setShowExportMenu(false)
-    const rows = filtered.map((s) => ({
-      nama_lengkap: s.nama_lengkap || '',
-      nis: s.nis || '',
-      nisn: s.nisn || '',
-      nik: s.nik || '',
-      kelas: s.kelas?.nama_kelas || '',
-      'jenis_kelamin(L/P)': s.jenis_kelamin || '',
-      agama: s.agama || '',
-      tempat_lahir: s.tempat_lahir || '',
-      'tanggal_lahir(YYYY-MM-DD)': s.tanggal_lahir || '',
-      nama_ayah: s.nama_ayah || '',
-      nama_ibu: s.nama_ibu || '',
-      nama_orang_tua: s.nama_orang_tua || '',
-      no_hp_orang_tua: s.no_hp_orang_tua || '',
-      alamat: s.alamat || '',
-      alamat_tinggal: s.alamat_tinggal || '',
-    }))
-
-    const ws = XLSX.utils.json_to_sheet(rows, { header: EXCEL_HEADERS })
-    ws['!cols'] = [
-      { wch: 24 }, { wch: 10 }, { wch: 12 }, { wch: 18 }, { wch: 10 }, { wch: 16 }, { wch: 12 },
-      { wch: 16 }, { wch: 20 }, { wch: 20 }, { wch: 20 }, { wch: 22 },
-      { wch: 16 }, { wch: 30 }, { wch: 30 },
-    ]
-    const wb = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(wb, ws, 'Data Siswa')
-    XLSX.writeFile(wb, `Data-Siswa-${new Date().toISOString().slice(0, 10)}.xlsx`)
-  }
-
-  // --- Export: Excel (CSV) ---
-  function handleExportCSV() {
-    setShowExportMenu(false)
-    const headers = ['Nama Lengkap', 'NIS', 'NISN', 'NIK', 'Kelas', 'Jenis Kelamin', 'Agama', 'Status', 'Tempat Lahir', 'Tanggal Lahir', 'Nama Ayah', 'Nama Ibu', 'Nama Orang Tua/Wali', 'No. HP Orang Tua', 'Alamat', 'Alamat Tempat Tinggal']
-    const rows = filtered.map((s) => [
-      s.nama_lengkap || '',
-      s.nis || '',
-      s.nisn || '',
-      s.nik || '',
-      s.kelas?.nama_kelas || '',
-      s.jenis_kelamin === 'L' ? 'Laki-laki' : 'Perempuan',
-      s.agama || '',
-      s.status || '',
-      s.tempat_lahir || '',
-      s.tanggal_lahir || '',
-      s.nama_ayah || '',
-      s.nama_ibu || '',
-      s.nama_orang_tua || '',
-      s.no_hp_orang_tua || '',
-      s.alamat || '',
-      s.alamat_tinggal || '',
+  function tambahBarisP5() {
+    setP5List((prev) => [
+      ...prev,
+      { id: null, tema: '', dimensi: '', sub_elemen: '', capaian: OPSI_CAPAIAN_P5[0] },
     ])
-
-    const escapeCell = (val) => {
-      const str = String(val).replace(/"/g, '""')
-      return /[",\n]/.test(str) ? `"${str}"` : str
-    }
-
-    const csvContent = [headers, ...rows].map((r) => r.map(escapeCell).join(',')).join('\r\n')
-    const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `Data-Siswa-${new Date().toISOString().slice(0, 10)}.csv`
-    a.click()
-    URL.revokeObjectURL(url)
   }
 
-  // --- Export: Cetak / Unduh PDF (lewat dialog cetak browser) ---
-  function handlePrintPDF() {
-    setShowExportMenu(false)
-    const tanggal = new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })
+  async function hapusBarisP5(index) {
+    const row = p5List[index]
+    if (row.id) {
+      await supabase.from('rapor_p5').delete().eq('id', row.id)
+    }
+    setP5List((prev) => prev.filter((_, i) => i !== index))
+  }
 
-    const rowsHtml = filtered
-      .map(
-        (s, i) => `
-        <tr>
-          <td>${i + 1}</td>
-          <td>${s.nama_lengkap || '-'}</td>
-          <td>${s.nis || '-'}</td>
-          <td>${s.nisn || '-'}</td>
-          <td>${s.nik || '-'}</td>
-          <td>${s.kelas?.nama_kelas || '-'}</td>
-          <td>${s.jenis_kelamin === 'L' ? 'Laki-laki' : 'Perempuan'}</td>
-          <td>${s.agama || '-'}</td>
-          <td>${s.status || '-'}</td>
-        </tr>`
-      )
-      .join('')
+  async function simpanP5() {
+    setSaving(true)
+    let gagal = []
+    for (const p of p5List) {
+      if (!p.tema.trim() && !p.dimensi.trim()) continue
+      if (p.id) {
+        const { error } = await supabase
+          .from('rapor_p5')
+          .update({ tema: p.tema, dimensi: p.dimensi, sub_elemen: p.sub_elemen, capaian: p.capaian })
+          .eq('id', p.id)
+        if (error) gagal.push(error.message)
+      } else {
+        const { error } = await supabase.from('rapor_p5').insert({
+          siswa_id: siswaId,
+          semester,
+          tahun_ajaran: tahunAjaran,
+          tema: p.tema,
+          dimensi: p.dimensi,
+          sub_elemen: p.sub_elemen,
+          capaian: p.capaian,
+        })
+        if (error) gagal.push(error.message)
+      }
+    }
+    if (gagal.length) alert('Gagal menyimpan sebagian data P5:\n' + [...new Set(gagal)].join('\n'))
+    await muatRapor()
+    setSaving(false)
+  }
 
-    const html = `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <meta charset="utf-8" />
-        <title>Data Siswa</title>
-        <style>
-          body { font-family: Arial, Helvetica, sans-serif; padding: 24px; color: #1a1a1a; }
-          h1 { font-size: 18px; margin-bottom: 2px; }
-          p.subtitle { font-size: 12px; color: #666; margin-top: 0; margin-bottom: 16px; }
-          table { width: 100%; border-collapse: collapse; font-size: 11px; }
-          th, td { border: 1px solid #ccc; padding: 6px 8px; text-align: left; }
-          th { background: #f2f2f2; }
-          @media print {
-            @page { size: landscape; margin: 16mm; }
-          }
-        </style>
-      </head>
-      <body>
-        <h1>Data Siswa</h1>
-        <p class="subtitle">Dicetak pada ${tanggal} · Total ${filtered.length} siswa</p>
-        <table>
-          <thead>
-            <tr>
-              <th>No</th>
-              <th>Nama Lengkap</th>
-              <th>NIS</th>
-              <th>NISN</th>
-              <th>NIK</th>
-              <th>Kelas</th>
-              <th>Jenis Kelamin</th>
-              <th>Agama</th>
-              <th>Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${rowsHtml}
-          </tbody>
-        </table>
-        <script>
-          window.onload = function () {
-            window.print();
-          };
-        </script>
-      </body>
-      </html>
-    `
+  // ---------- Ekstrakurikuler ----------
+  function tambahBarisEkskul() {
+    setEkskulList((prev) => [
+      ...prev,
+      { id: null, nama_ekstrakurikuler: '', predikat: '', keterangan: '' },
+    ])
+  }
 
-    const printWindow = window.open('', '_blank')
-    printWindow.document.write(html)
-    printWindow.document.close()
+  function ubahBarisEkskul(index, field, value) {
+    setEkskulList((prev) =>
+      prev.map((row, i) => (i === index ? { ...row, [field]: value } : row))
+    )
+  }
+
+  function pilihRekomendasiEkskul(index, template) {
+    const nama = ekskulList[index].nama_ekstrakurikuler || 'ini'
+    ubahBarisEkskul(index, 'keterangan', template.teks(nama))
+    setRekomendasiEkskulTerbuka(null)
+  }
+
+  async function hapusBarisEkskul(index) {
+    const row = ekskulList[index]
+    if (row.id) {
+      await supabase.from('ekstrakurikuler_nilai').delete().eq('id', row.id)
+    }
+    setEkskulList((prev) => prev.filter((_, i) => i !== index))
+  }
+
+  async function simpanEkskul() {
+    setSaving(true)
+    let gagal = []
+    for (const row of ekskulList) {
+      if (!row.nama_ekstrakurikuler.trim()) continue
+      if (row.id) {
+        const { error } = await supabase
+          .from('ekstrakurikuler_nilai')
+          .update({
+            nama_ekstrakurikuler: row.nama_ekstrakurikuler,
+            predikat: row.predikat,
+            keterangan: row.keterangan,
+          })
+          .eq('id', row.id)
+        if (error) gagal.push(error.message)
+      } else {
+        const { error } = await supabase.from('ekstrakurikuler_nilai').insert({
+          siswa_id: siswaId,
+          semester,
+          tahun_ajaran: tahunAjaran,
+          nama_ekstrakurikuler: row.nama_ekstrakurikuler,
+          predikat: row.predikat,
+          keterangan: row.keterangan,
+        })
+        if (error) gagal.push(error.message)
+      }
+    }
+    if (gagal.length) alert('Gagal menyimpan sebagian data Ekstrakurikuler:\n' + [...new Set(gagal)].join('\n'))
+    await muatRapor()
+    setSaving(false)
+  }
+
+  // ---------- Catatan wali kelas ----------
+  function ubahCatatan(field, value) {
+    setCatatan((prev) => ({ ...prev, [field]: value }))
+  }
+
+  function pilihRekomendasiCatatan(template) {
+    ubahCatatan('catatan', template.teks())
+    setRekomendasiCatatanTerbuka(false)
+  }
+
+  async function simpanCatatan() {
+    setSaving(true)
+    const payload = {
+      siswa_id: siswaId,
+      semester,
+      tahun_ajaran: tahunAjaran,
+      catatan: catatan.catatan,
+      tinggi_badan: catatan.tinggi_badan,
+      berat_badan: catatan.berat_badan,
+      kondisi_kesehatan: catatan.kondisi_kesehatan,
+      keputusan: catatan.keputusan,
+    }
+    const { error } = catatan.id
+      ? await supabase.from('catatan_siswa').update(payload).eq('id', catatan.id)
+      : await supabase.from('catatan_siswa').insert(payload)
+    if (error) alert('Gagal menyimpan catatan wali kelas:\n' + error.message)
+    await muatRapor()
+    setSaving(false)
+  }
+
+  function bukaCetak() {
+    if (!siswaId || !tahunAjaran) return
+    const params = new URLSearchParams({ siswaId, semester, tahunAjaran })
+    navigate(`/rapor/cetak?${params.toString()}`)
   }
 
   return (
-    <Layout
-      title="Data Siswa"
-      subtitle={`${data.length} siswa terdaftar`}
-      actions={
-        <>
-          <div className="relative" ref={exportMenuRef}>
-            <button className="btn-secondary" onClick={() => setShowExportMenu((v) => !v)}>
-              <Download size={16} /> Unduh / Cetak <ChevronDown size={14} />
-            </button>
-            {showExportMenu && (
-              <div className="absolute right-0 mt-1.5 w-64 card p-1.5 z-20 shadow-lg">
-                <button
-                  onClick={handleExportExcel}
-                  className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-ink-700 hover:bg-ink-900/[0.05] text-left"
-                >
-                  <FileSpreadsheet size={16} /> Unduh Excel (siap edit & impor ulang)
-                </button>
-                <button
-                  onClick={handleExportCSV}
-                  className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-ink-700 hover:bg-ink-900/[0.05] text-left"
-                >
-                  <FileSpreadsheet size={16} /> Unduh Excel (.csv)
-                </button>
-                <button
-                  onClick={handlePrintPDF}
-                  className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-ink-700 hover:bg-ink-900/[0.05] text-left"
-                >
-                  <Printer size={16} /> Cetak / Unduh PDF
-                </button>
-              </div>
-            )}
+    <Layout title="Rapor Siswa" subtitle="Kelola nilai, deskripsi capaian, P5, ekstrakurikuler & catatan wali kelas">
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#4a0e0e] to-[#7a1515] p-6 mb-6">
+        <div className="relative z-10 flex items-center gap-4">
+          <div className="w-11 h-11 rounded-full bg-white/15 flex items-center justify-center shrink-0">
+            <FileBadge size={20} className="text-paper" />
           </div>
-          {isAdmin && (
-            <button className="btn-secondary" onClick={() => setShowImport(true)}>
-              <UploadCloud size={16} /> Impor Massal
-            </button>
-          )}
-          {isAdmin && (
-            <button className="btn-primary" onClick={openAdd}>
-              <Plus size={16} /> Tambah Siswa
-            </button>
-          )}
-        </>
-      }
-    >
-      {/* Kartu pencarian — background biru tua (navy), sama seperti kartu identitas di Profil Saya, dengan corak batik emas */}
-      <div className="relative overflow-hidden rounded-xl p-6 mb-4 flex items-center gap-4 bg-gradient-to-br from-blue-900 to-blue-950">
-        <div className="absolute -top-10 -right-10 w-40 h-40 rounded-full bg-white/5 pointer-events-none" />
-        <div className="absolute -bottom-14 -left-6 w-32 h-32 rounded-full bg-white/5 pointer-events-none" />
-        <BatikOverlay patternId="batikSiswaBanner" strokeColor="#d4af37" />
-
-        <div className="relative w-10 h-10 rounded-full bg-white/10 ring-2 ring-white/20 text-white flex items-center justify-center shrink-0">
-          <Search size={18} />
+          <div>
+            <p className="font-display font-semibold text-lg text-paper">Rapor Siswa</p>
+            <p className="text-sm text-paper/70 mt-0.5">
+              {siswaTerpilih
+                ? `${siswaTerpilih.nama_lengkap} · ${siswaTerpilih.kelas?.nama_kelas || '-'} · Semester ${semester} ${tahunAjaran}`
+                : 'Pilih siswa untuk lihat & isi rapor'}
+            </p>
+          </div>
         </div>
-        <div className="relative max-w-sm w-full">
-          <input
-            className="input-field w-full"
-            placeholder="Cari nama, NIS, NISN, atau NIK..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
+        <FileBadge size={120} className="absolute -right-4 -bottom-6 text-white/5 rotate-12" />
+      </div>
+
+      <div className="card p-5 mb-5">
+        <div className="grid sm:grid-cols-4 gap-3">
+          <div className="sm:col-span-2">
+            <label className="label-field">Pilih Siswa</label>
+            <select className="input-field" value={siswaId} onChange={(e) => setSiswaId(e.target.value)}>
+              <option value="">-- Pilih siswa --</option>
+              {siswaList.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.nama_lengkap} {s.kelas?.nama_kelas ? `(${s.kelas.nama_kelas})` : ''}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="label-field">Semester</label>
+            <select className="input-field" value={semester} onChange={(e) => setSemester(e.target.value)}>
+              <option value="Ganjil">Ganjil</option>
+              <option value="Genap">Genap</option>
+            </select>
+          </div>
+          <div>
+            <label className="label-field">Tahun Ajaran</label>
+            <input
+              className="input-field"
+              placeholder="2025/2026"
+              value={tahunAjaran}
+              onChange={(e) => setTahunAjaran(e.target.value)}
+            />
+          </div>
+        </div>
+        <div className="mt-4 flex flex-wrap gap-3">
+          <button className="btn-primary" onClick={muatRapor} disabled={!siswaId || !tahunAjaran || loading}>
+            {loading && <Loader2 size={16} className="animate-spin" />}
+            Tampilkan Rapor
+          </button>
+          {siswaTerpilih && (
+            <button className="btn-secondary" onClick={bukaCetak}>
+              <Printer size={16} /> Buka Halaman Cetak
+            </button>
+          )}
         </div>
       </div>
 
-      <div className="card relative overflow-hidden overflow-x-auto">
-        <span className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-900 to-brass-400" />
-        <table className="table-shell">
-          <thead>
-            <tr>
-              <th>Foto</th>
-              <th>Nama Lengkap</th>
-              <th>NIS</th>
-              <th>NISN</th>
-              <th>NIK</th>
-              <th>Tempat, Tanggal Lahir</th>
-              <th>Kelas</th>
-              <th>Jenis Kelamin</th>
-              <th>Status</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading && (
-              <tr><td colSpan={10} className="text-center py-8 text-ink-700/50">Memuat data...</td></tr>
+      {siswaTerpilih && (
+        <div className="card p-0">
+          <div className="flex flex-wrap border-b border-ink-950/10 rounded-t-2xl overflow-hidden">
+            {TABS.map((tab) => {
+              const Icon = tab.icon
+              return (
+                <button
+                  key={tab.key}
+                  onClick={() => setActiveTab(tab.key)}
+                  className={`flex items-center gap-2 px-4 py-3 text-sm font-medium transition-colors ${
+                    activeTab === tab.key
+                      ? 'text-[#7a1515] border-b-2 border-[#7a1515]'
+                      : 'text-ink-700/60 hover:text-ink-950'
+                  }`}
+                >
+                  <Icon size={15} />
+                  {tab.label}
+                </button>
+              )
+            })}
+          </div>
+
+          <div className="p-6">
+            {activeTab === 'ringkasan' && (
+              <>
+                {barisMapel.length > 0 ? (
+                  <table className="table-shell mb-6">
+                    <thead>
+                      <tr>
+                        <th>Mata Pelajaran</th>
+                        <th>Rata-rata Nilai</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {barisMapel.map((b) => (
+                        <tr key={b.mapel}>
+                          <td className="font-medium">{b.mapel}</td>
+                          <td>{b.rataRata}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                ) : (
+                  <p className="text-sm text-ink-700/50 mb-6">Belum ada data nilai untuk periode ini.</p>
+                )}
+
+                <h4 className="font-display font-semibold text-ink-950 mb-3">Rekap Kehadiran</h4>
+                <div className="grid grid-cols-4 gap-3">
+                  <div className="rounded-lg bg-sage-500/10 p-3 text-center">
+                    <p className="text-2xl font-display font-semibold text-sage-500">{presensi.hadir}</p>
+                    <p className="text-xs text-ink-700/60">Hadir</p>
+                  </div>
+                  <div className="rounded-lg bg-amber-500/10 p-3 text-center">
+                    <p className="text-2xl font-display font-semibold text-amber-600">{presensi.izin}</p>
+                    <p className="text-xs text-ink-700/60">Izin</p>
+                  </div>
+                  <div className="rounded-lg bg-blue-500/10 p-3 text-center">
+                    <p className="text-2xl font-display font-semibold text-blue-600">{presensi.sakit}</p>
+                    <p className="text-xs text-ink-700/60">Sakit</p>
+                  </div>
+                  <div className="rounded-lg bg-red-50 p-3 text-center">
+                    <p className="text-2xl font-display font-semibold text-red-700">{presensi.alpa}</p>
+                    <p className="text-xs text-ink-700/60">Alpa</p>
+                  </div>
+                </div>
+              </>
             )}
-            {!loading && filtered.length === 0 && (
-              <tr><td colSpan={10} className="text-center py-8 text-ink-700/50">Belum ada data siswa.</td></tr>
-            )}
-            {filtered.map((s) => (
-              <tr key={s.id}>
-                <td>
-                  <label className="relative block w-10 h-10 rounded-full overflow-hidden bg-ink-900/[0.06] cursor-pointer shrink-0 group">
-                    {fotoUrl(s.foto_path) ? (
-                      <img src={fotoUrl(s.foto_path)} alt="" className="w-full h-full object-cover" />
-                    ) : (
-                      <span className="w-full h-full flex items-center justify-center text-xs font-semibold text-ink-700/40">
-                        {s.nama_lengkap?.[0]}
-                      </span>
-                    )}
-                    <span className="absolute inset-0 bg-ink-950/0 group-hover:bg-ink-950/40 flex items-center justify-center transition-colors">
-                      {uploadingId === s.id ? (
-                        <Loader2 size={14} className="animate-spin text-white" />
-                      ) : (
-                        <Camera size={13} className="text-white opacity-0 group-hover:opacity-100 transition-opacity" />
-                      )}
-                    </span>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      disabled={uploadingId === s.id}
-                      onChange={(e) => e.target.files?.[0] && handleFotoUpload(s.id, e.target.files[0])}
-                    />
-                  </label>
-                </td>
-                <td className="font-medium">
-                  <button
-                    type="button"
-                    onClick={() => setProfilLihat(s)}
-                    className="hover:underline hover:text-blue-900 text-left"
-                  >
-                    {s.nama_lengkap}
+
+            {activeTab === 'capaian' && (
+              <>
+                {capaianList.length === 0 && (
+                  <p className="text-sm text-ink-700/50 mb-4">
+                    Belum ada mata pelajaran. Klik &quot;Tambah Mapel&quot; untuk mulai isi deskripsi capaian.
+                  </p>
+                )}
+                <div className="space-y-4">
+                  {capaianList.map((c, i) => {
+                    const mapelInfo = barisMapel.find((b) => b.mapel === c.mata_pelajaran)
+                    const rekomendasiKategori = kategoriDariNilai(mapelInfo?.rataRata)
+                    return (
+                      <div key={c.id || `baru-${i}`} className="border border-ink-950/10 rounded-lg p-3">
+                        <div className="flex items-start justify-between gap-3 mb-2">
+                          {c.terkunci ? (
+                            <label className="label-field">{c.mata_pelajaran}</label>
+                          ) : (
+                            <input
+                              className="input-field"
+                              placeholder="Nama mata pelajaran"
+                              value={c.mata_pelajaran}
+                              onChange={(e) => ubahBarisCapaian(i, 'mata_pelajaran', e.target.value)}
+                            />
+                          )}
+                          <div className="flex items-center gap-2 shrink-0">
+                            <div className="relative">
+                              <button
+                                type="button"
+                                className="btn-secondary !px-3"
+                                onClick={() =>
+                                  setRekomendasiTerbuka(rekomendasiTerbuka === i ? null : i)
+                                }
+                                title="Lihat rekomendasi deskripsi"
+                              >
+                                <Lightbulb size={15} /> Rekomendasi
+                              </button>
+                              {rekomendasiTerbuka === i && (
+                                <div className="absolute right-0 bottom-full z-10 mb-2 w-72 max-h-72 overflow-y-auto rounded-lg border border-ink-950/10 bg-white shadow-lg p-2">
+                                  {TEMPLATE_DESKRIPSI.map((tpl) => (
+                                    <button
+                                      key={tpl.kategori}
+                                      type="button"
+                                      onClick={() => pilihRekomendasi(i, tpl)}
+                                      className="w-full text-left px-2.5 py-2 rounded-md hover:bg-ink-950/5 text-sm"
+                                    >
+                                      <span className="font-medium text-ink-950 flex items-center gap-1.5">
+                                        {tpl.kategori}
+                                        {rekomendasiKategori === tpl.kategori && (
+                                          <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-sage-500/15 text-sage-500">
+                                            disarankan
+                                          </span>
+                                        )}
+                                      </span>
+                                      <span className="block text-xs text-ink-700/50 mt-0.5 line-clamp-2">
+                                        {tpl.teks(c.mata_pelajaran || 'mapel ini')}
+                                      </span>
+                                    </button>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                            <button
+                              className="btn-secondary !px-3"
+                              onClick={() => hapusBarisCapaian(i)}
+                              title="Hapus mapel ini"
+                            >
+                              <Trash2 size={15} />
+                            </button>
+                          </div>
+                        </div>
+                        <textarea
+                          className="input-field min-h-[80px]"
+                          placeholder="Deskripsi capaian pembelajaran..."
+                          value={c.deskripsi_capaian}
+                          onChange={(e) => ubahBarisCapaian(i, 'deskripsi_capaian', e.target.value)}
+                        />
+                      </div>
+                    )
+                  })}
+                </div>
+                <div className="flex flex-wrap gap-3 mt-4">
+                  <button className="btn-secondary" onClick={tambahBarisCapaian}>
+                    <Plus size={16} /> Tambah Mapel
                   </button>
-                </td>
-                <td className="font-mono text-xs">{s.nis}</td>
-                <td className="font-mono text-xs">{s.nisn}</td>
-                <td className="font-mono text-xs">{s.nik || '—'}</td>
-                <td className="text-xs whitespace-nowrap">{tempatTanggalLahir(s)}</td>
-                <td>{s.kelas?.nama_kelas || '—'}</td>
-                <td>{s.jenis_kelamin === 'L' ? 'Laki-laki' : 'Perempuan'}</td>
-                <td>
-                  <span className={`badge ${s.status === 'aktif' ? 'bg-sage-500/15 text-sage-500' : 'bg-ink-900/10 text-ink-700'}`}>
-                    {s.status}
-                  </span>
-                </td>
-                <td>
-                  {isAdmin && (
-                    <div className="flex items-center gap-1 justify-end">
-                      <button onClick={() => openEdit(s)} className="p-2 hover:bg-ink-900/5 rounded-lg text-ink-700/60">
-                        <Pencil size={15} />
-                      </button>
-                      <button onClick={() => handleDelete(s.id)} className="p-2 hover:bg-red-50 rounded-lg text-red-600/70">
+                  <button className="btn-primary" onClick={simpanCapaian} disabled={saving}>
+                    {saving && <Loader2 size={16} className="animate-spin" />}
+                    <Save size={16} /> Simpan Deskripsi Capaian
+                  </button>
+                </div>
+              </>
+            )}
+
+            {activeTab === 'p5' && (
+              <>
+                <div className="space-y-3">
+                  {p5List.map((p, i) => (
+                    <div key={p.id || `baru-${i}`} className="border border-ink-950/10 rounded-lg p-3">
+                      <div className="grid sm:grid-cols-[1fr_1fr_1fr_auto] gap-3 mb-2">
+                        <input
+                          className="input-field"
+                          placeholder="Tema"
+                          value={p.tema}
+                          onChange={(e) => ubahBarisP5(i, 'tema', e.target.value)}
+                        />
+                        <input
+                          className="input-field"
+                          placeholder="Dimensi"
+                          value={p.dimensi}
+                          onChange={(e) => ubahBarisP5(i, 'dimensi', e.target.value)}
+                        />
+                        <input
+                          className="input-field"
+                          placeholder="Sub-elemen"
+                          value={p.sub_elemen}
+                          onChange={(e) => ubahBarisP5(i, 'sub_elemen', e.target.value)}
+                        />
+                        <button
+                          className="btn-secondary !px-3"
+                          onClick={() => hapusBarisP5(i)}
+                          title="Hapus baris"
+                        >
+                          <Trash2 size={15} />
+                        </button>
+                      </div>
+                      <div>
+                        <label className="text-xs text-ink-700/50 mb-1 block">Capaian</label>
+                        <select
+                          className="input-field"
+                          value={p.capaian || OPSI_CAPAIAN_P5[0]}
+                          onChange={(e) => ubahBarisP5(i, 'capaian', e.target.value)}
+                        >
+                          {OPSI_CAPAIAN_P5.map((opsi) => (
+                            <option key={opsi} value={opsi}>
+                              {opsi}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                  ))}
+                  {p5List.length === 0 && (
+                    <p className="text-sm text-ink-700/50">Belum ada data P5 untuk periode ini.</p>
+                  )}
+                </div>
+                <div className="flex flex-wrap gap-3 mt-4">
+                  <button className="btn-secondary" onClick={tambahBarisP5}>
+                    <Plus size={16} /> Tambah Baris P5
+                  </button>
+                  <button className="btn-primary" onClick={simpanP5} disabled={saving}>
+                    {saving && <Loader2 size={16} className="animate-spin" />}
+                    <Save size={16} /> Simpan P5
+                  </button>
+                </div>
+              </>
+            )}
+
+            {activeTab === 'ekskul' && (
+              <>
+                <div className="space-y-3">
+                  {ekskulList.map((row, i) => (
+                    <div key={row.id || `baru-${i}`} className="grid sm:grid-cols-[2fr_1fr_2fr_auto_auto] gap-3 items-start">
+                      <input
+                        className="input-field"
+                        placeholder="Nama ekstrakurikuler"
+                        value={row.nama_ekstrakurikuler}
+                        onChange={(e) => ubahBarisEkskul(i, 'nama_ekstrakurikuler', e.target.value)}
+                      />
+                      <input
+                        className="input-field"
+                        placeholder="Predikat"
+                        value={row.predikat}
+                        onChange={(e) => ubahBarisEkskul(i, 'predikat', e.target.value)}
+                      />
+                      <input
+                        className="input-field"
+                        placeholder="Keterangan"
+                        value={row.keterangan}
+                        onChange={(e) => ubahBarisEkskul(i, 'keterangan', e.target.value)}
+                      />
+                      <div className="relative shrink-0">
+                        <button
+                          type="button"
+                          className="btn-secondary !px-3"
+                          onClick={() =>
+                            setRekomendasiEkskulTerbuka(rekomendasiEkskulTerbuka === i ? null : i)
+                          }
+                          title="Lihat rekomendasi keterangan"
+                        >
+                          <Lightbulb size={15} />
+                        </button>
+                        {rekomendasiEkskulTerbuka === i && (
+                          <div className="absolute right-0 bottom-full z-10 mb-2 w-72 max-h-72 overflow-y-auto rounded-lg border border-ink-950/10 bg-white shadow-lg p-2">
+                            {TEMPLATE_EKSKUL.map((tpl) => (
+                              <button
+                                key={tpl.kategori}
+                                type="button"
+                                onClick={() => pilihRekomendasiEkskul(i, tpl)}
+                                className="w-full text-left px-2.5 py-2 rounded-md hover:bg-ink-950/5 text-sm"
+                              >
+                                <span className="font-medium text-ink-950">{tpl.kategori}</span>
+                                <span className="block text-xs text-ink-700/50 mt-0.5 line-clamp-2">
+                                  {tpl.teks(row.nama_ekstrakurikuler || 'ini')}
+                                </span>
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                      <button
+                        className="btn-secondary !px-3"
+                        onClick={() => hapusBarisEkskul(i)}
+                        title="Hapus baris"
+                      >
                         <Trash2 size={15} />
                       </button>
                     </div>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      {showForm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink-950/50 backdrop-blur-sm p-4">
-          <form onSubmit={handleSubmit} className="card w-full max-w-lg p-6 relative max-h-[90vh] overflow-y-auto">
-            <button type="button" onClick={() => setShowForm(false)} className="absolute top-4 right-4 text-ink-700/40 hover:text-ink-900">
-              <X size={20} />
-            </button>
-            <h2 className="font-display text-xl font-semibold mb-4">
-              {editingId ? 'Ubah Data Siswa' : 'Tambah Siswa'}
-            </h2>
-
-            {editingId && (
-              <div className="flex items-center gap-4 mb-4 p-3 rounded-lg bg-ink-900/[0.03]">
-                <label className="relative block w-16 h-16 rounded-full overflow-hidden bg-ink-900/[0.06] cursor-pointer shrink-0 group">
-                  {fotoUrl(data.find((d) => d.id === editingId)?.foto_path) ? (
-                    <img src={fotoUrl(data.find((d) => d.id === editingId)?.foto_path)} alt="" className="w-full h-full object-cover" />
-                  ) : (
-                    <span className="w-full h-full flex items-center justify-center text-lg font-semibold text-ink-700/40">
-                      {form.nama_lengkap?.[0]}
-                    </span>
-                  )}
-                  <span className="absolute inset-0 bg-ink-950/0 group-hover:bg-ink-950/40 flex items-center justify-center transition-colors">
-                    {uploadingId === editingId ? (
-                      <Loader2 size={16} className="animate-spin text-white" />
-                    ) : (
-                      <Camera size={15} className="text-white opacity-0 group-hover:opacity-100 transition-opacity" />
-                    )}
-                  </span>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    disabled={uploadingId === editingId}
-                    onChange={(e) => e.target.files?.[0] && handleFotoUpload(editingId, e.target.files[0])}
-                  />
-                </label>
-                <p className="text-xs text-ink-700/50">Klik foto untuk mengganti. Foto ini juga dipakai untuk Cetak Kartu Pelajar/Perpustakaan.</p>
-              </div>
+                  ))}
+                </div>
+                <div className="flex flex-wrap gap-3 mt-4">
+                  <button className="btn-secondary" onClick={tambahBarisEkskul}>
+                    <Plus size={16} /> Tambah Baris
+                  </button>
+                  <button className="btn-primary" onClick={simpanEkskul} disabled={saving}>
+                    {saving && <Loader2 size={16} className="animate-spin" />}
+                    <Save size={16} /> Simpan Ekstrakurikuler
+                  </button>
+                </div>
+              </>
             )}
 
-            <div className="grid grid-cols-2 gap-3">
-              <Field label="Nama Lengkap" full>
-                <input required className="input-field" value={form.nama_lengkap}
-                  onChange={(e) => setForm({ ...form, nama_lengkap: e.target.value })} />
-              </Field>
-              <Field label="NIS">
-                <input className="input-field" value={form.nis}
-                  onChange={(e) => setForm({ ...form, nis: e.target.value })} />
-              </Field>
-              <Field label="NISN">
-                <input className="input-field" value={form.nisn}
-                  onChange={(e) => setForm({ ...form, nisn: e.target.value })} />
-              </Field>
-              <Field label="NIK" full>
-                <input className="input-field" placeholder="16 digit NIK sesuai KK/KTP" value={form.nik}
-                  onChange={(e) => setForm({ ...form, nik: e.target.value })} />
-              </Field>
-              <Field label="Jenis Kelamin">
-                <select className="input-field" value={form.jenis_kelamin}
-                  onChange={(e) => setForm({ ...form, jenis_kelamin: e.target.value })}>
-                  <option value="L">Laki-laki</option>
-                  <option value="P">Perempuan</option>
-                </select>
-              </Field>
-              <Field label="Agama">
-                <select className="input-field" value={form.agama}
-                  onChange={(e) => setForm({ ...form, agama: e.target.value })}>
-                  <option value="">— Pilih Agama —</option>
-                  {AGAMA_OPTIONS.map((a) => <option key={a} value={a}>{a}</option>)}
-                </select>
-              </Field>
-              <Field label="Kelas">
-                <select className="input-field" value={form.kelas_id}
-                  onChange={(e) => setForm({ ...form, kelas_id: e.target.value })}>
-                  <option value="">— Belum ada kelas —</option>
-                  {kelasList.map((k) => <option key={k.id} value={k.id}>{k.nama_kelas}</option>)}
-                </select>
-              </Field>
-              <Field label="Tempat Lahir">
-                <input className="input-field" value={form.tempat_lahir}
-                  onChange={(e) => setForm({ ...form, tempat_lahir: e.target.value })} />
-              </Field>
-              <Field label="Tanggal Lahir">
-                <input type="date" className="input-field" value={form.tanggal_lahir || ''}
-                  onChange={(e) => setForm({ ...form, tanggal_lahir: e.target.value })} />
-              </Field>
-              <Field label="Pendidikan Sebelumnya" full>
-                <input className="input-field" placeholder="Contoh: TK Pertiwi Jerwatu"
-                  value={form.pendidikan_sebelumnya}
-                  onChange={(e) => setForm({ ...form, pendidikan_sebelumnya: e.target.value })} />
-              </Field>
-              <Field label="Nama Ayah">
-                <input className="input-field" value={form.nama_ayah}
-                  onChange={(e) => setForm({ ...form, nama_ayah: e.target.value })} />
-              </Field>
-              <Field label="Nama Ibu">
-                <input className="input-field" value={form.nama_ibu}
-                  onChange={(e) => setForm({ ...form, nama_ibu: e.target.value })} />
-              </Field>
-              <Field label="Pendidikan Ayah">
-                <input className="input-field" value={form.pendidikan_ayah}
-                  onChange={(e) => setForm({ ...form, pendidikan_ayah: e.target.value })} />
-              </Field>
-              <Field label="Pendidikan Ibu">
-                <input className="input-field" value={form.pendidikan_ibu}
-                  onChange={(e) => setForm({ ...form, pendidikan_ibu: e.target.value })} />
-              </Field>
-              <Field label="Pekerjaan Ayah">
-                <input className="input-field" value={form.pekerjaan_ayah}
-                  onChange={(e) => setForm({ ...form, pekerjaan_ayah: e.target.value })} />
-              </Field>
-              <Field label="Pekerjaan Ibu">
-                <input className="input-field" value={form.pekerjaan_ibu}
-                  onChange={(e) => setForm({ ...form, pekerjaan_ibu: e.target.value })} />
-              </Field>
-              <Field label="Nama Orang Tua/Wali" full>
-                <input className="input-field" value={form.nama_orang_tua}
-                  onChange={(e) => setForm({ ...form, nama_orang_tua: e.target.value })} />
-              </Field>
-              <Field label="No. HP Orang Tua">
-                <input className="input-field" value={form.no_hp_orang_tua}
-                  onChange={(e) => setForm({ ...form, no_hp_orang_tua: e.target.value })} />
-              </Field>
-              <Field label="Status">
-                <select className="input-field" value={form.status}
-                  onChange={(e) => setForm({ ...form, status: e.target.value })}>
-                  <option value="aktif">Aktif</option>
-                  <option value="lulus">Lulus</option>
-                  <option value="pindah">Pindah</option>
-                </select>
-              </Field>
-              <Field label="Alamat (sesuai KTP/KK)" full>
-                <textarea className="input-field" rows={2} value={form.alamat}
-                  onChange={(e) => setForm({ ...form, alamat: e.target.value })} />
-              </Field>
-              <Field label="Alamat Tempat Tinggal (domisili saat ini)" full>
-                <textarea className="input-field" rows={2} value={form.alamat_tinggal}
-                  onChange={(e) => setForm({ ...form, alamat_tinggal: e.target.value })} />
-              </Field>
-
-              {/* TAMBAHAN: khusus untuk Halaman Identitas Rapor — alamat orang tua terpisah
-                  (jalan dipakai dari field "Alamat" di atas) */}
-              <div className="col-span-2 pt-2 mt-1 border-t border-ink-900/[0.08]">
-                <p className="eyebrow mb-2">Alamat Orang Tua (untuk Halaman Identitas Rapor)</p>
-              </div>
-              <Field label="Kelurahan/Desa">
-                <input className="input-field" value={form.ortu_kelurahan_desa}
-                  onChange={(e) => setForm({ ...form, ortu_kelurahan_desa: e.target.value })} />
-              </Field>
-              <Field label="Kecamatan">
-                <input className="input-field" value={form.ortu_kecamatan}
-                  onChange={(e) => setForm({ ...form, ortu_kecamatan: e.target.value })} />
-              </Field>
-              <Field label="Kabupaten/Kota">
-                <input className="input-field" value={form.ortu_kabupaten_kota}
-                  onChange={(e) => setForm({ ...form, ortu_kabupaten_kota: e.target.value })} />
-              </Field>
-              <Field label="Provinsi">
-                <input className="input-field" value={form.ortu_provinsi}
-                  onChange={(e) => setForm({ ...form, ortu_provinsi: e.target.value })} />
-              </Field>
-
-              <div className="col-span-2 pt-2 mt-1 border-t border-ink-900/[0.08]">
-                <p className="eyebrow mb-2">Wali Peserta Didik (isi jika ada, selain orang tua)</p>
-              </div>
-              <Field label="Nama Wali">
-                <input className="input-field" value={form.nama_wali}
-                  onChange={(e) => setForm({ ...form, nama_wali: e.target.value })} />
-              </Field>
-              <Field label="Pekerjaan Wali">
-                <input className="input-field" value={form.pekerjaan_wali}
-                  onChange={(e) => setForm({ ...form, pekerjaan_wali: e.target.value })} />
-              </Field>
-              <Field label="Alamat Wali" full>
-                <textarea className="input-field" rows={2} value={form.alamat_wali}
-                  onChange={(e) => setForm({ ...form, alamat_wali: e.target.value })} />
-              </Field>
-            </div>
-
-            <div className="mt-5 flex justify-end gap-3">
-              <button type="button" className="btn-secondary" onClick={() => setShowForm(false)}>Batal</button>
-              <button type="submit" disabled={saving} className="btn-primary">
-                {saving && <Loader2 size={16} className="animate-spin" />}
-                Simpan
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
-
-      {/* Modal Lihat Profil — identitas lengkap + foto besar, dibuka dengan klik nama siswa */}
-      {profilLihat && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink-950/50 backdrop-blur-sm p-4">
-          <div className="card w-full max-w-md p-0 relative overflow-hidden max-h-[90vh] overflow-y-auto">
-            <button
-              type="button"
-              onClick={() => setProfilLihat(null)}
-              className="absolute top-4 right-4 z-10 text-white/80 hover:text-white bg-ink-950/20 rounded-full p-1"
-            >
-              <X size={18} />
-            </button>
-
-            <div className="relative overflow-hidden bg-gradient-to-br from-blue-900 to-blue-950 pt-8 pb-14 flex flex-col items-center">
-              <div className="absolute -top-10 -right-10 w-40 h-40 rounded-full bg-white/5 pointer-events-none" />
-              <div className="absolute -bottom-14 -left-6 w-32 h-32 rounded-full bg-white/5 pointer-events-none" />
-              <BatikOverlay patternId="batikSiswaModal" strokeColor="#d4af37" />
-              <div className="relative w-24 h-24 rounded-full overflow-hidden ring-4 ring-white/20 bg-white/10 flex items-center justify-center shrink-0">
-                {fotoUrl(profilLihat.foto_path) ? (
-                  <img src={fotoUrl(profilLihat.foto_path)} alt="" className="w-full h-full object-cover" />
-                ) : (
-                  <span className="text-3xl font-semibold text-white/60">{profilLihat.nama_lengkap?.[0]}</span>
-                )}
-              </div>
-              <p className="relative font-display font-semibold text-lg text-white mt-3 text-center px-6">{profilLihat.nama_lengkap}</p>
-              <span className={`relative badge mt-1.5 ${profilLihat.status === 'aktif' ? 'bg-sage-500/20 text-sage-100' : 'bg-white/10 text-white/70'}`}>
-                {profilLihat.status}
-              </span>
-            </div>
-
-            <div className="px-6 -mt-8 pb-6">
-              <div className="card p-4 space-y-3 bg-white shadow-md">
-                <ProfilRow label="NIS" value={profilLihat.nis} />
-                <ProfilRow label="NISN" value={profilLihat.nisn} />
-                <ProfilRow label="NIK" value={profilLihat.nik} />
-                <ProfilRow label="Kelas" value={profilLihat.kelas?.nama_kelas} />
-                <ProfilRow label="Jenis Kelamin" value={profilLihat.jenis_kelamin === 'L' ? 'Laki-laki' : 'Perempuan'} />
-                <ProfilRow label="Agama" value={profilLihat.agama} />
-                <ProfilRow label="Tempat, Tanggal Lahir" value={tempatTanggalLahir(profilLihat)} />
-                <ProfilRow label="Alamat" value={profilLihat.alamat} />
-                <ProfilRow label="Alamat Tempat Tinggal" value={profilLihat.alamat_tinggal} />
-                <ProfilRow label="Nama Ayah" value={profilLihat.nama_ayah} />
-                <ProfilRow label="Nama Ibu" value={profilLihat.nama_ibu} />
-                <ProfilRow label="Nama Orang Tua/Wali" value={profilLihat.nama_orang_tua} />
-                <ProfilRow label="No. HP Orang Tua/Wali" value={profilLihat.no_hp_orang_tua} telepon />
-              </div>
-
-              <div className="flex gap-2 mt-4">
-                {isAdmin && (
-                  <button
-                    type="button"
-                    onClick={() => { setProfilLihat(null); openEdit(profilLihat) }}
-                    className="btn-secondary flex-1 justify-center"
+            {activeTab === 'catatan' && (
+              <>
+                <div className="grid sm:grid-cols-2 gap-4 mb-4">
+                  <div>
+                    <label className="label-field">Tinggi Badan (cm)</label>
+                    <input
+                      className="input-field"
+                      value={catatan.tinggi_badan}
+                      onChange={(e) => ubahCatatan('tinggi_badan', e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label className="label-field">Berat Badan (kg)</label>
+                    <input
+                      className="input-field"
+                      value={catatan.berat_badan}
+                      onChange={(e) => ubahCatatan('berat_badan', e.target.value)}
+                    />
+                  </div>
+                </div>
+                <div className="mb-4">
+                  <label className="label-field">Kondisi Kesehatan</label>
+                  <input
+                    className="input-field"
+                    placeholder="mis. Baik / perlu perhatian pada..."
+                    value={catatan.kondisi_kesehatan}
+                    onChange={(e) => ubahCatatan('kondisi_kesehatan', e.target.value)}
+                  />
+                </div>
+                <div className="mb-4">
+                  <label className="label-field">Keputusan</label>
+                  <select
+                    className="input-field"
+                    value={catatan.keputusan}
+                    onChange={(e) => ubahCatatan('keputusan', e.target.value)}
                   >
-                    <Pencil size={15} /> Ubah Data
-                  </button>
-                )}
-                <a
-                  href="/kartu"
-                  className="btn-primary flex-1 justify-center"
-                >
-                  <IdCard size={15} /> Cetak Kartu
-                </a>
-              </div>
-            </div>
+                    <option value="">-- Belum ditentukan --</option>
+                    <option value="Naik Kelas">Naik Kelas</option>
+                    <option value="Tinggal Kelas">Tinggal Kelas</option>
+                    <option value="Lulus">Lulus</option>
+                  </select>
+                </div>
+                <div className="mb-4">
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="label-field !mb-0">Catatan Wali Kelas</label>
+                    <div className="relative">
+                      <button
+                        type="button"
+                        className="btn-secondary !px-3"
+                        onClick={() => setRekomendasiCatatanTerbuka((v) => !v)}
+                        title="Lihat rekomendasi catatan"
+                      >
+                        <Lightbulb size={15} /> Rekomendasi
+                      </button>
+                      {rekomendasiCatatanTerbuka && (
+                        <div className="absolute right-0 bottom-full z-10 mb-2 w-72 max-h-72 overflow-y-auto rounded-lg border border-ink-950/10 bg-white shadow-lg p-2">
+                          {TEMPLATE_CATATAN.map((tpl) => (
+                            <button
+                              key={tpl.kategori}
+                              type="button"
+                              onClick={() => pilihRekomendasiCatatan(tpl)}
+                              className="w-full text-left px-2.5 py-2 rounded-md hover:bg-ink-950/5 text-sm"
+                            >
+                              <span className="font-medium text-ink-950">{tpl.kategori}</span>
+                              <span className="block text-xs text-ink-700/50 mt-0.5 line-clamp-2">
+                                {tpl.teks()}
+                              </span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <textarea
+                    className="input-field min-h-[100px]"
+                    placeholder="Catatan perkembangan siswa dari wali kelas..."
+                    value={catatan.catatan}
+                    onChange={(e) => ubahCatatan('catatan', e.target.value)}
+                  />
+                </div>
+                <button className="btn-primary" onClick={simpanCatatan} disabled={saving}>
+                  {saving && <Loader2 size={16} className="animate-spin" />}
+                  <Save size={16} /> Simpan Catatan
+                </button>
+              </>
+            )}
           </div>
         </div>
       )}
-
-      <BulkImportModal
-        open={showImport}
-        onClose={() => { setShowImport(false); loadData() }}
-        title="Impor Data Siswa"
-        templateHeaders={['nama_lengkap', 'nis', 'nisn', 'nik', 'kelas', 'jenis_kelamin(L/P)', 'agama', 'tempat_lahir', 'tanggal_lahir(YYYY-MM-DD)', 'nama_ayah', 'nama_ibu', 'nama_orang_tua', 'no_hp_orang_tua', 'alamat', 'alamat_tinggal']}
-        mapRow={(row) => {
-          if (!row.nama_lengkap) return null
-          const namaKelas = String(row.kelas || '').trim()
-          const matchedKelas = kelasList.find(
-            (k) => k.nama_kelas.trim().toLowerCase() === namaKelas.toLowerCase()
-          )
-          return {
-            nama_lengkap: String(row.nama_lengkap).trim(),
-            nis: String(row.nis || '').trim(),
-            nisn: String(row.nisn || '').trim(),
-            nik: String(row.nik || '').trim(),
-            kelas_id: matchedKelas ? matchedKelas.id : null,
-            jenis_kelamin: String(row['jenis_kelamin(L/P)'] || row.jenis_kelamin || 'L').trim().toUpperCase(),
-            agama: String(row.agama || '').trim(),
-            tempat_lahir: String(row.tempat_lahir || '').trim(),
-            tanggal_lahir: row['tanggal_lahir(YYYY-MM-DD)'] || row.tanggal_lahir || null,
-            nama_ayah: String(row.nama_ayah || '').trim(),
-            nama_ibu: String(row.nama_ibu || '').trim(),
-            nama_orang_tua: String(row.nama_orang_tua || '').trim(),
-            no_hp_orang_tua: String(row.no_hp_orang_tua || '').trim(),
-            alamat: String(row.alamat || '').trim(),
-            alamat_tinggal: String(row.alamat_tinggal || '').trim(),
-            status: 'aktif',
-          }
-        }}
-        onImport={async (rows) => {
-          // Cocokkan tiap baris dengan siswa yang SUDAH ADA berdasarkan NIS atau NISN.
-          // Kalau cocok -> UPDATE data siswa itu (tidak menambah baris baru / duplikat).
-          // Kalau tidak cocok dengan siapa pun -> INSERT sebagai siswa baru.
-          const toUpdate = []
-          const toInsert = []
-
-          rows.forEach((row) => {
-            const match = data.find(
-              (d) =>
-                (row.nis && d.nis && String(d.nis).trim() === String(row.nis).trim()) ||
-                (row.nisn && d.nisn && String(d.nisn).trim() === String(row.nisn).trim())
-            )
-            if (match) {
-              toUpdate.push({ id: match.id, ...row })
-            } else {
-              toInsert.push(row)
-            }
-          })
-
-          if (toInsert.length > 0) {
-            const { error } = await supabase.from('siswa').insert(toInsert)
-            if (error) throw error
-          }
-
-          for (const row of toUpdate) {
-            const { id, ...payload } = row
-            const { error } = await supabase.from('siswa').update(payload).eq('id', id)
-            if (error) throw error
-          }
-
-          const tanpaKelas = rows.filter((r) => !r.kelas_id).length
-          setTimeout(() => {
-            let pesan = `Impor selesai: ${toInsert.length} siswa baru ditambahkan, ${toUpdate.length} siswa yang sudah ada di-update (dicocokkan lewat NIS/NISN).`
-            if (tanpaKelas > 0) {
-              pesan += `\n\nCatatan: ${tanpaKelas} baris tidak punya kelas yang cocok — pastikan nama kelas di file sama persis dengan yang ada di menu Kelas, lalu perbaiki manual lewat tombol edit.`
-            }
-            alert(pesan)
-          }, 300)
-
-          return { count: rows.length }
-        }}
-      />
     </Layout>
-  )
-}
-
-function Field({ label, children, full }) {
-  return (
-    <div className={full ? 'col-span-2' : ''}>
-      <label className="eyebrow mb-1.5 block">{label}</label>
-      {children}
-    </div>
-  )
-}
-
-function ProfilRow({ label, value, telepon }) {
-  return (
-    <div className="flex items-start justify-between gap-4 text-sm">
-      <span className="text-ink-700/50 shrink-0">{label}</span>
-      <span className="text-ink-950 font-medium text-right inline-flex items-center gap-1.5">
-        {value || '—'}
-        {telepon && <TeleponLink nomor={value} />}
-      </span>
-    </div>
   )
 }
