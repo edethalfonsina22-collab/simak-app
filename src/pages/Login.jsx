@@ -12,7 +12,7 @@ export default function Login() {
   const [loading, setLoading] = useState(false)
   const [mounted, setMounted] = useState(false)
   const [shake, setShake] = useState(0)
-  const [namaSekolah, setNamaSekolah] = useState('')
+  const [namaSekolah, setNamaSekolah] = useState('SD Negeri Waria')
 
   useEffect(() => {
     // Memicu animasi masuk sesaat setelah komponen ter-render
