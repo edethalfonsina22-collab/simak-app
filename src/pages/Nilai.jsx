@@ -6,6 +6,27 @@ import { Loader2, Save, BookOpenCheck } from 'lucide-react'
 import './Nilai.css'
 
 const JENIS_OPTS = ['Tugas', 'UH', 'UTS', 'UAS']
+const KOMPETENSI_OPTS = ['Pengetahuan', 'Keterampilan']
+
+// Predikat dihitung otomatis dari nilai angka — sesuai legenda rapor:
+// A: Sangat Baik (>=90), B: Baik (>=75), C: Cukup (>=60), D: Kurang (<60)
+function predikatDariNilai(nilai) {
+  if (nilai === '' || nilai === undefined || nilai === null) return null
+  const n = Number(nilai)
+  if (isNaN(n)) return null
+  if (n >= 90) return 'A'
+  if (n >= 75) return 'B'
+  if (n >= 60) return 'C'
+  return 'D'
+}
+
+// Warna badge predikat, senada dengan gaya badge yang sudah dipakai di halaman lain.
+const WARNA_PREDIKAT = {
+  A: 'bg-sage-500/15 text-sage-500',
+  B: 'bg-blue-500/15 text-blue-600',
+  C: 'bg-amber-500/15 text-amber-600',
+  D: 'bg-red-500/15 text-red-600',
+}
 
 // Motif sirkuit dekoratif senada dengan Loader, Login & Kelas.
 function CircuitBackdrop({ patternId }) {
@@ -39,6 +60,7 @@ export default function Nilai() {
   const [siswaList, setSiswaList] = useState([])
   const [mataPelajaran, setMataPelajaran] = useState('')
   const [jenis, setJenis] = useState('UH')
+  const [kompetensi, setKompetensi] = useState('Pengetahuan')
   const [semester, setSemester] = useState('Ganjil')
   const [tahunAjaran, setTahunAjaran] = useState('')
   const [nilaiMap, setNilaiMap] = useState({})
@@ -68,7 +90,8 @@ export default function Nilai() {
   async function loadExisting() {
     if (!mataPelajaran || !kelasId) return
     const { data } = await supabase.from('nilai').select('siswa_id, nilai')
-      .eq('mata_pelajaran', mataPelajaran).eq('jenis', jenis).eq('semester', semester).eq('tahun_ajaran', tahunAjaran)
+      .eq('mata_pelajaran', mataPelajaran).eq('jenis', jenis).eq('kompetensi', kompetensi)
+      .eq('semester', semester).eq('tahun_ajaran', tahunAjaran)
       .in('siswa_id', siswaList.map((s) => s.id))
     const map = {}
     ;(data || []).forEach((d) => { map[d.siswa_id] = d.nilai })
@@ -85,12 +108,14 @@ export default function Nilai() {
         siswa_id: s.id,
         mata_pelajaran: mataPelajaran,
         jenis,
+        kompetensi,
         semester,
         tahun_ajaran: tahunAjaran,
         nilai: Number(nilaiMap[s.id]),
+        predikat: predikatDariNilai(nilaiMap[s.id]),
         diisi_oleh: profil?.guru_id || null,
       }))
-    const { error } = await supabase.from('nilai').upsert(rows, { onConflict: 'siswa_id,mata_pelajaran,jenis,semester,tahun_ajaran' })
+    const { error } = await supabase.from('nilai').upsert(rows, { onConflict: 'siswa_id,mata_pelajaran,jenis,kompetensi,semester,tahun_ajaran' })
     setSaving(false)
     if (!error) setSaved(true)
     else alert('Gagal menyimpan nilai: ' + error.message)
@@ -116,7 +141,7 @@ export default function Nilai() {
         </div>
       </div>
 
-      <div className="nilai-card p-5 mb-5 grid grid-cols-2 md:grid-cols-5 gap-3">
+      <div className="nilai-card p-5 mb-5 grid grid-cols-2 md:grid-cols-6 gap-3">
         <div>
           <label className="nilai-label">Kelas</label>
           <select className="nilai-input" value={kelasId} onChange={(e) => setKelasId(e.target.value)}>
@@ -134,6 +159,12 @@ export default function Nilai() {
           </select>
         </div>
         <div>
+          <label className="nilai-label">Kompetensi</label>
+          <select className="nilai-input" value={kompetensi} onChange={(e) => { setKompetensi(e.target.value); setTimeout(loadExisting, 0) }}>
+            {KOMPETENSI_OPTS.map((k) => <option key={k} value={k}>{k}</option>)}
+          </select>
+        </div>
+        <div>
           <label className="nilai-label">Semester</label>
           <select className="nilai-input" value={semester} onChange={(e) => { setSemester(e.target.value); setTimeout(loadExisting, 0) }}>
             <option>Ganjil</option>
@@ -148,20 +179,30 @@ export default function Nilai() {
 
       <div className="nilai-card overflow-x-auto">
         <table className="nilai-table">
-          <thead><tr><th>Nama Siswa</th><th className="w-40">Nilai (0–100)</th></tr></thead>
+          <thead><tr><th>Nama Siswa</th><th className="w-40">Nilai (0–100)</th><th className="w-32">Predikat</th></tr></thead>
           <tbody>
-            {loading && <tr><td colSpan={2} className="text-center py-8 nilai-muted">Memuat...</td></tr>}
-            {!loading && siswaList.length === 0 && <tr><td colSpan={2} className="text-center py-8 nilai-muted">Belum ada siswa aktif di kelas ini.</td></tr>}
-            {siswaList.map((s) => (
-              <tr key={s.id}>
-                <td className="font-medium">{s.nama_lengkap}</td>
-                <td>
-                  <input type="number" min={0} max={100} className="nilai-input"
-                    value={nilaiMap[s.id] ?? ''}
-                    onChange={(e) => setNilaiMap({ ...nilaiMap, [s.id]: e.target.value })} />
-                </td>
-              </tr>
-            ))}
+            {loading && <tr><td colSpan={3} className="text-center py-8 nilai-muted">Memuat...</td></tr>}
+            {!loading && siswaList.length === 0 && <tr><td colSpan={3} className="text-center py-8 nilai-muted">Belum ada siswa aktif di kelas ini.</td></tr>}
+            {siswaList.map((s) => {
+              const predikat = predikatDariNilai(nilaiMap[s.id])
+              return (
+                <tr key={s.id}>
+                  <td className="font-medium">{s.nama_lengkap}</td>
+                  <td>
+                    <input type="number" min={0} max={100} className="nilai-input"
+                      value={nilaiMap[s.id] ?? ''}
+                      onChange={(e) => setNilaiMap({ ...nilaiMap, [s.id]: e.target.value })} />
+                  </td>
+                  <td>
+                    {predikat ? (
+                      <span className={`badge ${WARNA_PREDIKAT[predikat]}`}>{predikat}</span>
+                    ) : (
+                      <span className="text-xs nilai-muted">—</span>
+                    )}
+                  </td>
+                </tr>
+              )
+            })}
           </tbody>
         </table>
       </div>
