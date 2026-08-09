@@ -409,13 +409,13 @@ export default function RaporCetak() {
               <th rowSpan={2} className="text-left py-1.5 pr-2 w-[4%] align-bottom border-b border-ink-950/20">No</th>
               <th rowSpan={2} className="text-left py-1.5 pr-2 w-[15%] align-bottom border-b border-ink-950/20">Mata Pelajaran</th>
               <th colSpan={3} className="text-center py-1 border-b border-ink-950/20">Pengetahuan</th>
-              <th colSpan={3} className="text-center py-1 border-b border-ink-950/20 border-l-2 border-dashed border-ink-950/50">Keterampilan</th>
+              <th colSpan={3} className="text-center py-1 border-b border-ink-950/20 border-l-2 border-ink-950/30">Keterampilan</th>
             </tr>
             <tr className="border-b border-ink-950/20">
               <th className="text-center py-1.5 pr-2 w-[6%]">Nilai</th>
               <th className="text-center py-1.5 pr-2 w-[7%]">Predikat</th>
               <th className="text-left py-1.5 pr-2 w-[26%]">Deskripsi Capaian</th>
-              <th className="text-center py-1.5 pr-2 w-[6%] border-l-2 border-dashed border-ink-950/50">Nilai</th>
+              <th className="text-center py-1.5 pr-2 w-[6%] border-l-2 border-ink-950/30">Nilai</th>
               <th className="text-center py-1.5 pr-2 w-[7%]">Predikat</th>
               <th className="text-left py-1.5">Deskripsi Capaian</th>
             </tr>
@@ -428,7 +428,7 @@ export default function RaporCetak() {
                 <td className="py-1.5 pr-2 text-center">{b.pengetahuan.nilai ?? '-'}</td>
                 <td className="py-1.5 pr-2 text-center">{b.pengetahuan.predikat || '-'}</td>
                 <td className="py-1.5 pr-2">{b.pengetahuan.deskripsi || '-'}</td>
-                <td className="py-1.5 pr-2 text-center border-l-2 border-dashed border-ink-950/50">{b.keterampilan.nilai ?? '-'}</td>
+                <td className="py-1.5 pr-2 text-center border-l-2 border-ink-950/30">{b.keterampilan.nilai ?? '-'}</td>
                 <td className="py-1.5 pr-2 text-center">{b.keterampilan.predikat || '-'}</td>
                 <td className="py-1.5">{b.keterampilan.deskripsi || '-'}</td>
               </tr>
