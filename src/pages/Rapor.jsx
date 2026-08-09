@@ -28,6 +28,13 @@ import { useNavigate } from 'react-router-dom'
  * disebutkan di komentar RaporCetak.jsx (jalankan SQL ALTER/CREATE TABLE itu dulu
  * di Supabase kalau belum, termasuk kolom `jenis` pada `capaian_mapel` dan tabel
  * baru `prestasi_siswa`).
+ *
+ * PERBAIKAN (versi ini): tab "Deskripsi Capaian" sebelumnya hanya menyimpan teks
+ * deskripsi ke tabel `capaian_mapel`, sehingga kolom Nilai & Predikat di rapor
+ * cetak selalu tampil "-" karena tabel `nilai` tidak pernah terisi dengan
+ * jenis = 'Pengetahuan'/'Keterampilan'. Sekarang setiap baris deskripsi capaian
+ * juga punya input Nilai (angka) & Predikat (otomatis dihitung dari KKM, bisa
+ * di-override manual), dan tombol Simpan akan meng-upsert ke tabel `nilai` juga.
  * =====================================================================================
  */
 
@@ -61,6 +68,25 @@ function kategoriDariNilai(rataRata) {
   if (n >= 75) return 'Baik'
   if (n >= 60) return 'Cukup'
   return 'Perlu Bimbingan'
+}
+
+// Predikat mengikuti skala Kurikulum 2013: interval = (100 - KKM) / 3
+//   A: KKM + 2*interval s/d 100 | B: KKM + interval s/d < KKM + 2*interval
+//   C: KKM s/d < KKM + interval | D: < KKM
+function hitungPredikat(nilai, kkm) {
+  if (nilai === null || nilai === undefined || nilai === '' || isNaN(nilai)) return '-'
+  const interval = (100 - kkm) / 3
+  const n = Number(nilai)
+  if (n >= kkm + 2 * interval) return 'A'
+  if (n >= kkm + interval) return 'B'
+  if (n >= kkm) return 'C'
+  return 'D'
+}
+
+function kkmUntukMapel(mapel, kkmPaiPpkn, kkmLainnya) {
+  const nama = (mapel || '').toLowerCase()
+  if (nama.includes('agama') || nama.includes('pancasila') || nama.includes('ppkn')) return kkmPaiPpkn
+  return kkmLainnya
 }
 
 const OPSI_CAPAIAN_P5 = ['Belum Berkembang', 'Mulai Berkembang', 'Berkembang Sesuai Harapan', 'Sangat Berkembang']
@@ -249,12 +275,17 @@ export default function Rapor() {
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
 
+  // KKM sekolah, dipakai untuk menghitung predikat otomatis dari nilai
+  const [kkmPaiPpkn, setKkmPaiPpkn] = useState(75)
+  const [kkmLainnya, setKkmLainnya] = useState(70)
+
   // Ringkasan (nilai angka + presensi) — tetap dari tabel nilai & presensi_siswa
   const [nilai, setNilai] = useState([])
   const [presensi, setPresensi] = useState({ hadir: 0, izin: 0, sakit: 0, alpa: 0 })
 
   // Deskripsi capaian per mapel, dipecah Pengetahuan/Keterampilan — tabel capaian_mapel
-  const [capaianList, setCapaianList] = useState([]) // [{id, mata_pelajaran, jenis, deskripsi_capaian, terkunci}]
+  // Setiap baris juga membawa nilai_id/nilai/predikat yang tersimpan di tabel `nilai`
+  const [capaianList, setCapaianList] = useState([]) // [{id, mata_pelajaran, jenis, deskripsi_capaian, terkunci, nilai_id, nilai, predikat}]
 
   // P5 — tabel rapor_p5
   const [p5List, setP5List] = useState([]) // [{id, tema, dimensi, sub_elemen, capaian}]
@@ -288,6 +319,17 @@ export default function Rapor() {
       .select('id, nama_lengkap, nis, kelas(nama_kelas)')
       .order('nama_lengkap')
       .then(({ data }) => setSiswaList(data || []))
+
+    // Ambil KKM sekolah supaya predikat bisa dihitung otomatis dari nilai
+    supabase
+      .from('profil_sekolah')
+      .select('kkm_pai_ppkn, kkm_lainnya')
+      .eq('id', 1)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (data?.kkm_pai_ppkn) setKkmPaiPpkn(data.kkm_pai_ppkn)
+        if (data?.kkm_lainnya) setKkmLainnya(data.kkm_lainnya)
+      })
   }, [])
 
   async function muatRapor() {
@@ -313,7 +355,7 @@ export default function Rapor() {
     ] = await Promise.all([
       supabase
         .from('nilai')
-        .select('mata_pelajaran, jenis, nilai')
+        .select('id, mata_pelajaran, jenis, nilai, predikat')
         .eq('siswa_id', siswaId)
         .eq('semester', semester)
         .eq('tahun_ajaran', tahunAjaran),
@@ -370,6 +412,8 @@ export default function Rapor() {
     // supaya guru bisa isi deskripsi walau belum ada nilai angkanya. Setiap mapel
     // selalu ditampilkan sebagai 2 baris (Pengetahuan & Keterampilan) supaya
     // sejalan dengan format rapor cetak SD yang memisah nilai KI-3/KI-4.
+    // Setiap baris juga membawa nilai_id/nilai/predikat dari tabel `nilai` supaya
+    // guru bisa isi nilai & predikat di tempat yang sama dengan deskripsi capaian.
     const mapelDariNilai = [...new Set((nilaiRows || []).map((n) => n.mata_pelajaran))]
     const mapelDariCapaian = [...new Set((capaianRows || []).map((c) => c.mata_pelajaran))]
     const semuaMapel = [...new Set([...mapelDariNilai, ...mapelDariCapaian])]
@@ -377,15 +421,21 @@ export default function Rapor() {
     const daftarCapaian = []
     for (const mapel of semuaMapel) {
       for (const jenis of OPSI_JENIS_NILAI) {
-        const existing = (capaianRows || []).find(
+        const existingCapaian = (capaianRows || []).find(
           (c) => c.mata_pelajaran === mapel && (c.jenis || 'Pengetahuan') === jenis
         )
+        const existingNilai = (nilaiRows || []).find(
+          (n) => n.mata_pelajaran === mapel && (n.jenis || '') === jenis
+        )
         daftarCapaian.push({
-          id: existing?.id || null,
+          id: existingCapaian?.id || null,
           mata_pelajaran: mapel,
           jenis,
-          deskripsi_capaian: existing?.deskripsi_capaian || '',
+          deskripsi_capaian: existingCapaian?.deskripsi_capaian || '',
           terkunci: mapelDariNilai.includes(mapel), // nama mapel dari tabel nilai, tidak diedit di sini
+          nilai_id: existingNilai?.id || null,
+          nilai: existingNilai?.nilai ?? '',
+          predikat: existingNilai?.predikat || '',
         })
       }
     }
@@ -407,10 +457,19 @@ export default function Rapor() {
     rataRata: (nilaiArr.reduce((a, b) => a + b, 0) / nilaiArr.length).toFixed(1),
   }))
 
-  // ---------- Deskripsi capaian ----------
+  // ---------- Deskripsi capaian (+ Nilai & Predikat) ----------
   function ubahBarisCapaian(index, field, value) {
     setCapaianList((prev) =>
-      prev.map((c, i) => (i === index ? { ...c, [field]: value } : c))
+      prev.map((c, i) => {
+        if (i !== index) return c
+        const updated = { ...c, [field]: value }
+        // Saat nilai diubah, hitung ulang predikat otomatis berdasarkan KKM mapel
+        if (field === 'nilai') {
+          const kkm = kkmUntukMapel(updated.mata_pelajaran, kkmPaiPpkn, kkmLainnya)
+          updated.predikat = hitungPredikat(value, kkm)
+        }
+        return updated
+      })
     )
   }
 
@@ -423,7 +482,16 @@ export default function Rapor() {
   function tambahBarisCapaian() {
     setCapaianList((prev) => [
       ...prev,
-      { id: null, mata_pelajaran: '', jenis: 'Pengetahuan', deskripsi_capaian: '', terkunci: false },
+      {
+        id: null,
+        mata_pelajaran: '',
+        jenis: 'Pengetahuan',
+        deskripsi_capaian: '',
+        terkunci: false,
+        nilai_id: null,
+        nilai: '',
+        predikat: '',
+      },
     ])
   }
 
@@ -431,6 +499,9 @@ export default function Rapor() {
     const row = capaianList[index]
     if (row.id) {
       await supabase.from('capaian_mapel').delete().eq('id', row.id)
+    }
+    if (row.nilai_id) {
+      await supabase.from('nilai').delete().eq('id', row.nilai_id)
     }
     setCapaianList((prev) => prev.filter((_, i) => i !== index))
   }
@@ -444,6 +515,8 @@ export default function Rapor() {
     let gagal = []
     for (const c of capaianList) {
       if (!c.mata_pelajaran.trim()) continue
+
+      // Simpan deskripsi capaian
       if (c.id) {
         const { error } = await supabase
           .from('capaian_mapel')
@@ -467,8 +540,29 @@ export default function Rapor() {
         })
         if (error) gagal.push(error.message)
       }
+
+      // Simpan nilai & predikat ke tabel `nilai` supaya kolom Nilai/Predikat
+      // di rapor cetak ikut terisi (sebelumnya cuma deskripsi yang tersimpan)
+      if (c.nilai !== '' && c.nilai !== null && !isNaN(c.nilai)) {
+        const payloadNilai = {
+          siswa_id: siswaId,
+          mata_pelajaran: c.mata_pelajaran,
+          jenis: c.jenis,
+          semester,
+          tahun_ajaran: tahunAjaran,
+          nilai: Number(c.nilai),
+          predikat: c.predikat,
+        }
+        if (c.nilai_id) {
+          const { error } = await supabase.from('nilai').update(payloadNilai).eq('id', c.nilai_id)
+          if (error) gagal.push(error.message)
+        } else {
+          const { error } = await supabase.from('nilai').insert(payloadNilai)
+          if (error) gagal.push(error.message)
+        }
+      }
     }
-    if (gagal.length) alert('Gagal menyimpan sebagian deskripsi capaian:\n' + [...new Set(gagal)].join('\n'))
+    if (gagal.length) alert('Gagal menyimpan sebagian data:\n' + [...new Set(gagal)].join('\n'))
     await muatRapor()
     setSaving(false)
   }
@@ -838,7 +932,7 @@ export default function Rapor() {
                     return (
                       <div key={c.id || `baru-${i}`} className="border border-ink-950/10 rounded-lg p-3">
                         <div className="flex items-start justify-between gap-3 mb-2">
-                          <div className="flex-1 grid sm:grid-cols-[2fr_1fr] gap-2">
+                          <div className="flex-1 grid sm:grid-cols-[2fr_1fr_1fr_1fr] gap-2">
                             {c.terkunci ? (
                               <label className="label-field">{c.mata_pelajaran}</label>
                             ) : (
@@ -860,6 +954,23 @@ export default function Rapor() {
                                 </option>
                               ))}
                             </select>
+                            <input
+                              className="input-field"
+                              type="number"
+                              min={0}
+                              max={100}
+                              placeholder="Nilai"
+                              value={c.nilai}
+                              onChange={(e) => ubahBarisCapaian(i, 'nilai', e.target.value)}
+                              title="Nilai (0-100)"
+                            />
+                            <input
+                              className="input-field text-center font-semibold"
+                              placeholder="Predikat"
+                              value={c.predikat}
+                              onChange={(e) => ubahBarisCapaian(i, 'predikat', e.target.value)}
+                              title="Predikat (otomatis dari nilai, bisa diubah manual)"
+                            />
                           </div>
                           <div className="flex items-center gap-2 shrink-0">
                             <div className="relative">
