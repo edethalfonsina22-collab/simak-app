@@ -1,13 +1,40 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabaseClient'
 import Layout from '../components/Layout'
-import { Plus, Pencil, Trash2, X, Loader2 } from 'lucide-react'
+import { Plus, Pencil, Trash2, X, Loader2, Users } from 'lucide-react'
+import './Kelas.css'
 
 const emptyForm = { nama_kelas: '', tingkat: '', wali_kelas_id: '', tahun_ajaran: '' }
 
 function fotoWaliUrl(path) {
   if (!path) return null
   return supabase.storage.from('foto-profil').getPublicUrl(path).data.publicUrl
+}
+
+// Motif sirkuit dekoratif senada dengan Loader & Login — dipakai sebagai
+// latar tipis di balik grid kartu kelas, bukan menutupi seluruh halaman.
+function CircuitBackdrop() {
+  return (
+    <svg className="kelas-circuit" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+      <defs>
+        <pattern id="kelasCircuitTile" width="120" height="120" patternUnits="userSpaceOnUse">
+          <g fill="none" stroke="#2DD4EE" strokeWidth="1" opacity="0.4">
+            <path d="M0 30 H40 V60 H90" />
+            <path d="M120 90 H80 V50 H30" />
+            <path d="M60 0 V25 H100 V70" />
+            <path d="M0 100 H35 V120" />
+          </g>
+          <g fill="#2DD4EE">
+            <circle cx="40" cy="30" r="2" opacity="0.6" />
+            <circle cx="90" cy="60" r="2" opacity="0.6" />
+            <circle cx="80" cy="90" r="2" opacity="0.6" />
+            <circle cx="30" cy="50" r="2" opacity="0.6" />
+          </g>
+        </pattern>
+      </defs>
+      <rect width="100%" height="100%" fill="url(#kelasCircuitTile)" />
+    </svg>
+  )
 }
 
 export default function Kelas() {
@@ -61,76 +88,77 @@ export default function Kelas() {
 
   return (
     <Layout title="Kelas" subtitle={`${data.length} kelas`} actions={
-      <button className="btn-primary" onClick={openAdd}><Plus size={16} /> Tambah Kelas</button>
+      <button className="kelas-btn-primary" onClick={openAdd}><Plus size={16} /> Tambah Kelas</button>
     }>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {loading && <p className="text-ink-700/50 text-sm">Memuat data...</p>}
-        {!loading && data.length === 0 && <p className="text-ink-700/50 text-sm">Belum ada kelas. Tambahkan kelas pertama Anda.</p>}
-        {data.map((k) => (
-          <div
-            key={k.id}
-            className="relative overflow-hidden rounded-xl p-5 bg-gradient-to-br from-red-900 to-red-950 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-lg"
-          >
-            {/* Dekorasi lingkaran samar, senada gaya kartu identitas Profil Saya */}
-            <div className="absolute -top-8 -right-8 w-32 h-32 rounded-full bg-white/5 pointer-events-none" />
-            <div className="absolute -bottom-10 -left-4 w-24 h-24 rounded-full bg-white/5 pointer-events-none" />
+      <div className="kelas-wrap">
+        <CircuitBackdrop />
 
-            <div className="relative flex items-start justify-between">
-              <div>
-                <p className="font-display text-lg font-semibold text-white">{k.nama_kelas}</p>
-                <p className="text-xs text-red-200/70 mt-0.5">Tingkat {k.tingkat} · {k.tahun_ajaran}</p>
-              </div>
-              <div className="flex gap-1">
-                <button onClick={() => openEdit(k)} className="p-1.5 hover:bg-white/10 rounded-lg text-white/60"><Pencil size={14} /></button>
-                <button onClick={() => handleDelete(k.id)} className="p-1.5 hover:bg-white/10 rounded-lg text-red-200/80"><Trash2 size={14} /></button>
-              </div>
-            </div>
-            <div className="relative mt-4 pt-4 border-t border-white/10 flex items-center justify-between text-sm">
-              <div className="flex items-center gap-2">
-                <div className="w-7 h-7 rounded-full bg-white/10 ring-1 ring-white/20 overflow-hidden flex items-center justify-center shrink-0">
-                  {fotoWaliUrl(k.guru?.foto_profil_path) ? (
-                    <img src={fotoWaliUrl(k.guru.foto_profil_path)} alt={k.guru?.nama_lengkap || 'Wali kelas'} className="w-full h-full object-cover" />
-                  ) : (
-                    <span className="text-xs font-semibold text-white/70">{k.guru?.nama_lengkap?.[0] || '?'}</span>
-                  )}
+        <div className="relative grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {loading && <p className="text-ink-700/50 text-sm">Memuat data...</p>}
+          {!loading && data.length === 0 && <p className="text-ink-700/50 text-sm">Belum ada kelas. Tambahkan kelas pertama Anda.</p>}
+          {data.map((k) => (
+            <div key={k.id} className="kelas-card">
+              <div className="kelas-card-glow" />
+
+              <div className="relative flex items-start justify-between">
+                <div>
+                  <p className="font-display text-lg font-semibold kelas-card-title">{k.nama_kelas}</p>
+                  <p className="text-xs kelas-card-subtitle mt-0.5">Tingkat {k.tingkat} &middot; {k.tahun_ajaran}</p>
                 </div>
-                <span className="text-red-100/70">Wali: {k.guru?.nama_lengkap || '—'}</span>
+                <div className="flex gap-1">
+                  <button onClick={() => openEdit(k)} className="kelas-icon-btn kelas-icon-btn-edit"><Pencil size={14} /></button>
+                  <button onClick={() => handleDelete(k.id)} className="kelas-icon-btn kelas-icon-btn-delete"><Trash2 size={14} /></button>
+                </div>
               </div>
-              <span className="badge bg-brass-400/20 text-brass-300">{k.jumlah_siswa} siswa</span>
+
+              <div className="relative mt-4 pt-4 kelas-card-footer flex items-center justify-between text-sm">
+                <div className="flex items-center gap-2">
+                  <div className="kelas-avatar">
+                    {fotoWaliUrl(k.guru?.foto_profil_path) ? (
+                      <img src={fotoWaliUrl(k.guru.foto_profil_path)} alt={k.guru?.nama_lengkap || 'Wali kelas'} className="w-full h-full object-cover" />
+                    ) : (
+                      <span className="text-xs font-semibold">{k.guru?.nama_lengkap?.[0] || '?'}</span>
+                    )}
+                  </div>
+                  <span className="kelas-card-subtitle">Wali: {k.guru?.nama_lengkap || '—'}</span>
+                </div>
+                <span className="kelas-badge"><Users size={12} /> {k.jumlah_siswa} siswa</span>
+              </div>
             </div>
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
 
       {showForm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink-950/50 backdrop-blur-sm p-4">
-          <form onSubmit={handleSubmit} className="card w-full max-w-md p-6 relative">
-            <button type="button" onClick={() => setShowForm(false)} className="absolute top-4 right-4 text-ink-700/40 hover:text-ink-900"><X size={20} /></button>
-            <h2 className="font-display text-xl font-semibold mb-4">{editingId ? 'Ubah Kelas' : 'Tambah Kelas'}</h2>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <form onSubmit={handleSubmit} className="kelas-modal">
+            <button type="button" onClick={() => setShowForm(false)} className="kelas-modal-close"><X size={20} /></button>
+            <p className="kelas-modal-eyebrow">SIMAK &middot; DATA KELAS</p>
+            <h2 className="kelas-modal-title">{editingId ? 'Ubah Kelas' : 'Tambah Kelas'}</h2>
             <div className="space-y-3">
               <div>
-                <label className="eyebrow mb-1.5 block">Nama Kelas</label>
-                <input required className="input-field" placeholder="Contoh: VII-A" value={form.nama_kelas} onChange={(e) => setForm({ ...form, nama_kelas: e.target.value })} />
+                <label className="kelas-label">Nama Kelas</label>
+                <input required className="kelas-input" placeholder="Contoh: VII-A" value={form.nama_kelas} onChange={(e) => setForm({ ...form, nama_kelas: e.target.value })} />
               </div>
               <div>
-                <label className="eyebrow mb-1.5 block">Tingkat</label>
-                <input className="input-field" placeholder="Contoh: VII" value={form.tingkat} onChange={(e) => setForm({ ...form, tingkat: e.target.value })} />
+                <label className="kelas-label">Tingkat</label>
+                <input className="kelas-input" placeholder="Contoh: VII" value={form.tingkat} onChange={(e) => setForm({ ...form, tingkat: e.target.value })} />
               </div>
               <div>
-                <label className="eyebrow mb-1.5 block">Wali Kelas</label>
-                <select className="input-field" value={form.wali_kelas_id} onChange={(e) => setForm({ ...form, wali_kelas_id: e.target.value })}>
+                <label className="kelas-label">Wali Kelas</label>
+                <select className="kelas-input" value={form.wali_kelas_id} onChange={(e) => setForm({ ...form, wali_kelas_id: e.target.value })}>
                   <option value="">— Belum ditentukan —</option>
                   {guruList.map((g) => <option key={g.id} value={g.id}>{g.nama_lengkap}</option>)}
                 </select>
               </div>
               <div>
-                <label className="eyebrow mb-1.5 block">Tahun Ajaran</label>
-                <input className="input-field" placeholder="Contoh: 2026/2027" value={form.tahun_ajaran} onChange={(e) => setForm({ ...form, tahun_ajaran: e.target.value })} />
+                <label className="kelas-label">Tahun Ajaran</label>
+                <input className="kelas-input" placeholder="Contoh: 2026/2027" value={form.tahun_ajaran} onChange={(e) => setForm({ ...form, tahun_ajaran: e.target.value })} />
               </div>
             </div>
             <div className="mt-5 flex justify-end gap-3">
-              <button type="button" className="btn-secondary" onClick={() => setShowForm(false)}>Batal</button>
-              <button type="submit" disabled={saving} className="btn-primary">{saving && <Loader2 size={16} className="animate-spin" />} Simpan</button>
+              <button type="button" className="kelas-btn-secondary" onClick={() => setShowForm(false)}>Batal</button>
+              <button type="submit" disabled={saving} className="kelas-btn-primary">{saving && <Loader2 size={16} className="kelas-spin" />} Simpan</button>
             </div>
           </form>
         </div>
