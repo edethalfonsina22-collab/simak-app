@@ -3,12 +3,6 @@ import { useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabaseClient'
 import { Printer, Loader2 } from 'lucide-react'
 
-// Menghitung rentang tanggal dari kombinasi tahun ajaran + semester, supaya
-// rekap kehadiran yang tercetak hanya mengambil data presensi pada periode
-// rapor yang dipilih, bukan seluruh riwayat presensi siswa sepanjang masa.
-// Format tahunAjaran yang didukung: "2025/2026".
-//   Semester Ganjil -> 1 Juli s/d 31 Desember tahun awal (2025-07-01 s/d 2025-12-31)
-//   Semester Genap  -> 1 Januari s/d 30 Juni tahun akhir (2026-01-01 s/d 2026-06-30)
 function rentangTanggalPeriode(tahunAjaran, semester) {
   if (!tahunAjaran) return null
   const bagian = tahunAjaran.split('/')
@@ -21,7 +15,6 @@ function rentangTanggalPeriode(tahunAjaran, semester) {
   if (semester === 'Genap') {
     return { mulai: `${tahunAkhir}-01-01`, selesai: `${tahunAkhir}-06-30` }
   }
-  // Default / Ganjil
   return { mulai: `${tahunAwal}-07-01`, selesai: `${tahunAwal}-12-31` }
 }
 
@@ -32,6 +25,22 @@ function formatTanggalLahir(tgl) {
   } catch {
     return tgl
   }
+}
+
+// Predikat dari nilai angka — sama dengan legenda yang dipakai di Nilai.jsx
+function predikatDariNilai(nilai) {
+  if (nilai === null || nilai === undefined || nilai === '') return null
+  const n = Number(nilai)
+  if (isNaN(n)) return null
+  if (n >= 90) return 'A'
+  if (n >= 75) return 'B'
+  if (n >= 60) return 'C'
+  return 'D'
+}
+
+function rataRataArr(arr) {
+  if (!arr || arr.length === 0) return null
+  return (arr.reduce((a, b) => a + b, 0) / arr.length).toFixed(1)
 }
 
 export default function RaporCetak() {
@@ -80,8 +89,6 @@ export default function RaporCetak() {
       { data: catatanRow },
       { data: sekolahRow },
     ] = await Promise.all([
-      // select('*') supaya semua kolom identitas peserta didik & orang tua/wali
-      // ikut terambil untuk Halaman Sampul & Halaman Identitas.
       supabase
         .from('siswa')
         .select(
@@ -91,14 +98,16 @@ export default function RaporCetak() {
         .single(),
       supabase
         .from('nilai')
-        .select('mata_pelajaran, jenis, nilai')
+        // + kompetensi, supaya nilai Pengetahuan & Keterampilan bisa dipisah
+        .select('mata_pelajaran, kompetensi, jenis, nilai')
         .eq('siswa_id', siswaId)
         .eq('semester', semester)
         .eq('tahun_ajaran', tahunAjaran),
       queryPresensi,
       supabase
         .from('capaian_mapel')
-        .select('mata_pelajaran, deskripsi_capaian')
+        // + jenis, untuk mencocokkan deskripsi ke tabel Pengetahuan/Keterampilan
+        .select('mata_pelajaran, jenis, deskripsi_capaian')
         .eq('siswa_id', siswaId)
         .eq('semester', semester)
         .eq('tahun_ajaran', tahunAjaran),
@@ -150,22 +159,48 @@ export default function RaporCetak() {
     setLoading(false)
   }
 
-  const rekapPerMapel = {}
+  // ---------- Rekap nilai per mapel, dipecah Pengetahuan/Keterampilan ----------
+  const rekapPerMapelKompetensi = {}
   for (const n of nilai) {
-    if (!rekapPerMapel[n.mata_pelajaran]) rekapPerMapel[n.mata_pelajaran] = []
-    rekapPerMapel[n.mata_pelajaran].push(n.nilai)
-  }
-  const barisMapel = Object.entries(rekapPerMapel).map(([mapel, arr]) => ({
-    mapel,
-    rataRata: (arr.reduce((a, b) => a + b, 0) / arr.length).toFixed(1),
-    deskripsi: capaianList.find((c) => c.mata_pelajaran === mapel)?.deskripsi_capaian || '',
-  }))
-  // Mapel yang punya deskripsi tapi belum punya nilai angka
-  for (const c of capaianList) {
-    if (!barisMapel.find((b) => b.mapel === c.mata_pelajaran)) {
-      barisMapel.push({ mapel: c.mata_pelajaran, rataRata: '-', deskripsi: c.deskripsi_capaian })
+    if (!rekapPerMapelKompetensi[n.mata_pelajaran]) {
+      rekapPerMapelKompetensi[n.mata_pelajaran] = { Pengetahuan: [], Keterampilan: [] }
     }
+    const kk = n.kompetensi === 'Keterampilan' ? 'Keterampilan' : 'Pengetahuan'
+    rekapPerMapelKompetensi[n.mata_pelajaran][kk].push(n.nilai)
   }
+
+  const semuaMapel = [
+    ...new Set([
+      ...Object.keys(rekapPerMapelKompetensi),
+      ...capaianList.map((c) => c.mata_pelajaran),
+    ]),
+  ]
+
+  const barisMapel = semuaMapel.map((mapel) => {
+    const rr = rekapPerMapelKompetensi[mapel] || { Pengetahuan: [], Keterampilan: [] }
+    const deskripsiPengetahuan =
+      capaianList.find((c) => c.mata_pelajaran === mapel && c.jenis === 'Pengetahuan')?.deskripsi_capaian || ''
+    const deskripsiKeterampilan =
+      capaianList.find((c) => c.mata_pelajaran === mapel && c.jenis === 'Keterampilan')?.deskripsi_capaian || ''
+    const nilaiPengetahuan = rataRataArr(rr.Pengetahuan)
+    const nilaiKeterampilan = rataRataArr(rr.Keterampilan)
+    return {
+      mapel,
+      pengetahuan: {
+        nilai: nilaiPengetahuan,
+        predikat: predikatDariNilai(nilaiPengetahuan),
+        deskripsi: deskripsiPengetahuan,
+      },
+      keterampilan: {
+        nilai: nilaiKeterampilan,
+        predikat: predikatDariNilai(nilaiKeterampilan),
+        deskripsi: deskripsiKeterampilan,
+      },
+    }
+  })
+
+  const barisPengetahuan = barisMapel.filter((b) => b.pengetahuan.nilai !== null || b.pengetahuan.deskripsi)
+  const barisKeterampilan = barisMapel.filter((b) => b.keterampilan.nilai !== null || b.keterampilan.deskripsi)
 
   if (!siswaId || !semester || !tahunAjaran) {
     return (
@@ -370,32 +405,65 @@ export default function RaporCetak() {
           <p><span className="text-ink-700/60">NISN</span> : {siswa.nisn || '-'}</p>
         </div>
 
-        <h2 className="font-display font-semibold mb-2">A. Nilai & Deskripsi Capaian</h2>
+        <h2 className="font-display font-semibold mb-2">A. Pengetahuan</h2>
         <table className="w-full border-collapse mb-6 text-sm">
           <thead>
             <tr className="border-b border-ink-950/20">
-              <th className="text-left py-1.5 pr-2 w-[26%]">Mata Pelajaran</th>
-              <th className="text-center py-1.5 pr-2 w-[10%]">Nilai</th>
+              <th className="text-left py-1.5 pr-2 w-[6%]">No</th>
+              <th className="text-left py-1.5 pr-2 w-[24%]">Mata Pelajaran</th>
+              <th className="text-center py-1.5 pr-2 w-[8%]">Nilai</th>
+              <th className="text-center py-1.5 pr-2 w-[10%]">Predikat</th>
               <th className="text-left py-1.5">Deskripsi Capaian</th>
             </tr>
           </thead>
           <tbody>
-            {barisMapel.map((b) => (
+            {barisPengetahuan.map((b, i) => (
               <tr key={b.mapel} className="border-b border-ink-950/10 align-top">
+                <td className="py-1.5 pr-2">{i + 1}</td>
                 <td className="py-1.5 pr-2 font-medium">{b.mapel}</td>
-                <td className="py-1.5 pr-2 text-center">{b.rataRata}</td>
-                <td className="py-1.5">{b.deskripsi || '-'}</td>
+                <td className="py-1.5 pr-2 text-center">{b.pengetahuan.nilai ?? '-'}</td>
+                <td className="py-1.5 pr-2 text-center">{b.pengetahuan.predikat || '-'}</td>
+                <td className="py-1.5">{b.pengetahuan.deskripsi || '-'}</td>
               </tr>
             ))}
-            {barisMapel.length === 0 && (
+            {barisPengetahuan.length === 0 && (
               <tr>
-                <td colSpan={3} className="py-3 text-center text-ink-700/50">Belum ada data.</td>
+                <td colSpan={5} className="py-3 text-center text-ink-700/50">Belum ada data Pengetahuan.</td>
               </tr>
             )}
           </tbody>
         </table>
 
-        <h2 className="font-display font-semibold mb-2">B. Profil Pelajar Pancasila (P5)</h2>
+        <h2 className="font-display font-semibold mb-2">B. Keterampilan</h2>
+        <table className="w-full border-collapse mb-6 text-sm">
+          <thead>
+            <tr className="border-b border-ink-950/20">
+              <th className="text-left py-1.5 pr-2 w-[6%]">No</th>
+              <th className="text-left py-1.5 pr-2 w-[24%]">Mata Pelajaran</th>
+              <th className="text-center py-1.5 pr-2 w-[8%]">Nilai</th>
+              <th className="text-center py-1.5 pr-2 w-[10%]">Predikat</th>
+              <th className="text-left py-1.5">Deskripsi Capaian</th>
+            </tr>
+          </thead>
+          <tbody>
+            {barisKeterampilan.map((b, i) => (
+              <tr key={b.mapel} className="border-b border-ink-950/10 align-top">
+                <td className="py-1.5 pr-2">{i + 1}</td>
+                <td className="py-1.5 pr-2 font-medium">{b.mapel}</td>
+                <td className="py-1.5 pr-2 text-center">{b.keterampilan.nilai ?? '-'}</td>
+                <td className="py-1.5 pr-2 text-center">{b.keterampilan.predikat || '-'}</td>
+                <td className="py-1.5">{b.keterampilan.deskripsi || '-'}</td>
+              </tr>
+            ))}
+            {barisKeterampilan.length === 0 && (
+              <tr>
+                <td colSpan={5} className="py-3 text-center text-ink-700/50">Belum ada data Keterampilan.</td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+
+        <h2 className="font-display font-semibold mb-2">C. Profil Pelajar Pancasila (P5)</h2>
         <table className="w-full border-collapse mb-6 text-sm">
           <thead>
             <tr className="border-b border-ink-950/20">
@@ -422,7 +490,7 @@ export default function RaporCetak() {
           </tbody>
         </table>
 
-        <h2 className="font-display font-semibold mb-2">C. Ekstrakurikuler</h2>
+        <h2 className="font-display font-semibold mb-2">D. Ekstrakurikuler</h2>
         <table className="w-full border-collapse mb-6 text-sm">
           <thead>
             <tr className="border-b border-ink-950/20">
@@ -447,7 +515,7 @@ export default function RaporCetak() {
           </tbody>
         </table>
 
-        <h2 className="font-display font-semibold mb-2">D. Kehadiran</h2>
+        <h2 className="font-display font-semibold mb-2">E. Kehadiran</h2>
         <div className="grid grid-cols-4 gap-3 mb-6 text-center">
           <div><p className="text-lg font-semibold">{presensi.hadir}</p><p className="text-xs text-ink-700/60">Hadir</p></div>
           <div><p className="text-lg font-semibold">{presensi.izin}</p><p className="text-xs text-ink-700/60">Izin</p></div>
@@ -455,7 +523,7 @@ export default function RaporCetak() {
           <div><p className="text-lg font-semibold">{presensi.alpa}</p><p className="text-xs text-ink-700/60">Alpa</p></div>
         </div>
 
-        <h2 className="font-display font-semibold mb-2">E. Kondisi & Catatan Wali Kelas</h2>
+        <h2 className="font-display font-semibold mb-2">F. Kondisi & Catatan Wali Kelas</h2>
         <div className="grid grid-cols-2 gap-x-8 gap-y-1 mb-2 text-sm">
           <p><span className="text-ink-700/60">Tinggi Badan</span> : {catatan?.tinggi_badan || '-'} cm</p>
           <p><span className="text-ink-700/60">Berat Badan</span> : {catatan?.berat_badan || '-'} kg</p>
