@@ -21,7 +21,12 @@ const emptyForm = {
   kabupaten: '',
   dinas_pendidikan: '',
   kecamatan: '',
-  tempat_ttd: '', // <-- TAMBAHAN: nama tempat untuk tanggal di surat/laporan (mis. "Masidang")
+  tempat_ttd: '', // <-- nama tempat untuk tanggal di surat/laporan (mis. "Masidang")
+  // TAMBAHAN: dipakai di Halaman Identitas Rapor (kop identitas sekolah)
+  kelurahan_desa: '',
+  kode_pos: '',
+  provinsi: '',
+  website: '',
 }
 
 export default function ProfilSekolah() {
@@ -219,7 +224,7 @@ export default function ProfilSekolah() {
                 onChange={(e) => ubah('kecamatan', e.target.value)}
               />
             </div>
-            {/* TAMBAHAN: Nama Tempat untuk tanggal di surat/laporan (menggantikan hardcode "Masidang") */}
+            {/* Nama Tempat untuk tanggal di surat/laporan (menggantikan hardcode "Masidang") */}
             <div className="sm:col-span-2">
               <label className="label-field">Nama Tempat (untuk tanggal di surat/laporan)</label>
               <input
@@ -269,6 +274,23 @@ export default function ProfilSekolah() {
             <div>
               <label className="label-field">Email Sekolah</label>
               <input className="input-field" value={form.email} onChange={(e) => ubah('email', e.target.value)} />
+            </div>
+            {/* TAMBAHAN: dipakai di Halaman Identitas Rapor */}
+            <div>
+              <label className="label-field">Website Sekolah</label>
+              <input className="input-field" placeholder="https://..." value={form.website} onChange={(e) => ubah('website', e.target.value)} />
+            </div>
+            <div>
+              <label className="label-field">Kode Pos</label>
+              <input className="input-field" value={form.kode_pos} onChange={(e) => ubah('kode_pos', e.target.value)} />
+            </div>
+            <div>
+              <label className="label-field">Kelurahan/Desa</label>
+              <input className="input-field" value={form.kelurahan_desa} onChange={(e) => ubah('kelurahan_desa', e.target.value)} />
+            </div>
+            <div>
+              <label className="label-field">Provinsi</label>
+              <input className="input-field" value={form.provinsi} onChange={(e) => ubah('provinsi', e.target.value)} />
             </div>
             <div className="sm:col-span-2">
               <label className="label-field">Alamat</label>
