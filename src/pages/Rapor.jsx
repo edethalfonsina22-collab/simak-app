@@ -13,30 +13,8 @@ import {
   NotebookPen,
   Printer,
   Lightbulb,
-  Heart,
-  Trophy,
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
-
-/**
- * =====================================================================================
- * CATATAN PERUBAHAN (menyusul RaporCetak.jsx versi SD)
- * =====================================================================================
- * Tab baru "Sikap & Kepribadian" dan "Prestasi", plus field Saran & Kondisi Kesehatan
- * rinci di tab Catatan, dan pemisahan Pengetahuan/Keterampilan di tab Deskripsi
- * Capaian — semua memakai kolom/tabel tambahan yang sama seperti yang sudah
- * disebutkan di komentar RaporCetak.jsx (jalankan SQL ALTER/CREATE TABLE itu dulu
- * di Supabase kalau belum, termasuk kolom `jenis` pada `capaian_mapel` dan tabel
- * baru `prestasi_siswa`).
- *
- * PERBAIKAN (versi ini): tab "Deskripsi Capaian" sebelumnya hanya menyimpan teks
- * deskripsi ke tabel `capaian_mapel`, sehingga kolom Nilai & Predikat di rapor
- * cetak selalu tampil "-" karena tabel `nilai` tidak pernah terisi dengan
- * jenis = 'Pengetahuan'/'Keterampilan'. Sekarang setiap baris deskripsi capaian
- * juga punya input Nilai (angka) & Predikat (otomatis dihitung dari KKM, bisa
- * di-override manual), dan tombol Simpan akan meng-upsert ke tabel `nilai` juga.
- * =====================================================================================
- */
 
 const TEMPLATE_DESKRIPSI = [
   {
@@ -70,28 +48,7 @@ function kategoriDariNilai(rataRata) {
   return 'Perlu Bimbingan'
 }
 
-// Predikat mengikuti skala Kurikulum 2013: interval = (100 - KKM) / 3
-//   A: KKM + 2*interval s/d 100 | B: KKM + interval s/d < KKM + 2*interval
-//   C: KKM s/d < KKM + interval | D: < KKM
-function hitungPredikat(nilai, kkm) {
-  if (nilai === null || nilai === undefined || nilai === '' || isNaN(nilai)) return '-'
-  const interval = (100 - kkm) / 3
-  const n = Number(nilai)
-  if (n >= kkm + 2 * interval) return 'A'
-  if (n >= kkm + interval) return 'B'
-  if (n >= kkm) return 'C'
-  return 'D'
-}
-
-function kkmUntukMapel(mapel, kkmPaiPpkn, kkmLainnya) {
-  const nama = (mapel || '').toLowerCase()
-  if (nama.includes('agama') || nama.includes('pancasila') || nama.includes('ppkn')) return kkmPaiPpkn
-  return kkmLainnya
-}
-
 const OPSI_CAPAIAN_P5 = ['Belum Berkembang', 'Mulai Berkembang', 'Berkembang Sesuai Harapan', 'Sangat Berkembang']
-const OPSI_JENIS_NILAI = ['Pengetahuan', 'Keterampilan']
-const OPSI_PREDIKAT_KEPRIBADIAN = ['A', 'B', 'C', 'D']
 
 const TEMPLATE_EKSKUL = [
   {
@@ -139,106 +96,20 @@ const TEMPLATE_CATATAN = [
   },
 ]
 
-// Rekomendasi baru: Sikap Spiritual (bagian A.1 pada rapor cetak)
-const TEMPLATE_SIKAP_SPIRITUAL = [
-  {
-    kategori: 'Sangat Baik',
-    teks: () =>
-      `Ananda melaksanakan Sangat Baik dalam ketaatan beribadah, berdoa sebelum dan sesudah melakukan kegiatan, dan bersyukur atas nikmat yang diterima.`,
-  },
-  {
-    kategori: 'Baik',
-    teks: () =>
-      `Ananda melaksanakan Baik dalam ketaatan beribadah dan cukup terbiasa berdoa sebelum dan sesudah melakukan kegiatan.`,
-  },
-  {
-    kategori: 'Cukup',
-    teks: () =>
-      `Ananda menunjukkan sikap spiritual yang Cukup, namun masih perlu dibiasakan dalam ketaatan beribadah dan berdoa.`,
-  },
-  {
-    kategori: 'Perlu Bimbingan',
-    teks: () =>
-      `Ananda memerlukan bimbingan lebih lanjut dalam ketaatan beribadah dan pembiasaan berdoa sehari-hari.`,
-  },
-]
-
-// Rekomendasi baru: Sikap Sosial (bagian A.2 pada rapor cetak)
-const TEMPLATE_SIKAP_SOSIAL = [
-  {
-    kategori: 'Sangat Baik',
-    teks: () =>
-      `Ananda mempunyai sikap Sangat Baik dalam kejujuran, kedisiplinan, tanggung jawab, santun, dan peduli terhadap sesama.`,
-  },
-  {
-    kategori: 'Baik',
-    teks: () =>
-      `Ananda mempunyai sikap Baik dalam kejujuran, kedisiplinan, tanggung jawab, santun, dan peduli, meski masih perlu sedikit pendampingan.`,
-  },
-  {
-    kategori: 'Cukup',
-    teks: () =>
-      `Ananda menunjukkan sikap sosial yang Cukup dan perlu terus dibimbing dalam hal kedisiplinan dan tanggung jawab.`,
-  },
-  {
-    kategori: 'Perlu Bimbingan',
-    teks: () =>
-      `Ananda memerlukan bimbingan lebih lanjut dalam sikap disiplin, tanggung jawab, dan kepedulian terhadap sesama.`,
-  },
-]
-
-// Rekomendasi baru: Saran-saran (bagian D pada rapor cetak)
-const TEMPLATE_SARAN = [
-  {
-    kategori: 'Pertahankan',
-    teks: () =>
-      `Pertahankan semangat belajar dan sikap positif yang sudah ditunjukkan selama ini, teruslah berlatih agar semakin berkembang.`,
-  },
-  {
-    kategori: 'Tingkatkan',
-    teks: () =>
-      `Tingkatkan lagi keaktifan dan ketekunan dalam belajar, terutama pada mata pelajaran yang masih perlu diperbaiki.`,
-  },
-  {
-    kategori: 'Perlu Pendampingan',
-    teks: () =>
-      `Perlu pendampingan orang tua di rumah agar ananda lebih disiplin dalam belajar dan mengerjakan tugas.`,
-  },
-]
-
-// Rekomendasi baru: Prestasi (bagian G pada rapor cetak)
-const TEMPLATE_PRESTASI = [
-  { kategori: 'Tingkat Sekolah', teks: (jenis) => `Meraih prestasi tingkat sekolah pada kegiatan ${jenis || 'ini'}.` },
-  { kategori: 'Tingkat Kecamatan', teks: (jenis) => `Meraih prestasi tingkat kecamatan pada kegiatan ${jenis || 'ini'}.` },
-  { kategori: 'Tingkat Kabupaten', teks: (jenis) => `Meraih prestasi tingkat kabupaten/kota pada kegiatan ${jenis || 'ini'}.` },
-  { kategori: 'Belum Ada', teks: () => `Belum ada prestasi yang diraih pada periode ini.` },
-]
-
 const TABS = [
   { key: 'ringkasan', label: 'Ringkasan Nilai', icon: ClipboardList },
   { key: 'capaian', label: 'Deskripsi Capaian', icon: NotebookPen },
-  { key: 'sikap', label: 'Sikap & Kepribadian', icon: Heart },
   { key: 'p5', label: 'P5', icon: Sparkles },
   { key: 'ekskul', label: 'Ekstrakurikuler', icon: Dumbbell },
-  { key: 'prestasi', label: 'Prestasi', icon: Trophy },
   { key: 'catatan', label: 'Catatan Wali Kelas', icon: NotebookPen },
 ]
 
 const CATATAN_KOSONG = {
   id: null,
   catatan: '',
-  saran: '',
   tinggi_badan: '',
   berat_badan: '',
-  kondisi_pendengaran: '',
-  kondisi_penglihatan: '',
-  kondisi_gigi: '',
-  kondisi_lainnya: '',
-  sikap_spiritual: '',
-  sikap_sosial: '',
-  perilaku: '',
-  kerajinan: '',
-  kerapian: '',
+  kondisi_kesehatan: '',
   keputusan: '',
 }
 
@@ -275,17 +146,12 @@ export default function Rapor() {
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
 
-  // KKM sekolah, dipakai untuk menghitung predikat otomatis dari nilai
-  const [kkmPaiPpkn, setKkmPaiPpkn] = useState(75)
-  const [kkmLainnya, setKkmLainnya] = useState(70)
-
   // Ringkasan (nilai angka + presensi) — tetap dari tabel nilai & presensi_siswa
   const [nilai, setNilai] = useState([])
   const [presensi, setPresensi] = useState({ hadir: 0, izin: 0, sakit: 0, alpa: 0 })
 
-  // Deskripsi capaian per mapel, dipecah Pengetahuan/Keterampilan — tabel capaian_mapel
-  // Setiap baris juga membawa nilai_id/nilai/predikat yang tersimpan di tabel `nilai`
-  const [capaianList, setCapaianList] = useState([]) // [{id, mata_pelajaran, jenis, deskripsi_capaian, terkunci, nilai_id, nilai, predikat}]
+  // Deskripsi capaian per mapel — tabel capaian_mapel
+  const [capaianList, setCapaianList] = useState([]) // [{id, mata_pelajaran, deskripsi_capaian, terkunci}]
 
   // P5 — tabel rapor_p5
   const [p5List, setP5List] = useState([]) // [{id, tema, dimensi, sub_elemen, capaian}]
@@ -293,25 +159,15 @@ export default function Rapor() {
   // Ekstrakurikuler — tabel ekstrakurikuler_nilai
   const [ekskulList, setEkskulList] = useState([]) // [{id, nama_ekstrakurikuler, predikat, keterangan}]
 
-  // Prestasi — tabel prestasi_siswa (baru)
-  const [prestasiList, setPrestasiList] = useState([]) // [{id, jenis_prestasi, keterangan}]
-
-  // Catatan wali kelas — tabel catatan_siswa (sekarang juga menampung sikap, kepribadian, saran, kondisi kesehatan rinci)
+  // Catatan wali kelas — tabel catatan_siswa
   const [catatan, setCatatan] = useState(CATATAN_KOSONG)
 
   // Dropdown rekomendasi deskripsi capaian — index baris yang sedang terbuka
   const [rekomendasiTerbuka, setRekomendasiTerbuka] = useState(null)
   // Dropdown rekomendasi keterangan ekstrakurikuler — index baris yang sedang terbuka
   const [rekomendasiEkskulTerbuka, setRekomendasiEkskulTerbuka] = useState(null)
-  // Dropdown rekomendasi prestasi — index baris yang sedang terbuka
-  const [rekomendasiPrestasiTerbuka, setRekomendasiPrestasiTerbuka] = useState(null)
   // Dropdown rekomendasi catatan wali kelas — boolean, cuma satu baris
   const [rekomendasiCatatanTerbuka, setRekomendasiCatatanTerbuka] = useState(false)
-  // Dropdown rekomendasi saran — boolean, cuma satu baris
-  const [rekomendasiSaranTerbuka, setRekomendasiSaranTerbuka] = useState(false)
-  // Dropdown rekomendasi sikap spiritual / sosial — boolean, masing-masing satu baris
-  const [rekomendasiSpiritualTerbuka, setRekomendasiSpiritualTerbuka] = useState(false)
-  const [rekomendasiSosialTerbuka, setRekomendasiSosialTerbuka] = useState(false)
 
   useEffect(() => {
     supabase
@@ -319,17 +175,6 @@ export default function Rapor() {
       .select('id, nama_lengkap, nis, kelas(nama_kelas)')
       .order('nama_lengkap')
       .then(({ data }) => setSiswaList(data || []))
-
-    // Ambil KKM sekolah supaya predikat bisa dihitung otomatis dari nilai
-    supabase
-      .from('profil_sekolah')
-      .select('kkm_pai_ppkn, kkm_lainnya')
-      .eq('id', 1)
-      .maybeSingle()
-      .then(({ data }) => {
-        if (data?.kkm_pai_ppkn) setKkmPaiPpkn(data.kkm_pai_ppkn)
-        if (data?.kkm_lainnya) setKkmLainnya(data.kkm_lainnya)
-      })
   }, [])
 
   async function muatRapor() {
@@ -350,19 +195,18 @@ export default function Rapor() {
       { data: capaianRows },
       { data: p5Rows },
       { data: ekskulRows },
-      { data: prestasiRows },
       { data: catatanRows },
     ] = await Promise.all([
       supabase
         .from('nilai')
-        .select('id, mata_pelajaran, jenis, nilai, predikat')
+        .select('mata_pelajaran, jenis, nilai')
         .eq('siswa_id', siswaId)
         .eq('semester', semester)
         .eq('tahun_ajaran', tahunAjaran),
       queryPresensi,
       supabase
         .from('capaian_mapel')
-        .select('id, mata_pelajaran, jenis, deskripsi_capaian')
+        .select('id, mata_pelajaran, deskripsi_capaian')
         .eq('siswa_id', siswaId)
         .eq('semester', semester)
         .eq('tahun_ajaran', tahunAjaran),
@@ -380,16 +224,8 @@ export default function Rapor() {
         .eq('semester', semester)
         .eq('tahun_ajaran', tahunAjaran),
       supabase
-        .from('prestasi_siswa')
-        .select('id, jenis_prestasi, keterangan')
-        .eq('siswa_id', siswaId)
-        .eq('semester', semester)
-        .eq('tahun_ajaran', tahunAjaran),
-      supabase
         .from('catatan_siswa')
-        .select(
-          'id, catatan, saran, tinggi_badan, berat_badan, kondisi_pendengaran, kondisi_penglihatan, kondisi_gigi, kondisi_lainnya, sikap_spiritual, sikap_sosial, perilaku, kerajinan, kerapian, keputusan'
-        )
+        .select('id, catatan, tinggi_badan, berat_badan, kondisi_kesehatan, keputusan')
         .eq('siswa_id', siswaId)
         .eq('semester', semester)
         .eq('tahun_ajaran', tahunAjaran)
@@ -405,41 +241,24 @@ export default function Rapor() {
 
     setP5List(p5Rows || [])
     setEkskulList(ekskulRows || [])
-    setPrestasiList(prestasiRows || [])
     setCatatan(catatanRows || CATATAN_KOSONG)
 
     // Gabungkan mapel dari nilai dengan mapel yang sudah punya deskripsi capaian,
-    // supaya guru bisa isi deskripsi walau belum ada nilai angkanya. Setiap mapel
-    // selalu ditampilkan sebagai 2 baris (Pengetahuan & Keterampilan) supaya
-    // sejalan dengan format rapor cetak SD yang memisah nilai KI-3/KI-4.
-    // Setiap baris juga membawa nilai_id/nilai/predikat dari tabel `nilai` supaya
-    // guru bisa isi nilai & predikat di tempat yang sama dengan deskripsi capaian.
+    // supaya guru bisa isi deskripsi walau belum ada nilai angkanya.
     const mapelDariNilai = [...new Set((nilaiRows || []).map((n) => n.mata_pelajaran))]
-    const mapelDariCapaian = [...new Set((capaianRows || []).map((c) => c.mata_pelajaran))]
+    const mapelDariCapaian = (capaianRows || []).map((c) => c.mata_pelajaran)
     const semuaMapel = [...new Set([...mapelDariNilai, ...mapelDariCapaian])]
-
-    const daftarCapaian = []
-    for (const mapel of semuaMapel) {
-      for (const jenis of OPSI_JENIS_NILAI) {
-        const existingCapaian = (capaianRows || []).find(
-          (c) => c.mata_pelajaran === mapel && (c.jenis || 'Pengetahuan') === jenis
-        )
-        const existingNilai = (nilaiRows || []).find(
-          (n) => n.mata_pelajaran === mapel && (n.jenis || '') === jenis
-        )
-        daftarCapaian.push({
-          id: existingCapaian?.id || null,
+    setCapaianList(
+      semuaMapel.map((mapel) => {
+        const existing = (capaianRows || []).find((c) => c.mata_pelajaran === mapel)
+        return {
+          id: existing?.id || null,
           mata_pelajaran: mapel,
-          jenis,
-          deskripsi_capaian: existingCapaian?.deskripsi_capaian || '',
+          deskripsi_capaian: existing?.deskripsi_capaian || '',
           terkunci: mapelDariNilai.includes(mapel), // nama mapel dari tabel nilai, tidak diedit di sini
-          nilai_id: existingNilai?.id || null,
-          nilai: existingNilai?.nilai ?? '',
-          predikat: existingNilai?.predikat || '',
-        })
-      }
-    }
-    setCapaianList(daftarCapaian)
+        }
+      })
+    )
 
     setLoading(false)
   }
@@ -457,19 +276,10 @@ export default function Rapor() {
     rataRata: (nilaiArr.reduce((a, b) => a + b, 0) / nilaiArr.length).toFixed(1),
   }))
 
-  // ---------- Deskripsi capaian (+ Nilai & Predikat) ----------
+  // ---------- Deskripsi capaian ----------
   function ubahBarisCapaian(index, field, value) {
     setCapaianList((prev) =>
-      prev.map((c, i) => {
-        if (i !== index) return c
-        const updated = { ...c, [field]: value }
-        // Saat nilai diubah, hitung ulang predikat otomatis berdasarkan KKM mapel
-        if (field === 'nilai') {
-          const kkm = kkmUntukMapel(updated.mata_pelajaran, kkmPaiPpkn, kkmLainnya)
-          updated.predikat = hitungPredikat(value, kkm)
-        }
-        return updated
-      })
+      prev.map((c, i) => (i === index ? { ...c, [field]: value } : c))
     )
   }
 
@@ -482,16 +292,7 @@ export default function Rapor() {
   function tambahBarisCapaian() {
     setCapaianList((prev) => [
       ...prev,
-      {
-        id: null,
-        mata_pelajaran: '',
-        jenis: 'Pengetahuan',
-        deskripsi_capaian: '',
-        terkunci: false,
-        nilai_id: null,
-        nilai: '',
-        predikat: '',
-      },
+      { id: null, mata_pelajaran: '', deskripsi_capaian: '', terkunci: false },
     ])
   }
 
@@ -499,9 +300,6 @@ export default function Rapor() {
     const row = capaianList[index]
     if (row.id) {
       await supabase.from('capaian_mapel').delete().eq('id', row.id)
-    }
-    if (row.nilai_id) {
-      await supabase.from('nilai').delete().eq('id', row.nilai_id)
     }
     setCapaianList((prev) => prev.filter((_, i) => i !== index))
   }
@@ -515,14 +313,11 @@ export default function Rapor() {
     let gagal = []
     for (const c of capaianList) {
       if (!c.mata_pelajaran.trim()) continue
-
-      // Simpan deskripsi capaian
       if (c.id) {
         const { error } = await supabase
           .from('capaian_mapel')
           .update({
             mata_pelajaran: c.mata_pelajaran,
-            jenis: c.jenis,
             deskripsi_capaian: c.deskripsi_capaian,
             diisi_oleh: user?.id,
           })
@@ -532,7 +327,6 @@ export default function Rapor() {
         const { error } = await supabase.from('capaian_mapel').insert({
           siswa_id: siswaId,
           mata_pelajaran: c.mata_pelajaran,
-          jenis: c.jenis,
           semester,
           tahun_ajaran: tahunAjaran,
           deskripsi_capaian: c.deskripsi_capaian,
@@ -540,29 +334,8 @@ export default function Rapor() {
         })
         if (error) gagal.push(error.message)
       }
-
-      // Simpan nilai & predikat ke tabel `nilai` supaya kolom Nilai/Predikat
-      // di rapor cetak ikut terisi (sebelumnya cuma deskripsi yang tersimpan)
-      if (c.nilai !== '' && c.nilai !== null && !isNaN(c.nilai)) {
-        const payloadNilai = {
-          siswa_id: siswaId,
-          mata_pelajaran: c.mata_pelajaran,
-          jenis: c.jenis,
-          semester,
-          tahun_ajaran: tahunAjaran,
-          nilai: Number(c.nilai),
-          predikat: c.predikat,
-        }
-        if (c.nilai_id) {
-          const { error } = await supabase.from('nilai').update(payloadNilai).eq('id', c.nilai_id)
-          if (error) gagal.push(error.message)
-        } else {
-          const { error } = await supabase.from('nilai').insert(payloadNilai)
-          if (error) gagal.push(error.message)
-        }
-      }
     }
-    if (gagal.length) alert('Gagal menyimpan sebagian data:\n' + [...new Set(gagal)].join('\n'))
+    if (gagal.length) alert('Gagal menyimpan sebagian deskripsi capaian:\n' + [...new Set(gagal)].join('\n'))
     await muatRapor()
     setSaving(false)
   }
@@ -676,59 +449,7 @@ export default function Rapor() {
     setSaving(false)
   }
 
-  // ---------- Prestasi ----------
-  function tambahBarisPrestasi() {
-    setPrestasiList((prev) => [...prev, { id: null, jenis_prestasi: '', keterangan: '' }])
-  }
-
-  function ubahBarisPrestasi(index, field, value) {
-    setPrestasiList((prev) =>
-      prev.map((row, i) => (i === index ? { ...row, [field]: value } : row))
-    )
-  }
-
-  function pilihRekomendasiPrestasi(index, template) {
-    const jenis = prestasiList[index].jenis_prestasi || 'ini'
-    ubahBarisPrestasi(index, 'keterangan', template.teks(jenis))
-    setRekomendasiPrestasiTerbuka(null)
-  }
-
-  async function hapusBarisPrestasi(index) {
-    const row = prestasiList[index]
-    if (row.id) {
-      await supabase.from('prestasi_siswa').delete().eq('id', row.id)
-    }
-    setPrestasiList((prev) => prev.filter((_, i) => i !== index))
-  }
-
-  async function simpanPrestasi() {
-    setSaving(true)
-    let gagal = []
-    for (const row of prestasiList) {
-      if (!row.jenis_prestasi.trim()) continue
-      if (row.id) {
-        const { error } = await supabase
-          .from('prestasi_siswa')
-          .update({ jenis_prestasi: row.jenis_prestasi, keterangan: row.keterangan })
-          .eq('id', row.id)
-        if (error) gagal.push(error.message)
-      } else {
-        const { error } = await supabase.from('prestasi_siswa').insert({
-          siswa_id: siswaId,
-          semester,
-          tahun_ajaran: tahunAjaran,
-          jenis_prestasi: row.jenis_prestasi,
-          keterangan: row.keterangan,
-        })
-        if (error) gagal.push(error.message)
-      }
-    }
-    if (gagal.length) alert('Gagal menyimpan sebagian data Prestasi:\n' + [...new Set(gagal)].join('\n'))
-    await muatRapor()
-    setSaving(false)
-  }
-
-  // ---------- Catatan wali kelas (juga menampung Sikap, Kepribadian, Saran, Kondisi Kesehatan) ----------
+  // ---------- Catatan wali kelas ----------
   function ubahCatatan(field, value) {
     setCatatan((prev) => ({ ...prev, [field]: value }))
   }
@@ -738,21 +459,6 @@ export default function Rapor() {
     setRekomendasiCatatanTerbuka(false)
   }
 
-  function pilihRekomendasiSaran(template) {
-    ubahCatatan('saran', template.teks())
-    setRekomendasiSaranTerbuka(false)
-  }
-
-  function pilihRekomendasiSpiritual(template) {
-    ubahCatatan('sikap_spiritual', template.teks())
-    setRekomendasiSpiritualTerbuka(false)
-  }
-
-  function pilihRekomendasiSosial(template) {
-    ubahCatatan('sikap_sosial', template.teks())
-    setRekomendasiSosialTerbuka(false)
-  }
-
   async function simpanCatatan() {
     setSaving(true)
     const payload = {
@@ -760,18 +466,9 @@ export default function Rapor() {
       semester,
       tahun_ajaran: tahunAjaran,
       catatan: catatan.catatan,
-      saran: catatan.saran,
       tinggi_badan: catatan.tinggi_badan,
       berat_badan: catatan.berat_badan,
-      kondisi_pendengaran: catatan.kondisi_pendengaran,
-      kondisi_penglihatan: catatan.kondisi_penglihatan,
-      kondisi_gigi: catatan.kondisi_gigi,
-      kondisi_lainnya: catatan.kondisi_lainnya,
-      sikap_spiritual: catatan.sikap_spiritual,
-      sikap_sosial: catatan.sikap_sosial,
-      perilaku: catatan.perilaku,
-      kerajinan: catatan.kerajinan,
-      kerapian: catatan.kerapian,
+      kondisi_kesehatan: catatan.kondisi_kesehatan,
       keputusan: catatan.keputusan,
     }
     const { error } = catatan.id
@@ -789,7 +486,7 @@ export default function Rapor() {
   }
 
   return (
-    <Layout title="Rapor Siswa" subtitle="Kelola nilai, deskripsi capaian, sikap, P5, ekstrakurikuler, prestasi & catatan wali kelas">
+    <Layout title="Rapor Siswa" subtitle="Kelola nilai, deskripsi capaian, P5, ekstrakurikuler & catatan wali kelas">
       <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#4a0e0e] to-[#7a1515] p-6 mb-6">
         <div className="relative z-10 flex items-center gap-4">
           <div className="w-11 h-11 rounded-full bg-white/15 flex items-center justify-center shrink-0">
@@ -922,7 +619,7 @@ export default function Rapor() {
               <>
                 {capaianList.length === 0 && (
                   <p className="text-sm text-ink-700/50 mb-4">
-                    Belum ada mata pelajaran. Klik &quot;Tambah Baris&quot; untuk mulai isi deskripsi capaian.
+                    Belum ada mata pelajaran. Klik &quot;Tambah Mapel&quot; untuk mulai isi deskripsi capaian.
                   </p>
                 )}
                 <div className="space-y-4">
@@ -932,46 +629,16 @@ export default function Rapor() {
                     return (
                       <div key={c.id || `baru-${i}`} className="border border-ink-950/10 rounded-lg p-3">
                         <div className="flex items-start justify-between gap-3 mb-2">
-                          <div className="flex-1 grid sm:grid-cols-[2fr_1fr_1fr_1fr] gap-2">
-                            {c.terkunci ? (
-                              <label className="label-field">{c.mata_pelajaran}</label>
-                            ) : (
-                              <input
-                                className="input-field"
-                                placeholder="Nama mata pelajaran"
-                                value={c.mata_pelajaran}
-                                onChange={(e) => ubahBarisCapaian(i, 'mata_pelajaran', e.target.value)}
-                              />
-                            )}
-                            <select
-                              className="input-field"
-                              value={c.jenis}
-                              onChange={(e) => ubahBarisCapaian(i, 'jenis', e.target.value)}
-                            >
-                              {OPSI_JENIS_NILAI.map((opsi) => (
-                                <option key={opsi} value={opsi}>
-                                  {opsi}
-                                </option>
-                              ))}
-                            </select>
+                          {c.terkunci ? (
+                            <label className="label-field">{c.mata_pelajaran}</label>
+                          ) : (
                             <input
                               className="input-field"
-                              type="number"
-                              min={0}
-                              max={100}
-                              placeholder="Nilai"
-                              value={c.nilai}
-                              onChange={(e) => ubahBarisCapaian(i, 'nilai', e.target.value)}
-                              title="Nilai (0-100)"
+                              placeholder="Nama mata pelajaran"
+                              value={c.mata_pelajaran}
+                              onChange={(e) => ubahBarisCapaian(i, 'mata_pelajaran', e.target.value)}
                             />
-                            <input
-                              className="input-field text-center font-semibold"
-                              placeholder="Predikat"
-                              value={c.predikat}
-                              onChange={(e) => ubahBarisCapaian(i, 'predikat', e.target.value)}
-                              title="Predikat (otomatis dari nilai, bisa diubah manual)"
-                            />
-                          </div>
+                          )}
                           <div className="flex items-center gap-2 shrink-0">
                             <div className="relative">
                               <button
@@ -1012,7 +679,7 @@ export default function Rapor() {
                             <button
                               className="btn-secondary !px-3"
                               onClick={() => hapusBarisCapaian(i)}
-                              title="Hapus baris ini"
+                              title="Hapus mapel ini"
                             >
                               <Trash2 size={15} />
                             </button>
@@ -1020,7 +687,7 @@ export default function Rapor() {
                         </div>
                         <textarea
                           className="input-field min-h-[80px]"
-                          placeholder={`Deskripsi capaian ${c.jenis.toLowerCase()}...`}
+                          placeholder="Deskripsi capaian pembelajaran..."
                           value={c.deskripsi_capaian}
                           onChange={(e) => ubahBarisCapaian(i, 'deskripsi_capaian', e.target.value)}
                         />
@@ -1030,145 +697,13 @@ export default function Rapor() {
                 </div>
                 <div className="flex flex-wrap gap-3 mt-4">
                   <button className="btn-secondary" onClick={tambahBarisCapaian}>
-                    <Plus size={16} /> Tambah Baris
+                    <Plus size={16} /> Tambah Mapel
                   </button>
                   <button className="btn-primary" onClick={simpanCapaian} disabled={saving}>
                     {saving && <Loader2 size={16} className="animate-spin" />}
                     <Save size={16} /> Simpan Deskripsi Capaian
                   </button>
                 </div>
-              </>
-            )}
-
-            {activeTab === 'sikap' && (
-              <>
-                <h4 className="font-display font-semibold text-ink-950 mb-3">A. Sikap</h4>
-                <div className="mb-4">
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="label-field !mb-0">1. Spiritual</label>
-                    <div className="relative">
-                      <button
-                        type="button"
-                        className="btn-secondary !px-3"
-                        onClick={() => setRekomendasiSpiritualTerbuka((v) => !v)}
-                        title="Lihat rekomendasi sikap spiritual"
-                      >
-                        <Lightbulb size={15} /> Rekomendasi
-                      </button>
-                      {rekomendasiSpiritualTerbuka && (
-                        <div className="absolute right-0 bottom-full z-10 mb-2 w-72 max-h-72 overflow-y-auto rounded-lg border border-ink-950/10 bg-white shadow-lg p-2">
-                          {TEMPLATE_SIKAP_SPIRITUAL.map((tpl) => (
-                            <button
-                              key={tpl.kategori}
-                              type="button"
-                              onClick={() => pilihRekomendasiSpiritual(tpl)}
-                              className="w-full text-left px-2.5 py-2 rounded-md hover:bg-ink-950/5 text-sm"
-                            >
-                              <span className="font-medium text-ink-950">{tpl.kategori}</span>
-                              <span className="block text-xs text-ink-700/50 mt-0.5 line-clamp-2">{tpl.teks()}</span>
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                  <textarea
-                    className="input-field min-h-[80px]"
-                    placeholder="Deskripsi sikap spiritual..."
-                    value={catatan.sikap_spiritual}
-                    onChange={(e) => ubahCatatan('sikap_spiritual', e.target.value)}
-                  />
-                </div>
-                <div className="mb-6">
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="label-field !mb-0">2. Sosial</label>
-                    <div className="relative">
-                      <button
-                        type="button"
-                        className="btn-secondary !px-3"
-                        onClick={() => setRekomendasiSosialTerbuka((v) => !v)}
-                        title="Lihat rekomendasi sikap sosial"
-                      >
-                        <Lightbulb size={15} /> Rekomendasi
-                      </button>
-                      {rekomendasiSosialTerbuka && (
-                        <div className="absolute right-0 bottom-full z-10 mb-2 w-72 max-h-72 overflow-y-auto rounded-lg border border-ink-950/10 bg-white shadow-lg p-2">
-                          {TEMPLATE_SIKAP_SOSIAL.map((tpl) => (
-                            <button
-                              key={tpl.kategori}
-                              type="button"
-                              onClick={() => pilihRekomendasiSosial(tpl)}
-                              className="w-full text-left px-2.5 py-2 rounded-md hover:bg-ink-950/5 text-sm"
-                            >
-                              <span className="font-medium text-ink-950">{tpl.kategori}</span>
-                              <span className="block text-xs text-ink-700/50 mt-0.5 line-clamp-2">{tpl.teks()}</span>
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                  <textarea
-                    className="input-field min-h-[80px]"
-                    placeholder="Deskripsi sikap sosial..."
-                    value={catatan.sikap_sosial}
-                    onChange={(e) => ubahCatatan('sikap_sosial', e.target.value)}
-                  />
-                </div>
-
-                <h4 className="font-display font-semibold text-ink-950 mb-3">I. Kepribadian</h4>
-                <div className="grid sm:grid-cols-3 gap-4 mb-4">
-                  <div>
-                    <label className="label-field">Perilaku</label>
-                    <select
-                      className="input-field"
-                      value={catatan.perilaku}
-                      onChange={(e) => ubahCatatan('perilaku', e.target.value)}
-                    >
-                      <option value="">-- Pilih --</option>
-                      {OPSI_PREDIKAT_KEPRIBADIAN.map((p) => (
-                        <option key={p} value={p}>
-                          {p}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="label-field">Kerajinan</label>
-                    <select
-                      className="input-field"
-                      value={catatan.kerajinan}
-                      onChange={(e) => ubahCatatan('kerajinan', e.target.value)}
-                    >
-                      <option value="">-- Pilih --</option>
-                      {OPSI_PREDIKAT_KEPRIBADIAN.map((p) => (
-                        <option key={p} value={p}>
-                          {p}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="label-field">Kerapian</label>
-                    <select
-                      className="input-field"
-                      value={catatan.kerapian}
-                      onChange={(e) => ubahCatatan('kerapian', e.target.value)}
-                    >
-                      <option value="">-- Pilih --</option>
-                      {OPSI_PREDIKAT_KEPRIBADIAN.map((p) => (
-                        <option key={p} value={p}>
-                          {p}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-
-                <button className="btn-primary" onClick={simpanCatatan} disabled={saving}>
-                  {saving && <Loader2 size={16} className="animate-spin" />}
-                  <Save size={16} /> Simpan Sikap & Kepribadian
-                </button>
               </>
             )}
 
@@ -1310,77 +845,6 @@ export default function Rapor() {
               </>
             )}
 
-            {activeTab === 'prestasi' && (
-              <>
-                <div className="space-y-3">
-                  {prestasiList.map((row, i) => (
-                    <div key={row.id || `baru-${i}`} className="grid sm:grid-cols-[2fr_3fr_auto_auto] gap-3 items-start">
-                      <input
-                        className="input-field"
-                        placeholder="Jenis prestasi (mis. Pramuka, Olahraga)"
-                        value={row.jenis_prestasi}
-                        onChange={(e) => ubahBarisPrestasi(i, 'jenis_prestasi', e.target.value)}
-                      />
-                      <input
-                        className="input-field"
-                        placeholder="Keterangan"
-                        value={row.keterangan}
-                        onChange={(e) => ubahBarisPrestasi(i, 'keterangan', e.target.value)}
-                      />
-                      <div className="relative shrink-0">
-                        <button
-                          type="button"
-                          className="btn-secondary !px-3"
-                          onClick={() =>
-                            setRekomendasiPrestasiTerbuka(rekomendasiPrestasiTerbuka === i ? null : i)
-                          }
-                          title="Lihat rekomendasi keterangan"
-                        >
-                          <Lightbulb size={15} />
-                        </button>
-                        {rekomendasiPrestasiTerbuka === i && (
-                          <div className="absolute right-0 bottom-full z-10 mb-2 w-72 max-h-72 overflow-y-auto rounded-lg border border-ink-950/10 bg-white shadow-lg p-2">
-                            {TEMPLATE_PRESTASI.map((tpl) => (
-                              <button
-                                key={tpl.kategori}
-                                type="button"
-                                onClick={() => pilihRekomendasiPrestasi(i, tpl)}
-                                className="w-full text-left px-2.5 py-2 rounded-md hover:bg-ink-950/5 text-sm"
-                              >
-                                <span className="font-medium text-ink-950">{tpl.kategori}</span>
-                                <span className="block text-xs text-ink-700/50 mt-0.5 line-clamp-2">
-                                  {tpl.teks(row.jenis_prestasi || 'ini')}
-                                </span>
-                              </button>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                      <button
-                        className="btn-secondary !px-3"
-                        onClick={() => hapusBarisPrestasi(i)}
-                        title="Hapus baris"
-                      >
-                        <Trash2 size={15} />
-                      </button>
-                    </div>
-                  ))}
-                  {prestasiList.length === 0 && (
-                    <p className="text-sm text-ink-700/50">Belum ada data prestasi untuk periode ini.</p>
-                  )}
-                </div>
-                <div className="flex flex-wrap gap-3 mt-4">
-                  <button className="btn-secondary" onClick={tambahBarisPrestasi}>
-                    <Plus size={16} /> Tambah Baris
-                  </button>
-                  <button className="btn-primary" onClick={simpanPrestasi} disabled={saving}>
-                    {saving && <Loader2 size={16} className="animate-spin" />}
-                    <Save size={16} /> Simpan Prestasi
-                  </button>
-                </div>
-              </>
-            )}
-
             {activeTab === 'catatan' && (
               <>
                 <div className="grid sm:grid-cols-2 gap-4 mb-4">
@@ -1401,47 +865,15 @@ export default function Rapor() {
                     />
                   </div>
                 </div>
-
-                <h4 className="font-display font-semibold text-ink-950 mb-2">Kondisi Kesehatan</h4>
-                <div className="grid sm:grid-cols-2 gap-4 mb-4">
-                  <div>
-                    <label className="label-field">Pendengaran</label>
-                    <input
-                      className="input-field"
-                      placeholder="mis. Baik"
-                      value={catatan.kondisi_pendengaran}
-                      onChange={(e) => ubahCatatan('kondisi_pendengaran', e.target.value)}
-                    />
-                  </div>
-                  <div>
-                    <label className="label-field">Penglihatan</label>
-                    <input
-                      className="input-field"
-                      placeholder="mis. Baik"
-                      value={catatan.kondisi_penglihatan}
-                      onChange={(e) => ubahCatatan('kondisi_penglihatan', e.target.value)}
-                    />
-                  </div>
-                  <div>
-                    <label className="label-field">Kesehatan Gigi</label>
-                    <input
-                      className="input-field"
-                      placeholder="mis. Baik"
-                      value={catatan.kondisi_gigi}
-                      onChange={(e) => ubahCatatan('kondisi_gigi', e.target.value)}
-                    />
-                  </div>
-                  <div>
-                    <label className="label-field">Lainnya</label>
-                    <input
-                      className="input-field"
-                      placeholder="mis. Baik / perlu perhatian pada..."
-                      value={catatan.kondisi_lainnya}
-                      onChange={(e) => ubahCatatan('kondisi_lainnya', e.target.value)}
-                    />
-                  </div>
+                <div className="mb-4">
+                  <label className="label-field">Kondisi Kesehatan</label>
+                  <input
+                    className="input-field"
+                    placeholder="mis. Baik / perlu perhatian pada..."
+                    value={catatan.kondisi_kesehatan}
+                    onChange={(e) => ubahCatatan('kondisi_kesehatan', e.target.value)}
+                  />
                 </div>
-
                 <div className="mb-4">
                   <label className="label-field">Keputusan</label>
                   <select
@@ -1455,44 +887,6 @@ export default function Rapor() {
                     <option value="Lulus">Lulus</option>
                   </select>
                 </div>
-
-                <div className="mb-4">
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="label-field !mb-0">Saran-saran</label>
-                    <div className="relative">
-                      <button
-                        type="button"
-                        className="btn-secondary !px-3"
-                        onClick={() => setRekomendasiSaranTerbuka((v) => !v)}
-                        title="Lihat rekomendasi saran"
-                      >
-                        <Lightbulb size={15} /> Rekomendasi
-                      </button>
-                      {rekomendasiSaranTerbuka && (
-                        <div className="absolute right-0 bottom-full z-10 mb-2 w-72 max-h-72 overflow-y-auto rounded-lg border border-ink-950/10 bg-white shadow-lg p-2">
-                          {TEMPLATE_SARAN.map((tpl) => (
-                            <button
-                              key={tpl.kategori}
-                              type="button"
-                              onClick={() => pilihRekomendasiSaran(tpl)}
-                              className="w-full text-left px-2.5 py-2 rounded-md hover:bg-ink-950/5 text-sm"
-                            >
-                              <span className="font-medium text-ink-950">{tpl.kategori}</span>
-                              <span className="block text-xs text-ink-700/50 mt-0.5 line-clamp-2">{tpl.teks()}</span>
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                  <textarea
-                    className="input-field min-h-[80px]"
-                    placeholder="Saran untuk siswa dan orang tua..."
-                    value={catatan.saran}
-                    onChange={(e) => ubahCatatan('saran', e.target.value)}
-                  />
-                </div>
-
                 <div className="mb-4">
                   <div className="flex items-center justify-between mb-1">
                     <label className="label-field !mb-0">Catatan Wali Kelas</label>
