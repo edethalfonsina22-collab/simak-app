@@ -26,15 +26,6 @@ function rentangTanggalPeriode(tahunAjaran, semester) {
   return { mulai: `${tahunAwal}-07-01`, selesai: `${tahunAwal}-12-31` }
 }
 
-function formatTanggalLahir(tgl) {
-  if (!tgl) return null
-  try {
-    return new Date(tgl).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })
-  } catch {
-    return tgl
-  }
-}
-
 export default function RaporCetak() {
   const [searchParams] = useSearchParams()
   const siswaId = searchParams.get('siswaId')
@@ -51,7 +42,6 @@ export default function RaporCetak() {
   const [catatan, setCatatan] = useState(null)
   const [sekolah, setSekolah] = useState(null)
   const [logoUrl, setLogoUrl] = useState('')
-  const [fotoSiswaUrl, setFotoSiswaUrl] = useState('')
 
   useEffect(() => {
     if (!siswaId || !semester || !tahunAjaran) {
@@ -82,12 +72,10 @@ export default function RaporCetak() {
       { data: catatanRow },
       { data: sekolahRow },
     ] = await Promise.all([
-      // PERBAIKAN: select('*') supaya semua kolom identitas peserta didik & orang tua/wali
-      // ikut terambil untuk Halaman Sampul & Halaman Identitas (bukan cuma nama_orang_tua).
       supabase
         .from('siswa')
         .select(
-          '*, kelas(nama_kelas, wali_kelas:guru!wali_kelas_id(nama_lengkap, nip))'
+          'id, nama_lengkap, nis, nisn, nama_orang_tua, kelas(nama_kelas, wali_kelas:guru!wali_kelas_id(nama_lengkap, nip))'
         )
         .eq('id', siswaId)
         .single(),
@@ -134,11 +122,6 @@ export default function RaporCetak() {
     }
 
     setSiswa(siswaRow || null)
-    if (siswaRow?.foto_path) {
-      const { data: pub } = supabase.storage.from('foto-siswa').getPublicUrl(siswaRow.foto_path)
-      setFotoSiswaUrl(pub.publicUrl)
-    }
-
     setNilai(nilaiRows || [])
     const rekap = { hadir: 0, izin: 0, sakit: 0, alpa: 0 }
     for (const p of presensiRows || []) {
@@ -195,9 +178,7 @@ export default function RaporCetak() {
         @media print {
           .no-print { display: none !important; }
           .lembar-cetak { box-shadow: none !important; margin: 0 !important; }
-          .lembar-cetak + .lembar-cetak { page-break-before: always; }
           body { background: white; }
-          @page { size: A4; margin: 14mm; }
         }
       `}</style>
 
@@ -207,129 +188,7 @@ export default function RaporCetak() {
         </button>
       </div>
 
-      {/* ===================== HALAMAN 1: SAMPUL ===================== */}
-      <div className="lembar-cetak max-w-[800px] mx-auto bg-white shadow-lg p-10 text-sm text-ink-950 flex flex-col items-center min-h-[1000px]">
-        <div className="w-28 h-28 mt-10 mb-4 flex items-center justify-center">
-          {logoUrl && <img src={logoUrl} alt="Logo sekolah" className="w-full h-full object-contain" />}
-        </div>
-        <h1 className="font-display text-2xl font-bold text-center uppercase leading-snug">
-          Rapor Peserta Didik
-          <br />
-          Sekolah Dasar
-          <br />
-          ( S D )
-        </h1>
-
-        <div className="mt-24 w-full max-w-md text-center">
-          <p className="text-ink-700/60 mb-1">Nama Peserta Didik :</p>
-          <div className="border-2 border-ink-950 rounded px-4 py-2 font-bold text-lg uppercase">
-            {siswa.nama_lengkap}
-          </div>
-
-          <p className="text-ink-700/60 mt-6 mb-1">Nomor Induk Siswa</p>
-          <div className="border-2 border-ink-950 rounded px-4 py-2 font-medium">
-            {siswa.nis || '\u00A0'}
-          </div>
-        </div>
-
-        <div className="mt-auto pt-16 text-center">
-          <p className="font-display font-bold uppercase text-sm">Kementerian Pendidikan dan Kebudayaan</p>
-          <p className="font-display font-bold uppercase text-sm">Republik Indonesia</p>
-        </div>
-      </div>
-
-      {/* ===================== HALAMAN 2: IDENTITAS ===================== */}
-      <div className="lembar-cetak max-w-[800px] mx-auto bg-white shadow-lg p-10 text-sm text-ink-950 mt-8 print:mt-0">
-        <h2 className="text-center font-display font-bold text-base uppercase mb-4">
-          Identitas Sekolah
-        </h2>
-        <div className="grid grid-cols-[180px_10px_1fr] gap-y-1 mb-8">
-          <span className="text-ink-700/70">Nama Sekolah</span><span>:</span><span className="font-medium">{sekolah?.nama_sekolah || '-'}</span>
-          <span className="text-ink-700/70">NPSN</span><span>:</span><span className="font-medium">{sekolah?.npsn || '-'}</span>
-          <span className="text-ink-700/70">Alamat Sekolah</span><span>:</span><span className="font-medium">{sekolah?.alamat || '-'}</span>
-          <span className="text-ink-700/70">Kelurahan/Desa</span><span>:</span><span className="font-medium">{sekolah?.kelurahan_desa || '-'}</span>
-          <span className="text-ink-700/70">Kecamatan</span><span>:</span><span className="font-medium">{sekolah?.kecamatan || '-'}</span>
-          <span className="text-ink-700/70">Kota / Kabupaten</span><span>:</span><span className="font-medium">{sekolah?.kabupaten || '-'}</span>
-          <span className="text-ink-700/70">Provinsi</span><span>:</span><span className="font-medium">{sekolah?.provinsi || '-'}</span>
-          <span className="text-ink-700/70">Kode Pos</span><span>:</span><span className="font-medium">{sekolah?.kode_pos || '-'}</span>
-          <span className="text-ink-700/70">No Telpon</span><span>:</span><span className="font-medium">{sekolah?.telepon || '-'}</span>
-          <span className="text-ink-700/70">Website</span><span>:</span><span className="font-medium">{sekolah?.website || '-'}</span>
-          <span className="text-ink-700/70">E-mail</span><span>:</span><span className="font-medium">{sekolah?.email || '-'}</span>
-        </div>
-
-        <h2 className="text-center font-display font-bold text-base uppercase mb-4">
-          Identitas Peserta Didik
-        </h2>
-        <div className="flex gap-6 mb-2">
-          <div className="grid grid-cols-[190px_10px_1fr] gap-y-1 flex-1">
-            <span className="text-ink-700/70">1. Nama Peserta Didik</span><span>:</span><span className="font-medium">{siswa.nama_lengkap}</span>
-            <span className="text-ink-700/70">2. Nomor Induk Siswa</span><span>:</span><span className="font-medium">{siswa.nis || '-'}</span>
-            <span className="text-ink-700/70">3. N I S N</span><span>:</span><span className="font-medium">{siswa.nisn || '-'}</span>
-            <span className="text-ink-700/70">4. Tempat, Tanggal Lahir</span><span>:</span>
-            <span className="font-medium">
-              {[siswa.tempat_lahir, formatTanggalLahir(siswa.tanggal_lahir)].filter(Boolean).join(', ') || '-'}
-            </span>
-            <span className="text-ink-700/70">5. Jenis Kelamin</span><span>:</span>
-            <span className="font-medium">{siswa.jenis_kelamin === 'L' ? 'Laki-laki' : siswa.jenis_kelamin === 'P' ? 'Perempuan' : '-'}</span>
-            <span className="text-ink-700/70">6. Agama</span><span>:</span><span className="font-medium">{siswa.agama || '-'}</span>
-            <span className="text-ink-700/70">7. Pendidikan Sebelumnya</span><span>:</span><span className="font-medium">{siswa.pendidikan_sebelumnya || '-'}</span>
-            <span className="text-ink-700/70">8. Alamat Peserta Didik</span><span>:</span><span className="font-medium">{siswa.alamat || siswa.alamat_tinggal || '-'}</span>
-          </div>
-          <div className="w-24 h-32 border-2 border-ink-950 shrink-0 flex items-center justify-center overflow-hidden">
-            {fotoSiswaUrl ? (
-              <img src={fotoSiswaUrl} alt="Pas foto" className="w-full h-full object-cover" />
-            ) : (
-              <span className="text-[10px] text-center text-ink-700/50 px-1">Pas Foto<br />3 x 4</span>
-            )}
-          </div>
-        </div>
-
-        <div className="grid grid-cols-[190px_10px_1fr] gap-y-1 mt-2">
-          <span className="text-ink-700/70">9. Nama Orang Tua</span><span></span><span></span>
-          <span className="text-ink-700/70 pl-4">1) Ayah</span><span>:</span><span className="font-medium">{siswa.nama_ayah || siswa.nama_orang_tua || '-'}</span>
-          <span className="text-ink-700/70 pl-4">2) Ibu</span><span>:</span><span className="font-medium">{siswa.nama_ibu || '-'}</span>
-
-          <span className="text-ink-700/70">10. Pendidikan Orang Tua</span><span></span><span></span>
-          <span className="text-ink-700/70 pl-4">1) Ayah</span><span>:</span><span className="font-medium">{siswa.pendidikan_ayah || '-'}</span>
-          <span className="text-ink-700/70 pl-4">2) Ibu</span><span>:</span><span className="font-medium">{siswa.pendidikan_ibu || '-'}</span>
-
-          <span className="text-ink-700/70">11. Pekerjaan Orang Tua</span><span></span><span></span>
-          <span className="text-ink-700/70 pl-4">1) Ayah</span><span>:</span><span className="font-medium">{siswa.pekerjaan_ayah || '-'}</span>
-          <span className="text-ink-700/70 pl-4">2) Ibu</span><span>:</span><span className="font-medium">{siswa.pekerjaan_ibu || '-'}</span>
-
-          <span className="text-ink-700/70">12. Alamat Orang Tua</span><span></span><span></span>
-          <span className="text-ink-700/70 pl-4">1) Jalan</span><span>:</span><span className="font-medium">{siswa.alamat || '-'}</span>
-          <span className="text-ink-700/70 pl-4">2) Kelurahan/Desa</span><span>:</span><span className="font-medium">{siswa.ortu_kelurahan_desa || '-'}</span>
-          <span className="text-ink-700/70 pl-4">3) Kecamatan</span><span>:</span><span className="font-medium">{siswa.ortu_kecamatan || '-'}</span>
-          <span className="text-ink-700/70 pl-4">4) Kabupaten/Kota</span><span>:</span><span className="font-medium">{siswa.ortu_kabupaten_kota || '-'}</span>
-          <span className="text-ink-700/70 pl-4">5) Provinsi</span><span>:</span><span className="font-medium">{siswa.ortu_provinsi || '-'}</span>
-
-          <span className="text-ink-700/70">13. Wali Peserta Didik</span><span></span><span></span>
-          <span className="text-ink-700/70 pl-4">1) Nama</span><span>:</span><span className="font-medium">{siswa.nama_wali || '-'}</span>
-          <span className="text-ink-700/70 pl-4">2) Pekerjaan</span><span>:</span><span className="font-medium">{siswa.pekerjaan_wali || '-'}</span>
-          <span className="text-ink-700/70 pl-4">3) Alamat</span><span>:</span><span className="font-medium">{siswa.alamat_wali || '-'}</span>
-        </div>
-
-        <div className="flex justify-end mt-12">
-          <div className="text-center">
-            <p>
-              {sekolah?.tempat_ttd || '.......................'},{' '}
-              {new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}
-            </p>
-            <p className="mb-1">Kepala Sekolah</p>
-            <div className="h-16" />
-            <p className="font-semibold border-t border-ink-950/40 pt-1 inline-block px-6">
-              {sekolah?.kepala_sekolah || '(.......................................)'}
-            </p>
-            {sekolah?.nip_kepala_sekolah && (
-              <p className="text-xs text-ink-700/60">NIP. {sekolah.nip_kepala_sekolah}</p>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* ===================== HALAMAN 3+: LEMBAR HASIL BELAJAR (sudah ada) ===================== */}
-      <div className="lembar-cetak max-w-[800px] mx-auto bg-white shadow-lg p-10 text-sm text-ink-950 mt-8 print:mt-0">
+      <div className="lembar-cetak max-w-[800px] mx-auto bg-white shadow-lg p-10 text-sm text-ink-950">
         <div className="flex items-center gap-4 mb-1.5">
           <div className="w-20 h-20 shrink-0 flex items-center justify-center">
             {logoUrl && <img src={logoUrl} alt="Logo sekolah" className="w-full h-full object-contain" />}
