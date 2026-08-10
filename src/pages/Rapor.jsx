@@ -7,7 +7,6 @@ import {
   Save,
   Plus,
   Trash2,
-  Pencil,
   ClipboardList,
   Sparkles,
   Dumbbell,
@@ -738,72 +737,6 @@ export default function Rapor() {
     navigate(`/rapor/cetak?${params.toString()}`)
   }
 
-  // Tombol "Edit" di daftar siswa per kelas — pilih siswa itu lalu langsung
-  // muat rapornya. Kalau tahun ajaran belum dipilih, beri tahu guru secara
-  // jelas (sebelumnya di sini gagal diam-diam tanpa pesan apa pun, sehingga
-  // terasa seperti tombolnya tidak berfungsi).
-  function editSiswaRapor(target) {
-    if (!tahunAjaran) {
-      alert('Pilih Semester dan Tahun Ajaran terlebih dahulu di bagian atas, baru klik Edit.')
-      return
-    }
-    setSiswaId(target.id)
-    setActiveTab('ringkasan')
-    muatRapor(target.id)
-  }
-
-  // Tombol "Hapus" di daftar siswa per kelas — hapus semua data rapor siswa
-  // itu (capaian, P5, ekstrakurikuler, catatan) untuk semester & tahun ajaran
-  // yang sedang dipilih. Nilai angka (tabel nilai) tidak ikut terhapus karena
-  // dikelola dari halaman input nilai, bukan dari sini.
-  async function hapusRaporSiswa(target) {
-    if (!tahunAjaran) {
-      alert('Pilih tahun ajaran terlebih dahulu sebelum menghapus rapor.')
-      return
-    }
-    const konfirmasi = window.confirm(
-      `Hapus seluruh data rapor ${target.nama_lengkap} untuk Semester ${semester} ${tahunAjaran}? Data capaian, P5, ekstrakurikuler, dan catatan wali kelas akan terhapus permanen.`
-    )
-    if (!konfirmasi) return
-
-    setSaving(true)
-    await Promise.all([
-      supabase
-        .from('capaian_mapel')
-        .delete()
-        .eq('siswa_id', target.id)
-        .eq('semester', semester)
-        .eq('tahun_ajaran', tahunAjaran),
-      supabase
-        .from('rapor_p5')
-        .delete()
-        .eq('siswa_id', target.id)
-        .eq('semester', semester)
-        .eq('tahun_ajaran', tahunAjaran),
-      supabase
-        .from('ekstrakurikuler_nilai')
-        .delete()
-        .eq('siswa_id', target.id)
-        .eq('semester', semester)
-        .eq('tahun_ajaran', tahunAjaran),
-      supabase
-        .from('catatan_siswa')
-        .delete()
-        .eq('siswa_id', target.id)
-        .eq('semester', semester)
-        .eq('tahun_ajaran', tahunAjaran),
-    ])
-
-    if (siswaId === target.id) {
-      setCapaianList([])
-      setP5List([])
-      setEkskulList([])
-      setCatatan(CATATAN_KOSONG)
-    }
-    setSaving(false)
-    alert('Data rapor siswa berhasil dihapus.')
-  }
-
   return (
     <Layout title="Rapor Siswa" subtitle="Kelola nilai, deskripsi capaian, P5, ekstrakurikuler & catatan wali kelas">
       <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#4a0e0e] to-[#7a1515] p-6 mb-6">
@@ -897,7 +830,6 @@ export default function Rapor() {
                 <tr>
                   <th>Nama</th>
                   <th>NIS</th>
-                  <th className="text-right">Aksi</th>
                 </tr>
               </thead>
               <tbody>
@@ -905,24 +837,6 @@ export default function Rapor() {
                   <tr key={s.id}>
                     <td className="font-medium">{s.nama_lengkap}</td>
                     <td>{s.nis || '-'}</td>
-                    <td className="text-right">
-                      <div className="flex justify-end gap-2">
-                        <button
-                          className="btn-secondary !px-3 !py-1.5 text-xs"
-                          onClick={() => editSiswaRapor(s)}
-                          title="Edit rapor siswa ini"
-                        >
-                          <Pencil size={14} /> Edit
-                        </button>
-                        <button
-                          className="btn-secondary !px-3 !py-1.5 text-xs text-red-700"
-                          onClick={() => hapusRaporSiswa(s)}
-                          title="Hapus semua data rapor siswa ini"
-                        >
-                          <Trash2 size={14} /> Hapus
-                        </button>
-                      </div>
-                    </td>
                   </tr>
                 ))}
               </tbody>
