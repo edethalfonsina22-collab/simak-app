@@ -545,7 +545,7 @@ export default function Rapor() {
       for (const komp of KOMPETENSI_KEYS) {
         const entri = c[komp.key]
         if (entri.id) {
-          const { error } = await supabase
+          const { data, error } = await supabase
             .from('capaian_mapel')
             .update({
               mata_pelajaran: c.mata_pelajaran,
@@ -553,18 +553,38 @@ export default function Rapor() {
               diisi_oleh: user?.id,
             })
             .eq('id', entri.id)
-          if (error) gagal.push(error.message)
+            .select()
+          if (error) {
+            gagal.push(error.message)
+          } else if (!data || data.length === 0) {
+            // Tidak ada error, tapi tidak ada baris ter-update — biasanya ini
+            // berarti kebijakan RLS Supabase menolak UPDATE ini secara diam-
+            // diam. Tandai sebagai gagal supaya guru tahu, bukan seolah-olah
+            // tersimpan padahal database tidak berubah.
+            gagal.push(
+              `${c.mata_pelajaran} (${komp.label}): tidak tersimpan — kemungkinan kebijakan RLS pada tabel capaian_mapel belum mengizinkan UPDATE.`
+            )
+          }
         } else if (entri.deskripsi_capaian.trim()) {
-          const { error } = await supabase.from('capaian_mapel').insert({
-            siswa_id: siswaId,
-            mata_pelajaran: c.mata_pelajaran,
-            jenis: komp.jenis,
-            semester,
-            tahun_ajaran: tahunAjaran,
-            deskripsi_capaian: entri.deskripsi_capaian,
-            diisi_oleh: user?.id,
-          })
-          if (error) gagal.push(error.message)
+          const { data, error } = await supabase
+            .from('capaian_mapel')
+            .insert({
+              siswa_id: siswaId,
+              mata_pelajaran: c.mata_pelajaran,
+              jenis: komp.jenis,
+              semester,
+              tahun_ajaran: tahunAjaran,
+              deskripsi_capaian: entri.deskripsi_capaian,
+              diisi_oleh: user?.id,
+            })
+            .select()
+          if (error) {
+            gagal.push(error.message)
+          } else if (!data || data.length === 0) {
+            gagal.push(
+              `${c.mata_pelajaran} (${komp.label}): tidak tersimpan — kemungkinan kebijakan RLS pada tabel capaian_mapel belum mengizinkan INSERT.`
+            )
+          }
         }
       }
     }
@@ -719,13 +739,17 @@ export default function Rapor() {
   }
 
   // Tombol "Edit" di daftar siswa per kelas — pilih siswa itu lalu langsung
-  // muat rapornya (kalau tahun ajaran sudah dipilih).
+  // muat rapornya. Kalau tahun ajaran belum dipilih, beri tahu guru secara
+  // jelas (sebelumnya di sini gagal diam-diam tanpa pesan apa pun, sehingga
+  // terasa seperti tombolnya tidak berfungsi).
   function editSiswaRapor(target) {
+    if (!tahunAjaran) {
+      alert('Pilih Semester dan Tahun Ajaran terlebih dahulu di bagian atas, baru klik Edit.')
+      return
+    }
     setSiswaId(target.id)
     setActiveTab('ringkasan')
-    if (tahunAjaran) {
-      muatRapor(target.id)
-    }
+    muatRapor(target.id)
   }
 
   // Tombol "Hapus" di daftar siswa per kelas — hapus semua data rapor siswa
