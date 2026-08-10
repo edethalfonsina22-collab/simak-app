@@ -14,54 +14,99 @@ import {
   NotebookPen,
   Printer,
   Lightbulb,
+  BookOpen,
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 
-// Template deskripsi kini menerima MATERI/TOPIK spesifik yang diajarkan
-// (bukan hanya nama mata pelajaran), supaya hasilnya membahas materi yang
-// benar-benar diajarkan ke siswa. Contoh: "adanya Allah Swt. yang Maha
-// Pengasih dan Maha Penyayang" — bukan sekadar "mata pelajaran agama islam".
 const TEMPLATE_DESKRIPSI = [
   {
     kategori: 'Sangat Baik',
-    teks: (materi) =>
-      `Ananda menunjukkan penguasaan yang sangat baik dalam ${materi}, mampu memahami dan menerapkan konsep dengan tepat, serta menunjukkan inisiatif dan rasa ingin tahu yang tinggi dalam pembelajaran.`,
+    teks: (mapel) =>
+      `Ananda menunjukkan penguasaan yang sangat baik pada mata pelajaran ${mapel}, mampu memahami dan menerapkan konsep dengan tepat, serta menunjukkan inisiatif dan rasa ingin tahu yang tinggi dalam pembelajaran.`,
   },
   {
     kategori: 'Baik',
-    teks: (materi) =>
-      `Ananda menunjukkan pemahaman yang baik dalam ${materi}, mampu mengikuti pembelajaran dengan baik dan menyelesaikan sebagian besar tugas dengan tepat waktu.`,
+    teks: (mapel) =>
+      `Ananda menunjukkan pemahaman yang baik pada mata pelajaran ${mapel}, mampu mengikuti pembelajaran dengan baik dan menyelesaikan sebagian besar tugas dengan tepat waktu.`,
   },
   {
     kategori: 'Cukup',
-    teks: (materi) =>
-      `Ananda menunjukkan pemahaman yang cukup dalam ${materi}. Dengan bimbingan dan latihan lebih lanjut, ananda diharapkan dapat meningkatkan pemahamannya.`,
+    teks: (mapel) =>
+      `Ananda menunjukkan pemahaman yang cukup pada mata pelajaran ${mapel}. Dengan bimbingan dan latihan lebih lanjut, ananda diharapkan dapat meningkatkan pemahamannya.`,
   },
   {
     kategori: 'Perlu Bimbingan',
-    teks: (materi) =>
-      `Ananda masih memerlukan bimbingan lebih lanjut dalam ${materi} untuk dapat memahami materi secara optimal. Diperlukan perhatian dan pendampingan yang lebih intensif.`,
+    teks: (mapel) =>
+      `Ananda masih memerlukan bimbingan lebih lanjut pada mata pelajaran ${mapel} untuk dapat memahami materi secara optimal. Diperlukan perhatian dan pendampingan yang lebih intensif.`,
   },
 ]
 
 // Template khusus untuk kolom Keterampilan (KI-4) — fokus pada praktik/unjuk
 // kerja, bukan pemahaman konsep seperti TEMPLATE_DESKRIPSI (Pengetahuan).
-// Juga memakai MATERI, bukan nama mapel.
 const TEMPLATE_DESKRIPSI_KETERAMPILAN = [
   {
     kategori: 'Sangat Baik',
+    teks: (mapel) =>
+      `Ananda menunjukkan keterampilan yang sangat baik dalam mempraktikkan materi ${mapel}, mampu menyelesaikan tugas praktik/unjuk kerja dengan sangat terampil, kreatif, dan tepat waktu.`,
+  },
+  {
+    kategori: 'Baik',
+    teks: (mapel) =>
+      `Ananda menunjukkan keterampilan yang baik dalam mempraktikkan materi ${mapel}, mampu menyelesaikan sebagian besar tugas praktik/unjuk kerja dengan baik dan tepat waktu.`,
+  },
+  {
+    kategori: 'Cukup',
+    teks: (mapel) =>
+      `Ananda menunjukkan keterampilan yang cukup dalam mempraktikkan materi ${mapel}. Dengan latihan dan bimbingan lebih lanjut, ananda diharapkan dapat lebih terampil dalam praktik.`,
+  },
+  {
+    kategori: 'Perlu Bimbingan',
+    teks: (mapel) =>
+      `Ananda masih memerlukan bimbingan lebih lanjut dalam mempraktikkan keterampilan pada mata pelajaran ${mapel}. Diperlukan latihan dan pendampingan yang lebih intensif.`,
+  },
+]
+
+// Template rekomendasi berbasis Kompetensi Dasar (KD) — dipakai saat guru
+// memilih salah satu KD dari Bank KD. `materi` di sini adalah teks KD
+// (opsional diawali kode KD), bukan nama mata pelajaran.
+const TEMPLATE_KD_PENGETAHUAN = [
+  {
+    kategori: 'Sangat Baik',
     teks: (materi) =>
-      `Ananda menunjukkan keterampilan yang sangat baik dalam mempraktikkan ${materi}, mampu menyelesaikan tugas praktik/unjuk kerja dengan sangat terampil, kreatif, dan tepat waktu.`,
+      `Ananda menunjukkan penguasaan yang sangat baik terhadap materi ${materi}, mampu memahami dan menjelaskannya dengan tepat serta menerapkannya dalam kehidupan sehari-hari.`,
   },
   {
     kategori: 'Baik',
     teks: (materi) =>
-      `Ananda menunjukkan keterampilan yang baik dalam mempraktikkan ${materi}, mampu menyelesaikan sebagian besar tugas praktik/unjuk kerja dengan baik dan tepat waktu.`,
+      `Ananda menunjukkan pemahaman yang baik terhadap materi ${materi}, mampu menjelaskan dan mengaitkannya dengan baik dalam pembelajaran.`,
   },
   {
     kategori: 'Cukup',
     teks: (materi) =>
-      `Ananda menunjukkan keterampilan yang cukup dalam mempraktikkan ${materi}. Dengan latihan dan bimbingan lebih lanjut, ananda diharapkan dapat lebih terampil dalam praktik.`,
+      `Ananda menunjukkan pemahaman yang cukup terhadap materi ${materi}. Dengan bimbingan lebih lanjut, ananda diharapkan dapat lebih memahami materi ini.`,
+  },
+  {
+    kategori: 'Perlu Bimbingan',
+    teks: (materi) =>
+      `Ananda masih memerlukan bimbingan lebih lanjut untuk memahami materi ${materi}. Diperlukan pendampingan yang lebih intensif.`,
+  },
+]
+
+const TEMPLATE_KD_KETERAMPILAN = [
+  {
+    kategori: 'Sangat Baik',
+    teks: (materi) =>
+      `Ananda menunjukkan keterampilan yang sangat baik dalam mempraktikkan ${materi}, mampu melakukannya secara mandiri, tepat, dan konsisten.`,
+  },
+  {
+    kategori: 'Baik',
+    teks: (materi) =>
+      `Ananda menunjukkan keterampilan yang baik dalam mempraktikkan ${materi}, mampu melakukannya dengan baik meski sesekali masih perlu arahan.`,
+  },
+  {
+    kategori: 'Cukup',
+    teks: (materi) =>
+      `Ananda menunjukkan keterampilan yang cukup dalam mempraktikkan ${materi}. Dengan latihan lebih lanjut, ananda diharapkan dapat lebih terampil.`,
   },
   {
     kategori: 'Perlu Bimbingan',
@@ -202,8 +247,7 @@ export default function Rapor() {
   // Deskripsi capaian per mapel — tabel capaian_mapel, kini 1 baris per
   // (mapel, jenis) di mana jenis = 'Pengetahuan' atau 'Keterampilan'.
   // capaianList di state React tetap 1 baris per mapel, tapi menyimpan
-  // dua sub-objek: pengetahuan & keterampilan, plus `materi` (topik yang
-  // diajarkan, dipakai di kalimat rekomendasi deskripsi).
+  // dua sub-objek: pengetahuan & keterampilan.
   const [capaianList, setCapaianList] = useState([])
 
   // P5 — tabel rapor_p5
@@ -219,6 +263,15 @@ export default function Rapor() {
   const [rekomendasiTerbuka, setRekomendasiTerbuka] = useState(null)
   const [rekomendasiEkskulTerbuka, setRekomendasiEkskulTerbuka] = useState(null)
   const [rekomendasiCatatanTerbuka, setRekomendasiCatatanTerbuka] = useState(false)
+
+  // Bank Kompetensi Dasar (KD) — dropdown "Bank KD" per (mapel, jenis).
+  // kdTerbuka pakai format kunci yang sama dengan rekomendasiTerbuka:
+  // "index:kompetensiKey". kdList berisi daftar KD untuk dropdown yang
+  // sedang terbuka saja (dimuat ulang setiap dropdown dibuka).
+  const [kdTerbuka, setKdTerbuka] = useState(null)
+  const [kdList, setKdList] = useState([])
+  const [kdLoading, setKdLoading] = useState(false)
+  const [kdBaru, setKdBaru] = useState({ kode: '', teks: '' })
 
   useEffect(() => {
     supabase
@@ -267,8 +320,7 @@ export default function Rapor() {
       supabase
         .from('capaian_mapel')
         // + jenis, untuk memisahkan baris Pengetahuan vs Keterampilan
-        // + materi, topik/materi spesifik yang diajarkan (dipakai di deskripsi capaian)
-        .select('id, mata_pelajaran, jenis, materi, deskripsi_capaian')
+        .select('id, mata_pelajaran, jenis, deskripsi_capaian')
         .eq('siswa_id', idSiswa)
         .eq('semester', semester)
         .eq('tahun_ajaran', tahunAjaran),
@@ -321,9 +373,6 @@ export default function Rapor() {
         return {
           mata_pelajaran: mapel,
           terkunci: mapelDariNilai.includes(mapel),
-          // Materi sama untuk Pengetahuan & Keterampilan pada 1 mapel yang
-          // sama, jadi cukup ambil dari salah satu baris yang tersedia.
-          materi: pengetahuan?.materi || keterampilan?.materi || '',
           pengetahuan: { id: pengetahuan?.id || null, deskripsi_capaian: pengetahuan?.deskripsi_capaian || '' },
           keterampilan: { id: keterampilan?.id || null, deskripsi_capaian: keterampilan?.deskripsi_capaian || '' },
         }
@@ -367,17 +416,100 @@ export default function Rapor() {
     setCapaianList((prev) => prev.map((c, i) => (i === index ? { ...c, mata_pelajaran: value } : c)))
   }
 
-  // Ubah materi/topik yang diajarkan untuk 1 baris mapel.
-  function ubahMateriCapaian(index, value) {
-    setCapaianList((prev) => prev.map((c, i) => (i === index ? { ...c, materi: value } : c)))
+  function pilihRekomendasi(index, kompKey, template) {
+    const mapel = capaianList[index].mata_pelajaran || 'mata pelajaran ini'
+    ubahBarisCapaian(index, kompKey, template.teks(mapel))
+    setRekomendasiTerbuka(null)
   }
 
-  function pilihRekomendasi(index, kompKey, template) {
-    // Pakai materi kalau sudah diisi guru; kalau belum, fallback ke nama
-    // mapel supaya tombol rekomendasi tetap berfungsi (tidak error).
-    const materi = capaianList[index].materi?.trim() || capaianList[index].mata_pelajaran || 'materi ini'
-    ubahBarisCapaian(index, kompKey, template.teks(materi))
+  // ---------- Bank Kompetensi Dasar (KD) ----------
+  async function muatKD(mapel, jenisKD) {
+    if (!mapel || !siswaTerpilih?.kelas_id) {
+      setKdList([])
+      return
+    }
+    setKdLoading(true)
+    const { data, error } = await supabase
+      .from('kompetensi_dasar')
+      .select('id, kode, teks')
+      .eq('kelas_id', siswaTerpilih.kelas_id)
+      .eq('mata_pelajaran', mapel)
+      .eq('jenis', jenisKD)
+      .order('kode')
+    if (error) {
+      console.error(error)
+      setKdList([])
+    } else {
+      setKdList(data || [])
+    }
+    setKdLoading(false)
+  }
+
+  function bukaBankKD(index, kompKey) {
+    const kunci = `${index}:${kompKey}`
+    if (kdTerbuka === kunci) {
+      setKdTerbuka(null)
+      return
+    }
     setRekomendasiTerbuka(null)
+    setKdTerbuka(kunci)
+    setKdBaru({ kode: '', teks: '' })
+    const mapel = capaianList[index].mata_pelajaran
+    const jenisKD = KOMPETENSI_KEYS.find((k) => k.key === kompKey).jenis
+    muatKD(mapel, jenisKD)
+  }
+
+  function pilihKD(index, kompKey, kd) {
+    const templates = kompKey === 'keterampilan' ? TEMPLATE_KD_KETERAMPILAN : TEMPLATE_KD_PENGETAHUAN
+    const mapelInfo = barisMapel.find((b) => b.mapel === capaianList[index].mata_pelajaran)
+    const rataRata = kompKey === 'keterampilan' ? mapelInfo?.rataRataKeterampilan : mapelInfo?.rataRataPengetahuan
+    const kategori = kategoriDariNilai(rataRata) || 'Baik'
+    const tpl = templates.find((t) => t.kategori === kategori) || templates[1]
+    const materiText = kd.kode ? `${kd.kode} ${kd.teks}` : kd.teks
+    ubahBarisCapaian(index, kompKey, tpl.teks(materiText))
+    setKdTerbuka(null)
+  }
+
+  async function tambahKDBaru(index, kompKey) {
+    if (!kdBaru.teks.trim()) return
+    const mapel = capaianList[index].mata_pelajaran
+    if (!mapel) {
+      alert('Isi nama mata pelajaran terlebih dahulu.')
+      return
+    }
+    if (!siswaTerpilih?.kelas_id) {
+      alert('Siswa ini belum terhubung ke kelas manapun.')
+      return
+    }
+    const jenisKD = KOMPETENSI_KEYS.find((k) => k.key === kompKey).jenis
+    const { data, error } = await supabase
+      .from('kompetensi_dasar')
+      .insert({
+        kelas_id: siswaTerpilih.kelas_id,
+        mata_pelajaran: mapel,
+        jenis: jenisKD,
+        kode: kdBaru.kode,
+        teks: kdBaru.teks,
+      })
+      .select()
+      .single()
+    if (error) {
+      alert('Gagal menambah KD: ' + error.message)
+      return
+    }
+    setKdList((prev) => [...prev, data])
+    setKdBaru({ kode: '', teks: '' })
+  }
+
+  async function hapusKD(kdId) {
+    const konfirmasi = window.confirm('Hapus KD ini dari Bank KD? Berlaku untuk seluruh kelas ini.')
+    if (!konfirmasi) return
+    const { error } = await supabase.from('kompetensi_dasar').delete().eq('id', kdId)
+    if (error) {
+      alert('Gagal menghapus KD: ' + error.message)
+      return
+    }
+    setKdList((prev) => prev.filter((k) => k.id !== kdId))
   }
 
   function tambahBarisCapaian() {
@@ -386,7 +518,6 @@ export default function Rapor() {
       {
         mata_pelajaran: '',
         terkunci: false,
-        materi: '',
         pengetahuan: { id: null, deskripsi_capaian: '' },
         keterampilan: { id: null, deskripsi_capaian: '' },
       },
@@ -418,7 +549,6 @@ export default function Rapor() {
             .from('capaian_mapel')
             .update({
               mata_pelajaran: c.mata_pelajaran,
-              materi: c.materi,
               deskripsi_capaian: entri.deskripsi_capaian,
               diisi_oleh: user?.id,
             })
@@ -429,7 +559,6 @@ export default function Rapor() {
             siswa_id: siswaId,
             mata_pelajaran: c.mata_pelajaran,
             jenis: komp.jenis,
-            materi: c.materi,
             semester,
             tahun_ajaran: tahunAjaran,
             deskripsi_capaian: entri.deskripsi_capaian,
@@ -885,21 +1014,6 @@ export default function Rapor() {
                           </button>
                         </div>
 
-                        {/* Materi/Topik yang Diajarkan — dipakai oleh tombol
-                            Rekomendasi supaya deskripsi capaian membahas
-                            materi spesifik, bukan sekadar nama mapel. */}
-                        <div className="mb-3">
-                          <label className="text-xs font-semibold text-ink-700/70 mb-1 block">
-                            Materi/Topik yang Diajarkan
-                          </label>
-                          <input
-                            className="input-field"
-                            placeholder="mis. adanya Allah Swt. yang Maha Pengasih dan Maha Penyayang"
-                            value={c.materi || ''}
-                            onChange={(e) => ubahMateriCapaian(i, e.target.value)}
-                          />
-                        </div>
-
                         {KOMPETENSI_KEYS.map((komp) => {
                           const entri = c[komp.key]
                           const rataRata =
@@ -917,46 +1031,134 @@ export default function Rapor() {
                                     <span className="text-ink-700/40 font-normal"> · rata-rata {rataRata}</span>
                                   )}
                                 </label>
-                                <div className="relative">
-                                  <button
-                                    type="button"
-                                    className="btn-secondary !px-3 !py-1 text-xs"
-                                    onClick={() =>
-                                      setRekomendasiTerbuka(
-                                        rekomendasiTerbuka === kunciDropdown ? null : kunciDropdown
-                                      )
-                                    }
-                                    title={`Lihat rekomendasi deskripsi ${komp.label}`}
-                                  >
-                                    <Lightbulb size={13} /> Rekomendasi
-                                  </button>
-                                  {rekomendasiTerbuka === kunciDropdown && (
-                                    <div className="absolute right-0 bottom-full z-10 mb-2 w-72 max-h-72 overflow-y-auto rounded-lg border border-ink-950/10 bg-white shadow-lg p-2">
-                                      {(komp.key === 'keterampilan'
-                                        ? TEMPLATE_DESKRIPSI_KETERAMPILAN
-                                        : TEMPLATE_DESKRIPSI
-                                      ).map((tpl) => (
-                                        <button
-                                          key={tpl.kategori}
-                                          type="button"
-                                          onClick={() => pilihRekomendasi(i, komp.key, tpl)}
-                                          className="w-full text-left px-2.5 py-2 rounded-md hover:bg-ink-950/5 text-sm"
-                                        >
-                                          <span className="font-medium text-ink-950 flex items-center gap-1.5">
-                                            {tpl.kategori}
-                                            {rekomendasiKategori === tpl.kategori && (
-                                              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-sage-500/15 text-sage-500">
-                                                disarankan
-                                              </span>
+                                <div className="flex items-center gap-2">
+                                  <div className="relative">
+                                    <button
+                                      type="button"
+                                      className="btn-secondary !px-3 !py-1 text-xs"
+                                      onClick={() => bukaBankKD(i, komp.key)}
+                                      title={`Ambil dari Bank KD ${komp.label}`}
+                                    >
+                                      <BookOpen size={13} /> Bank KD
+                                    </button>
+                                    {kdTerbuka === kunciDropdown && (
+                                      <div className="absolute right-0 bottom-full z-10 mb-2 w-80 max-h-80 overflow-y-auto rounded-lg border border-ink-950/10 bg-white shadow-lg p-2">
+                                        {!c.mata_pelajaran.trim() ? (
+                                          <p className="text-xs text-ink-700/50 p-2">
+                                            Isi nama mata pelajaran terlebih dahulu.
+                                          </p>
+                                        ) : kdLoading ? (
+                                          <p className="text-xs text-ink-700/50 p-2 flex items-center gap-2">
+                                            <Loader2 size={13} className="animate-spin" /> Memuat KD...
+                                          </p>
+                                        ) : (
+                                          <>
+                                            {kdList.length === 0 && (
+                                              <p className="text-xs text-ink-700/50 p-2">
+                                                Belum ada KD untuk {c.mata_pelajaran} ({komp.label}) di kelas ini.
+                                                Tambahkan di bawah.
+                                              </p>
                                             )}
-                                          </span>
-                                          <span className="block text-xs text-ink-700/50 mt-0.5 line-clamp-2">
-                                            {tpl.teks(c.materi?.trim() || c.mata_pelajaran || 'materi ini')}
-                                          </span>
-                                        </button>
-                                      ))}
-                                    </div>
-                                  )}
+                                            {kdList.map((kd) => (
+                                              <div
+                                                key={kd.id}
+                                                className="flex items-start gap-1 group rounded-md hover:bg-ink-950/5"
+                                              >
+                                                <button
+                                                  type="button"
+                                                  onClick={() => pilihKD(i, komp.key, kd)}
+                                                  className="flex-1 text-left px-2.5 py-2 text-sm"
+                                                >
+                                                  <span className="font-medium text-ink-950">
+                                                    {kd.kode ? `${kd.kode} · ` : ''}
+                                                    {kd.teks}
+                                                  </span>
+                                                </button>
+                                                <button
+                                                  type="button"
+                                                  onClick={() => hapusKD(kd.id)}
+                                                  className="opacity-0 group-hover:opacity-100 px-2 py-2 text-ink-700/40 hover:text-red-700"
+                                                  title="Hapus KD ini"
+                                                >
+                                                  <Trash2 size={13} />
+                                                </button>
+                                              </div>
+                                            ))}
+                                            <div className="border-t border-ink-950/10 mt-2 pt-2 space-y-1.5">
+                                              <p className="text-[11px] font-semibold text-ink-700/60 px-1">
+                                                Tambah KD baru
+                                              </p>
+                                              <input
+                                                className="input-field !py-1.5 text-xs"
+                                                placeholder="Kode (mis. 3.1)"
+                                                value={kdBaru.kode}
+                                                onChange={(e) =>
+                                                  setKdBaru((prev) => ({ ...prev, kode: e.target.value }))
+                                                }
+                                              />
+                                              <textarea
+                                                className="input-field !py-1.5 text-xs min-h-[50px]"
+                                                placeholder="Teks KD / materi..."
+                                                value={kdBaru.teks}
+                                                onChange={(e) =>
+                                                  setKdBaru((prev) => ({ ...prev, teks: e.target.value }))
+                                                }
+                                              />
+                                              <button
+                                                type="button"
+                                                className="btn-secondary !py-1 text-xs w-full justify-center"
+                                                onClick={() => tambahKDBaru(i, komp.key)}
+                                              >
+                                                <Plus size={13} /> Simpan KD
+                                              </button>
+                                            </div>
+                                          </>
+                                        )}
+                                      </div>
+                                    )}
+                                  </div>
+                                  <div className="relative">
+                                    <button
+                                      type="button"
+                                      className="btn-secondary !px-3 !py-1 text-xs"
+                                      onClick={() => {
+                                        setKdTerbuka(null)
+                                        setRekomendasiTerbuka(
+                                          rekomendasiTerbuka === kunciDropdown ? null : kunciDropdown
+                                        )
+                                      }}
+                                      title={`Lihat rekomendasi deskripsi ${komp.label}`}
+                                    >
+                                      <Lightbulb size={13} /> Rekomendasi
+                                    </button>
+                                    {rekomendasiTerbuka === kunciDropdown && (
+                                      <div className="absolute right-0 bottom-full z-10 mb-2 w-72 max-h-72 overflow-y-auto rounded-lg border border-ink-950/10 bg-white shadow-lg p-2">
+                                        {(komp.key === 'keterampilan'
+                                          ? TEMPLATE_DESKRIPSI_KETERAMPILAN
+                                          : TEMPLATE_DESKRIPSI
+                                        ).map((tpl) => (
+                                          <button
+                                            key={tpl.kategori}
+                                            type="button"
+                                            onClick={() => pilihRekomendasi(i, komp.key, tpl)}
+                                            className="w-full text-left px-2.5 py-2 rounded-md hover:bg-ink-950/5 text-sm"
+                                          >
+                                            <span className="font-medium text-ink-950 flex items-center gap-1.5">
+                                              {tpl.kategori}
+                                              {rekomendasiKategori === tpl.kategori && (
+                                                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-sage-500/15 text-sage-500">
+                                                  disarankan
+                                                </span>
+                                              )}
+                                            </span>
+                                            <span className="block text-xs text-ink-700/50 mt-0.5 line-clamp-2">
+                                              {tpl.teks(c.mata_pelajaran || 'mapel ini')}
+                                            </span>
+                                          </button>
+                                        ))}
+                                      </div>
+                                    )}
+                                  </div>
                                 </div>
                               </div>
                               <textarea
