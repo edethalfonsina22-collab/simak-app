@@ -87,10 +87,20 @@ export default function Nilai() {
     setLoading(false)
   }
 
+  // Ambil versi mata pelajaran yang sudah dirapikan (tanpa spasi di awal/akhir,
+  // spasi ganda dirapatkan) — dipakai konsisten baik saat mencari data lama
+  // maupun saat menyimpan, supaya "Matematika", "Matematika " dan " Matematika"
+  // selalu dianggap satu mapel yang sama, bukan tiga baris terpisah.
+  function mapelBersih() {
+    return mataPelajaran.trim().replace(/\s+/g, ' ')
+  }
+
   async function loadExisting() {
-    if (!mataPelajaran || !kelasId) return
+    const mapel = mapelBersih()
+    if (mapel !== mataPelajaran) setMataPelajaran(mapel)
+    if (!mapel || !kelasId) return
     const { data } = await supabase.from('nilai').select('siswa_id, nilai')
-      .eq('mata_pelajaran', mataPelajaran).eq('jenis', jenis).eq('kompetensi', kompetensi)
+      .eq('mata_pelajaran', mapel).eq('jenis', jenis).eq('kompetensi', kompetensi)
       .eq('semester', semester).eq('tahun_ajaran', tahunAjaran)
       .in('siswa_id', siswaList.map((s) => s.id))
     const map = {}
@@ -100,13 +110,15 @@ export default function Nilai() {
   }
 
   async function handleSave() {
-    if (!mataPelajaran) return alert('Isi nama mata pelajaran terlebih dahulu.')
+    const mapel = mapelBersih()
+    if (!mapel) return alert('Isi nama mata pelajaran terlebih dahulu.')
+    setMataPelajaran(mapel)
     setSaving(true)
     const rows = siswaList
       .filter((s) => nilaiMap[s.id] !== undefined && nilaiMap[s.id] !== '')
       .map((s) => ({
         siswa_id: s.id,
-        mata_pelajaran: mataPelajaran,
+        mata_pelajaran: mapel,
         jenis,
         kompetensi,
         semester,
