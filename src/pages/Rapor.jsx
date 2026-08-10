@@ -17,51 +17,56 @@ import {
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 
+// Template deskripsi kini menerima MATERI/TOPIK spesifik yang diajarkan
+// (bukan hanya nama mata pelajaran), supaya hasilnya membahas materi yang
+// benar-benar diajarkan ke siswa. Contoh: "adanya Allah Swt. yang Maha
+// Pengasih dan Maha Penyayang" — bukan sekadar "mata pelajaran agama islam".
 const TEMPLATE_DESKRIPSI = [
   {
     kategori: 'Sangat Baik',
-    teks: (mapel) =>
-      `Ananda menunjukkan penguasaan yang sangat baik pada mata pelajaran ${mapel}, mampu memahami dan menerapkan konsep dengan tepat, serta menunjukkan inisiatif dan rasa ingin tahu yang tinggi dalam pembelajaran.`,
+    teks: (materi) =>
+      `Ananda menunjukkan penguasaan yang sangat baik dalam ${materi}, mampu memahami dan menerapkan konsep dengan tepat, serta menunjukkan inisiatif dan rasa ingin tahu yang tinggi dalam pembelajaran.`,
   },
   {
     kategori: 'Baik',
-    teks: (mapel) =>
-      `Ananda menunjukkan pemahaman yang baik pada mata pelajaran ${mapel}, mampu mengikuti pembelajaran dengan baik dan menyelesaikan sebagian besar tugas dengan tepat waktu.`,
+    teks: (materi) =>
+      `Ananda menunjukkan pemahaman yang baik dalam ${materi}, mampu mengikuti pembelajaran dengan baik dan menyelesaikan sebagian besar tugas dengan tepat waktu.`,
   },
   {
     kategori: 'Cukup',
-    teks: (mapel) =>
-      `Ananda menunjukkan pemahaman yang cukup pada mata pelajaran ${mapel}. Dengan bimbingan dan latihan lebih lanjut, ananda diharapkan dapat meningkatkan pemahamannya.`,
+    teks: (materi) =>
+      `Ananda menunjukkan pemahaman yang cukup dalam ${materi}. Dengan bimbingan dan latihan lebih lanjut, ananda diharapkan dapat meningkatkan pemahamannya.`,
   },
   {
     kategori: 'Perlu Bimbingan',
-    teks: (mapel) =>
-      `Ananda masih memerlukan bimbingan lebih lanjut pada mata pelajaran ${mapel} untuk dapat memahami materi secara optimal. Diperlukan perhatian dan pendampingan yang lebih intensif.`,
+    teks: (materi) =>
+      `Ananda masih memerlukan bimbingan lebih lanjut dalam ${materi} untuk dapat memahami materi secara optimal. Diperlukan perhatian dan pendampingan yang lebih intensif.`,
   },
 ]
 
 // Template khusus untuk kolom Keterampilan (KI-4) — fokus pada praktik/unjuk
 // kerja, bukan pemahaman konsep seperti TEMPLATE_DESKRIPSI (Pengetahuan).
+// Juga memakai MATERI, bukan nama mapel.
 const TEMPLATE_DESKRIPSI_KETERAMPILAN = [
   {
     kategori: 'Sangat Baik',
-    teks: (mapel) =>
-      `Ananda menunjukkan keterampilan yang sangat baik dalam mempraktikkan materi ${mapel}, mampu menyelesaikan tugas praktik/unjuk kerja dengan sangat terampil, kreatif, dan tepat waktu.`,
+    teks: (materi) =>
+      `Ananda menunjukkan keterampilan yang sangat baik dalam mempraktikkan ${materi}, mampu menyelesaikan tugas praktik/unjuk kerja dengan sangat terampil, kreatif, dan tepat waktu.`,
   },
   {
     kategori: 'Baik',
-    teks: (mapel) =>
-      `Ananda menunjukkan keterampilan yang baik dalam mempraktikkan materi ${mapel}, mampu menyelesaikan sebagian besar tugas praktik/unjuk kerja dengan baik dan tepat waktu.`,
+    teks: (materi) =>
+      `Ananda menunjukkan keterampilan yang baik dalam mempraktikkan ${materi}, mampu menyelesaikan sebagian besar tugas praktik/unjuk kerja dengan baik dan tepat waktu.`,
   },
   {
     kategori: 'Cukup',
-    teks: (mapel) =>
-      `Ananda menunjukkan keterampilan yang cukup dalam mempraktikkan materi ${mapel}. Dengan latihan dan bimbingan lebih lanjut, ananda diharapkan dapat lebih terampil dalam praktik.`,
+    teks: (materi) =>
+      `Ananda menunjukkan keterampilan yang cukup dalam mempraktikkan ${materi}. Dengan latihan dan bimbingan lebih lanjut, ananda diharapkan dapat lebih terampil dalam praktik.`,
   },
   {
     kategori: 'Perlu Bimbingan',
-    teks: (mapel) =>
-      `Ananda masih memerlukan bimbingan lebih lanjut dalam mempraktikkan keterampilan pada mata pelajaran ${mapel}. Diperlukan latihan dan pendampingan yang lebih intensif.`,
+    teks: (materi) =>
+      `Ananda masih memerlukan bimbingan lebih lanjut dalam mempraktikkan ${materi}. Diperlukan latihan dan pendampingan yang lebih intensif.`,
   },
 ]
 
@@ -197,7 +202,8 @@ export default function Rapor() {
   // Deskripsi capaian per mapel — tabel capaian_mapel, kini 1 baris per
   // (mapel, jenis) di mana jenis = 'Pengetahuan' atau 'Keterampilan'.
   // capaianList di state React tetap 1 baris per mapel, tapi menyimpan
-  // dua sub-objek: pengetahuan & keterampilan.
+  // dua sub-objek: pengetahuan & keterampilan, plus `materi` (topik yang
+  // diajarkan, dipakai di kalimat rekomendasi deskripsi).
   const [capaianList, setCapaianList] = useState([])
 
   // P5 — tabel rapor_p5
@@ -261,7 +267,8 @@ export default function Rapor() {
       supabase
         .from('capaian_mapel')
         // + jenis, untuk memisahkan baris Pengetahuan vs Keterampilan
-        .select('id, mata_pelajaran, jenis, deskripsi_capaian')
+        // + materi, topik/materi spesifik yang diajarkan (dipakai di deskripsi capaian)
+        .select('id, mata_pelajaran, jenis, materi, deskripsi_capaian')
         .eq('siswa_id', idSiswa)
         .eq('semester', semester)
         .eq('tahun_ajaran', tahunAjaran),
@@ -314,6 +321,9 @@ export default function Rapor() {
         return {
           mata_pelajaran: mapel,
           terkunci: mapelDariNilai.includes(mapel),
+          // Materi sama untuk Pengetahuan & Keterampilan pada 1 mapel yang
+          // sama, jadi cukup ambil dari salah satu baris yang tersedia.
+          materi: pengetahuan?.materi || keterampilan?.materi || '',
           pengetahuan: { id: pengetahuan?.id || null, deskripsi_capaian: pengetahuan?.deskripsi_capaian || '' },
           keterampilan: { id: keterampilan?.id || null, deskripsi_capaian: keterampilan?.deskripsi_capaian || '' },
         }
@@ -357,9 +367,16 @@ export default function Rapor() {
     setCapaianList((prev) => prev.map((c, i) => (i === index ? { ...c, mata_pelajaran: value } : c)))
   }
 
+  // Ubah materi/topik yang diajarkan untuk 1 baris mapel.
+  function ubahMateriCapaian(index, value) {
+    setCapaianList((prev) => prev.map((c, i) => (i === index ? { ...c, materi: value } : c)))
+  }
+
   function pilihRekomendasi(index, kompKey, template) {
-    const mapel = capaianList[index].mata_pelajaran || 'mata pelajaran ini'
-    ubahBarisCapaian(index, kompKey, template.teks(mapel))
+    // Pakai materi kalau sudah diisi guru; kalau belum, fallback ke nama
+    // mapel supaya tombol rekomendasi tetap berfungsi (tidak error).
+    const materi = capaianList[index].materi?.trim() || capaianList[index].mata_pelajaran || 'materi ini'
+    ubahBarisCapaian(index, kompKey, template.teks(materi))
     setRekomendasiTerbuka(null)
   }
 
@@ -369,6 +386,7 @@ export default function Rapor() {
       {
         mata_pelajaran: '',
         terkunci: false,
+        materi: '',
         pengetahuan: { id: null, deskripsi_capaian: '' },
         keterampilan: { id: null, deskripsi_capaian: '' },
       },
@@ -400,6 +418,7 @@ export default function Rapor() {
             .from('capaian_mapel')
             .update({
               mata_pelajaran: c.mata_pelajaran,
+              materi: c.materi,
               deskripsi_capaian: entri.deskripsi_capaian,
               diisi_oleh: user?.id,
             })
@@ -410,6 +429,7 @@ export default function Rapor() {
             siswa_id: siswaId,
             mata_pelajaran: c.mata_pelajaran,
             jenis: komp.jenis,
+            materi: c.materi,
             semester,
             tahun_ajaran: tahunAjaran,
             deskripsi_capaian: entri.deskripsi_capaian,
@@ -865,6 +885,21 @@ export default function Rapor() {
                           </button>
                         </div>
 
+                        {/* Materi/Topik yang Diajarkan — dipakai oleh tombol
+                            Rekomendasi supaya deskripsi capaian membahas
+                            materi spesifik, bukan sekadar nama mapel. */}
+                        <div className="mb-3">
+                          <label className="text-xs font-semibold text-ink-700/70 mb-1 block">
+                            Materi/Topik yang Diajarkan
+                          </label>
+                          <input
+                            className="input-field"
+                            placeholder="mis. adanya Allah Swt. yang Maha Pengasih dan Maha Penyayang"
+                            value={c.materi || ''}
+                            onChange={(e) => ubahMateriCapaian(i, e.target.value)}
+                          />
+                        </div>
+
                         {KOMPETENSI_KEYS.map((komp) => {
                           const entri = c[komp.key]
                           const rataRata =
@@ -916,7 +951,7 @@ export default function Rapor() {
                                             )}
                                           </span>
                                           <span className="block text-xs text-ink-700/50 mt-0.5 line-clamp-2">
-                                            {tpl.teks(c.mata_pelajaran || 'mapel ini')}
+                                            {tpl.teks(c.materi?.trim() || c.mata_pelajaran || 'materi ini')}
                                           </span>
                                         </button>
                                       ))}
