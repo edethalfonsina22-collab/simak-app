@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../lib/AuthContext'
 import Layout from '../components/Layout'
-import { ImagePlus, Loader2, X, Trash2, Images, ChevronLeft, ChevronRight } from 'lucide-react'
+import { ImagePlus, Loader2, X, Trash2, Images, ChevronLeft, ChevronRight, PlayCircle } from 'lucide-react'
 
 const KATEGORI_LIST = ['Semua', 'Akademik', 'Ekstrakurikuler', 'Perayaan', 'Umum']
 
@@ -13,6 +13,15 @@ const KATEGORI_BADGE = {
   Ekstrakurikuler: 'bg-emerald-600/90',
   Perayaan: 'bg-rose-600/90',
   Umum: 'bg-purple-600/90',
+}
+
+// Ekstensi yang dianggap video — dipakai untuk menentukan apakah sebuah item
+// di galeri harus dirender sebagai <video> atau <img>.
+const VIDEO_EXT = ['mp4', 'webm', 'ogg', 'mov', 'mkv', 'avi', 'm4v']
+
+function isVideoPath(path) {
+  const ext = (path || '').split('.').pop()?.toLowerCase()
+  return VIDEO_EXT.includes(ext)
 }
 
 // Motif batik (kawung + parang) — sama persis dengan Profil Saya & Dasbor,
@@ -73,7 +82,7 @@ export default function Galeri() {
   const [openAlbum, setOpenAlbum] = useState(null)
   const [showForm, setShowForm] = useState(false)
   const [filterKategori, setFilterKategori] = useState('Semua')
-  const [lightboxIndex, setLightboxIndex] = useState(null) // index foto yang lagi dibuka, null = tertutup
+  const [lightboxIndex, setLightboxIndex] = useState(null) // index item yang lagi dibuka, null = tertutup
 
   const [form, setForm] = useState({ judul: '', deskripsi: '', kategori: 'Umum', files: [] })
 
@@ -117,7 +126,11 @@ export default function Galeri() {
       const ext = file.name.split('.').pop()
       const path = `${newKegiatan.id}/${Date.now()}-${i}.${ext}`
 
-      const { error: uploadError } = await supabase.storage.from('galeri-foto').upload(path, file)
+      // contentType eksplisit supaya video (mp4/webm/dll) disajikan browser
+      // dengan mime type yang benar, bukan default octet-stream.
+      const { error: uploadError } = await supabase.storage
+        .from('galeri-foto')
+        .upload(path, file, { contentType: file.type || undefined })
       if (uploadError) continue
 
       await supabase.from('galeri_foto').insert({ kegiatan_id: newKegiatan.id, foto_path: path })
@@ -182,7 +195,7 @@ export default function Galeri() {
   }, [lightboxIndex, openAlbum])
 
   return (
-    <Layout title="Galeri Kegiatan" subtitle="Dokumentasi foto kegiatan sekolah">
+    <Layout title="Galeri Kegiatan" subtitle="Dokumentasi foto & video kegiatan sekolah">
       {/* Keyframe animasi muncul bertahap, senada dengan Dasbor & Login */}
       <style>{`
         @keyframes galeriFadeInUp {
@@ -266,13 +279,13 @@ export default function Galeri() {
             <input
               className="input w-full border-slate-200"
               type="file"
-              accept="image/*"
+              accept="image/*,video/*"
               multiple
               onChange={(e) => setForm({ ...form, files: Array.from(e.target.files || []) })}
               required
             />
             {form.files.length > 0 && (
-              <p className="text-xs text-slate-500">{form.files.length} foto dipilih</p>
+              <p className="text-xs text-slate-500">{form.files.length} file dipilih (foto/video)</p>
             )}
             <button
               type="submit"
@@ -296,6 +309,8 @@ export default function Galeri() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
           {kegiatanTerfilter.map((item, i) => {
             const foto = item.galeri_foto || []
+            const cover = foto[0]
+            const coverIsVideo = cover && isVideoPath(cover.foto_path)
             return (
               <button
                 key={item.id}
@@ -305,8 +320,23 @@ export default function Galeri() {
               >
                 <span className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-900 to-brass-400 z-10" />
                 <div className="aspect-video bg-slate-100 relative">
-                  {foto[0] ? (
-                    <img src={fotoUrl(foto[0].foto_path)} alt={item.judul} className="w-full h-full object-cover" />
+                  {cover ? (
+                    coverIsVideo ? (
+                      <>
+                        <video
+                          src={fotoUrl(cover.foto_path)}
+                          className="w-full h-full object-cover"
+                          muted
+                          playsInline
+                          preload="metadata"
+                        />
+                        <div className="absolute inset-0 flex items-center justify-center bg-black/20">
+                          <PlayCircle size={36} className="text-white drop-shadow" />
+                        </div>
+                      </>
+                    ) : (
+                      <img src={fotoUrl(cover.foto_path)} alt={item.judul} className="w-full h-full object-cover" />
+                    )
                   ) : (
                     <div className="w-full h-full flex items-center justify-center text-slate-300">
                       <Images size={28} />
@@ -316,7 +346,7 @@ export default function Galeri() {
                     {item.kategori || 'Umum'}
                   </span>
                   <span className="absolute bottom-2 right-2 text-[11px] font-medium px-2 py-0.5 rounded-md bg-ink-950/80 text-white">
-                    {foto.length} foto
+                    {foto.length} media
                   </span>
                 </div>
                 <div className="p-4">
@@ -331,7 +361,7 @@ export default function Galeri() {
         </div>
       )}
 
-      {/* Modal Album (grid foto) */}
+      {/* Modal Album (grid foto/video) */}
       {openAlbum && (
         <div className="fixed inset-0 bg-slate-900/70 flex items-center justify-center p-4 z-50" onClick={() => setOpenAlbum(null)}>
           <div className="bg-white rounded-xl max-w-3xl w-full max-h-[85vh] overflow-y-auto shadow-xl" onClick={(e) => e.stopPropagation()}>
@@ -362,21 +392,39 @@ export default function Galeri() {
               </div>
             </div>
             <div className="p-5 grid grid-cols-2 sm:grid-cols-3 gap-3">
-              {(openAlbum.galeri_foto || []).map((f, idx) => (
-                <button key={f.id} onClick={() => openLightboxAt(idx)} className="block">
-                  <img
-                    src={fotoUrl(f.foto_path)}
-                    alt=""
-                    className="w-full aspect-square object-cover rounded-lg hover:opacity-90 transition-opacity cursor-zoom-in"
-                  />
-                </button>
-              ))}
+              {(openAlbum.galeri_foto || []).map((f, idx) => {
+                const video = isVideoPath(f.foto_path)
+                return (
+                  <button key={f.id} onClick={() => openLightboxAt(idx)} className="relative block">
+                    {video ? (
+                      <>
+                        <video
+                          src={fotoUrl(f.foto_path)}
+                          className="w-full aspect-square object-cover rounded-lg hover:opacity-90 transition-opacity cursor-zoom-in"
+                          muted
+                          playsInline
+                          preload="metadata"
+                        />
+                        <span className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                          <PlayCircle size={28} className="text-white drop-shadow" />
+                        </span>
+                      </>
+                    ) : (
+                      <img
+                        src={fotoUrl(f.foto_path)}
+                        alt=""
+                        className="w-full aspect-square object-cover rounded-lg hover:opacity-90 transition-opacity cursor-zoom-in"
+                      />
+                    )}
+                  </button>
+                )
+              })}
             </div>
           </div>
         </div>
       )}
 
-      {/* Lightbox foto (klik foto, geser next/prev) */}
+      {/* Lightbox foto/video (klik item, geser next/prev) */}
       {openAlbum && lightboxIndex !== null && (
         <div
           className="fixed inset-0 bg-slate-900/90 flex items-center justify-center z-[60]"
@@ -396,12 +444,22 @@ export default function Galeri() {
             <ChevronLeft size={24} />
           </button>
 
-          <img
-            src={fotoUrl(openAlbum.galeri_foto[lightboxIndex].foto_path)}
-            alt=""
-            className="max-w-[90vw] max-h-[85vh] object-contain rounded-lg"
-            onClick={(e) => e.stopPropagation()}
-          />
+          {isVideoPath(openAlbum.galeri_foto[lightboxIndex].foto_path) ? (
+            <video
+              src={fotoUrl(openAlbum.galeri_foto[lightboxIndex].foto_path)}
+              className="max-w-[90vw] max-h-[85vh] rounded-lg"
+              controls
+              autoPlay
+              onClick={(e) => e.stopPropagation()}
+            />
+          ) : (
+            <img
+              src={fotoUrl(openAlbum.galeri_foto[lightboxIndex].foto_path)}
+              alt=""
+              className="max-w-[90vw] max-h-[85vh] object-contain rounded-lg"
+              onClick={(e) => e.stopPropagation()}
+            />
+          )}
 
           <button
             onClick={(e) => { e.stopPropagation(); nextFoto() }}
