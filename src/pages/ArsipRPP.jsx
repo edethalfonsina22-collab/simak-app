@@ -21,13 +21,16 @@ function isDocFile(nameOrType = '') {
   return /\.(docx?|DOCX?)$/.test(nameOrType) || nameOrType.includes('word')
 }
 
-// Modal Rekomendasi RPP berbasis AI (Langsung panggil OpenAI)
+// Modal Rekomendasi RPP berbasis AI — memanggil Supabase Edge Function
+// `generate-rpp`, BUKAN OpenAI langsung dari browser. API key OpenAI hanya
+// hidup sebagai secret di server Supabase, tidak pernah terkirim ke client.
 function AiRppModal({ isOpen, onClose, onApplyToForm }) {
   const [mataPelajaran, setMataPelajaran] = useState('')
   const [kelas, setKelas] = useState('')
   const [materi, setMateri] = useState('')
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState('')
+  const [errorMsg, setErrorMsg] = useState('')
   const [copied, setCopied] = useState(false)
 
   if (!isOpen) return null
@@ -36,55 +39,23 @@ function AiRppModal({ isOpen, onClose, onApplyToForm }) {
     e.preventDefault()
     setLoading(true)
     setResult('')
-
-    // Membaca API Key dari Vercel Environment Variables atau API Key Cadangan
-    const apiKey =
-      import.meta.env.VITE_OPENAI_API_KEY ||
-      import.meta.env.VITE_OPENAI_KEY ||
-      "sk-proj-9Ad05dA_8wR3q2_1H_rRt-0CuyXOH6nVdTih8kvHQq59f1Jguo0jV3X3rs2m2InL-hDRcxuNNTT3B1bkFJL-eOlSSowf2mrrU-SapUDn3IUBTQ85a4kRdFzrcI3DPRXzl0wY3mug"
-
-    if (!apiKey || apiKey === "PASTE_OPENAI_API_KEY_ANDA_DI_SINI") {
-      alert('API Key belum diisi! Silakan masukkan API Key OpenAI Anda di Vercel Environment Variables atau langsung di kode ArsipRPP.jsx.')
-      setLoading(false)
-      return
-    }
-
-    const promptText = `Anda adalah asisten ahli kurikulum pendidikan Indonesia. 
-Buatkan draf RPP (Rencana Pelaksanaan Pembelajaran) ringkas dan terstruktur berdasarkan data berikut:
-- Mata Pelajaran: ${mataPelajaran}
-- Kelas/Semester: ${kelas || 'Sesuai'}
-- Materi Pokok: ${materi}
-
-Format RPP yang dihasilkan harus mencakup:
-1. Tujuan Pembelajaran
-2. Langkah-Langkah Pembelajaran (Pendahuluan, Kegiatan Inti, Penutup)
-3. Metode & Media Pembelajaran
-4. Penilaian / Asesmen`
+    setErrorMsg('')
 
     try {
-      const res = await fetch('https://api.openai.com/v1/chat/completions', {
+      const res = await fetch('/api/generate-rpp', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${apiKey}`,
-        },
-        body: JSON.stringify({
-          model: 'gpt-4o-mini',
-          messages: [{ role: 'user', content: promptText }],
-          temperature: 0.7,
-        }),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mataPelajaran, kelas, materi }),
       })
-
       const data = await res.json()
 
-      if (res.ok) {
-        const textHasil = data.choices?.[0]?.message?.content || 'Gagal menghasilkan RPP.'
-        setResult(textHasil)
-      } else {
-        alert('Error dari OpenAI: ' + (data.error?.message || 'Gagal memproses permintaan AI.'))
+      if (!res.ok) {
+        throw new Error(data?.error || 'Gagal memproses permintaan AI.')
       }
+
+      setResult(data?.result || 'Gagal menghasilkan RPP.')
     } catch (err) {
-      alert('Gagal membuat rekomendasi RPP: ' + err.message)
+      setErrorMsg('Gagal membuat rekomendasi RPP: ' + err.message)
     } finally {
       setLoading(false)
     }
@@ -149,6 +120,12 @@ Format RPP yang dihasilkan harus mencakup:
               {loading ? 'Sedang Menyusun Rekomendasi...' : 'Generate Rekomendasi RPP'}
             </button>
           </form>
+
+          {errorMsg && (
+            <div className="rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-xs text-red-600">
+              {errorMsg}
+            </div>
+          )}
 
           {result && (
             <div className="mt-4 border border-slate-200 rounded-lg p-4 bg-slate-50 relative">
@@ -495,7 +472,7 @@ export default function ArsipRPP() {
           <form onSubmit={handleUpload} className="card p-6 mb-6 space-y-3">
             <div className="flex justify-between items-center mb-1">
               <h3 className="font-display text-lg font-semibold">Upload RPP ke Arsip</h3>
-              
+
               <button
                 type="button"
                 onClick={() => setIsAiModalOpen(true)}
