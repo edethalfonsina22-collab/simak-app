@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib'
 import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../lib/AuthContext'
@@ -17,6 +17,8 @@ const STATUS_LABEL = {
   ditolak: 'Ditolak',
 }
 
+const NEW_VALUE = '__baru__'
+
 export default function RPP() {
   const { profil, isAdmin, session } = useAuth()
   const [items, setItems] = useState([])
@@ -33,6 +35,12 @@ export default function RPP() {
     tahun_ajaran: '',
     file: null,
   })
+
+  // Mode dropdown vs input manual (untuk Mata Pelajaran & Kelas baru)
+  const [mapelIsNew, setMapelIsNew] = useState(false)
+  const [kelasIsNew, setKelasIsNew] = useState(false)
+  // Nilai dropdown Materi yang sedang dipilih (untuk mengisi Judul RPP)
+  const [materiPilihan, setMateriPilihan] = useState('')
 
   // Form persetujuan admin, per baris
   const [approvalForm, setApprovalForm] = useState({ nama: '', jabatan: 'Kepala Sekolah' })
@@ -52,6 +60,62 @@ export default function RPP() {
   useEffect(() => {
     load()
   }, [])
+
+  // ---- Daftar Mata Pelajaran & Kelas yang sudah pernah ada, untuk dropdown ----
+  const mapelOptions = useMemo(() => {
+    return [...new Set(items.map((i) => i.mata_pelajaran).filter(Boolean))].sort((a, b) =>
+      a.localeCompare(b)
+    )
+  }, [items])
+
+  const kelasOptions = useMemo(() => {
+    return [...new Set(items.map((i) => i.kelas).filter(Boolean))].sort((a, b) =>
+      a.localeCompare(b, undefined, { numeric: true })
+    )
+  }, [items])
+
+  // ---- Daftar Materi (judul RPP) yang cocok dengan Mata Pelajaran + Kelas terpilih ----
+  const materiOptions = useMemo(() => {
+    if (!form.mata_pelajaran || !form.kelas) return []
+    return [
+      ...new Set(
+        items
+          .filter((i) => i.mata_pelajaran === form.mata_pelajaran && i.kelas === form.kelas)
+          .map((i) => i.judul)
+          .filter(Boolean)
+      ),
+    ]
+  }, [items, form.mata_pelajaran, form.kelas])
+
+  function handleMapelSelect(value) {
+    if (value === NEW_VALUE) {
+      setMapelIsNew(true)
+      setForm((f) => ({ ...f, mata_pelajaran: '' }))
+    } else {
+      setForm((f) => ({ ...f, mata_pelajaran: value }))
+    }
+    // Ganti mata pelajaran -> reset pilihan materi lama
+    setMateriPilihan('')
+  }
+
+  function handleKelasSelect(value) {
+    if (value === NEW_VALUE) {
+      setKelasIsNew(true)
+      setForm((f) => ({ ...f, kelas: '' }))
+    } else {
+      setForm((f) => ({ ...f, kelas: value }))
+    }
+    setMateriPilihan('')
+  }
+
+  function handleMateriSelect(value) {
+    setMateriPilihan(value)
+    if (value === NEW_VALUE) {
+      setForm((f) => ({ ...f, judul: '' }))
+    } else if (value) {
+      setForm((f) => ({ ...f, judul: value }))
+    }
+  }
 
   async function handleUpload(e) {
     e.preventDefault()
@@ -86,6 +150,9 @@ export default function RPP() {
       alert('Gagal simpan data RPP: ' + insertError.message)
     } else {
       setForm({ judul: '', mata_pelajaran: '', kelas: '', semester: 'Ganjil', tahun_ajaran: '', file: null })
+      setMapelIsNew(false)
+      setKelasIsNew(false)
+      setMateriPilihan('')
       await load()
     }
     setUploading(false)
@@ -213,24 +280,121 @@ export default function RPP() {
         <form onSubmit={handleUpload} className="card p-6 mb-6 space-y-3">
           <h3 className="font-display text-lg font-semibold mb-1">Upload RPP Baru</h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {/* ---- Mata Pelajaran: dropdown, bisa tambah baru ---- */}
+            {mapelIsNew || mapelOptions.length === 0 ? (
+              <div className="flex gap-2">
+                <input
+                  className="input-field"
+                  placeholder="Mata Pelajaran baru"
+                  value={form.mata_pelajaran}
+                  onChange={(e) => setForm({ ...form, mata_pelajaran: e.target.value })}
+                  autoFocus={mapelIsNew}
+                />
+                {mapelOptions.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMapelIsNew(false)
+                      setForm((f) => ({ ...f, mata_pelajaran: '' }))
+                    }}
+                    className="text-xs text-ink-700/50 shrink-0 px-2"
+                  >
+                    Pilih dari daftar
+                  </button>
+                )}
+              </div>
+            ) : (
+              <select
+                className="input-field"
+                value={form.mata_pelajaran}
+                onChange={(e) => handleMapelSelect(e.target.value)}
+              >
+                <option value="">Pilih Mata Pelajaran</option>
+                {mapelOptions.map((m) => (
+                  <option key={m} value={m}>
+                    {m}
+                  </option>
+                ))}
+                <option value={NEW_VALUE}>+ Mata Pelajaran baru...</option>
+              </select>
+            )}
+
+            {/* ---- Kelas: dropdown, bisa tambah baru ---- */}
+            {kelasIsNew || kelasOptions.length === 0 ? (
+              <div className="flex gap-2">
+                <input
+                  className="input-field"
+                  placeholder="Kelas baru"
+                  value={form.kelas}
+                  onChange={(e) => setForm({ ...form, kelas: e.target.value })}
+                  autoFocus={kelasIsNew}
+                />
+                {kelasOptions.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setKelasIsNew(false)
+                      setForm((f) => ({ ...f, kelas: '' }))
+                    }}
+                    className="text-xs text-ink-700/50 shrink-0 px-2"
+                  >
+                    Pilih dari daftar
+                  </button>
+                )}
+              </div>
+            ) : (
+              <select
+                className="input-field"
+                value={form.kelas}
+                onChange={(e) => handleKelasSelect(e.target.value)}
+              >
+                <option value="">Pilih Kelas</option>
+                {kelasOptions.map((k) => (
+                  <option key={k} value={k}>
+                    {k}
+                  </option>
+                ))}
+                <option value={NEW_VALUE}>+ Kelas baru...</option>
+              </select>
+            )}
+
+            {/* ---- Materi: muncul otomatis begitu Mata Pelajaran + Kelas terpilih ---- */}
+            {materiOptions.length > 0 && (
+              <div className="sm:col-span-2">
+                <select
+                  className="input-field"
+                  value={materiPilihan}
+                  onChange={(e) => handleMateriSelect(e.target.value)}
+                >
+                  <option value="">Pilih Materi yang sudah ada (opsional)</option>
+                  {materiOptions.map((m) => (
+                    <option key={m} value={m}>
+                      {m}
+                    </option>
+                  ))}
+                  <option value={NEW_VALUE}>+ Materi baru...</option>
+                </select>
+                <p className="text-[11px] text-ink-700/40 mt-1">
+                  Memilih materi akan mengisi otomatis kolom Judul RPP di bawah.
+                </p>
+              </div>
+            )}
+
             <input
               className="input-field"
               placeholder="Judul RPP"
               value={form.judul}
-              onChange={(e) => setForm({ ...form, judul: e.target.value })}
+              onChange={(e) => {
+                setForm({ ...form, judul: e.target.value })
+                setMateriPilihan(NEW_VALUE)
+              }}
               required
             />
             <input
               className="input-field"
-              placeholder="Mata Pelajaran"
-              value={form.mata_pelajaran}
-              onChange={(e) => setForm({ ...form, mata_pelajaran: e.target.value })}
-            />
-            <input
-              className="input-field"
-              placeholder="Kelas"
-              value={form.kelas}
-              onChange={(e) => setForm({ ...form, kelas: e.target.value })}
+              placeholder="Tahun Ajaran (mis. 2026/2027)"
+              value={form.tahun_ajaran}
+              onChange={(e) => setForm({ ...form, tahun_ajaran: e.target.value })}
             />
             <select
               className="input-field"
@@ -240,12 +404,6 @@ export default function RPP() {
               <option value="Ganjil">Ganjil</option>
               <option value="Genap">Genap</option>
             </select>
-            <input
-              className="input-field"
-              placeholder="Tahun Ajaran (mis. 2026/2027)"
-              value={form.tahun_ajaran}
-              onChange={(e) => setForm({ ...form, tahun_ajaran: e.target.value })}
-            />
             <input
               className="input-field"
               type="file"
