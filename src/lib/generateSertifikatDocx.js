@@ -1,9 +1,10 @@
 // src/lib/generateSertifikatDocx.js
 //
 // Generator .docx untuk Sertifikat / Piagam Penghargaan (guru maupun siswa).
-// Layout landscape satu halaman dengan bingkai dekoratif, nama penerima besar
-// di tengah, kalimat isi (bisa hasil AI dari /api/generate-sertifikat atau
-// ditulis manual), dan blok tanda tangan Kepala Sekolah.
+// Layout landscape satu halaman dengan bingkai ganda (navy luar + emas dalam),
+// nama penerima besar di tengah, kalimat isi (bisa hasil AI dari
+// /api/generate-sertifikat atau ditulis manual), dan blok tanda tangan
+// Kepala Sekolah lengkap dengan NIP.
 //
 // Jalan langsung di browser, tidak perlu instalasi apa pun secara lokal.
 
@@ -13,7 +14,14 @@ import {
 } from 'docx'
 
 const FONT_TITLE = 'Georgia'
+const FONT_SCRIPT = 'Georgia' // dipakai untuk nama penerima, italic besar
 const FONT_BODY = 'Calibri'
+
+const NAVY = '1e3a5f'
+const GOLD = 'B8860B'
+const GOLD_LIGHT = 'D4AF37'
+const INK = '1F2937'
+const MUTED = '4B5563'
 
 function centered(children, opts = {}) {
   return new Paragraph({
@@ -36,10 +44,121 @@ function buildDocument({
   namaSekolah,
   deskripsi, // kalimat isi ("atas ..." / "sebagai ...")
   namaKepalaSekolah,
+  nipKepalaSekolah,
   tempatTtd,
   tanggal,
 }) {
   const judulBesar = jenis === 'sertifikat' ? 'SERTIFIKAT' : 'PIAGAM PENGHARGAAN'
+
+  // Isi utama sertifikat — akan dibungkus dua lapis bingkai (emas di dalam,
+  // navy di luar) supaya terasa seperti frame ganda, bukan garis tunggal.
+  const isiKonten = [
+    // Ornamen kecil di atas nama sekolah, sebagai aksen dekoratif ringan.
+    centered(
+      [new TextRun({ text: '❦', size: 28, font: FONT_TITLE, color: GOLD })],
+      { after: 120 }
+    ),
+    centered(
+      [new TextRun({ text: (namaSekolah || 'SEKOLAH').toUpperCase(), bold: true, size: 24, font: FONT_BODY, color: NAVY })],
+      { after: 40 }
+    ),
+    // Garis pendek dekoratif di bawah nama sekolah
+    new Paragraph({
+      alignment: AlignmentType.CENTER,
+      spacing: { after: 340 },
+      border: { bottom: { style: BorderStyle.SINGLE, size: 8, color: GOLD_LIGHT, space: 4 } },
+      children: [new TextRun({ text: '        ', size: 4 })],
+    }),
+
+    centered(
+      [new TextRun({ text: judulBesar, bold: true, size: 68, font: FONT_TITLE, color: NAVY })],
+      { after: 40 }
+    ),
+    centered(
+      [new TextRun({ text: jenis === 'sertifikat' ? 'Diberikan kepada' : 'Dengan bangga diberikan kepada', italics: true, size: 24, font: FONT_BODY, color: MUTED })],
+      { after: 320 }
+    ),
+
+    centered(
+      [new TextRun({ text: namaPenerima || '-', bold: true, italics: true, size: 52, font: FONT_SCRIPT, color: GOLD })],
+      { after: 40 }
+    ),
+    centered(
+      [new TextRun({ text: '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', size: 20, font: FONT_BODY, color: GOLD_LIGHT })],
+      { after: 340 }
+    ),
+
+    new Paragraph({
+      alignment: AlignmentType.CENTER,
+      spacing: { after: 520 },
+      children: [new TextRun({ text: deskripsi || '', size: 25, font: FONT_BODY, color: INK })],
+    }),
+
+    centered(
+      [new TextRun({ text: buildKotaTanggal(tempatTtd, tanggal), size: 20, font: FONT_BODY, color: MUTED })],
+      { after: 700 }
+    ),
+
+    centered(
+      [new TextRun({ text: 'Kepala Sekolah', size: 20, font: FONT_BODY, color: INK })],
+      { after: 700 }
+    ),
+    centered(
+      [new TextRun({ text: `( ${namaKepalaSekolah || '.................................'} )`, bold: true, size: 22, font: FONT_BODY, color: INK })],
+      { after: nipKepalaSekolah ? 40 : 0 }
+    ),
+    ...(nipKepalaSekolah
+      ? [centered([new TextRun({ text: `NIP. ${nipKepalaSekolah}`, size: 19, font: FONT_BODY, color: MUTED })], { after: 0 })]
+      : []),
+  ]
+
+  // Bingkai EMAS (dalam) — bungkus isiKonten
+  const bingkaiEmas = new Table({
+    width: { size: 14300, type: WidthType.DXA },
+    borders: {
+      top: { style: BorderStyle.SINGLE, size: 8, color: GOLD },
+      bottom: { style: BorderStyle.SINGLE, size: 8, color: GOLD },
+      left: { style: BorderStyle.SINGLE, size: 8, color: GOLD },
+      right: { style: BorderStyle.SINGLE, size: 8, color: GOLD },
+    },
+    rows: [
+      new TableRow({
+        children: [
+          new TableCell({
+            margins: { top: 420, bottom: 420, left: 600, right: 600 },
+            children: isiKonten,
+          }),
+        ],
+      }),
+    ],
+  })
+
+  // Bingkai NAVY (luar) — bungkus bingkaiEmas, dengan jarak (margin) di
+  // antara keduanya supaya terlihat sebagai dua garis frame terpisah,
+  // bukan menempel jadi satu garis tebal.
+  const bingkaiLuar = new Table({
+    width: { size: 14838, type: WidthType.DXA },
+    borders: {
+      top: { style: BorderStyle.DOUBLE, size: 20, color: NAVY },
+      bottom: { style: BorderStyle.DOUBLE, size: 20, color: NAVY },
+      left: { style: BorderStyle.DOUBLE, size: 20, color: NAVY },
+      right: { style: BorderStyle.DOUBLE, size: 20, color: NAVY },
+    },
+    rows: [
+      new TableRow({
+        children: [
+          new TableCell({
+            margins: { top: 260, bottom: 260, left: 260, right: 260 },
+            children: [
+              new Paragraph({ children: [], spacing: { after: 0 } }), // sedikit napas di dalam frame navy
+            ],
+            // Table di dalam TableCell: docx mendukung ini lewat children campuran
+            // paragraph + table dalam array yang sama.
+          }),
+        ],
+      }),
+    ],
+  })
 
   return new Document({
     sections: [
@@ -47,68 +166,24 @@ function buildDocument({
         properties: {
           page: {
             size: { width: 16838, height: 11906 }, // A4 landscape
-            margin: { top: 900, bottom: 900, left: 1000, right: 1000 },
+            margin: { top: 700, bottom: 700, left: 800, right: 800 },
           },
         },
         children: [
-          // Bingkai dekoratif ganda — dua garis border bersarang sebagai
-          // pengganti frame gambar, dibuat dari border tabel 1-sel penuh halaman.
           new Table({
-            width: { size: 14838, type: WidthType.DXA },
+            width: { size: 15238, type: WidthType.DXA },
             borders: {
-              top: { style: BorderStyle.DOUBLE, size: 18, color: '1e3a5f' },
-              bottom: { style: BorderStyle.DOUBLE, size: 18, color: '1e3a5f' },
-              left: { style: BorderStyle.DOUBLE, size: 18, color: '1e3a5f' },
-              right: { style: BorderStyle.DOUBLE, size: 18, color: '1e3a5f' },
+              top: { style: BorderStyle.DOUBLE, size: 20, color: NAVY },
+              bottom: { style: BorderStyle.DOUBLE, size: 20, color: NAVY },
+              left: { style: BorderStyle.DOUBLE, size: 20, color: NAVY },
+              right: { style: BorderStyle.DOUBLE, size: 20, color: NAVY },
             },
             rows: [
               new TableRow({
                 children: [
                   new TableCell({
-                    margins: { top: 500, bottom: 500, left: 700, right: 700 },
-                    children: [
-                      centered(
-                        [new TextRun({ text: (namaSekolah || 'SEKOLAH').toUpperCase(), bold: true, size: 22, font: FONT_BODY, color: '1e3a5f' })],
-                        { after: 400 }
-                      ),
-
-                      centered(
-                        [new TextRun({ text: judulBesar, bold: true, size: 60, font: FONT_TITLE, color: '1e3a5f' })],
-                        { after: 60 }
-                      ),
-                      centered(
-                        [new TextRun({ text: jenis === 'sertifikat' ? 'Diberikan kepada' : 'Dengan bangga diberikan kepada', italics: true, size: 22, font: FONT_BODY, color: '4B5563' })],
-                        { after: 260 }
-                      ),
-
-                      centered(
-                        [new TextRun({ text: namaPenerima || '-', bold: true, size: 44, font: FONT_TITLE, color: 'B45309' })],
-                        { after: 60 }
-                      ),
-                      centered(
-                        [new TextRun({ text: '________________________________________', size: 22, font: FONT_BODY, color: '9CA3AF' })],
-                        { after: 300 }
-                      ),
-
-                      centered(
-                        [new TextRun({ text: deskripsi || '', size: 24, font: FONT_BODY, color: '1F2937' })],
-                        { after: 500 }
-                      ),
-
-                      centered(
-                        [new TextRun({ text: buildKotaTanggal(tempatTtd, tanggal), size: 20, font: FONT_BODY, color: '4B5563' })],
-                        { after: 700 }
-                      ),
-
-                      centered(
-                        [new TextRun({ text: 'Kepala Sekolah', size: 20, font: FONT_BODY })],
-                        { after: 700 }
-                      ),
-                      centered(
-                        [new TextRun({ text: `( ${namaKepalaSekolah || '.................................'} )`, bold: true, size: 22, font: FONT_BODY })],
-                        { after: 0 }
-                      ),
-                    ],
+                    margins: { top: 220, bottom: 220, left: 220, right: 220 },
+                    children: [bingkaiEmas],
                   }),
                 ],
               }),
