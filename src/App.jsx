@@ -37,6 +37,7 @@ import SertifikatPenghargaan from './pages/SertifikatPenghargaan'
 import PengajuanSuratAktif from './pages/PengajuanSuratAktif'
 import PengajuanEditSiswa from './pages/PengajuanEditSiswa'
 import HariLibur from './pages/HariLibur'
+import RapatVideo from './pages/RapatVideo'
 import Loader from './components/Loader'
 
 function ProtectedRoute({ children, adminOnly }) {
@@ -100,6 +101,7 @@ export default function App() {
       <Route path="/buat-ujian" element={<ProtectedRoute><BuatUjian /></ProtectedRoute>} />
       <Route path="/profil-saya" element={<ProtectedRoute><ProfilSaya /></ProtectedRoute>} />
       <Route path="/sertifikat" element={<ProtectedRoute><SertifikatPenghargaan /></ProtectedRoute>} />
+      <Route path="/rapat/:roomId" element={<ProtectedRoute><RapatVideo /></ProtectedRoute>} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )
