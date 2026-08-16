@@ -6,12 +6,24 @@
 // mem-parsingnya jadi heading/paragraf/bullet, lalu dirender jadi Word.
 //
 // Versi ini mendukung 2 "mode" konten dalam satu teks:
-//   1. RPP inti  -> 4 bagian bernomor (Tujuan Pembelajaran, Langkah-Langkah,
+//   1. RPP inti  -> 4 bagian (Tujuan Pembelajaran, Langkah-Langkah,
 //      Metode & Media, Penilaian) -> heading ukuran sedang, warna abu-gelap.
 //   2. Lampiran   -> diawali baris "LAMPIRAN A: ...", "LAMPIRAN B: ...", dst
-//      (lihat prompt di api/generate-rpp.js) -> tiap lampiran dimulai di
-//      halaman baru dengan heading lebih besar berwarna amber, supaya
-//      terlihat jelas beda dari badan RPP.
+//      -> tiap lampiran dimulai di halaman baru dengan heading lebih besar
+//      berwarna amber, supaya terlihat jelas beda dari badan RPP.
+//
+// PERBAIKAN vs versi sebelumnya:
+//   - Deteksi heading bagian RPP inti sekarang toleran terhadap berbagai
+//     format penomoran AI: "1. Judul", "1) Judul", "A. Judul", judul
+//     ALL CAPS berdiri sendiri, atau judul dibungkus **tebal** sendirian
+//     di satu baris — tidak hanya format "angka titik" seperti sebelumnya.
+//   - Teks **tebal** di TENGAH kalimat sekarang benar-benar dirender bold
+//     di Word (sebelumnya tanda ** hanya dihapus, jadi bold hilang).
+//   - Baris kosong berturut-turut tidak lagi menghasilkan tumpukan
+//     paragraf tak rapi.
+//   - Blok tanda tangan Guru & Kepala Sekolah dipertegas dengan garis
+//     bawah (bukan cuma tanda kurung titik-titik) supaya jelas terlihat
+//     sebagai tempat tanda tangan.
 //
 // Jalan langsung di browser, tidak perlu instalasi apa pun secara lokal.
 
@@ -22,12 +34,33 @@ import {
 
 const FONT = 'Calibri'
 
+// --- Render teks dengan dukungan **bold** inline ---
+// Memecah "kalimat **penting** biasa" jadi beberapa TextRun, sebagian bold.
+function textRuns(text, baseOpts = {}) {
+  const parts = text.split(/(\*\*.+?\*\*)/g).filter((s) => s.length > 0)
+  if (parts.length === 0) {
+    return [new TextRun({ text: '', size: baseOpts.size ?? 22, font: FONT })]
+  }
+  return parts.map((part) => {
+    const isBold = /^\*\*.+\*\*$/.test(part)
+    const clean = isBold ? part.slice(2, -2) : part
+    return new TextRun({
+      text: clean,
+      bold: isBold || baseOpts.bold,
+      italics: baseOpts.italics,
+      size: baseOpts.size ?? 22,
+      font: FONT,
+      color: baseOpts.color,
+    })
+  })
+}
+
 function p(text, opts = {}) {
   return new Paragraph({
     spacing: { after: opts.after ?? 120 },
     alignment: opts.align,
     pageBreakBefore: opts.pageBreakBefore,
-    children: [new TextRun({ text, bold: opts.bold, italics: opts.italics, size: opts.size ?? 22, font: FONT })],
+    children: textRuns(text, opts),
   })
 }
 
@@ -36,7 +69,7 @@ function heading(text) {
   return new Paragraph({
     heading: HeadingLevel.HEADING_2,
     spacing: { before: 260, after: 120 },
-    children: [new TextRun({ text, bold: true, size: 24, font: FONT, color: '1F2937' })],
+    children: [new TextRun({ text: stripMd(text), bold: true, size: 24, font: FONT, color: '1F2937' })],
   })
 }
 
@@ -62,7 +95,7 @@ function bullet(text) {
   return new Paragraph({
     numbering: { reference: 'ai-bullet-list', level: 0 },
     spacing: { after: 60 },
-    children: [new TextRun({ text, size: 22, font: FONT })],
+    children: textRuns(text),
   })
 }
 
@@ -95,21 +128,27 @@ function identityRow(label, value) {
 
 // --- Pola pengenalan baris ---
 
-// Heading bagian RPP inti: hanya dianggap heading kalau judulnya cocok salah
-// satu dari 4 bagian yang diminta di prompt (whitelist) — supaya baris
-// bernomor lain (mis. soal nomor 1 di LKPD) TIDAK ikut dianggap heading.
+// Kata kunci 4 bagian inti RPP — dicek dengan "includes", jadi cocok untuk
+// format penomoran apa pun (angka, huruf, atau tanpa nomor sama sekali).
 const RPP_HEADING_KEYWORDS = [
   'tujuan pembelajaran',
   'langkah-langkah pembelajaran',
+  'langkah pembelajaran',
   'metode & media pembelajaran',
   'metode dan media pembelajaran',
+  'media pembelajaran',
   'penilaian / asesmen',
   'penilaian/asesmen',
   'penilaian dan asesmen',
+  'asesmen',
 ]
-const NUMBERED_LINE_RE = /^(?:\*\*)?\s*\d+[.).]\s*(.+?)(?:\*\*)?\s*$/
+
+// Baris "1. teks", "1) teks", "A. teks", "a) teks" — prefix penomoran apa pun.
+const NUMBERED_LINE_RE = /^(?:\*\*)?\s*(?:\d+|[A-Za-z])[.)]\s*(.+?)(?:\*\*)?\s*$/
+// Judul berdiri sendiri: ALL CAPS (min 3 huruf) atau dibungkus **tebal** penuh.
+const STANDALONE_HEADING_RE = /^(?:\*\*(.+)\*\*|([A-ZÀ-Ý][A-ZÀ-Ý\s/&-]{2,}))$/
 const LAMPIRAN_RE = /^\*{0,2}LAMPIRAN\s+([A-Z])\s*:\s*(.+?)\*{0,2}$/i
-const SUB_HEADING_RE = /^(pendahuluan|kegiatan inti|inti|penutup)\s*[:.]?\s*$/i
+const SUB_HEADING_RE = /^(?:\*\*)?(pendahuluan|kegiatan inti|inti|penutup)(?:\*\*)?\s*[:.]?\s*$/i
 const BULLET_RE = /^[-*•]\s+(.+)$/
 
 function stripMd(text) {
@@ -123,16 +162,14 @@ function isRppSectionHeading(title) {
 
 /**
  * Parsing teks bebas hasil AI (RPP inti + opsional Lampiran) jadi array
- * elemen docx. Toleran terhadap variasi kecil format — baris yang tidak
- * cocok pola apa pun tetap dirender sebagai paragraf biasa.
+ * elemen docx. Toleran terhadap variasi format — baris yang tidak cocok
+ * pola apa pun tetap dirender sebagai paragraf biasa (dengan bold inline
+ * tetap dihormati).
  */
 function parseAiText(rawText) {
   const lines = (rawText || '').split('\n').map((l) => l.trim())
   const elements = []
   let inLampiran = false
-  // Index di array "elements" tempat Lampiran pertama dimulai — dipakai
-  // buildDocument() untuk menyisipkan blok tanda tangan tepat SEBELUM
-  // halaman Lampiran (atau di akhir dokumen kalau tidak ada Lampiran sama sekali).
   let lampiranStartIndex = null
 
   for (const line of lines) {
@@ -148,38 +185,52 @@ function parseAiText(rawText) {
     }
 
     // Sub-bagian Pendahuluan/Inti/Penutup (khusus di dalam RPP inti)
-    if (!inLampiran && SUB_HEADING_RE.test(stripMd(line))) {
+    if (!inLampiran && SUB_HEADING_RE.test(line)) {
       elements.push(subheading(stripMd(line)))
       continue
     }
 
-    // Baris bernomor: heading RPP inti (whitelist) kalau belum masuk lampiran,
-    // selain itu dianggap item bernomor biasa (soal LKPD, kisi-kisi, dst)
+    // Baris bernomor (angka ATAU huruf): heading RPP inti kalau cocok
+    // whitelist & belum masuk lampiran, selain itu item bernomor biasa.
     const numberedMatch = line.match(NUMBERED_LINE_RE)
     if (numberedMatch) {
       if (!inLampiran && isRppSectionHeading(numberedMatch[1])) {
-        elements.push(heading(stripMd(numberedMatch[1])))
+        elements.push(heading(numberedMatch[1]))
       } else {
         elements.push(p(stripMd(line), { after: 90 }))
       }
       continue
     }
 
+    // Judul berdiri sendiri tanpa nomor (ALL CAPS atau **tebal** penuh satu baris)
+    const standaloneMatch = line.match(STANDALONE_HEADING_RE)
+    if (standaloneMatch) {
+      const title = standaloneMatch[1] || standaloneMatch[2]
+      if (!inLampiran && isRppSectionHeading(title)) {
+        elements.push(heading(title))
+        continue
+      }
+    }
+
     const bulletMatch = line.match(BULLET_RE)
     if (bulletMatch) {
-      elements.push(bullet(stripMd(bulletMatch[1])))
+      elements.push(bullet(bulletMatch[1]))
       continue
     }
 
-    elements.push(p(stripMd(line)))
+    elements.push(p(line))
   }
 
   return { elements, lampiranStartIndex: lampiranStartIndex ?? elements.length }
 }
 
 // Blok tanda tangan Guru & Kepala Sekolah — ditempatkan tepat setelah RPP
-// inti (sebelum Lampiran, kalau ada), sama seperti posisi tanda tangan di
-// RPP resmi/format generateRppDocx.js.
+// inti (sebelum Lampiran, kalau ada). Garis bawah dipakai supaya area
+// tanda tangan terlihat jelas walau nama belum diisi.
+function signatureLine(name) {
+  return p(name ? `( ${name} )` : '_________________________', { bold: !!name })
+}
+
 function buildSignatureBlock({ mataPelajaran, kelas, namaGuru, namaKepalaSekolah, kotaTanggal }) {
   return new Table({
     width: { size: 8960, type: WidthType.DXA },
@@ -198,7 +249,7 @@ function buildSignatureBlock({ mataPelajaran, kelas, namaGuru, namaKepalaSekolah
               p('Mengetahui,'),
               p('Kepala Sekolah'),
               p('', { after: 700 }),
-              p(`( ${namaKepalaSekolah || '.................................'} )`, { bold: true }),
+              signatureLine(namaKepalaSekolah),
             ],
           }),
           new TableCell({
@@ -207,7 +258,7 @@ function buildSignatureBlock({ mataPelajaran, kelas, namaGuru, namaKepalaSekolah
               p(kotaTanggal || ''),
               p(`Guru ${mataPelajaran || ''} Kelas ${kelas || ''}`),
               p('', { after: 700 }),
-              p(`( ${namaGuru || '.................................'} )`, { bold: true }),
+              signatureLine(namaGuru),
             ],
           }),
         ],
