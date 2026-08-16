@@ -1,14 +1,19 @@
 // src/lib/generateAiRppDocx.js
 //
-// Generator .docx khusus untuk hasil "Rekomendasi RPP (AI)" di ArsipRPP.jsx.
-// Berbeda dari generateRppDocx.js (yang butuh data RPP terstruktur lengkap:
-// kompetensiInti, kompetensiDasar, dst), file ini menerima TEKS BEBAS hasil
-// Gemini (lihat api/generate-rpp.js) dan mem-parsingnya jadi heading/paragraf/
-// bullet secara sederhana, lalu dirender jadi Word dengan gaya yang senada
-// (font Calibri, heading abu-gelap) dengan dokumen RPP lain di app.
+// Generator .docx untuk hasil "Rekomendasi RPP (AI)" di ArsipRPP.jsx.
+// Berbeda dari generateRppDocx.js (yang butuh data RPP terstruktur lengkap),
+// file ini menerima TEKS BEBAS hasil Gemini (lihat api/generate-rpp.js) dan
+// mem-parsingnya jadi heading/paragraf/bullet, lalu dirender jadi Word.
 //
-// Jalan langsung di browser, sama seperti generateRppDocx.js — tidak perlu
-// instalasi apa pun secara lokal, cukup push ke GitHub dan Vercel yang build.
+// Versi ini mendukung 2 "mode" konten dalam satu teks:
+//   1. RPP inti  -> 4 bagian bernomor (Tujuan Pembelajaran, Langkah-Langkah,
+//      Metode & Media, Penilaian) -> heading ukuran sedang, warna abu-gelap.
+//   2. Lampiran   -> diawali baris "LAMPIRAN A: ...", "LAMPIRAN B: ...", dst
+//      (lihat prompt di api/generate-rpp.js) -> tiap lampiran dimulai di
+//      halaman baru dengan heading lebih besar berwarna amber, supaya
+//      terlihat jelas beda dari badan RPP.
+//
+// Jalan langsung di browser, tidak perlu instalasi apa pun secara lokal.
 
 import {
   Document, Packer, Paragraph, TextRun, HeadingLevel, Table, TableRow, TableCell,
@@ -21,15 +26,28 @@ function p(text, opts = {}) {
   return new Paragraph({
     spacing: { after: opts.after ?? 120 },
     alignment: opts.align,
+    pageBreakBefore: opts.pageBreakBefore,
     children: [new TextRun({ text, bold: opts.bold, italics: opts.italics, size: opts.size ?? 22, font: FONT })],
   })
 }
 
+// Heading bagian RPP inti (1-4)
 function heading(text) {
   return new Paragraph({
     heading: HeadingLevel.HEADING_2,
     spacing: { before: 260, after: 120 },
     children: [new TextRun({ text, bold: true, size: 24, font: FONT, color: '1F2937' })],
+  })
+}
+
+// Heading Lampiran — halaman baru, warna beda supaya jelas terpisah dari RPP inti
+function lampiranHeading(text) {
+  return new Paragraph({
+    heading: HeadingLevel.HEADING_1,
+    pageBreakBefore: true,
+    spacing: { before: 0, after: 160 },
+    border: { bottom: { style: BorderStyle.SINGLE, size: 6, color: 'D97706', space: 8 } },
+    children: [new TextRun({ text, bold: true, size: 28, font: FONT, color: 'B45309' })],
   })
 }
 
@@ -75,43 +93,70 @@ function identityRow(label, value) {
   })
 }
 
-// Baris yang dianggap heading utama, misal: "1. Tujuan Pembelajaran",
-// "1) Tujuan Pembelajaran", atau "**Tujuan Pembelajaran**"
-const MAIN_HEADING_RE = /^(?:\*\*)?\s*\d+[.).]\s*(.+?)(?:\*\*)?\s*$/
-// Baris sub-bagian di dalam Langkah-Langkah Pembelajaran
+// --- Pola pengenalan baris ---
+
+// Heading bagian RPP inti: hanya dianggap heading kalau judulnya cocok salah
+// satu dari 4 bagian yang diminta di prompt (whitelist) — supaya baris
+// bernomor lain (mis. soal nomor 1 di LKPD) TIDAK ikut dianggap heading.
+const RPP_HEADING_KEYWORDS = [
+  'tujuan pembelajaran',
+  'langkah-langkah pembelajaran',
+  'metode & media pembelajaran',
+  'metode dan media pembelajaran',
+  'penilaian / asesmen',
+  'penilaian/asesmen',
+  'penilaian dan asesmen',
+]
+const NUMBERED_LINE_RE = /^(?:\*\*)?\s*\d+[.).]\s*(.+?)(?:\*\*)?\s*$/
+const LAMPIRAN_RE = /^\*{0,2}LAMPIRAN\s+([A-Z])\s*:\s*(.+?)\*{0,2}$/i
 const SUB_HEADING_RE = /^(pendahuluan|kegiatan inti|inti|penutup)\s*[:.]?\s*$/i
-// Baris bullet: diawali "-", "*", atau "•"
 const BULLET_RE = /^[-*•]\s+(.+)$/
 
 function stripMd(text) {
   return text.replace(/\*\*/g, '').trim()
 }
 
+function isRppSectionHeading(title) {
+  const t = stripMd(title).toLowerCase()
+  return RPP_HEADING_KEYWORDS.some((k) => t.includes(k))
+}
+
 /**
- * Parsing teks bebas hasil AI jadi array elemen docx (heading/sub/bullet/paragraf).
- * Format teks yang diharapkan (sesuai prompt di api/generate-rpp.js):
- *   1. Tujuan Pembelajaran
- *   2. Langkah-Langkah Pembelajaran (Pendahuluan, Kegiatan Inti, Penutup)
- *   3. Metode & Media Pembelajaran
- *   4. Penilaian / Asesmen
- * Tapi parser ini sengaja dibuat toleran — kalau AI sedikit mengubah format,
- * baris yang tidak cocok pola apa pun tetap dirender sebagai paragraf biasa.
+ * Parsing teks bebas hasil AI (RPP inti + opsional Lampiran) jadi array
+ * elemen docx. Toleran terhadap variasi kecil format — baris yang tidak
+ * cocok pola apa pun tetap dirender sebagai paragraf biasa.
  */
 function parseAiText(rawText) {
   const lines = (rawText || '').split('\n').map((l) => l.trim())
   const elements = []
+  let inLampiran = false
 
   for (const line of lines) {
     if (!line) continue
 
-    const mainMatch = line.match(MAIN_HEADING_RE)
-    if (mainMatch) {
-      elements.push(heading(stripMd(mainMatch[1])))
+    // Lampiran baru (halaman baru + heading besar)
+    const lampiranMatch = line.match(LAMPIRAN_RE)
+    if (lampiranMatch) {
+      inLampiran = true
+      elements.push(lampiranHeading(`Lampiran ${lampiranMatch[1].toUpperCase()}: ${stripMd(lampiranMatch[2])}`))
       continue
     }
 
-    if (SUB_HEADING_RE.test(stripMd(line))) {
+    // Sub-bagian Pendahuluan/Inti/Penutup (khusus di dalam RPP inti)
+    if (!inLampiran && SUB_HEADING_RE.test(stripMd(line))) {
       elements.push(subheading(stripMd(line)))
+      continue
+    }
+
+    // Baris bernomor: heading RPP inti (whitelist) kalau belum masuk lampiran,
+    // selain itu dianggap item bernomor biasa (soal LKPD, kisi-kisi, dst)
+    const numberedMatch = line.match(NUMBERED_LINE_RE)
+    if (numberedMatch) {
+      if (!inLampiran && isRppSectionHeading(numberedMatch[1])) {
+        elements.push(heading(stripMd(numberedMatch[1])))
+      } else {
+        elements.push(p(stripMd(line), { after: 90 }))
+      }
       continue
     }
 
@@ -192,7 +237,7 @@ function buildDocument({ mataPelajaran, kelas, materi, tahunAjaran, semester, re
             spacing: { before: 100 },
             children: [
               new TextRun({
-                text: 'Catatan: draf ini dihasilkan otomatis oleh AI dan sebaiknya diperiksa/disesuaikan kembali oleh guru sebelum digunakan.',
+                text: 'Catatan: draf ini (termasuk lampiran) dihasilkan otomatis oleh AI dan sebaiknya diperiksa/disesuaikan kembali oleh guru sebelum digunakan.',
                 italics: true,
                 size: 18,
                 font: FONT,
