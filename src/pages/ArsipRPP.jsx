@@ -42,6 +42,7 @@ function AiRppModal({ isOpen, onClose, onApplyToForm }) {
   const [copied, setCopied] = useState(false)
   const [generatingDocx, setGeneratingDocx] = useState(false)
   const [applyingToForm, setApplyingToForm] = useState(false)
+  const [sertakanLampiran, setSertakanLampiran] = useState(true)
 
   if (!isOpen) return null
 
@@ -55,7 +56,7 @@ function AiRppModal({ isOpen, onClose, onApplyToForm }) {
       const res = await fetch('/api/generate-rpp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mataPelajaran, kelas, materi }),
+        body: JSON.stringify({ mataPelajaran, kelas, materi, sertakanLampiran }),
       })
       const data = await res.json()
 
@@ -141,6 +142,18 @@ function AiRppModal({ isOpen, onClose, onApplyToForm }) {
               onChange={(e) => setMateri(e.target.value)}
               required
             />
+            <label className="sm:col-span-2 flex items-start gap-2 text-xs text-slate-600 -mt-1">
+              <input
+                type="checkbox"
+                checked={sertakanLampiran}
+                onChange={(e) => setSertakanLampiran(e.target.checked)}
+                className="mt-0.5"
+              />
+              <span>
+                Sertakan lampiran lengkap (LKPD, Instrumen Penilaian, Bahan Ajar, Kisi-kisi & Soal Evaluasi) —
+                digabung dalam satu file .docx dengan RPP-nya
+              </span>
+            </label>
             <button
               type="submit"
               disabled={loading}
@@ -200,6 +213,7 @@ function AiRppModal({ isOpen, onClose, onApplyToForm }) {
               <p className="text-[11px] text-slate-400 mt-1.5 text-center">
                 File .docx akan dibuat otomatis dan langsung mengisi kolom "Choose File" di form upload —
                 tidak perlu copy-paste manual ke Word lagi.
+                {sertakanLampiran && ' Lampiran (LKPD, dll.) ikut tergabung di halaman berikutnya dalam file yang sama.'}
               </p>
             </div>
           )}
