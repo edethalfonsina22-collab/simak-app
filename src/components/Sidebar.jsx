@@ -32,6 +32,7 @@ import {
   CalendarOff,
   FileCheck2,
   UserCog,
+  Award,
 } from 'lucide-react'
 import { useAuth } from '../lib/AuthContext'
 import { supabase } from '../lib/supabaseClient'
@@ -60,6 +61,7 @@ const groupsAdmin = [
       { to: '/rapor', label: 'Rapor Siswa', icon: FileBadge },
       { to: '/rpp', label: 'RPP', icon: NotebookPen },
       { to: '/arsip-rpp', label: 'Arsip RPP', icon: Archive },
+      { to: '/sertifikat', label: 'Sertifikat & Penghargaan', icon: Award },
       { to: '/buat-ujian', label: 'Buat Ujian', icon: FilePlus },
       { to: '/hasil-ujian', label: 'Hasil Ujian', icon: ClipboardList },
       { to: '/bank-soal', label: 'Bank Soal', icon: Database },
@@ -103,6 +105,7 @@ const linksGuru = [
   { to: '/rapor', label: 'Rapor Siswa', icon: FileBadge },
   { to: '/rpp', label: 'RPP', icon: NotebookPen },
   { to: '/arsip-rpp', label: 'Arsip RPP', icon: Archive },
+  { to: '/sertifikat', label: 'Sertifikat & Penghargaan', icon: Award },
   { to: '/pengajuan-surat-aktif', label: 'Pengajuan Surat Aktif', icon: FileCheck2 },
   { to: '/perbaikan-data-siswa', label: 'Perbaikan Data Siswa', icon: UserCog },
   { to: '/buat-ujian', label: 'Buat Ujian', icon: FilePlus },
