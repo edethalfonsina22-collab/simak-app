@@ -1,9 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
-import jsQR from 'jsqr'
 import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../lib/AuthContext'
 import Layout from '../components/Layout'
-import { Loader2, Save, ClipboardCheck, WifiOff, Camera, X, CheckCircle2, AlertCircle, RotateCcw } from 'lucide-react'
+import { Loader2, Save, ClipboardCheck, WifiOff, Camera, X, RotateCcw, Check } from 'lucide-react'
 import { tambahAntrian, ambilAntrian, sinkronAntrian } from '../lib/offlineQueue'
 
 const STATUS_OPTS = [
@@ -81,20 +80,19 @@ function jamLabel(iso) {
 }
 
 // ============================================================
-// Modul Kamera: scan QR identitas guru + ambil foto bukti sekaligus
-// dari frame yang sama saat QR berhasil terbaca.
+// Modul Kamera: ambil satu foto bukti kehadiran untuk satu guru.
+// Tidak ada scan QR — murni ambil foto lalu simpan.
 // ============================================================
-function ScannerPresensiGuru({ guruList, tanggal, onDetected, onClose }) {
+function CameraFotoGuru({ guru, tanggal, onSaved, onClose }) {
   const videoRef = useRef(null)
   const canvasRef = useRef(null)
   const streamRef = useRef(null)
-  const rafRef = useRef(null)
-  const scanningRef = useRef(true)
 
-  const [facingMode, setFacingMode] = useState('environment')
-  const [status, setStatus] = useState('starting') // starting | scanning | processing | success | error | cam-error
-  const [message, setMessage] = useState('')
-  const [lastGuruName, setLastGuruName] = useState('')
+  const [facingMode, setFacingMode] = useState('user')
+  const [status, setStatus] = useState('starting') // starting | live | preview | saving | cam-error
+  const [errorMsg, setErrorMsg] = useState('')
+  const [previewUrl, setPreviewUrl] = useState('')
+  const [capturedBlob, setCapturedBlob] = useState(null)
 
   useEffect(() => {
     startCamera(facingMode)
@@ -105,7 +103,7 @@ function ScannerPresensiGuru({ guruList, tanggal, onDetected, onClose }) {
   async function startCamera(mode) {
     stopCamera()
     setStatus('starting')
-    setMessage('')
+    setErrorMsg('')
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: { ideal: mode }, width: { ideal: 960 }, height: { ideal: 720 } },
@@ -116,85 +114,65 @@ function ScannerPresensiGuru({ guruList, tanggal, onDetected, onClose }) {
         videoRef.current.srcObject = stream
         await videoRef.current.play()
       }
-      scanningRef.current = true
-      setStatus('scanning')
-      rafRef.current = requestAnimationFrame(tick)
+      setStatus('live')
     } catch (err) {
       setStatus('cam-error')
-      setMessage('Tidak bisa mengakses kamera: ' + (err.message || 'izin ditolak.'))
+      setErrorMsg('Tidak bisa mengakses kamera: ' + (err.message || 'izin ditolak.'))
     }
   }
 
   function stopCamera() {
-    if (rafRef.current) cancelAnimationFrame(rafRef.current)
-    rafRef.current = null
-    scanningRef.current = false
     if (streamRef.current) {
       streamRef.current.getTracks().forEach((t) => t.stop())
       streamRef.current = null
     }
   }
 
-  function tick() {
-    if (!scanningRef.current) return
+  function ambilFoto() {
     const video = videoRef.current
     const canvas = canvasRef.current
-    if (video && canvas && video.readyState === video.HAVE_ENOUGH_DATA) {
-      canvas.width = video.videoWidth
-      canvas.height = video.videoHeight
-      const ctx = canvas.getContext('2d')
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
-      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
-      const code = jsQR(imageData.data, imageData.width, imageData.height)
-      if (code && code.data) {
-        handleDetected(code.data, canvas)
-        return
-      }
-    }
-    rafRef.current = requestAnimationFrame(tick)
+    if (!video || !canvas) return
+    canvas.width = video.videoWidth
+    canvas.height = video.videoHeight
+    const ctx = canvas.getContext('2d')
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
+    canvas.toBlob(
+      (blob) => {
+        if (!blob) return
+        setCapturedBlob(blob)
+        setPreviewUrl(URL.createObjectURL(blob))
+        setStatus('preview')
+        stopCamera()
+      },
+      'image/jpeg',
+      0.85
+    )
   }
 
-  async function handleDetected(text, canvas) {
-    scanningRef.current = false
-    setStatus('processing')
+  function ambilUlang() {
+    setCapturedBlob(null)
+    setPreviewUrl('')
+    startCamera(facingMode)
+  }
 
-    const guru = guruList.find((g) => g.id === text)
-    if (!guru) {
-      setStatus('error')
-      setMessage('QR tidak dikenali sebagai identitas guru terdaftar.')
-      setTimeout(() => {
-        scanningRef.current = true
-        setStatus('scanning')
-        rafRef.current = requestAnimationFrame(tick)
-      }, 1800)
+  async function gunakanFoto() {
+    if (!capturedBlob) return
+    setStatus('saving')
+    const path = `${guru.id}/${tanggal}.jpg`
+
+    const { error: uploadError } = await supabase.storage
+      .from(BUCKET_BUKTI)
+      .upload(path, capturedBlob, { upsert: true, contentType: 'image/jpeg' })
+
+    if (uploadError) {
+      setStatus('preview')
+      setErrorMsg('Gagal upload foto: ' + uploadError.message)
       return
     }
 
-    // Ambil snapshot frame yang sama sebagai foto bukti kehadiran
-    const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.85))
-    const path = `${guru.id}/${tanggal}.jpg`
-
-    let fotoPath = null
-    if (blob) {
-      const { error: uploadError } = await supabase.storage
-        .from(BUCKET_BUKTI)
-        .upload(path, blob, { upsert: true, contentType: 'image/jpeg' })
-      if (!uploadError) fotoPath = path
-    }
-
     const jamAbsen = new Date().toISOString()
-
-    setLastGuruName(guru.nama_lengkap)
-    setStatus('success')
-    setMessage(`${guru.nama_lengkap} berhasil ditandai hadir.`)
-
-    onDetected({ guru, fotoPath, jamAbsen })
-
-    setTimeout(() => {
-      scanningRef.current = true
-      setStatus('scanning')
-      rafRef.current = requestAnimationFrame(tick)
-    }, 1400)
+    await onSaved({ guru, fotoPath: path, jamAbsen })
+    onClose()
   }
 
   function switchCamera() {
@@ -206,28 +184,27 @@ function ScannerPresensiGuru({ guruList, tanggal, onDetected, onClose }) {
       <div className="card relative overflow-hidden w-full max-w-md p-5">
         <span className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-900 to-brass-400" />
         <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-2.5 min-w-0">
             <div className="w-9 h-9 rounded-full bg-blue-900/10 text-blue-900 flex items-center justify-center shrink-0">
               <Camera size={17} />
             </div>
-            <div>
-              <h2 className="font-display text-lg font-semibold leading-tight">Scan QR Guru</h2>
-              <p className="text-xs text-ink-700/50">Arahkan kamera ke QR identitas guru</p>
+            <div className="min-w-0">
+              <h2 className="font-display text-lg font-semibold leading-tight truncate">Foto Bukti Kehadiran</h2>
+              <p className="text-xs text-ink-700/50 truncate">{guru.nama_lengkap}</p>
             </div>
           </div>
-          <button type="button" onClick={onClose} className="text-ink-700/40 hover:text-ink-900">
+          <button type="button" onClick={onClose} className="text-ink-700/40 hover:text-ink-900 shrink-0">
             <X size={20} />
           </button>
         </div>
 
         <div className="relative w-full aspect-square rounded-lg overflow-hidden bg-ink-950">
-          <video ref={videoRef} className="w-full h-full object-cover" muted playsInline />
-          <canvas ref={canvasRef} className="hidden" />
-
-          {/* Bingkai target scan */}
-          {status === 'scanning' && (
-            <div className="absolute inset-8 border-2 border-brass-400/70 rounded-lg pointer-events-none" />
+          {status === 'preview' ? (
+            <img src={previewUrl} alt="Pratinjau foto" className="w-full h-full object-cover" />
+          ) : (
+            <video ref={videoRef} className="w-full h-full object-cover" muted playsInline />
           )}
+          <canvas ref={canvasRef} className="hidden" />
 
           {status === 'starting' && (
             <div className="absolute inset-0 flex items-center justify-center bg-ink-950/60 text-white text-sm gap-2">
@@ -235,31 +212,15 @@ function ScannerPresensiGuru({ guruList, tanggal, onDetected, onClose }) {
             </div>
           )}
 
-          {status === 'processing' && (
+          {status === 'saving' && (
             <div className="absolute inset-0 flex items-center justify-center bg-ink-950/60 text-white text-sm gap-2">
-              <Loader2 size={16} className="animate-spin" /> Memproses...
-            </div>
-          )}
-
-          {status === 'success' && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center bg-sage-500/80 text-white text-sm gap-2 text-center px-6">
-              <CheckCircle2 size={28} />
-              <span className="font-medium">{lastGuruName}</span>
-              <span className="text-xs opacity-90">Tercatat hadir</span>
-            </div>
-          )}
-
-          {status === 'error' && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center bg-red-900/80 text-white text-sm gap-2 text-center px-6">
-              <AlertCircle size={28} />
-              <span>{message}</span>
+              <Loader2 size={16} className="animate-spin" /> Menyimpan...
             </div>
           )}
 
           {status === 'cam-error' && (
             <div className="absolute inset-0 flex flex-col items-center justify-center bg-ink-950/90 text-white text-sm gap-3 text-center px-6">
-              <AlertCircle size={28} />
-              <span>{message}</span>
+              <span>{errorMsg}</span>
               <button
                 type="button"
                 onClick={() => startCamera(facingMode)}
@@ -271,17 +232,36 @@ function ScannerPresensiGuru({ guruList, tanggal, onDetected, onClose }) {
           )}
         </div>
 
+        {errorMsg && status === 'preview' && (
+          <p className="text-xs text-red-700 mt-2">{errorMsg}</p>
+        )}
+
         <div className="flex items-center justify-between mt-4">
-          <button
-            type="button"
-            onClick={switchCamera}
-            className="flex items-center gap-1.5 text-xs text-ink-700/60 hover:text-ink-900"
-          >
-            <RotateCcw size={13} /> Ganti kamera
-          </button>
-          <button type="button" onClick={onClose} className="btn-secondary text-sm">
-            Selesai
-          </button>
+          {status === 'live' && (
+            <>
+              <button
+                type="button"
+                onClick={switchCamera}
+                className="flex items-center gap-1.5 text-xs text-ink-700/60 hover:text-ink-900"
+              >
+                <RotateCcw size={13} /> Ganti kamera
+              </button>
+              <button type="button" onClick={ambilFoto} className="btn-primary text-sm">
+                <Camera size={15} /> Ambil Foto
+              </button>
+            </>
+          )}
+
+          {status === 'preview' && (
+            <>
+              <button type="button" onClick={ambilUlang} className="btn-secondary text-sm">
+                Ambil Ulang
+              </button>
+              <button type="button" onClick={gunakanFoto} className="btn-primary text-sm">
+                <Check size={15} /> Gunakan Foto
+              </button>
+            </>
+          )}
         </div>
       </div>
     </div>
@@ -304,7 +284,7 @@ export default function Presensi() {
   const [savedOffline, setSavedOffline] = useState(false)
   const [isOffline, setIsOffline] = useState(!navigator.onLine)
   const [queueCount, setQueueCount] = useState(0)
-  const [showScanner, setShowScanner] = useState(false)
+  const [cameraForGuru, setCameraForGuru] = useState(null) // objek guru yang sedang difoto, atau null
 
   useEffect(() => {
     supabase.from('kelas').select('id, nama_kelas').order('nama_kelas').then(({ data }) => {
@@ -381,10 +361,10 @@ export default function Presensi() {
     setLoading(false)
   }
 
-  // Dipanggil dari modul kamera setiap kali satu guru berhasil di-scan.
+  // Dipanggil dari modul kamera setelah foto diambil untuk satu guru.
   // Langsung disimpan ke database (tidak menunggu tombol "Simpan Presensi"),
-  // supaya kehadiran tercatat seketika itu juga.
-  async function handleScanDetected({ guru, fotoPath, jamAbsen }) {
+  // supaya foto & status tercatat seketika itu juga.
+  async function handleFotoTersimpan({ guru, fotoPath, jamAbsen }) {
     setStatusMap((prev) => ({ ...prev, [guru.id]: 'hadir' }))
     setBuktiMap((prev) => ({ ...prev, [guru.id]: { foto_bukti_path: fotoPath, jam_absen: jamAbsen } }))
 
@@ -505,15 +485,6 @@ export default function Presensi() {
             {kelasList.map((k) => <option key={k.id} value={k.id}>{k.nama_kelas}</option>)}
           </select>
         )}
-        {tab === 'guru' && (
-          <button
-            type="button"
-            onClick={() => setShowScanner(true)}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-900 text-white text-sm font-medium hover:bg-blue-950 transition-colors"
-          >
-            <Camera size={16} /> Scan QR Guru
-          </button>
-        )}
       </div>
 
       <div className="card relative overflow-hidden overflow-x-auto">
@@ -523,7 +494,7 @@ export default function Presensi() {
             <tr>
               <th>Nama</th>
               <th>Status Kehadiran</th>
-              {tab === 'guru' && <th>Bukti</th>}
+              {tab === 'guru' && <th>Foto Bukti</th>}
             </tr>
           </thead>
           <tbody>
@@ -565,16 +536,27 @@ export default function Presensi() {
                 {tab === 'guru' && (
                   <td>
                     {buktiMap[item.id]?.foto_bukti_path ? (
-                      <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setCameraForGuru(item)}
+                        className="flex items-center gap-2 group"
+                        title="Ambil ulang foto"
+                      >
                         <img
                           src={fotoBuktiUrl(buktiMap[item.id].foto_bukti_path)}
                           alt="Bukti presensi"
-                          className="w-9 h-9 rounded-lg object-cover ring-1 ring-ink-900/10"
+                          className="w-9 h-9 rounded-lg object-cover ring-1 ring-ink-900/10 group-hover:ring-blue-900/40"
                         />
                         <span className="text-xs text-ink-700/50">{jamLabel(buktiMap[item.id].jam_absen) || '—'}</span>
-                      </div>
+                      </button>
                     ) : (
-                      <span className="text-xs text-ink-700/30">Belum scan</span>
+                      <button
+                        type="button"
+                        onClick={() => setCameraForGuru(item)}
+                        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-blue-900/10 text-blue-900 text-xs font-medium hover:bg-blue-900/15"
+                      >
+                        <Camera size={13} /> Ambil Foto
+                      </button>
                     )}
                   </td>
                 )}
@@ -595,12 +577,12 @@ export default function Presensi() {
         </div>
       )}
 
-      {showScanner && (
-        <ScannerPresensiGuru
-          guruList={guruList}
+      {cameraForGuru && (
+        <CameraFotoGuru
+          guru={cameraForGuru}
           tanggal={tanggal}
-          onDetected={handleScanDetected}
-          onClose={() => setShowScanner(false)}
+          onSaved={handleFotoTersimpan}
+          onClose={() => setCameraForGuru(null)}
         />
       )}
     </Layout>
