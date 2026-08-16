@@ -20,6 +20,15 @@ Buatkan draf RPP (Rencana Pelaksanaan Pembelajaran) ringkas dan terstruktur berd
 - Kelas/Semester: ${kelas || 'Sesuai'}
 - Materi Pokok: ${materi}
 
+PENTING — ATURAN FORMAT (berlaku untuk SELURUH jawaban, bukan hanya judul bagian):
+- Tulis semuanya dalam teks polos (plain text) saja.
+- JANGAN gunakan markdown dalam bentuk apa pun: tanpa tanda bintang untuk tebal (**teks**),
+  tanpa tanda pagar untuk judul (#), tanpa tanda garis miring untuk miring (_teks_).
+- Untuk memberi penekanan pada suatu istilah, gunakan kalimat biasa saja, jangan diberi
+  format khusus.
+- Setiap baris judul bagian, sub-bagian, maupun poin bernomor ditulis apa adanya tanpa
+  simbol markdown apa pun di depan atau belakangnya.
+
 Format RPP yang dihasilkan harus mencakup PERSIS 4 bagian berikut, masing-masing diawali baris bernomor
 seperti contoh ini (jangan ubah judul bagiannya, jangan pakai tanda bintang/markdown lain):
 1. Tujuan Pembelajaran
@@ -46,7 +55,10 @@ Isi: rangkuman materi "${materi}" yang ringkas dan mudah dipahami siswa, dalam b
 
 LAMPIRAN D: KISI-KISI & SOAL EVALUASI
 Isi: tabel kisi-kisi sederhana (Indikator Soal - Level Kognitif - Bentuk Soal) ditulis per poin dengan
-tanda "-", diikuti 5 soal evaluasi bernomor (1., 2., dst) beserta kunci jawaban singkat di setiap akhir soal.`
+tanda "-", diikuti 5 soal evaluasi bernomor (1., 2., dst) beserta kunci jawaban singkat di setiap akhir soal.
+
+INGAT: seluruh isi lampiran di atas juga harus teks polos, tanpa markdown apa pun (tanpa **tebal**,
+tanpa #, tanpa _miring_), sama seperti aturan format di bagian RPP inti.`
 
     const prompt = sertakanLampiran ? promptRppInti + promptLampiran : promptRppInti
 
