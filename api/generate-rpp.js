@@ -30,7 +30,7 @@ Format RPP yang dihasilkan harus mencakup:
 3. Metode & Media Pembelajaran
 4. Penilaian / Asesmen`
 
-    const model = 'gemini-2.5-flash'
+    const model = 'gemini-3.5-flash'
     const response = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
       {
