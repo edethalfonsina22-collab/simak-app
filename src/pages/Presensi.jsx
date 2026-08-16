@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import jsQR from 'jsqr'
 import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../lib/AuthContext'
 import Layout from '../components/Layout'
-import { Loader2, Save, ClipboardCheck, WifiOff } from 'lucide-react'
+import { Loader2, Save, ClipboardCheck, WifiOff, Camera, X, CheckCircle2, AlertCircle, RotateCcw } from 'lucide-react'
 import { tambahAntrian, ambilAntrian, sinkronAntrian } from '../lib/offlineQueue'
 
 const STATUS_OPTS = [
@@ -11,6 +12,8 @@ const STATUS_OPTS = [
   { value: 'sakit', label: 'Sakit', color: 'bg-blue-100 text-blue-700' },
   { value: 'alpa', label: 'Alpa', color: 'bg-red-100 text-red-700' },
 ]
+
+const BUCKET_BUKTI = 'bukti-presensi'
 
 // Motif batik (kawung + parang) — sama persis dengan Profil Saya, Dasbor, Galeri, Dokumen & Data Siswa,
 // warna garis menyesuaikan latar (emas di atas navy).
@@ -67,6 +70,224 @@ function fotoGuruUrl(path) {
   return supabase.storage.from('foto-profil').getPublicUrl(path).data.publicUrl
 }
 
+function fotoBuktiUrl(path) {
+  if (!path) return null
+  return supabase.storage.from(BUCKET_BUKTI).getPublicUrl(path).data.publicUrl
+}
+
+function jamLabel(iso) {
+  if (!iso) return null
+  return new Date(iso).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })
+}
+
+// ============================================================
+// Modul Kamera: scan QR identitas guru + ambil foto bukti sekaligus
+// dari frame yang sama saat QR berhasil terbaca.
+// ============================================================
+function ScannerPresensiGuru({ guruList, tanggal, onDetected, onClose }) {
+  const videoRef = useRef(null)
+  const canvasRef = useRef(null)
+  const streamRef = useRef(null)
+  const rafRef = useRef(null)
+  const scanningRef = useRef(true)
+
+  const [facingMode, setFacingMode] = useState('environment')
+  const [status, setStatus] = useState('starting') // starting | scanning | processing | success | error | cam-error
+  const [message, setMessage] = useState('')
+  const [lastGuruName, setLastGuruName] = useState('')
+
+  useEffect(() => {
+    startCamera(facingMode)
+    return stopCamera
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [facingMode])
+
+  async function startCamera(mode) {
+    stopCamera()
+    setStatus('starting')
+    setMessage('')
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: mode }, width: { ideal: 960 }, height: { ideal: 720 } },
+        audio: false,
+      })
+      streamRef.current = stream
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream
+        await videoRef.current.play()
+      }
+      scanningRef.current = true
+      setStatus('scanning')
+      rafRef.current = requestAnimationFrame(tick)
+    } catch (err) {
+      setStatus('cam-error')
+      setMessage('Tidak bisa mengakses kamera: ' + (err.message || 'izin ditolak.'))
+    }
+  }
+
+  function stopCamera() {
+    if (rafRef.current) cancelAnimationFrame(rafRef.current)
+    rafRef.current = null
+    scanningRef.current = false
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((t) => t.stop())
+      streamRef.current = null
+    }
+  }
+
+  function tick() {
+    if (!scanningRef.current) return
+    const video = videoRef.current
+    const canvas = canvasRef.current
+    if (video && canvas && video.readyState === video.HAVE_ENOUGH_DATA) {
+      canvas.width = video.videoWidth
+      canvas.height = video.videoHeight
+      const ctx = canvas.getContext('2d')
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
+      const code = jsQR(imageData.data, imageData.width, imageData.height)
+      if (code && code.data) {
+        handleDetected(code.data, canvas)
+        return
+      }
+    }
+    rafRef.current = requestAnimationFrame(tick)
+  }
+
+  async function handleDetected(text, canvas) {
+    scanningRef.current = false
+    setStatus('processing')
+
+    const guru = guruList.find((g) => g.id === text)
+    if (!guru) {
+      setStatus('error')
+      setMessage('QR tidak dikenali sebagai identitas guru terdaftar.')
+      setTimeout(() => {
+        scanningRef.current = true
+        setStatus('scanning')
+        rafRef.current = requestAnimationFrame(tick)
+      }, 1800)
+      return
+    }
+
+    // Ambil snapshot frame yang sama sebagai foto bukti kehadiran
+    const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.85))
+    const path = `${guru.id}/${tanggal}.jpg`
+
+    let fotoPath = null
+    if (blob) {
+      const { error: uploadError } = await supabase.storage
+        .from(BUCKET_BUKTI)
+        .upload(path, blob, { upsert: true, contentType: 'image/jpeg' })
+      if (!uploadError) fotoPath = path
+    }
+
+    const jamAbsen = new Date().toISOString()
+
+    setLastGuruName(guru.nama_lengkap)
+    setStatus('success')
+    setMessage(`${guru.nama_lengkap} berhasil ditandai hadir.`)
+
+    onDetected({ guru, fotoPath, jamAbsen })
+
+    setTimeout(() => {
+      scanningRef.current = true
+      setStatus('scanning')
+      rafRef.current = requestAnimationFrame(tick)
+    }, 1400)
+  }
+
+  function switchCamera() {
+    setFacingMode((m) => (m === 'environment' ? 'user' : 'environment'))
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink-950/70 backdrop-blur-sm p-4">
+      <div className="card relative overflow-hidden w-full max-w-md p-5">
+        <span className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-900 to-brass-400" />
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-full bg-blue-900/10 text-blue-900 flex items-center justify-center shrink-0">
+              <Camera size={17} />
+            </div>
+            <div>
+              <h2 className="font-display text-lg font-semibold leading-tight">Scan QR Guru</h2>
+              <p className="text-xs text-ink-700/50">Arahkan kamera ke QR identitas guru</p>
+            </div>
+          </div>
+          <button type="button" onClick={onClose} className="text-ink-700/40 hover:text-ink-900">
+            <X size={20} />
+          </button>
+        </div>
+
+        <div className="relative w-full aspect-square rounded-lg overflow-hidden bg-ink-950">
+          <video ref={videoRef} className="w-full h-full object-cover" muted playsInline />
+          <canvas ref={canvasRef} className="hidden" />
+
+          {/* Bingkai target scan */}
+          {status === 'scanning' && (
+            <div className="absolute inset-8 border-2 border-brass-400/70 rounded-lg pointer-events-none" />
+          )}
+
+          {status === 'starting' && (
+            <div className="absolute inset-0 flex items-center justify-center bg-ink-950/60 text-white text-sm gap-2">
+              <Loader2 size={16} className="animate-spin" /> Membuka kamera...
+            </div>
+          )}
+
+          {status === 'processing' && (
+            <div className="absolute inset-0 flex items-center justify-center bg-ink-950/60 text-white text-sm gap-2">
+              <Loader2 size={16} className="animate-spin" /> Memproses...
+            </div>
+          )}
+
+          {status === 'success' && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center bg-sage-500/80 text-white text-sm gap-2 text-center px-6">
+              <CheckCircle2 size={28} />
+              <span className="font-medium">{lastGuruName}</span>
+              <span className="text-xs opacity-90">Tercatat hadir</span>
+            </div>
+          )}
+
+          {status === 'error' && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center bg-red-900/80 text-white text-sm gap-2 text-center px-6">
+              <AlertCircle size={28} />
+              <span>{message}</span>
+            </div>
+          )}
+
+          {status === 'cam-error' && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center bg-ink-950/90 text-white text-sm gap-3 text-center px-6">
+              <AlertCircle size={28} />
+              <span>{message}</span>
+              <button
+                type="button"
+                onClick={() => startCamera(facingMode)}
+                className="px-3 py-1.5 rounded-lg bg-brass-400 text-ink-950 text-xs font-medium"
+              >
+                Coba lagi
+              </button>
+            </div>
+          )}
+        </div>
+
+        <div className="flex items-center justify-between mt-4">
+          <button
+            type="button"
+            onClick={switchCamera}
+            className="flex items-center gap-1.5 text-xs text-ink-700/60 hover:text-ink-900"
+          >
+            <RotateCcw size={13} /> Ganti kamera
+          </button>
+          <button type="button" onClick={onClose} className="btn-secondary text-sm">
+            Selesai
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function Presensi() {
   const { profil } = useAuth()
   const [tab, setTab] = useState('siswa')
@@ -76,12 +297,14 @@ export default function Presensi() {
   const [siswaList, setSiswaList] = useState([])
   const [guruList, setGuruList] = useState([])
   const [statusMap, setStatusMap] = useState({})
+  const [buktiMap, setBuktiMap] = useState({}) // { [guru_id]: { foto_bukti_path, jam_absen } }
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [savedOffline, setSavedOffline] = useState(false)
   const [isOffline, setIsOffline] = useState(!navigator.onLine)
   const [queueCount, setQueueCount] = useState(0)
+  const [showScanner, setShowScanner] = useState(false)
 
   useEffect(() => {
     supabase.from('kelas').select('id, nama_kelas').order('nama_kelas').then(({ data }) => {
@@ -139,12 +362,53 @@ export default function Presensi() {
     setLoading(true)
     setSaved(false)
     setSavedOffline(false)
-    const { data: existing } = await supabase.from('presensi_guru').select('guru_id, status').eq('tanggal', tanggal)
+    const { data: existing } = await supabase
+      .from('presensi_guru')
+      .select('guru_id, status, foto_bukti_path, jam_absen')
+      .eq('tanggal', tanggal)
+
     const map = {}
-    ;(existing || []).forEach((e) => { map[e.guru_id] = e.status })
+    const bukti = {}
+    ;(existing || []).forEach((e) => {
+      map[e.guru_id] = e.status
+      if (e.foto_bukti_path || e.jam_absen) {
+        bukti[e.guru_id] = { foto_bukti_path: e.foto_bukti_path, jam_absen: e.jam_absen }
+      }
+    })
     guruList.forEach((g) => { if (!map[g.id]) map[g.id] = 'hadir' })
     setStatusMap(map)
+    setBuktiMap(bukti)
     setLoading(false)
+  }
+
+  // Dipanggil dari modul kamera setiap kali satu guru berhasil di-scan.
+  // Langsung disimpan ke database (tidak menunggu tombol "Simpan Presensi"),
+  // supaya kehadiran tercatat seketika itu juga.
+  async function handleScanDetected({ guru, fotoPath, jamAbsen }) {
+    setStatusMap((prev) => ({ ...prev, [guru.id]: 'hadir' }))
+    setBuktiMap((prev) => ({ ...prev, [guru.id]: { foto_bukti_path: fotoPath, jam_absen: jamAbsen } }))
+
+    const row = {
+      guru_id: guru.id,
+      tanggal,
+      status: 'hadir',
+      foto_bukti_path: fotoPath,
+      jam_absen: jamAbsen,
+    }
+
+    if (!navigator.onLine) {
+      await tambahAntrian({ table: 'presensi_guru', conflictCol: 'guru_id,tanggal', rows: [row] })
+      const sisa = await ambilAntrian()
+      setQueueCount(sisa.length)
+      return
+    }
+
+    const { error } = await supabase.from('presensi_guru').upsert([row], { onConflict: 'guru_id,tanggal' })
+    if (error) {
+      await tambahAntrian({ table: 'presensi_guru', conflictCol: 'guru_id,tanggal', rows: [row] })
+      const sisa = await ambilAntrian()
+      setQueueCount(sisa.length)
+    }
   }
 
   async function handleSave() {
@@ -154,7 +418,13 @@ export default function Presensi() {
 
     const rows = tab === 'siswa'
       ? siswaList.map((s) => ({ siswa_id: s.id, tanggal, status: statusMap[s.id] || 'hadir', diisi_oleh: profil?.guru_id || null }))
-      : guruList.map((g) => ({ guru_id: g.id, tanggal, status: statusMap[g.id] || 'hadir' }))
+      : guruList.map((g) => ({
+          guru_id: g.id,
+          tanggal,
+          status: statusMap[g.id] || 'hadir',
+          foto_bukti_path: buktiMap[g.id]?.foto_bukti_path ?? null,
+          jam_absen: buktiMap[g.id]?.jam_absen ?? null,
+        }))
 
     const table = tab === 'siswa' ? 'presensi_siswa' : 'presensi_guru'
     const conflictCol = tab === 'siswa' ? 'siswa_id,tanggal' : 'guru_id,tanggal'
@@ -220,7 +490,7 @@ export default function Presensi() {
         </div>
       )}
 
-      <div className="flex items-center gap-4 mb-5">
+      <div className="flex items-center gap-4 mb-5 flex-wrap">
         <div className="inline-flex rounded-lg bg-white border border-ink-900/10 p-1">
           {['siswa', 'guru'].map((t) => (
             <button key={t} onClick={() => setTab(t)}
@@ -235,18 +505,31 @@ export default function Presensi() {
             {kelasList.map((k) => <option key={k.id} value={k.id}>{k.nama_kelas}</option>)}
           </select>
         )}
+        {tab === 'guru' && (
+          <button
+            type="button"
+            onClick={() => setShowScanner(true)}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-900 text-white text-sm font-medium hover:bg-blue-950 transition-colors"
+          >
+            <Camera size={16} /> Scan QR Guru
+          </button>
+        )}
       </div>
 
       <div className="card relative overflow-hidden overflow-x-auto">
         <span className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-900 to-brass-400" />
         <table className="table-shell">
           <thead>
-            <tr><th>Nama</th><th>Status Kehadiran</th></tr>
+            <tr>
+              <th>Nama</th>
+              <th>Status Kehadiran</th>
+              {tab === 'guru' && <th>Bukti</th>}
+            </tr>
           </thead>
           <tbody>
-            {loading && <tr><td colSpan={2} className="text-center py-8 text-ink-700/50">Memuat...</td></tr>}
+            {loading && <tr><td colSpan={tab === 'guru' ? 3 : 2} className="text-center py-8 text-ink-700/50">Memuat...</td></tr>}
             {!loading && list.length === 0 && (
-              <tr><td colSpan={2} className="text-center py-8 text-ink-700/50">
+              <tr><td colSpan={tab === 'guru' ? 3 : 2} className="text-center py-8 text-ink-700/50">
                 {tab === 'siswa' ? 'Pilih kelas yang memiliki siswa aktif.' : 'Belum ada data guru aktif.'}
               </td></tr>
             )}
@@ -279,6 +562,22 @@ export default function Presensi() {
                     ))}
                   </div>
                 </td>
+                {tab === 'guru' && (
+                  <td>
+                    {buktiMap[item.id]?.foto_bukti_path ? (
+                      <div className="flex items-center gap-2">
+                        <img
+                          src={fotoBuktiUrl(buktiMap[item.id].foto_bukti_path)}
+                          alt="Bukti presensi"
+                          className="w-9 h-9 rounded-lg object-cover ring-1 ring-ink-900/10"
+                        />
+                        <span className="text-xs text-ink-700/50">{jamLabel(buktiMap[item.id].jam_absen) || '—'}</span>
+                      </div>
+                    ) : (
+                      <span className="text-xs text-ink-700/30">Belum scan</span>
+                    )}
+                  </td>
+                )}
               </tr>
             ))}
           </tbody>
@@ -294,6 +593,15 @@ export default function Presensi() {
           {saved && <span className="text-sm text-sage-500">Tersimpan.</span>}
           {savedOffline && <span className="text-sm text-brass-600">Tersimpan lokal — akan dikirim otomatis saat online.</span>}
         </div>
+      )}
+
+      {showScanner && (
+        <ScannerPresensiGuru
+          guruList={guruList}
+          tanggal={tanggal}
+          onDetected={handleScanDetected}
+          onClose={() => setShowScanner(false)}
+        />
       )}
     </Layout>
   )
