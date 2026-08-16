@@ -1,10 +1,11 @@
 // src/lib/generateSertifikatDocx.js
 //
 // Generator .docx untuk Sertifikat / Piagam Penghargaan (guru maupun siswa).
-// Layout landscape satu halaman dengan bingkai ganda (navy luar + emas dalam),
-// nama penerima besar di tengah, kalimat isi (bisa hasil AI dari
-// /api/generate-sertifikat atau ditulis manual), dan blok tanda tangan
-// Kepala Sekolah lengkap dengan NIP.
+// Layout landscape satu halaman dengan bingkai ganda (navy luar + emas dalam,
+// dengan jarak di antara keduanya supaya terlihat sebagai dua frame terpisah),
+// nama penerima besar di tengah bergaya kaligrafi, kalimat isi (bisa hasil AI
+// dari /api/generate-sertifikat atau ditulis manual), dan blok tanda tangan
+// Kepala Sekolah lengkap dengan NIP (opsional).
 //
 // Jalan langsung di browser, tidak perlu instalasi apa pun secara lokal.
 
@@ -62,7 +63,8 @@ function buildDocument({
       [new TextRun({ text: (namaSekolah || 'SEKOLAH').toUpperCase(), bold: true, size: 24, font: FONT_BODY, color: NAVY })],
       { after: 40 }
     ),
-    // Garis pendek dekoratif di bawah nama sekolah
+    // Garis pendek dekoratif di bawah nama sekolah — pemisah antara header
+    // sekolah dan judul besar.
     new Paragraph({
       alignment: AlignmentType.CENTER,
       spacing: { after: 340 },
@@ -79,6 +81,8 @@ function buildDocument({
       { after: 320 }
     ),
 
+    // Nama penerima bergaya "kaligrafi" — miring, tebal, warna emas — dengan
+    // garis panjang emas di bawahnya sebagai penekanan.
     centered(
       [new TextRun({ text: namaPenerima || '-', bold: true, italics: true, size: 52, font: FONT_SCRIPT, color: GOLD })],
       { after: 40 }
@@ -112,7 +116,7 @@ function buildDocument({
       : []),
   ]
 
-  // Bingkai EMAS (dalam) — bungkus isiKonten
+  // Bingkai EMAS (dalam) — bungkus isiKonten.
   const bingkaiEmas = new Table({
     width: { size: 14300, type: WidthType.DXA },
     borders: {
@@ -133,11 +137,11 @@ function buildDocument({
     ],
   })
 
-  // Bingkai NAVY (luar) — bungkus bingkaiEmas, dengan jarak (margin) di
-  // antara keduanya supaya terlihat sebagai dua garis frame terpisah,
-  // bukan menempel jadi satu garis tebal.
+  // Bingkai NAVY (luar) — bungkus bingkaiEmas, dengan margin di antara
+  // keduanya supaya terlihat sebagai dua garis frame terpisah (frame ganda
+  // beneran), bukan menempel jadi satu garis tebal.
   const bingkaiLuar = new Table({
-    width: { size: 14838, type: WidthType.DXA },
+    width: { size: 15238, type: WidthType.DXA },
     borders: {
       top: { style: BorderStyle.DOUBLE, size: 20, color: NAVY },
       bottom: { style: BorderStyle.DOUBLE, size: 20, color: NAVY },
@@ -148,12 +152,10 @@ function buildDocument({
       new TableRow({
         children: [
           new TableCell({
-            margins: { top: 260, bottom: 260, left: 260, right: 260 },
-            children: [
-              new Paragraph({ children: [], spacing: { after: 0 } }), // sedikit napas di dalam frame navy
-            ],
-            // Table di dalam TableCell: docx mendukung ini lewat children campuran
-            // paragraph + table dalam array yang sama.
+            margins: { top: 220, bottom: 220, left: 220, right: 220 },
+            // Table di dalam TableCell: docx mendukung nested table langsung
+            // sebagai salah satu children dari TableCell.
+            children: [bingkaiEmas],
           }),
         ],
       }),
@@ -169,27 +171,7 @@ function buildDocument({
             margin: { top: 700, bottom: 700, left: 800, right: 800 },
           },
         },
-        children: [
-          new Table({
-            width: { size: 15238, type: WidthType.DXA },
-            borders: {
-              top: { style: BorderStyle.DOUBLE, size: 20, color: NAVY },
-              bottom: { style: BorderStyle.DOUBLE, size: 20, color: NAVY },
-              left: { style: BorderStyle.DOUBLE, size: 20, color: NAVY },
-              right: { style: BorderStyle.DOUBLE, size: 20, color: NAVY },
-            },
-            rows: [
-              new TableRow({
-                children: [
-                  new TableCell({
-                    margins: { top: 220, bottom: 220, left: 220, right: 220 },
-                    children: [bingkaiEmas],
-                  }),
-                ],
-              }),
-            ],
-          }),
-        ],
+        children: [bingkaiLuar],
       },
     ],
   })
