@@ -12,7 +12,7 @@ import {
 // lewat /api/generate-sertifikat (Gemini), lalu langsung membuat .docx dan
 // menyimpan record-nya ke tabel sertifikat_penghargaan sekaligus (tidak ada
 // langkah "isi form upload" terpisah seperti di RPP, karena datanya lebih ringkas).
-function SertifikatAiModal({ isOpen, onClose, onSaved, penerimaTipe, namaPenerimaAwal, siswaId, guruId, defaultNamaKepalaSekolah, tempatTtd, namaSekolah, session, profil }) {
+function SertifikatAiModal({ isOpen, onClose, onSaved, penerimaTipe, namaPenerimaAwal, siswaId, guruId, defaultNamaKepalaSekolah, nipKepalaSekolah, tempatTtd, namaSekolah, session, profil }) {
   const [jenis, setJenis] = useState('sertifikat')
   const [namaPenerima, setNamaPenerima] = useState(namaPenerimaAwal || '')
   const [acaraPrestasi, setAcaraPrestasi] = useState('')
@@ -72,6 +72,7 @@ function SertifikatAiModal({ isOpen, onClose, onSaved, penerimaTipe, namaPenerim
         namaSekolah,
         deskripsi,
         namaKepalaSekolah: defaultNamaKepalaSekolah,
+        nipKepalaSekolah,
         tempatTtd,
         tanggal,
       }
@@ -116,6 +117,7 @@ function SertifikatAiModal({ isOpen, onClose, onSaved, penerimaTipe, namaPenerim
       namaSekolah,
       deskripsi,
       namaKepalaSekolah: defaultNamaKepalaSekolah,
+      nipKepalaSekolah,
       tempatTtd,
       tanggal,
     })
@@ -517,6 +519,7 @@ export default function SertifikatPenghargaan() {
         siswaId={siswaTerpilih?.id}
         guruId={profil?.guru_id}
         defaultNamaKepalaSekolah={schoolProfile?.kepala_sekolah || ''}
+        nipKepalaSekolah={schoolProfile?.nip_kepala_sekolah || ''}
         tempatTtd={schoolProfile?.tempat_ttd || ''}
         namaSekolah={schoolProfile?.nama_sekolah || ''}
         session={session}
