@@ -130,6 +130,10 @@ function parseAiText(rawText) {
   const lines = (rawText || '').split('\n').map((l) => l.trim())
   const elements = []
   let inLampiran = false
+  // Index di array "elements" tempat Lampiran pertama dimulai — dipakai
+  // buildDocument() untuk menyisipkan blok tanda tangan tepat SEBELUM
+  // halaman Lampiran (atau di akhir dokumen kalau tidak ada Lampiran sama sekali).
+  let lampiranStartIndex = null
 
   for (const line of lines) {
     if (!line) continue
@@ -137,6 +141,7 @@ function parseAiText(rawText) {
     // Lampiran baru (halaman baru + heading besar)
     const lampiranMatch = line.match(LAMPIRAN_RE)
     if (lampiranMatch) {
+      if (lampiranStartIndex === null) lampiranStartIndex = elements.length
       inLampiran = true
       elements.push(lampiranHeading(`Lampiran ${lampiranMatch[1].toUpperCase()}: ${stripMd(lampiranMatch[2])}`))
       continue
@@ -169,11 +174,58 @@ function parseAiText(rawText) {
     elements.push(p(stripMd(line)))
   }
 
-  return elements
+  return { elements, lampiranStartIndex: lampiranStartIndex ?? elements.length }
 }
 
-function buildDocument({ mataPelajaran, kelas, materi, tahunAjaran, semester, resultText }) {
-  const bodyElements = parseAiText(resultText)
+// Blok tanda tangan Guru & Kepala Sekolah — ditempatkan tepat setelah RPP
+// inti (sebelum Lampiran, kalau ada), sama seperti posisi tanda tangan di
+// RPP resmi/format generateRppDocx.js.
+function buildSignatureBlock({ mataPelajaran, kelas, namaGuru, namaKepalaSekolah, kotaTanggal }) {
+  return new Table({
+    width: { size: 8960, type: WidthType.DXA },
+    borders: {
+      top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE },
+      left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE },
+      insideHorizontal: { style: BorderStyle.NONE }, insideVertical: { style: BorderStyle.NONE },
+    },
+    columnWidths: [4480, 4480],
+    rows: [
+      new TableRow({
+        children: [
+          new TableCell({
+            width: { size: 4480, type: WidthType.DXA },
+            children: [
+              p('Mengetahui,'),
+              p('Kepala Sekolah'),
+              p('', { after: 700 }),
+              p(`( ${namaKepalaSekolah || '.................................'} )`, { bold: true }),
+            ],
+          }),
+          new TableCell({
+            width: { size: 4480, type: WidthType.DXA },
+            children: [
+              p(kotaTanggal || ''),
+              p(`Guru ${mataPelajaran || ''} Kelas ${kelas || ''}`),
+              p('', { after: 700 }),
+              p(`( ${namaGuru || '.................................'} )`, { bold: true }),
+            ],
+          }),
+        ],
+      }),
+    ],
+  })
+}
+
+function buildDocument({ mataPelajaran, kelas, materi, tahunAjaran, semester, resultText, namaGuru, namaKepalaSekolah, kotaTanggal }) {
+  const { elements: parsedElements, lampiranStartIndex } = parseAiText(resultText)
+  const coreElements = parsedElements.slice(0, lampiranStartIndex)
+  const lampiranElements = parsedElements.slice(lampiranStartIndex)
+  const bodyElements = [
+    ...coreElements,
+    p('', { after: 240 }),
+    buildSignatureBlock({ mataPelajaran, kelas, namaGuru, namaKepalaSekolah, kotaTanggal }),
+    ...lampiranElements,
+  ]
 
   return new Document({
     numbering: {
