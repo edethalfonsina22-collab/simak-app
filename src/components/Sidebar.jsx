@@ -33,6 +33,7 @@ import {
   FileCheck2,
   UserCog,
   Award,
+  Video,
 } from 'lucide-react'
 import { useAuth } from '../lib/AuthContext'
 import { supabase } from '../lib/supabaseClient'
@@ -44,6 +45,7 @@ const groupsAdmin = [
     links: [
       { to: '/', label: 'Dasbor', icon: LayoutDashboard, end: true },
       { to: '/profil-saya', label: 'Profil Saya', icon: UserCircle },
+      { to: '/rapat', label: 'Rapat Video', icon: Video },
       { to: '/galeri', label: 'Galeri Kegiatan', icon: Images },
       { to: '/dokumen', label: 'Dokumen Penting', icon: HardDrive },
       { to: '/pengumuman', label: 'Pengumuman', icon: Megaphone },
@@ -97,6 +99,7 @@ const groupsAdmin = [
 const linksGuru = [
   { to: '/', label: 'Dasbor', icon: LayoutDashboard, end: true },
   { to: '/profil-saya', label: 'Profil Saya', icon: UserCircle },
+  { to: '/rapat', label: 'Rapat Video', icon: Video },
   { to: '/galeri', label: 'Galeri Kegiatan', icon: Images },
   { to: '/dokumen', label: 'Dokumen Penting', icon: HardDrive },
   { to: '/siswa', label: 'Data Siswa', icon: Users },
