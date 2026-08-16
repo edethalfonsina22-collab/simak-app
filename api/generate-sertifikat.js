@@ -1,3 +1,51 @@
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+// Coba parse "Please retry in 27.8s" dari pesan error Gemini, kalau ada.
+// Kalau tidak ketemu, pakai fallback delay dari argumen.
+function parseRetryDelayMs(message, fallbackMs) {
+  const match = /retry in (\d+(\.\d+)?)s/i.exec(message || '')
+  if (match) {
+    return Math.min(Math.ceil(parseFloat(match[1]) * 1000), 15000) // cap 15 detik biar request tidak menggantung lama
+  }
+  return fallbackMs
+}
+
+// Panggil Gemini API dengan retry otomatis khusus untuk 429 (rate limit/quota).
+// Error lain (400, 401, 500, dst.) langsung dilempar tanpa retry.
+async function callGeminiWithRetry(url, body, maxRetries = 2) {
+  let lastData = null
+  let lastStatus = 500
+
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+    const data = await response.json()
+
+    if (response.ok) {
+      return { ok: true, data }
+    }
+
+    lastData = data
+    lastStatus = response.status
+
+    const isRateLimited = response.status === 429
+    const isLastAttempt = attempt === maxRetries
+    if (!isRateLimited || isLastAttempt) {
+      return { ok: false, status: response.status, data }
+    }
+
+    const delayMs = parseRetryDelayMs(data?.error?.message, 2000 * (attempt + 1))
+    await sleep(delayMs)
+  }
+
+  return { ok: false, status: lastStatus, data: lastData }
+}
+
 export default async function handler(req, res) {
   res.setHeader('Content-Type', 'application/json')
   if (req.method !== 'POST') {
@@ -49,25 +97,28 @@ ATURAN FORMAT:
 - Gunakan bahasa Indonesia formal yang lazim dipakai di sertifikat/piagam sekolah.`
 
     const model = 'gemini-3.5-flash'
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: { temperature: 0.7 },
-        }),
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`
+
+    const result = await callGeminiWithRetry(url, {
+      contents: [{ parts: [{ text: prompt }] }],
+      generationConfig: { temperature: 0.7 },
+    })
+
+    if (!result.ok) {
+      // Kuota/rate-limit habis walau sudah di-retry beberapa kali — kasih
+      // pesan yang jelas untuk pengguna, bukan pesan teknis mentah dari Google.
+      if (result.status === 429) {
+        return res.status(429).json({
+          error: 'Server AI sedang sibuk (kuota Gemini API tercapai). Coba lagi dalam beberapa saat, atau hubungi admin untuk menaikkan kuota.',
+        })
       }
-    )
-    const data = await response.json()
-    if (!response.ok) {
-      return res.status(response.status).json({
-        error: data.error?.message || 'Gagal merespons dari Gemini API.',
+      return res.status(result.status).json({
+        error: result.data?.error?.message || 'Gagal merespons dari Gemini API.',
       })
     }
+
     const hasil =
-      data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || 'Gagal menghasilkan teks.'
+      result.data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || 'Gagal menghasilkan teks.'
     return res.status(200).json({ result: hasil })
   } catch (error) {
     return res.status(500).json({ error: 'Server Error: ' + error.message })
