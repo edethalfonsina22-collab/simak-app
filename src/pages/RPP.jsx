@@ -3,7 +3,9 @@ import { PDFDocument, StandardFonts, rgb } from 'pdf-lib'
 import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../lib/AuthContext'
 import Layout from '../components/Layout'
-import { Upload, FileText, Download, CheckCircle2, XCircle, Clock, Loader2, NotebookPen } from 'lucide-react'
+import { Upload, FileText, Download, CheckCircle2, XCircle, Clock, Loader2, NotebookPen, Wand2 } from 'lucide-react'
+import { findRppTemplate } from '../data/rppTemplates'
+import { buildRppDocxFile } from '../lib/generateRppDocx'
 
 const STATUS_STYLE = {
   menunggu: 'bg-brass-400/15 text-brass-600',
@@ -41,6 +43,7 @@ export default function RPP() {
   const [kelasIsNew, setKelasIsNew] = useState(false)
   // Nilai dropdown Materi yang sedang dipilih (untuk mengisi Judul RPP)
   const [materiPilihan, setMateriPilihan] = useState('')
+  const [generatingTemplate, setGeneratingTemplate] = useState(false)
 
   // Form persetujuan admin, per baris
   const [approvalForm, setApprovalForm] = useState({ nama: '', jabatan: 'Kepala Sekolah' })
@@ -86,6 +89,25 @@ export default function RPP() {
       ),
     ]
   }, [items, form.mata_pelajaran, form.kelas])
+
+  // Template RPP siap-pakai untuk kombinasi Mata Pelajaran + Kelas yang dipilih
+  const rppTemplate = useMemo(
+    () => findRppTemplate(form.mata_pelajaran, form.kelas),
+    [form.mata_pelajaran, form.kelas]
+  )
+
+  async function handleGenerateTemplate() {
+    if (!rppTemplate) return
+    setGeneratingTemplate(true)
+    try {
+      const file = await buildRppDocxFile(rppTemplate)
+      setForm((f) => ({ ...f, judul: rppTemplate.materiPokok, file }))
+      setMateriPilihan(rppTemplate.materiPokok)
+    } catch (err) {
+      alert('Gagal membuat file RPP: ' + err.message)
+    }
+    setGeneratingTemplate(false)
+  }
 
   function handleMapelSelect(value) {
     if (value === NEW_VALUE) {
@@ -358,6 +380,24 @@ export default function RPP() {
               </select>
             )}
 
+            {/* ---- Template siap pakai: muncul kalau ada template untuk mapel+kelas ini ---- */}
+            {rppTemplate && (
+              <div className="sm:col-span-2 flex items-center justify-between gap-3 rounded-xl bg-sage-500/10 px-3 py-2.5">
+                <p className="text-xs text-ink-700">
+                  Template RPP <strong>{rppTemplate.materiPokok}</strong> tersedia untuk {rppTemplate.mataPelajaran} Kelas {rppTemplate.kelas}.
+                </p>
+                <button
+                  type="button"
+                  onClick={handleGenerateTemplate}
+                  disabled={generatingTemplate}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-sage-500 text-white disabled:opacity-50 shrink-0"
+                >
+                  {generatingTemplate ? <Loader2 size={14} className="animate-spin" /> : <Wand2 size={14} />}
+                  Pakai Template
+                </button>
+              </div>
+            )}
+
             {/* ---- Materi: muncul otomatis begitu Mata Pelajaran + Kelas terpilih ---- */}
             {materiOptions.length > 0 && (
               <div className="sm:col-span-2">
@@ -404,13 +444,18 @@ export default function RPP() {
               <option value="Ganjil">Ganjil</option>
               <option value="Genap">Genap</option>
             </select>
-            <input
-              className="input-field"
-              type="file"
-              accept=".pdf,.doc,.docx"
-              onChange={(e) => setForm({ ...form, file: e.target.files?.[0] || null })}
-              required
-            />
+            <div>
+              <input
+                className="input-field"
+                type="file"
+                accept=".pdf,.doc,.docx"
+                onChange={(e) => setForm({ ...form, file: e.target.files?.[0] || null })}
+                required
+              />
+              {form.file && rppTemplate && form.file.name.startsWith('RPP_') && (
+                <p className="text-[11px] text-sage-500 mt-1">File dibuat otomatis dari template.</p>
+              )}
+            </div>
           </div>
           <button type="submit" disabled={uploading} className="btn-primary">
             {uploading ? <Loader2 size={16} className="animate-spin" /> : <Upload size={16} />}
