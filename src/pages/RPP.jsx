@@ -3,7 +3,7 @@ import { PDFDocument, StandardFonts, rgb } from 'pdf-lib'
 import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../lib/AuthContext'
 import Layout from '../components/Layout'
-import { Upload, FileText, Download, CheckCircle2, XCircle, Clock, Loader2, NotebookPen, Wand2 } from 'lucide-react'
+import { Upload, FileText, Download, CheckCircle2, XCircle, Clock, Loader2, NotebookPen, Wand2, Users } from 'lucide-react'
 import { findRppTemplate } from '../data/rppTemplates'
 import { buildRppDocxFile } from '../lib/generateRppDocx'
 
@@ -50,6 +50,19 @@ export default function RPP() {
   const [rejectingId, setRejectingId] = useState(null)
   const [catatanTolak, setCatatanTolak] = useState('')
 
+  // ---- Upload massal RPP (admin) ----
+  const [guruList, setGuruList] = useState([])
+  const [bulkCommon, setBulkCommon] = useState({
+    mata_pelajaran: '',
+    kelas: '',
+    semester: 'Ganjil',
+    tahun_ajaran: '',
+  })
+  const [bulkFiles, setBulkFiles] = useState([]) // { id, file, guru_id, judul }
+  const [bulkApplyGuru, setBulkApplyGuru] = useState('')
+  const [bulkUploading, setBulkUploading] = useState(false)
+  const [bulkResults, setBulkResults] = useState([]) // { id, name, ok, message }
+
   async function load() {
     setLoading(true)
     const { data } = await supabase
@@ -63,6 +76,18 @@ export default function RPP() {
   useEffect(() => {
     load()
   }, [])
+
+  // Ambil daftar guru untuk keperluan upload massal (hanya admin)
+  useEffect(() => {
+    if (!isAdmin) return
+    supabase
+      .from('guru')
+      .select('id, nama_lengkap')
+      .order('nama_lengkap')
+      .then(({ data, error }) => {
+        if (!error) setGuruList(data || [])
+      })
+  }, [isAdmin])
 
   // ---- Daftar Mata Pelajaran & Kelas yang sudah pernah ada, untuk dropdown ----
   const mapelOptions = useMemo(() => {
@@ -178,6 +203,94 @@ export default function RPP() {
       await load()
     }
     setUploading(false)
+  }
+
+  // ---- Upload massal: handlers ----
+  function handleBulkFilesSelect(e) {
+    const selected = Array.from(e.target.files || [])
+    const mapped = selected.map((file, idx) => ({
+      id: `${Date.now()}-${idx}-${file.name}`,
+      file,
+      guru_id: '',
+      judul: '',
+    }))
+    setBulkFiles((prev) => [...prev, ...mapped])
+    setBulkResults([])
+    e.target.value = ''
+  }
+
+  function updateBulkFile(id, patch) {
+    setBulkFiles((prev) => prev.map((bf) => (bf.id === id ? { ...bf, ...patch } : bf)))
+  }
+
+  function removeBulkFile(id) {
+    setBulkFiles((prev) => prev.filter((bf) => bf.id !== id))
+    setBulkResults((prev) => prev.filter((r) => r.id !== id))
+  }
+
+  function applyGuruToAll() {
+    if (!bulkApplyGuru) return
+    setBulkFiles((prev) => prev.map((bf) => ({ ...bf, guru_id: bulkApplyGuru })))
+  }
+
+  async function handleBulkSubmit() {
+    if (!bulkCommon.mata_pelajaran || !bulkCommon.kelas || !bulkCommon.tahun_ajaran) {
+      alert('Isi Mata Pelajaran, Kelas, dan Tahun Ajaran dulu (berlaku untuk semua file).')
+      return
+    }
+    if (bulkFiles.length === 0) return
+
+    setBulkUploading(true)
+    const results = []
+
+    for (const bf of bulkFiles) {
+      if (!bf.guru_id || !bf.judul) {
+        results.push({
+          id: bf.id,
+          name: bf.file.name,
+          ok: false,
+          message: 'Guru/Judul belum diisi',
+        })
+        continue
+      }
+
+      try {
+        const ext = bf.file.name.split('.').pop()
+        const path = `${bf.guru_id}/${Date.now()}-${bf.id}.${ext}`
+
+        const { error: uploadError } = await supabase.storage
+          .from('rpp-files')
+          .upload(path, bf.file)
+        if (uploadError) throw new Error('Upload file gagal: ' + uploadError.message)
+
+        const { error: insertError } = await supabase.from('rpp').insert({
+          guru_id: bf.guru_id,
+          judul: bf.judul,
+          mata_pelajaran: bulkCommon.mata_pelajaran,
+          kelas: bulkCommon.kelas,
+          semester: bulkCommon.semester,
+          tahun_ajaran: bulkCommon.tahun_ajaran,
+          file_path: path,
+          file_nama: bf.file.name,
+        })
+        // Cek error insert secara eksplisit — supaya kalau RLS menolak simpan data,
+        // ini langsung kelihatan per file dan tidak diam-diam gagal.
+        if (insertError) throw new Error('Simpan data gagal (cek RLS/izin): ' + insertError.message)
+
+        results.push({ id: bf.id, name: bf.file.name, ok: true, message: 'Berhasil diupload' })
+      } catch (err) {
+        results.push({ id: bf.id, name: bf.file.name, ok: false, message: err.message })
+      }
+    }
+
+    setBulkResults(results)
+    setBulkUploading(false)
+
+    // Hapus dari daftar hanya file yang berhasil — yang gagal tetap tampil supaya bisa dicoba lagi
+    const successIds = results.filter((r) => r.ok).map((r) => r.id)
+    setBulkFiles((prev) => prev.filter((bf) => !successIds.includes(bf.id)))
+
+    await load()
   }
 
   async function handleDownload(path, fileName) {
@@ -481,6 +594,173 @@ export default function RPP() {
           <p className="sm:col-span-2 text-xs text-ink-700/50">
             Nama & jabatan ini akan otomatis dipakai setiap kali Anda menyetujui RPP di bawah.
           </p>
+        </div>
+      )}
+
+      {/* ---- Upload Massal RPP (admin) ---- */}
+      {isAdmin && (
+        <div className="card p-6 mb-6">
+          <h3 className="font-display text-lg font-semibold mb-1">Upload Massal RPP</h3>
+          <p className="text-xs text-ink-700/50 mb-4">
+            Upload banyak file RPP sekaligus untuk beberapa guru. Mata Pelajaran, Kelas, Semester, dan Tahun
+            Ajaran di bawah berlaku sama untuk semua file — tinggal tentukan Guru dan Judul per file sebelum
+            diupload.
+          </p>
+
+          <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 mb-4">
+            <input
+              className="input-field"
+              placeholder="Mata Pelajaran"
+              list="mapel-list-bulk"
+              value={bulkCommon.mata_pelajaran}
+              onChange={(e) => setBulkCommon({ ...bulkCommon, mata_pelajaran: e.target.value })}
+            />
+            <datalist id="mapel-list-bulk">
+              {mapelOptions.map((m) => (
+                <option key={m} value={m} />
+              ))}
+            </datalist>
+
+            <input
+              className="input-field"
+              placeholder="Kelas"
+              list="kelas-list-bulk"
+              value={bulkCommon.kelas}
+              onChange={(e) => setBulkCommon({ ...bulkCommon, kelas: e.target.value })}
+            />
+            <datalist id="kelas-list-bulk">
+              {kelasOptions.map((k) => (
+                <option key={k} value={k} />
+              ))}
+            </datalist>
+
+            <select
+              className="input-field"
+              value={bulkCommon.semester}
+              onChange={(e) => setBulkCommon({ ...bulkCommon, semester: e.target.value })}
+            >
+              <option value="Ganjil">Ganjil</option>
+              <option value="Genap">Genap</option>
+            </select>
+
+            <input
+              className="input-field"
+              placeholder="Tahun Ajaran (mis. 2026/2027)"
+              value={bulkCommon.tahun_ajaran}
+              onChange={(e) => setBulkCommon({ ...bulkCommon, tahun_ajaran: e.target.value })}
+            />
+          </div>
+
+          <div className="mb-4">
+            <label className="btn-primary inline-flex items-center gap-2 cursor-pointer w-fit">
+              <Upload size={16} />
+              Pilih File RPP
+              <input
+                type="file"
+                multiple
+                accept=".pdf,.doc,.docx"
+                className="hidden"
+                onChange={handleBulkFilesSelect}
+              />
+            </label>
+            <span className="text-xs text-ink-700/50 ml-3">
+              {bulkFiles.length > 0 ? `${bulkFiles.length} file dipilih` : 'Belum ada file dipilih'}
+            </span>
+          </div>
+
+          {bulkFiles.length > 0 && (
+            <>
+              <div className="flex flex-wrap items-center gap-2 mb-3">
+                <Users size={14} className="text-ink-700/40" />
+                <select
+                  className="input-field !py-1.5 !text-xs w-56"
+                  value={bulkApplyGuru}
+                  onChange={(e) => setBulkApplyGuru(e.target.value)}
+                >
+                  <option value="">Set guru untuk semua file...</option>
+                  {guruList.map((g) => (
+                    <option key={g.id} value={g.id}>
+                      {g.nama_lengkap}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  onClick={applyGuruToAll}
+                  className="text-xs font-medium text-ink-700 px-2.5 py-1.5 rounded-lg hover:bg-ink-900/[0.05]"
+                >
+                  Terapkan ke semua
+                </button>
+              </div>
+
+              <ul className="divide-y divide-ink-900/[0.06] mb-4">
+                {bulkFiles.map((bf) => {
+                  const result = bulkResults.find((r) => r.id === bf.id)
+                  return (
+                    <li key={bf.id} className="py-3 flex flex-col sm:flex-row sm:items-center gap-2">
+                      <div className="flex items-center gap-2 flex-1 min-w-0">
+                        <FileText size={14} className="text-ink-700/40 shrink-0" />
+                        <span className="text-xs text-ink-700 truncate">{bf.file.name}</span>
+                      </div>
+                      <select
+                        className="input-field !py-1.5 !text-xs sm:w-48 shrink-0"
+                        value={bf.guru_id}
+                        onChange={(e) => updateBulkFile(bf.id, { guru_id: e.target.value })}
+                      >
+                        <option value="">Pilih Guru</option>
+                        {guruList.map((g) => (
+                          <option key={g.id} value={g.id}>
+                            {g.nama_lengkap}
+                          </option>
+                        ))}
+                      </select>
+                      <input
+                        className="input-field !py-1.5 !text-xs sm:w-56 shrink-0"
+                        placeholder="Judul RPP"
+                        value={bf.judul}
+                        onChange={(e) => updateBulkFile(bf.id, { judul: e.target.value })}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => removeBulkFile(bf.id)}
+                        className="text-ink-700/40 hover:text-red-600 shrink-0 p-1"
+                        title="Hapus dari daftar"
+                      >
+                        <XCircle size={16} />
+                      </button>
+                      {result && (
+                        <span
+                          className={`text-[11px] font-medium shrink-0 flex items-center gap-1 ${
+                            result.ok ? 'text-sage-500' : 'text-red-600'
+                          }`}
+                        >
+                          {result.ok ? <CheckCircle2 size={12} /> : <XCircle size={12} />}
+                          {result.ok ? 'Berhasil' : result.message}
+                        </span>
+                      )}
+                    </li>
+                  )
+                })}
+              </ul>
+
+              <button
+                type="button"
+                onClick={handleBulkSubmit}
+                disabled={bulkUploading}
+                className="btn-primary"
+              >
+                {bulkUploading ? <Loader2 size={16} className="animate-spin" /> : <Upload size={16} />}
+                {bulkUploading ? 'Mengunggah...' : `Upload ${bulkFiles.length} File`}
+              </button>
+
+              {bulkResults.length > 0 && bulkResults.some((r) => !r.ok) && (
+                <p className="text-xs text-red-600 mt-2">
+                  Beberapa file gagal diupload — lihat keterangan di samping masing-masing file di atas. File
+                  yang gagal tetap ada di daftar supaya bisa dicoba lagi tanpa perlu memilih ulang filenya.
+                </p>
+              )}
+            </>
+          )}
         </div>
       )}
 
