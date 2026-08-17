@@ -175,44 +175,51 @@ export default function BankSoal() {
     await load()
   }
 
-  // Hapus seluruh soal dalam satu folder mata pelajaran sekaligus.
+  // Hapus seluruh soal dalam satu folder (kelas + mata pelajaran) sekaligus.
   // Kalau ada soal milik guru lain yang tidak boleh dihapus user ini (bukan admin),
   // soal tersebut dilewati dan user diberi tahu jumlahnya sebelum konfirmasi.
-  async function handleDeleteMapel(mapel, soalMapel) {
-    const idsBolehHapus = soalMapel.filter(canDelete).map((item) => item.id)
+  async function handleDeleteMapel(label, soalFolder) {
+    const idsBolehHapus = soalFolder.filter(canDelete).map((item) => item.id)
 
     if (idsBolehHapus.length === 0) {
-      alert(`Tidak ada soal yang bisa Anda hapus di mata pelajaran "${mapel}".`)
+      alert(`Tidak ada soal yang bisa Anda hapus di "${label}".`)
       return
     }
 
-    const semuaBisaDihapus = idsBolehHapus.length === soalMapel.length
+    const semuaBisaDihapus = idsBolehHapus.length === soalFolder.length
     const pesanKonfirmasi = semuaBisaDihapus
-      ? `Hapus seluruh ${idsBolehHapus.length} soal pada mata pelajaran "${mapel}"? Tindakan ini tidak bisa dibatalkan.`
-      : `Anda hanya bisa menghapus ${idsBolehHapus.length} dari ${soalMapel.length} soal di mata pelajaran "${mapel}" (sisanya milik guru lain). Lanjutkan menghapus yang bisa dihapus?`
+      ? `Hapus seluruh ${idsBolehHapus.length} soal pada "${label}"? Tindakan ini tidak bisa dibatalkan.`
+      : `Anda hanya bisa menghapus ${idsBolehHapus.length} dari ${soalFolder.length} soal di "${label}" (sisanya milik guru lain). Lanjutkan menghapus yang bisa dihapus?`
 
     if (!confirm(pesanKonfirmasi)) return
 
-    setDeletingMapel(mapel)
+    setDeletingMapel(label)
     const { error } = await supabase.from('bank_soal').delete().in('id', idsBolehHapus)
     setDeletingMapel('')
 
     if (error) {
-      alert('Gagal menghapus folder mata pelajaran: ' + error.message)
+      alert('Gagal menghapus folder: ' + error.message)
     }
     await load()
   }
 
   const canDelete = (item) => isAdmin || item.guru_id === profil?.guru_id
 
+  // Folder dikelompokkan per Kelas + Mata Pelajaran supaya nama kelasnya selalu terlihat,
+  // bukan cuma dikelompokkan per mata pelajaran saja.
   const grouped = items.reduce((acc, item) => {
-    if (!acc[item.mata_pelajaran]) acc[item.mata_pelajaran] = []
-    acc[item.mata_pelajaran].push(item)
+    const key = `${item.kelas || '-'}||${item.mata_pelajaran}`
+    if (!acc[key]) acc[key] = { kelas: item.kelas || '-', mata_pelajaran: item.mata_pelajaran, soal: [] }
+    acc[key].soal.push(item)
     return acc
   }, {})
 
-  const mapelList = Object.keys(grouped).sort()
-  const mapelTampil = mapelFilter ? mapelList.filter((m) => m === mapelFilter) : mapelList
+  const groupList = Object.values(grouped).sort((a, b) => {
+    return a.mata_pelajaran.localeCompare(b.mata_pelajaran) || String(a.kelas).localeCompare(String(b.kelas), 'id', { numeric: true })
+  })
+
+  const mapelList = [...new Set(items.map((item) => item.mata_pelajaran))].sort()
+  const groupTampil = mapelFilter ? groupList.filter((g) => g.mata_pelajaran === mapelFilter) : groupList
 
   return (
     <Layout title="Bank Soal" subtitle="Kumpulan soal tersimpan, siap dipakai ulang untuk Ujian Online">
@@ -265,7 +272,7 @@ export default function BankSoal() {
               onClick={() => setMapelFilter(m)}
               className={`px-3 py-1.5 rounded-lg text-xs font-medium ${mapelFilter === m ? 'bg-brass-400 text-ink-950' : 'bg-ink-900/[0.06] text-ink-700'}`}
             >
-              {m} ({grouped[m].length})
+              {m} ({items.filter((item) => item.mata_pelajaran === m).length})
             </button>
           ))}
         </div>
@@ -279,29 +286,34 @@ export default function BankSoal() {
         </div>
       ) : (
         <div className="space-y-4">
-          {mapelTampil.map((mapel) => {
-            const isOpen = expanded[mapel]
-            const soalMapel = grouped[mapel]
-            const adaYangBolehDihapus = soalMapel.some(canDelete)
-            const sedangHapusFolder = deletingMapel === mapel
+          {groupTampil.map((grup) => {
+            const key = `${grup.kelas}||${grup.mata_pelajaran}`
+            const label = `${grup.mata_pelajaran} · Kelas ${grup.kelas}`
+            const isOpen = expanded[key]
+            const soalFolder = grup.soal
+            const adaYangBolehDihapus = soalFolder.some(canDelete)
+            const sedangHapusFolder = deletingMapel === label
             return (
-              <div key={mapel} className="card overflow-hidden">
+              <div key={key} className="card overflow-hidden">
                 <div className="w-full flex items-center justify-between p-4 gap-3">
                   <button
-                    onClick={() => setExpanded({ ...expanded, [mapel]: !isOpen })}
+                    onClick={() => setExpanded({ ...expanded, [key]: !isOpen })}
                     className="flex-1 flex items-center justify-between min-w-0"
                   >
-                    <p className="text-sm font-medium text-ink-950">{mapel} <span className="text-ink-700/40 font-normal">({soalMapel.length} soal)</span></p>
+                    <p className="text-sm font-medium text-ink-950">
+                      {grup.mata_pelajaran} <span className="text-brass-500 font-semibold">· Kelas {grup.kelas}</span>{' '}
+                      <span className="text-ink-700/40 font-normal">({soalFolder.length} soal)</span>
+                    </p>
                     {isOpen ? <ChevronUp size={16} className="text-ink-700/50 shrink-0" /> : <ChevronDown size={16} className="text-ink-700/50 shrink-0" />}
                   </button>
                   {adaYangBolehDihapus && (
                     <button
                       onClick={(e) => {
                         e.stopPropagation()
-                        handleDeleteMapel(mapel, soalMapel)
+                        handleDeleteMapel(label, soalFolder)
                       }}
                       disabled={sedangHapusFolder}
-                      title={`Hapus seluruh soal mata pelajaran ${mapel}`}
+                      title={`Hapus seluruh soal ${label}`}
                       className="w-7 h-7 rounded-lg flex items-center justify-center text-red-600 hover:bg-red-50 shrink-0 disabled:opacity-50"
                     >
                       {sedangHapusFolder ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
@@ -310,11 +322,11 @@ export default function BankSoal() {
                 </div>
                 {isOpen && (
                   <ul className="divide-y divide-ink-900/[0.06] border-t border-ink-900/[0.06]">
-                    {soalMapel.map((item, i) => (
+                    {soalFolder.map((item, i) => (
                       <li key={item.id} className="p-4 flex items-start justify-between gap-3">
                         <div className="min-w-0">
                           <p className="text-sm text-ink-900">{i + 1}. {item.soal}</p>
-                          <p className="text-xs text-ink-700/40 mt-1">Kelas: {item.kelas || '-'} · Jawaban benar: {item.jawaban_benar}</p>
+                          <p className="text-xs text-ink-700/40 mt-1">Jawaban benar: {item.jawaban_benar}</p>
                         </div>
                         {canDelete(item) && (
                           <button
