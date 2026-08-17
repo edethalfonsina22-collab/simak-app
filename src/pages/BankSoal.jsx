@@ -10,7 +10,6 @@ export default function BankSoal() {
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(true)
   const [uploading, setUploading] = useState(false)
-  const [mapelUpload, setMapelUpload] = useState('')
   const [mapelFilter, setMapelFilter] = useState('')
   const [expanded, setExpanded] = useState({})
   const [deletingMapel, setDeletingMapel] = useState('')
@@ -26,89 +25,118 @@ export default function BankSoal() {
     load()
   }, [])
 
-  async function handleUpload(file) {
-    if (!mapelUpload) {
-      alert('Isi nama mata pelajaran dulu sebelum upload.')
-      return
-    }
-    setUploading(true)
-    try {
-      const buffer = await file.arrayBuffer()
-      const wb = XLSX.read(buffer, { type: 'array' })
-      const sheet = wb.Sheets[wb.SheetNames[0]]
-      const rows = XLSX.utils.sheet_to_json(sheet)
+  // Ambil satu file Excel: kelas & mata pelajaran dibaca langsung dari kolom di file,
+  // tidak perlu diisi manual di form. Mendukung banyak file sekaligus (upload massal).
+  async function parseFile(file) {
+    const soalRows = []
+    const gagal = [] // { file, baris, alasan }
 
-      const soalRows = []
-      const gagal = [] // { baris, alasan }
+    const buffer = await file.arrayBuffer()
+    const wb = XLSX.read(buffer, { type: 'array' })
+    const sheet = wb.Sheets[wb.SheetNames[0]]
+    const rows = XLSX.utils.sheet_to_json(sheet)
 
-      rows.forEach((r, idx) => {
-        const baris = idx + 2 // baris 1 = header, data mulai baris 2 di Excel
+    rows.forEach((r, idx) => {
+      const baris = idx + 2 // baris 1 = header, data mulai baris 2 di Excel
 
-        const soal = String(r.soal || r.Soal || '').trim()
-        const pilihan_a = String(r.pilihan_a || r['Pilihan A'] || r.pilihan_A || '').trim()
-        const pilihan_b = String(r.pilihan_b || r['Pilihan B'] || r.pilihan_B || '').trim()
-        const pilihan_c = String(r.pilihan_c || r['Pilihan C'] || r.pilihan_C || '').trim()
-        const pilihan_d = String(r.pilihan_d || r['Pilihan D'] || r.pilihan_D || '').trim()
-        const jawaban_benar = String(r.jawaban_benar || r['Jawaban Benar'] || r.jawaban || '').trim().toUpperCase()
+      const kelas = String(r.kelas || r.Kelas || r.KELAS || '').trim()
+      const mata_pelajaran = String(
+        r.mata_pelajaran || r['Mata Pelajaran'] || r.mapel || r.Mapel || r.MAPEL || ''
+      ).trim()
+      const soal = String(r.soal || r.Soal || '').trim()
+      const pilihan_a = String(r.pilihan_a || r['Pilihan A'] || r.pilihan_A || '').trim()
+      const pilihan_b = String(r.pilihan_b || r['Pilihan B'] || r.pilihan_B || '').trim()
+      const pilihan_c = String(r.pilihan_c || r['Pilihan C'] || r.pilihan_C || '').trim()
+      const pilihan_d = String(r.pilihan_d || r['Pilihan D'] || r.pilihan_D || '').trim()
+      const jawaban_benar = String(r.jawaban_benar || r['Jawaban Benar'] || r.jawaban || '').trim().toUpperCase()
 
-        // Lewati baris yang memang kosong total (bukan error, cuma baris kosong di Excel)
-        const semuaKosong = !soal && !pilihan_a && !pilihan_b && !pilihan_c && !pilihan_d && !jawaban_benar
-        if (semuaKosong) return
+      // Lewati baris yang memang kosong total (bukan error, cuma baris kosong di Excel)
+      const semuaKosong = !kelas && !mata_pelajaran && !soal && !pilihan_a && !pilihan_b && !pilihan_c && !pilihan_d && !jawaban_benar
+      if (semuaKosong) return
 
-        const alasanBaris = []
-        if (!soal) alasanBaris.push('kolom "soal" kosong')
-        if (!pilihan_a) alasanBaris.push('pilihan_a kosong')
-        if (!pilihan_b) alasanBaris.push('pilihan_b kosong')
-        if (!pilihan_c) alasanBaris.push('pilihan_c kosong')
-        if (!pilihan_d) alasanBaris.push('pilihan_d kosong')
-        if (!['A', 'B', 'C', 'D'].includes(jawaban_benar)) {
-          alasanBaris.push(`jawaban_benar harus A/B/C/D (terbaca: "${jawaban_benar || '-'}")`)
-        }
+      const alasanBaris = []
+      if (!kelas) alasanBaris.push('kolom "kelas" kosong')
+      if (!mata_pelajaran) alasanBaris.push('kolom "mata_pelajaran" kosong')
+      if (!soal) alasanBaris.push('kolom "soal" kosong')
+      if (!pilihan_a) alasanBaris.push('pilihan_a kosong')
+      if (!pilihan_b) alasanBaris.push('pilihan_b kosong')
+      if (!pilihan_c) alasanBaris.push('pilihan_c kosong')
+      if (!pilihan_d) alasanBaris.push('pilihan_d kosong')
+      if (!['A', 'B', 'C', 'D'].includes(jawaban_benar)) {
+        alasanBaris.push(`jawaban_benar harus A/B/C/D (terbaca: "${jawaban_benar || '-'}")`)
+      }
 
-        if (alasanBaris.length > 0) {
-          gagal.push({ baris, alasan: alasanBaris.join(', ') })
-          return
-        }
-
-        soalRows.push({
-          mata_pelajaran: mapelUpload,
-          soal,
-          pilihan_a,
-          pilihan_b,
-          pilihan_c,
-          pilihan_d,
-          jawaban_benar,
-          guru_id: profil.guru_id,
-        })
-      })
-
-      if (soalRows.length === 0) {
-        const detailGagal = gagal.length > 0
-          ? '\n\nDetail baris gagal:\n' + gagal.map((g) => `Baris ${g.baris}: ${g.alasan}`).join('\n')
-          : ''
-        alert(
-          'Tidak ada soal valid ditemukan. Pastikan kolom Excel: soal, pilihan_a, pilihan_b, pilihan_c, pilihan_d, jawaban_benar (isi A/B/C/D).' +
-          detailGagal
-        )
-        setUploading(false)
+      if (alasanBaris.length > 0) {
+        gagal.push({ file: file.name, baris, alasan: alasanBaris.join(', ') })
         return
       }
 
-      const { error } = await supabase.from('bank_soal').insert(soalRows)
-      if (error) {
-        alert('Gagal menyimpan soal: ' + error.message)
-      } else {
-        let pesan = `${soalRows.length} soal berhasil ditambahkan ke Bank Soal ${mapelUpload}.`
-        if (gagal.length > 0) {
-          pesan += `\n\n${gagal.length} baris ditolak dan TIDAK ikut diupload:\n` +
-            gagal.map((g) => `Baris ${g.baris}: ${g.alasan}`).join('\n')
-        }
-        alert(pesan)
-        setMapelUpload('')
-        await load()
+      soalRows.push({
+        kelas,
+        mata_pelajaran,
+        soal,
+        pilihan_a,
+        pilihan_b,
+        pilihan_c,
+        pilihan_d,
+        jawaban_benar,
+        guru_id: profil.guru_id,
+      })
+    })
+
+    return { soalRows, gagal }
+  }
+
+  // Upload massal: proses semua file Excel yang dipilih sekaligus.
+  // Kelas & mata pelajaran tiap soal diambil dari isi file, bukan dari input form.
+  async function handleUploadFiles(fileList) {
+    const files = Array.from(fileList)
+    if (files.length === 0) return
+
+    setUploading(true)
+    let semuaSoal = []
+    let semuaGagal = []
+    const gagalBaca = [] // file yang gagal dibaca sama sekali
+
+    for (const file of files) {
+      try {
+        const { soalRows, gagal } = await parseFile(file)
+        semuaSoal = semuaSoal.concat(soalRows)
+        semuaGagal = semuaGagal.concat(gagal)
+      } catch (err) {
+        gagalBaca.push(`${file.name}: ${err.message}`)
       }
-    } catch (err) {
-      alert('Gagal membaca file Excel: ' + err.message)
+    }
+
+    if (semuaSoal.length === 0) {
+      const detailGagal = semuaGagal.length > 0
+        ? '\n\nDetail baris gagal:\n' + semuaGagal.map((g) => `${g.file} baris ${g.baris}: ${g.alasan}`).join('\n')
+        : ''
+      const detailGagalBaca = gagalBaca.length > 0
+        ? '\n\nFile gagal dibaca:\n' + gagalBaca.join('\n')
+        : ''
+      alert(
+        'Tidak ada soal valid ditemukan. Pastikan kolom Excel: kelas, mata_pelajaran, soal, pilihan_a, pilihan_b, pilihan_c, pilihan_d, jawaban_benar (isi A/B/C/D).' +
+        detailGagal + detailGagalBaca
+      )
+      setUploading(false)
+      return
+    }
+
+    const { error } = await supabase.from('bank_soal').insert(semuaSoal)
+    if (error) {
+      alert('Gagal menyimpan soal: ' + error.message)
+    } else {
+      let pesan = `${semuaSoal.length} soal berhasil ditambahkan dari ${files.length} file.`
+      if (semuaGagal.length > 0) {
+        pesan += `\n\n${semuaGagal.length} baris ditolak dan TIDAK ikut diupload:\n` +
+          semuaGagal.map((g) => `${g.file} baris ${g.baris}: ${g.alasan}`).join('\n')
+      }
+      if (gagalBaca.length > 0) {
+        pesan += `\n\nFile gagal dibaca:\n` + gagalBaca.join('\n')
+      }
+      alert(pesan)
+      await load()
     }
     setUploading(false)
   }
@@ -176,30 +204,23 @@ export default function BankSoal() {
 
       <div className="card p-6 mb-6 space-y-3">
         <h3 className="font-display text-lg font-semibold mb-1">Upload Soal Baru</h3>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <div>
-            <label className="eyebrow mb-1.5 block">Mata Pelajaran</label>
-            <input
-              className="input-field"
-              placeholder="Matematika"
-              value={mapelUpload}
-              onChange={(e) => setMapelUpload(e.target.value)}
-            />
-          </div>
-          <div>
-            <label className="eyebrow mb-1.5 block">File Excel</label>
-            <input
-              className="input-field"
-              type="file"
-              accept=".xlsx,.xls"
-              disabled={uploading}
-              onChange={(e) => e.target.files?.[0] && handleUpload(e.target.files[0])}
-            />
-          </div>
+        <div>
+          <label className="eyebrow mb-1.5 block">File Excel (bisa pilih banyak file sekaligus)</label>
+          <input
+            className="input-field"
+            type="file"
+            accept=".xlsx,.xls"
+            multiple
+            disabled={uploading}
+            onChange={(e) => {
+              if (e.target.files?.length) handleUploadFiles(e.target.files)
+              e.target.value = ''
+            }}
+          />
         </div>
         {uploading && <p className="text-xs text-ink-700/50 flex items-center gap-1.5"><Loader2 size={12} className="animate-spin" /> Mengunggah...</p>}
         <p className="text-xs text-ink-700/40">
-          Kolom Excel: <code>soal</code>, <code>pilihan_a</code>, <code>pilihan_b</code>, <code>pilihan_c</code>, <code>pilihan_d</code>, <code>jawaban_benar</code> (isi A/B/C/D). Semua soal dalam 1 file akan masuk ke mata pelajaran yang diisi di atas.
+          Kolom Excel: <code>kelas</code>, <code>mata_pelajaran</code>, <code>soal</code>, <code>pilihan_a</code>, <code>pilihan_b</code>, <code>pilihan_c</code>, <code>pilihan_d</code>, <code>jawaban_benar</code> (isi A/B/C/D). Kelas dan mata pelajaran diambil langsung dari isi file, tidak perlu diisi manual. Bisa upload beberapa file berbeda kelas/mapel dalam satu kali proses.
         </p>
       </div>
 
@@ -266,7 +287,7 @@ export default function BankSoal() {
                       <li key={item.id} className="p-4 flex items-start justify-between gap-3">
                         <div className="min-w-0">
                           <p className="text-sm text-ink-900">{i + 1}. {item.soal}</p>
-                          <p className="text-xs text-ink-700/40 mt-1">Jawaban benar: {item.jawaban_benar}</p>
+                          <p className="text-xs text-ink-700/40 mt-1">Kelas: {item.kelas || '-'} · Jawaban benar: {item.jawaban_benar}</p>
                         </div>
                         {canDelete(item) && (
                           <button
