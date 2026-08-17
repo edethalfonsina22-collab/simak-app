@@ -57,3 +57,30 @@ body {
 .badge {
   @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium;
 }
+
+/* Aturan cetak untuk Kuitansi/Nota — sembunyikan seluruh halaman kecuali
+   elemen berkelas .print-only (dipakai oleh KuitansiPrintTemplate) saat
+   window.print() dipanggil dari Keuangan.jsx / KuitansiModal.jsx / Kuitansi.jsx */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  .print-only,
+  .print-only * {
+    visibility: visible;
+  }
+  .print-only {
+    position: absolute;
+    top: 0;
+    left: 0;
+  }
+  .no-print {
+    display: none !important;
+  }
+}
+
+@media screen {
+  .print-only {
+    display: none;
+  }
+}
