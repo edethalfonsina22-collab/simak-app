@@ -25,11 +25,37 @@ export default function BankSoal() {
     load()
   }, [])
 
-  // Ambil satu file Excel: kelas & mata pelajaran dibaca langsung dari kolom di file,
-  // tidak perlu diisi manual di form. Mendukung banyak file sekaligus (upload massal).
+  // Nama file soal biasanya mengandung info kelas & mapel, contoh:
+  // "soal_BAHASA_INDONESIA_KLS6_SMT1.xlsx" -> mata_pelajaran: "Bahasa Indonesia", kelas: "6"
+  // Dipakai sebagai fallback kalau file Excel tidak punya kolom kelas/mata_pelajaran sendiri.
+  function tebakDariNamaFile(filename) {
+    const base = filename.replace(/\.[^/.]+$/, '') // buang ekstensi
+    const tanpaPrefix = base.replace(/^soal[_\-\s]*/i, '')
+    const kelasMatch = tanpaPrefix.match(/kls[_\-\s]*([0-9]+)/i)
+    const kelas = kelasMatch ? kelasMatch[1] : ''
+
+    let bagianMapel = kelasMatch ? tanpaPrefix.slice(0, kelasMatch.index) : tanpaPrefix
+    // buang bagian semester kalau ada (misal "_SMT1") yang mungkin ikut kepotong di depan kelas
+    bagianMapel = bagianMapel.replace(/[_\-\s]*smt[_\-\s]*[0-9]+/i, '')
+    bagianMapel = bagianMapel.replace(/[_\-]+/g, ' ').trim()
+
+    const mata_pelajaran = bagianMapel
+      .toLowerCase()
+      .split(' ')
+      .filter(Boolean)
+      .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+      .join(' ')
+
+    return { kelas, mata_pelajaran }
+  }
+
+  // Ambil satu file Excel: kelas & mata pelajaran diambil dari kolom di file kalau ada,
+  // kalau tidak ada kolomnya, ditebak dari nama file (lihat tebakDariNamaFile).
+  // Mendukung banyak file sekaligus (upload massal).
   async function parseFile(file) {
     const soalRows = []
     const gagal = [] // { file, baris, alasan }
+    const dariNamaFile = tebakDariNamaFile(file.name)
 
     const buffer = await file.arrayBuffer()
     const wb = XLSX.read(buffer, { type: 'array' })
@@ -39,9 +65,9 @@ export default function BankSoal() {
     rows.forEach((r, idx) => {
       const baris = idx + 2 // baris 1 = header, data mulai baris 2 di Excel
 
-      const kelas = String(r.kelas || r.Kelas || r.KELAS || '').trim()
+      const kelas = String(r.kelas || r.Kelas || r.KELAS || dariNamaFile.kelas || '').trim()
       const mata_pelajaran = String(
-        r.mata_pelajaran || r['Mata Pelajaran'] || r.mapel || r.Mapel || r.MAPEL || ''
+        r.mata_pelajaran || r['Mata Pelajaran'] || r.mapel || r.Mapel || r.MAPEL || dariNamaFile.mata_pelajaran || ''
       ).trim()
       const soal = String(r.soal || r.Soal || '').trim()
       const pilihan_a = String(r.pilihan_a || r['Pilihan A'] || r.pilihan_A || '').trim()
@@ -50,13 +76,14 @@ export default function BankSoal() {
       const pilihan_d = String(r.pilihan_d || r['Pilihan D'] || r.pilihan_D || '').trim()
       const jawaban_benar = String(r.jawaban_benar || r['Jawaban Benar'] || r.jawaban || '').trim().toUpperCase()
 
-      // Lewati baris yang memang kosong total (bukan error, cuma baris kosong di Excel)
-      const semuaKosong = !kelas && !mata_pelajaran && !soal && !pilihan_a && !pilihan_b && !pilihan_c && !pilihan_d && !jawaban_benar
+      // Lewati baris yang memang kosong total (bukan error, cuma baris kosong di Excel).
+      // Kelas/mapel tidak dihitung di sini karena bisa terisi otomatis dari nama file.
+      const semuaKosong = !soal && !pilihan_a && !pilihan_b && !pilihan_c && !pilihan_d && !jawaban_benar
       if (semuaKosong) return
 
       const alasanBaris = []
-      if (!kelas) alasanBaris.push('kolom "kelas" kosong')
-      if (!mata_pelajaran) alasanBaris.push('kolom "mata_pelajaran" kosong')
+      if (!kelas) alasanBaris.push('kelas kosong (tidak ada kolom "kelas" & tidak terbaca dari nama file, contoh nama file yang benar: soal_BAHASA_INDONESIA_KLS6_SMT1.xlsx)')
+      if (!mata_pelajaran) alasanBaris.push('mata pelajaran kosong (tidak ada kolom "mata_pelajaran" & tidak terbaca dari nama file)')
       if (!soal) alasanBaris.push('kolom "soal" kosong')
       if (!pilihan_a) alasanBaris.push('pilihan_a kosong')
       if (!pilihan_b) alasanBaris.push('pilihan_b kosong')
@@ -116,7 +143,7 @@ export default function BankSoal() {
         ? '\n\nFile gagal dibaca:\n' + gagalBaca.join('\n')
         : ''
       alert(
-        'Tidak ada soal valid ditemukan. Pastikan kolom Excel: kelas, mata_pelajaran, soal, pilihan_a, pilihan_b, pilihan_c, pilihan_d, jawaban_benar (isi A/B/C/D).' +
+        'Tidak ada soal valid ditemukan. Pastikan kolom Excel: soal, pilihan_a, pilihan_b, pilihan_c, pilihan_d, jawaban_benar (isi A/B/C/D). Kelas & mata pelajaran diambil dari kolom kelas/mata_pelajaran (kalau ada) atau ditebak dari nama file (contoh: soal_BAHASA_INDONESIA_KLS6_SMT1.xlsx).' +
         detailGagal + detailGagalBaca
       )
       setUploading(false)
@@ -220,7 +247,7 @@ export default function BankSoal() {
         </div>
         {uploading && <p className="text-xs text-ink-700/50 flex items-center gap-1.5"><Loader2 size={12} className="animate-spin" /> Mengunggah...</p>}
         <p className="text-xs text-ink-700/40">
-          Kolom Excel: <code>kelas</code>, <code>mata_pelajaran</code>, <code>soal</code>, <code>pilihan_a</code>, <code>pilihan_b</code>, <code>pilihan_c</code>, <code>pilihan_d</code>, <code>jawaban_benar</code> (isi A/B/C/D). Kelas dan mata pelajaran diambil langsung dari isi file, tidak perlu diisi manual. Bisa upload beberapa file berbeda kelas/mapel dalam satu kali proses.
+          Kolom Excel yang wajib: <code>soal</code>, <code>pilihan_a</code>, <code>pilihan_b</code>, <code>pilihan_c</code>, <code>pilihan_d</code>, <code>jawaban_benar</code> (isi A/B/C/D). Kelas & mata pelajaran otomatis diambil dari kolom <code>kelas</code>/<code>mata_pelajaran</code> kalau ada di file — kalau tidak ada, akan dibaca dari <b>nama file</b>, contoh: <code>soal_BAHASA_INDONESIA_KLS6_SMT1.xlsx</code> → mapel "Bahasa Indonesia", kelas "6". Bisa pilih beberapa file berbeda kelas/mapel sekaligus.
         </p>
       </div>
 
