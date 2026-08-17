@@ -23,6 +23,7 @@ import Rapor from './pages/Rapor'
 import RaporCetak from './pages/RaporCetak'
 import LaporanBulanan from './pages/LaporanBulanan'
 import Keuangan from './pages/Keuangan'
+import Kuitansi from './pages/Kuitansi'
 import Backup from './pages/Backup'
 import ProfilSekolah from './pages/ProfilSekolah'
 import PPDBPublik from './pages/PPDBPublik'
@@ -86,6 +87,7 @@ export default function App() {
       <Route path="/laporan" element={<ProtectedRoute adminOnly><LaporanBulanan /></ProtectedRoute>} />
       <Route path="/hari-libur" element={<ProtectedRoute adminOnly><HariLibur /></ProtectedRoute>} />
       <Route path="/keuangan" element={<ProtectedRoute adminOnly><Keuangan /></ProtectedRoute>} />
+      <Route path="/kuitansi" element={<ProtectedRoute adminOnly><Kuitansi /></ProtectedRoute>} />
       <Route path="/backup" element={<ProtectedRoute adminOnly><Backup /></ProtectedRoute>} />
       <Route path="/profil-sekolah" element={<ProtectedRoute adminOnly><ProfilSekolah /></ProtectedRoute>} />
       <Route path="/ppdb-admin" element={<ProtectedRoute adminOnly><PPDBAdmin /></ProtectedRoute>} />
