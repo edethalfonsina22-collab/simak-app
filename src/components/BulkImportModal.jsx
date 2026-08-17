@@ -1,134 +1,360 @@
-import { useState } from 'react'
-import * as XLSX from 'xlsx'
-import { X, UploadCloud, Loader2, CheckCircle2, AlertCircle } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { supabase } from '../lib/supabaseClient'
+import { Plus, Trash2, X, Loader2, Printer } from 'lucide-react'
+import KuitansiPrintTemplate from './KuitansiPrintTemplate'
+
+const emptyItem = () => ({ id: crypto.randomUUID(), nama_barang: '', jumlah: 1, harga_satuan: 0 })
 
 /**
- * Modal generik untuk input data massal dari file Excel (.xlsx) atau CSV.
- * - `templateHeaders`: kolom yang diharapkan, ditampilkan sebagai contoh unduhan template.
- * - `mapRow(row)`: mengubah satu baris mentah dari file menjadi object siap kirim ke Supabase.
- * - `onImport(rows)`: fungsi async yang melakukan insert ke Supabase.
+ * Dipanggil dari Keuangan.jsx:
+ *   <KuitansiModal
+ *     keuanganRow={row}          // baris transaksi keuangan yang mau dibuatkan kuitansi
+ *     sekolah={{ nama, alamat, kota }}
+ *     onClose={() => setKuitansiFor(null)}
+ *   />
  */
-export default function BulkImportModal({ open, onClose, title, templateHeaders, mapRow, onImport }) {
-  const [rows, setRows] = useState([])
-  const [fileName, setFileName] = useState('')
-  const [status, setStatus] = useState('idle') // idle | parsed | importing | done | error
-  const [errorMsg, setErrorMsg] = useState('')
-  const [result, setResult] = useState(null)
+export default function KuitansiModal({ keuanganRow, sekolah, onClose }) {
+  const [jenis, setJenis] = useState('kuitansi')
+  const [form, setForm] = useState({
+    // umum
+    diterima_dari: '',
+    untuk_pembayaran: keuanganRow?.catatan || keuanganRow?.kategori || '',
+    disetujui_oleh: '',
+    jabatan_disetujui: 'Atasan Langsung',
+    dibayar_oleh: '',
+    jabatan_dibayar: 'Pemegang Kas',
+    catatan: '',
+    tanggal: keuanganRow?.tanggal || new Date().toISOString().slice(0, 10),
+    // khusus kwitansi
+    no_bukti: '',
+    lembar: 'I/II/III/IV/V',
+    mata_anggaran: '',
+    tahun_anggaran: String(new Date().getFullYear()),
+    nip_dibayar: '',
+    nip_disetujui: '',
+    nama_penerima: '',
+    alamat_penerima: '',
+    // khusus nota
+    tuan: '',
+    toko: '',
+  })
+  const [items, setItems] = useState([
+    { ...emptyItem(), nama_barang: keuanganRow?.catatan || keuanganRow?.kategori || '', jumlah: 1, harga_satuan: keuanganRow?.jumlah || 0 },
+  ])
+  const [saving, setSaving] = useState(false)
+  const [savedData, setSavedData] = useState(null) // { ...kuitansi row } setelah tersimpan, siap dicetak
+  const printRef = useRef(null)
 
-  if (!open) return null
+  const total = items.reduce((a, b) => a + Number(b.jumlah || 0) * Number(b.harga_satuan || 0), 0)
 
-  function handleFile(e) {
-    const file = e.target.files?.[0]
-    if (!file) return
-    setFileName(file.name)
-    setStatus('idle')
-    setErrorMsg('')
-
-    const reader = new FileReader()
-    reader.onload = (evt) => {
-      try {
-        const wb = XLSX.read(evt.target.result, { type: 'binary' })
-        const sheet = wb.Sheets[wb.SheetNames[0]]
-        const json = XLSX.utils.sheet_to_json(sheet, { defval: '' })
-        const mapped = json.map(mapRow).filter(Boolean)
-        setRows(mapped)
-        setStatus('parsed')
-      } catch (err) {
-        setErrorMsg('Gagal membaca file. Pastikan formatnya .xlsx atau .csv sesuai template.')
-        setStatus('error')
-      }
-    }
-    reader.readAsBinaryString(file)
+  function updateItem(id, field, value) {
+    setItems((prev) => prev.map((it) => (it.id === id ? { ...it, [field]: value } : it)))
   }
 
-  function downloadTemplate() {
-    const ws = XLSX.utils.aoa_to_sheet([templateHeaders])
-    const wb = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(wb, ws, 'Template')
-    XLSX.writeFile(wb, `template-${title.toLowerCase().replace(/\s+/g, '-')}.xlsx`)
+  function addItem() {
+    setItems((prev) => [...prev, emptyItem()])
   }
 
-  async function handleImport() {
-    setStatus('importing')
+  function removeItem(id) {
+    setItems((prev) => (prev.length > 1 ? prev.filter((it) => it.id !== id) : prev))
+  }
+
+  async function handleSimpan(e) {
+    e.preventDefault()
+    setSaving(true)
     try {
-      const res = await onImport(rows)
-      setResult(res)
-      setStatus('done')
+      const { data: nomorData, error: nomorErr } = await supabase.rpc('next_nomor_kuitansi', { p_jenis: jenis })
+      if (nomorErr) throw nomorErr
+
+      const payload = {
+        keuangan_id: keuanganRow?.id || null,
+        jenis,
+        nomor: nomorData,
+        tanggal: form.tanggal,
+        diterima_dari: form.diterima_dari,
+        untuk_pembayaran: form.untuk_pembayaran,
+        jumlah_total: total,
+        disetujui_oleh: form.disetujui_oleh,
+        jabatan_disetujui: form.jabatan_disetujui,
+        dibayar_oleh: form.dibayar_oleh,
+        jabatan_dibayar: form.jabatan_dibayar,
+        catatan: form.catatan,
+        no_bukti: form.no_bukti,
+        lembar: form.lembar,
+        mata_anggaran: form.mata_anggaran,
+        tahun_anggaran: form.tahun_anggaran,
+        nip_dibayar: form.nip_dibayar,
+        nip_disetujui: form.nip_disetujui,
+        nama_penerima: form.nama_penerima,
+        alamat_penerima: form.alamat_penerima,
+        tuan: form.tuan,
+        toko: form.toko,
+      }
+
+      const { data: inserted, error: insertErr } = await supabase.from('kuitansi').insert(payload).select().single()
+      if (insertErr) throw insertErr
+
+      const itemPayload = items
+        .filter((it) => it.nama_barang.trim() !== '')
+        .map((it, i) => ({
+          kuitansi_id: inserted.id,
+          nama_barang: it.nama_barang,
+          jumlah: Number(it.jumlah) || 1,
+          harga_satuan: Number(it.harga_satuan) || 0,
+          urutan: i,
+        }))
+
+      if (itemPayload.length > 0) {
+        const { error: itemErr } = await supabase.from('kuitansi_item').insert(itemPayload)
+        if (itemErr) throw itemErr
+      }
+
+      setSavedData(inserted)
     } catch (err) {
-      setErrorMsg(err.message || 'Terjadi kesalahan saat menyimpan data.')
-      setStatus('error')
+      alert('Gagal menyimpan kuitansi: ' + err.message)
+    } finally {
+      setSaving(false)
     }
   }
 
-  function handleClose() {
-    setRows([])
-    setFileName('')
-    setStatus('idle')
-    setErrorMsg('')
-    setResult(null)
-    onClose()
-  }
+  useEffect(() => {
+    if (savedData) {
+      // beri waktu render sebelum memanggil print dialog
+      const t = setTimeout(() => window.print(), 150)
+      return () => clearTimeout(t)
+    }
+  }, [savedData])
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink-950/50 backdrop-blur-sm p-4">
-      <div className="card w-full max-w-lg p-6 relative">
-        <button onClick={handleClose} className="absolute top-4 right-4 text-ink-700/40 hover:text-ink-900">
-          <X size={20} />
-        </button>
-        <h2 className="font-display text-xl font-semibold text-ink-950">{title}</h2>
-        <p className="text-sm text-ink-700/60 mt-1">
-          Unggah file Excel/CSV untuk menambahkan banyak data sekaligus.
-        </p>
-
-        <button onClick={downloadTemplate} className="btn-secondary mt-4 w-full">
-          Unduh Template Kosong
-        </button>
-
-        <label className="mt-3 flex flex-col items-center justify-center gap-2 border-2 border-dashed border-ink-900/15 rounded-xl py-8 cursor-pointer hover:border-brass-400 transition-colors">
-          <UploadCloud size={24} className="text-ink-700/40" />
-          <span className="text-sm text-ink-700/60">
-            {fileName || 'Klik untuk memilih file .xlsx atau .csv'}
-          </span>
-          <input type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={handleFile} />
-        </label>
-
-        {status === 'parsed' && (
-          <div className="mt-4 flex items-center gap-2 text-sm text-sage-500 bg-sage-500/10 rounded-lg px-3 py-2.5">
-            <CheckCircle2 size={16} />
-            {rows.length} baris data siap diimpor.
-          </div>
-        )}
-
-        {status === 'error' && (
-          <div className="mt-4 flex items-center gap-2 text-sm text-red-700 bg-red-50 rounded-lg px-3 py-2.5">
-            <AlertCircle size={16} />
-            {errorMsg}
-          </div>
-        )}
-
-        {status === 'done' && (
-          <div className="mt-4 flex items-center gap-2 text-sm text-sage-500 bg-sage-500/10 rounded-lg px-3 py-2.5">
-            <CheckCircle2 size={16} />
-            Berhasil menyimpan {result?.count ?? rows.length} data.
-          </div>
-        )}
-
-        <div className="mt-5 flex justify-end gap-3">
-          <button className="btn-secondary" onClick={handleClose}>
-            {status === 'done' ? 'Tutup' : 'Batal'}
-          </button>
-          {status !== 'done' && (
-            <button
-              className="btn-primary"
-              disabled={rows.length === 0 || status === 'importing'}
-              onClick={handleImport}
-            >
-              {status === 'importing' && <Loader2 size={16} className="animate-spin" />}
-              Impor {rows.length > 0 ? `${rows.length} Data` : ''}
-            </button>
-          )}
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4 no-print">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-xl p-6 max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="font-display text-lg font-semibold">Buat Kuitansi / Nota</h2>
+          <button className="icon-btn" onClick={onClose}><X size={18} /></button>
         </div>
+
+        <form onSubmit={handleSimpan} className="space-y-3">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="label-field">Jenis Dokumen</label>
+              <select className="input-field" value={jenis} onChange={(e) => setJenis(e.target.value)}>
+                <option value="kuitansi">Kuitansi</option>
+                <option value="nota">Nota</option>
+              </select>
+            </div>
+            <div>
+              <label className="label-field">Tanggal</label>
+              <input
+                type="date"
+                className="input-field"
+                value={form.tanggal}
+                onChange={(e) => setForm({ ...form, tanggal: e.target.value })}
+              />
+            </div>
+          </div>
+
+          {jenis === 'kuitansi' && (
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="label-field">No. Bukti</label>
+                <input
+                  className="input-field"
+                  placeholder="Mis. BNU-12"
+                  value={form.no_bukti}
+                  onChange={(e) => setForm({ ...form, no_bukti: e.target.value })}
+                />
+              </div>
+              <div>
+                <label className="label-field">Lembar</label>
+                <input
+                  className="input-field"
+                  value={form.lembar}
+                  onChange={(e) => setForm({ ...form, lembar: e.target.value })}
+                />
+              </div>
+              <div>
+                <label className="label-field">Mata Anggaran</label>
+                <input
+                  className="input-field"
+                  placeholder="Mis. 5.1.02.01.01.00.55"
+                  value={form.mata_anggaran}
+                  onChange={(e) => setForm({ ...form, mata_anggaran: e.target.value })}
+                />
+              </div>
+              <div>
+                <label className="label-field">Tahun</label>
+                <input
+                  className="input-field"
+                  value={form.tahun_anggaran}
+                  onChange={(e) => setForm({ ...form, tahun_anggaran: e.target.value })}
+                />
+              </div>
+            </div>
+          )}
+
+          {jenis === 'nota' && (
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="label-field">Tuan</label>
+                <input
+                  className="input-field"
+                  placeholder="Nama pembeli"
+                  value={form.tuan}
+                  onChange={(e) => setForm({ ...form, tuan: e.target.value })}
+                />
+              </div>
+              <div>
+                <label className="label-field">Toko</label>
+                <input
+                  className="input-field"
+                  placeholder="Nama toko/penjual"
+                  value={form.toko}
+                  onChange={(e) => setForm({ ...form, toko: e.target.value })}
+                />
+              </div>
+            </div>
+          )}
+
+          {jenis === 'kuitansi' && (
+            <div>
+              <label className="label-field">Sudah Terima Dari</label>
+              <input
+                className="input-field"
+                placeholder="Nama orang tua / pihak pembayar"
+                value={form.diterima_dari}
+                onChange={(e) => setForm({ ...form, diterima_dari: e.target.value })}
+              />
+            </div>
+          )}
+
+          <div>
+            <label className="label-field">Untuk Pembayaran / Keterangan</label>
+            <input
+              className="input-field"
+              value={form.untuk_pembayaran}
+              onChange={(e) => setForm({ ...form, untuk_pembayaran: e.target.value })}
+            />
+          </div>
+
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <label className="label-field mb-0">Rincian Barang / Item</label>
+              <button type="button" className="icon-btn" onClick={addItem}><Plus size={15} /></button>
+            </div>
+            <div className="space-y-2">
+              {items.map((it) => (
+                <div key={it.id} className="grid grid-cols-12 gap-2 items-center">
+                  <input
+                    className="input-field col-span-5"
+                    placeholder="Nama barang"
+                    value={it.nama_barang}
+                    onChange={(e) => updateItem(it.id, 'nama_barang', e.target.value)}
+                  />
+                  <input
+                    type="number"
+                    min="0"
+                    className="input-field col-span-2"
+                    placeholder="Jml"
+                    value={it.jumlah}
+                    onChange={(e) => updateItem(it.id, 'jumlah', e.target.value)}
+                  />
+                  <input
+                    type="number"
+                    min="0"
+                    className="input-field col-span-4"
+                    placeholder="Harga satuan"
+                    value={it.harga_satuan}
+                    onChange={(e) => updateItem(it.id, 'harga_satuan', e.target.value)}
+                  />
+                  <button type="button" className="icon-btn col-span-1 text-red-600" onClick={() => removeItem(it.id)}>
+                    <Trash2 size={15} />
+                  </button>
+                </div>
+              ))}
+            </div>
+            <p className="text-right text-sm font-medium mt-2">
+              Total: {new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(total)}
+            </p>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="label-field">Setuju Dibayar (nama)</label>
+              <input
+                className="input-field"
+                value={form.disetujui_oleh}
+                onChange={(e) => setForm({ ...form, disetujui_oleh: e.target.value })}
+              />
+            </div>
+            <div>
+              <label className="label-field">Lunas Dibayar (nama)</label>
+              <input
+                className="input-field"
+                value={form.dibayar_oleh}
+                onChange={(e) => setForm({ ...form, dibayar_oleh: e.target.value })}
+              />
+            </div>
+          </div>
+
+          {jenis === 'kuitansi' && (
+            <>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="label-field">NIP Setuju Dibayar</label>
+                  <input
+                    className="input-field"
+                    value={form.nip_disetujui}
+                    onChange={(e) => setForm({ ...form, nip_disetujui: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <label className="label-field">NIP Lunas Dibayar</label>
+                  <input
+                    className="input-field"
+                    value={form.nip_dibayar}
+                    onChange={(e) => setForm({ ...form, nip_dibayar: e.target.value })}
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="label-field">Yang Menerima (nama toko/penerima)</label>
+                  <input
+                    className="input-field"
+                    value={form.nama_penerima}
+                    onChange={(e) => setForm({ ...form, nama_penerima: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <label className="label-field">Alamat Penerima</label>
+                  <input
+                    className="input-field"
+                    value={form.alamat_penerima}
+                    onChange={(e) => setForm({ ...form, alamat_penerima: e.target.value })}
+                  />
+                </div>
+              </div>
+            </>
+          )}
+
+          <div className="flex justify-end gap-3 pt-2">
+            <button type="button" className="btn-secondary" onClick={onClose}>Batal</button>
+            <button type="submit" className="btn-primary" disabled={saving}>
+              {saving ? <Loader2 size={16} className="animate-spin" /> : <Printer size={16} />}
+              Simpan & Cetak
+            </button>
+          </div>
+        </form>
       </div>
+
+      {savedData && (
+        <KuitansiPrintTemplate
+          ref={printRef}
+          sekolah={sekolah}
+          data={savedData}
+          items={items.filter((it) => it.nama_barang.trim() !== '')}
+        />
+      )}
     </div>
   )
 }
