@@ -78,6 +78,18 @@ export default function Nota({ sekolah }) {
     muatDaftar()
   }, [])
 
+  // Setelah dialog print ditutup (baik jadi dicetak atau dibatalkan),
+  // kosongkan lagi notaCetak supaya blok pratinjau cetak (yang tingginya
+  // satu halaman A4 penuh) tidak tertinggal di DOM dan mengganggu layout
+  // layar biasa (mis. menutupi sidebar).
+  useEffect(() => {
+    function bersihkanSetelahPrint() {
+      setNotaCetak([])
+    }
+    window.addEventListener('afterprint', bersihkanSetelahPrint)
+    return () => window.removeEventListener('afterprint', bersihkanSetelahPrint)
+  }, [])
+
   // ------------------------- Form manual -------------------------
   function bukaTambah() {
     setEditingId(null)
@@ -546,19 +558,20 @@ export default function Nota({ sekolah }) {
       </div>
 
       {/* Wajib DI LUAR elemen "no-print" — ini yang tampil saat window.print().
-          Setiap nota di-render di dalam pembungkusnya sendiri dengan
-          "break-after: page" (kecuali yang terakhir) supaya kalau nota
-          terpilih lebih dari satu, printer otomatis pindah ke halaman baru
-          untuk tiap nota dalam SATU kali print job — bukan print job
-          terpisah satu-satu seperti sebelumnya. */}
-      {notaCetak.map((n, idx) => (
-        <div
-          key={n.id ?? idx}
-          style={idx < notaCetak.length - 1 ? { breakAfter: 'page', pageBreakAfter: 'always' } : undefined}
-        >
-          <NotaPrintTemplate ref={idx === 0 ? printRef : null} sekolah={sekolah} data={n} />
-        </div>
-      ))}
+          Dibungkus "hidden print:block" (Tailwind) supaya PASTI tersembunyi
+          di layar biasa (tidak mendorong/menutupi sidebar), terlepas dari
+          ada-tidaknya aturan CSS ".print-only" di file global — dan hanya
+          muncul saat proses cetak berjalan. */}
+      <div className="hidden print:block">
+        {notaCetak.map((n, idx) => (
+          <div
+            key={n.id ?? idx}
+            style={idx < notaCetak.length - 1 ? { breakAfter: 'page', pageBreakAfter: 'always' } : undefined}
+          >
+            <NotaPrintTemplate ref={idx === 0 ? printRef : null} sekolah={sekolah} data={n} />
+          </div>
+        ))}
+      </div>
     </div>
   )
 }
