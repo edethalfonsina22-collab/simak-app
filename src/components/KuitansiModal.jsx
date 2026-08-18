@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { supabase } from '../lib/supabaseClient'
 import { Plus, Trash2, X, Loader2, Printer } from 'lucide-react'
-import KuitansiPrintTemplate from './KuitansiPrintTemplate'
+import KuitansiPrintTemplate from '../lib/KuitansiPrintTemplate'
 
 const emptyItem = () => ({ id: crypto.randomUUID(), nama_barang: '', jumlah: 1, harga_satuan: 0 })
 
