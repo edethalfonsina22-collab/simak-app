@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from 'react'
 import * as XLSX from 'xlsx'
 import { supabase } from '../lib/supabaseClient' // sesuaikan path kalau berbeda di project kamu
 import NotaPrintTemplate from '../components/NotaPrintTemplate'
-import KuitansiPrintTemplate from '../components/KuitansiPrintTemplate'
 import Layout from '../components/Layout'
 
 // -----------------------------------------------------------------
@@ -31,48 +30,6 @@ function hitungJumlahBaris(item) {
 
 function hitungTotal(items) {
   return items.reduce((sum, it) => sum + hitungJumlahBaris(it), 0)
-}
-
-// ------------------------- Terbilang (angka -> teks) -------------------------
-// Dipakai untuk kolom "Uang sejumlah" di Kuitansi resmi, yang harus berupa
-// teks (mis. "Tiga ratus lima puluh ribu rupiah"), bukan angka.
-const SATUAN_TERBILANG = [
-  '', 'satu', 'dua', 'tiga', 'empat', 'lima', 'enam', 'tujuh', 'delapan', 'sembilan',
-  'sepuluh', 'sebelas',
-]
-
-function angkaKeTerbilang(n) {
-  n = Math.floor(Math.abs(Number(n) || 0))
-  if (n < 12) return SATUAN_TERBILANG[n]
-  if (n < 20) return `${angkaKeTerbilang(n - 10)} belas`
-  if (n < 100) return `${angkaKeTerbilang(Math.floor(n / 10))} puluh ${angkaKeTerbilang(n % 10)}`.trim()
-  if (n < 200) return `seratus ${angkaKeTerbilang(n - 100)}`.trim()
-  if (n < 1000) return `${angkaKeTerbilang(Math.floor(n / 100))} ratus ${angkaKeTerbilang(n % 100)}`.trim()
-  if (n < 2000) return `seribu ${angkaKeTerbilang(n - 1000)}`.trim()
-  if (n < 1000000) return `${angkaKeTerbilang(Math.floor(n / 1000))} ribu ${angkaKeTerbilang(n % 1000)}`.trim()
-  if (n < 1000000000) return `${angkaKeTerbilang(Math.floor(n / 1000000))} juta ${angkaKeTerbilang(n % 1000000)}`.trim()
-  return `${angkaKeTerbilang(Math.floor(n / 1000000000))} miliar ${angkaKeTerbilang(n % 1000000000)}`.trim()
-}
-
-function rupiahTerbilang(n) {
-  const teks = angkaKeTerbilang(n).replace(/\s+/g, ' ').trim()
-  const kapital = teks.charAt(0).toUpperCase() + teks.slice(1)
-  return `${kapital} rupiah`
-}
-
-// Ubah satu baris nota jadi data yang dipahami KuitansiPrintTemplate.
-// "Telah terima dari" diisi nama sekolah (pembeli/pembayar), karena
-// kwitansi ini dikeluarkan toko sebagai bukti sekolah sudah membayar.
-function mapUntukKwitansi(row, sekolah) {
-  const namaBarang = (row.items || []).map((it) => it.nama_barang).filter(Boolean).join(', ')
-  return {
-    no_kwitansi: row.no_nota,
-    tanggal: row.tanggal,
-    dari: sekolah?.nama || '',
-    uang_sejumlah: rupiahTerbilang(row.jumlah_total || 0),
-    untuk_pembayaran: `Pembayaran belanja ${namaBarang ? `(${namaBarang}) ` : ''}sesuai Nota No. ${row.no_nota}`,
-    jumlah: row.jumlah_total || 0,
-  }
 }
 
 // Ubah item tersimpan (banyaknya angka + satuan terpisah) jadi bentuk yang
@@ -241,8 +198,6 @@ export default function Nota({ sekolah }) {
   // satu kali window.print() -> satu print job banyak halaman, bukan
   // satu-satu.
   const [notaCetak, setNotaCetak] = useState([])
-  // Data kwitansi yang lagi disiapkan untuk print (null = tidak ada).
-  const [kuitansiCetak, setKuitansiCetak] = useState(null)
   const [importBusy, setImportBusy] = useState(false)
   const [importRingkasan, setImportRingkasan] = useState(null)
   // Set berisi id nota yang dicentang di tabel, untuk cetak massal.
@@ -273,7 +228,6 @@ export default function Nota({ sekolah }) {
   useEffect(() => {
     function bersihkanSetelahPrint() {
       setNotaCetak([])
-      setKuitansiCetak(null)
     }
     window.addEventListener('afterprint', bersihkanSetelahPrint)
     return () => window.removeEventListener('afterprint', bersihkanSetelahPrint)
@@ -372,12 +326,6 @@ export default function Nota({ sekolah }) {
   function cetakNota(row) {
     setNotaCetak([mapUntukCetak(row)])
     // beri waktu render sebelum memanggil print
-    setTimeout(() => window.print(), 100)
-  }
-
-  // Cetak Kwitansi resmi untuk satu nota (tombol "Cetak Kwitansi" per baris).
-  function cetakKuitansi(row) {
-    setKuitansiCetak(mapUntukKwitansi(row, sekolah))
     setTimeout(() => window.print(), 100)
   }
 
@@ -658,7 +606,6 @@ export default function Nota({ sekolah }) {
                     <td className="p-2">
                       <div className="flex justify-center gap-2 text-xs">
                         <button onClick={() => cetakNota(row)} className="text-blue-600">Cetak Nota</button>
-                        <button onClick={() => cetakKuitansi(row)} className="text-purple-600">Cetak Kwitansi</button>
                         <button onClick={() => bukaEdit(row)} className="text-amber-600">Edit</button>
                         <button onClick={() => hapusNota(row.id)} className="text-red-600">Hapus</button>
                       </div>
@@ -796,48 +743,37 @@ export default function Nota({ sekolah }) {
           di layar biasa (tidak ikut memengaruhi layout sidebar), dan hanya
           muncul saat proses cetak berjalan.
 
-          PENTING soal kenapa sebelumnya jadi 2-3 halaman: browser secara
-          default menambahkan margin cetak sendiri (biasanya ~12-13mm di
-          setiap sisi) di luar kendali CSS biasa. Jadi kotak "297mm" yang
-          kita buat sebenarnya lebih tinggi daripada area cetak yang benar-
-          benar tersedia di satu lembar, dan kelebihannya meluber jadi
-          halaman tambahan. Aturan `@page { size: A4; margin: 0 }` di bawah
-          ini memaksa area cetak benar-benar 297mm x 210mm penuh tanpa
-          margin bawaan browser, supaya wrapper 1-halaman kita pas persis.
+          Cara paling sederhana & paling tahan banting untuk mendorong Nota
+          ke bagian bawah kertas: pakai `marginTop` biasa (alur dokumen
+          normal), BUKAN position:absolute/fixed atau trik ukuran 297mm.
+          Cara-cara sebelumnya (flex+justify-end, absolute+@page) gagal /
+          bikin halaman kosong karena sangat bergantung pada bagaimana
+          browser/print-engine menghitung ukuran halaman & margin cetak
+          bawaan, yang ternyata tidak konsisten. `marginTop` di sini tidak
+          butuh trik apa pun — nota-nya cuma "didorong" turun sebelum mulai
+          dicetak, sisanya browser yang urus secara normal, jadi hasilnya
+          selalu 1 halaman.
 
-          Nota SENDIRI (148mm) dibungkus wrapper 1 halaman A4 penuh (297mm)
-          yang `position: relative`, lalu NotaPrintTemplate ditempel dengan
-          `position: absolute; bottom: 0` supaya nempel PERSIS di bagian
-          paling bawah kertas.
-
-          Kuitansi SEMENTARA tidak diikutsertakan di sini (fokus benerin
-          Nota dulu sesuai permintaan) — tinggal aktifkan lagi nanti kalau
-          template Kuitansi-nya sudah siap.
-
-          Kalau kamu ingin jarak nota dari TEPI BAWAH kertas (bukan mepet
-          0mm), ubah angka `bottom: 0` di bawah ini, mis. `bottom: '10mm'`. */}
+          MENGATUR SEBERAPA TURUN: ubah angka `marginTop` di bawah ini.
+          Kertas A4 tingginya 297mm, dan Nota-nya sendiri tingginya sekitar
+          148mm. Kalau kamu mau Nota-nya menempel PAS di bagian paling
+          bawah kertas, coba naikkan angkanya sedikit demi sedikit dari
+          nilai sekarang (mis. dari 120mm -> 130mm -> 140mm) sambil cek
+          hasil print preview, sampai pas — jangan langsung diset ke
+          "297mm - 148mm = 149mm", karena browser tetap punya margin cetak
+          bawaan sendiri (biasanya sekitar 10-15mm) yang bisa membuatnya
+          malah meluber ke halaman ke-2 kalau angkanya terlalu mepet. */}
       <div className="hidden print:block">
-        <style>{`
-          @page { size: A4; margin: 0; }
-          @media print {
-            html, body { margin: 0 !important; padding: 0 !important; }
-          }
-        `}</style>
         {notaCetak.map((n, idx) => (
           <div
             key={n.id ?? idx}
             style={{
-              position: 'relative',
               width: '210mm',
-              height: '297mm',
-              boxSizing: 'border-box',
-              overflow: 'hidden',
+              marginTop: '120mm',
               ...(idx < notaCetak.length - 1 ? { breakAfter: 'page', pageBreakAfter: 'always' } : {}),
             }}
           >
-            <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0 }}>
-              <NotaPrintTemplate ref={idx === 0 ? printRef : null} sekolah={sekolah} data={n} />
-            </div>
+            <NotaPrintTemplate ref={idx === 0 ? printRef : null} sekolah={sekolah} data={n} />
           </div>
         ))}
       </div>
