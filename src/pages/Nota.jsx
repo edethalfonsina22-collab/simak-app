@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import * as XLSX from 'xlsx'
 import { supabase } from '../lib/supabaseClient' // sesuaikan path kalau berbeda di project kamu
 import NotaPrintTemplate from '../components/NotaPrintTemplate'
+import KuitansiPrintTemplate from '../components/KuitansiPrintTemplate'
 
 // -----------------------------------------------------------------
 // Baris item kosong untuk form manual
@@ -44,17 +45,82 @@ function mapUntukCetak(nota) {
   }
 }
 
+// -----------------------------------------------------------------
+// Terbilang sederhana (angka -> teks) untuk mengisi "Uang sejumlah"
+// di kwitansi secara otomatis dari jumlah_total. Cukup untuk kebutuhan
+// nominal rupiah pada umumnya; silakan ganti dengan library terbilang
+// kalau butuh yang lebih lengkap/akurat.
+// -----------------------------------------------------------------
+const SATUAN = ['', 'satu', 'dua', 'tiga', 'empat', 'lima', 'enam', 'tujuh', 'delapan', 'sembilan']
+
+function tigaAngka(n) {
+  n = Number(n)
+  let hasil = ''
+  if (n >= 100) {
+    hasil += (n / 100 === 1 ? 'seratus' : SATUAN[Math.floor(n / 100)] + ' ratus') + ' '
+    n %= 100
+  }
+  if (n >= 10 && n < 20) {
+    const belasan = ['sepuluh', 'sebelas', 'dua belas', 'tiga belas', 'empat belas', 'lima belas', 'enam belas', 'tujuh belas', 'delapan belas', 'sembilan belas']
+    hasil += belasan[n - 10] + ' '
+    n = 0
+  } else if (n >= 20) {
+    hasil += SATUAN[Math.floor(n / 10)] + ' puluh '
+    n %= 10
+  }
+  if (n > 0) hasil += SATUAN[n] + ' '
+  return hasil.trim()
+}
+
+function angkaKeTerbilang(angka) {
+  angka = Math.floor(Number(angka) || 0)
+  if (angka === 0) return 'nol rupiah'
+
+  const jutaan = Math.floor(angka / 1000000)
+  const ribuan = Math.floor((angka % 1000000) / 1000)
+  const sisaRatusan = angka % 1000
+
+  let bagian = []
+  if (jutaan > 0) bagian.push(`${tigaAngka(jutaan)} juta`)
+  if (ribuan > 0) bagian.push(ribuan === 1 ? 'seribu' : `${tigaAngka(ribuan)} ribu`)
+  if (sisaRatusan > 0) bagian.push(tigaAngka(sisaRatusan))
+
+  const teks = bagian.join(' ').trim()
+  return teks.charAt(0).toUpperCase() + teks.slice(1) + ' rupiah'
+}
+
+// Ubah data nota jadi bentuk yang dipahami KuitansiPrintTemplate.
+// Sesuaikan pemetaan field ini kalau kebutuhan kwitansi kamu beda
+// (mis. dari = nama pembeli, untuk_pembayaran = ringkasan barang, dst).
+function mapUntukCetakKuitansi(nota) {
+  const ringkasanBarang = (nota.items || [])
+    .map((it) => it.nama_barang)
+    .filter(Boolean)
+    .join(', ')
+
+  return {
+    no_kwitansi: nota.no_nota,
+    tanggal: nota.tanggal,
+    dari: nota.tuan,
+    uang_sejumlah: angkaKeTerbilang(nota.jumlah_total),
+    untuk_pembayaran: ringkasanBarang || 'Pembayaran barang',
+    jumlah: nota.jumlah_total,
+  }
+}
+
 export default function Nota({ sekolah }) {
   const [daftar, setDaftar] = useState([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState(null)
   const [form, setForm] = useState(formKosong())
-  const [notaCetak, setNotaCetak] = useState(null) // data yang lagi disiapkan untuk print
+  const [notaCetak, setNotaCetak] = useState(null) // data yang lagi disiapkan untuk print nota
+  const [kuitansiCetak, setKuitansiCetak] = useState(null) // data yang lagi disiapkan untuk print kwitansi
   const [importBusy, setImportBusy] = useState(false)
   const [importRingkasan, setImportRingkasan] = useState(null)
 
   const printRef = useRef(null)
+  const printKuitansiRef = useRef(null)
   const fileInputRef = useRef(null)
 
   async function muatDaftar() {
@@ -146,7 +212,15 @@ export default function Nota({ sekolah }) {
 
   // ------------------------- Cetak -------------------------
   function cetakNota(row) {
+    setKuitansiCetak(null)
     setNotaCetak(mapUntukCetak(row))
+    // beri waktu render sebelum memanggil print
+    setTimeout(() => window.print(), 100)
+  }
+
+  function cetakKuitansi(row) {
+    setNotaCetak(null)
+    setKuitansiCetak(mapUntukCetakKuitansi(row))
     // beri waktu render sebelum memanggil print
     setTimeout(() => window.print(), 100)
   }
@@ -323,7 +397,8 @@ export default function Nota({ sekolah }) {
                     </td>
                     <td className="p-2">
                       <div className="flex justify-center gap-2 text-xs">
-                        <button onClick={() => cetakNota(row)} className="text-blue-600">Cetak</button>
+                        <button onClick={() => cetakNota(row)} className="text-blue-600">Cetak Nota</button>
+                        <button onClick={() => cetakKuitansi(row)} className="text-purple-600">Cetak Kwitansi</button>
                         <button onClick={() => bukaEdit(row)} className="text-amber-600">Edit</button>
                         <button onClick={() => hapusNota(row.id)} className="text-red-600">Hapus</button>
                       </div>
@@ -459,6 +534,9 @@ export default function Nota({ sekolah }) {
       {/* Wajib DI LUAR elemen "no-print" — ini yang tampil saat window.print() */}
       {notaCetak && (
         <NotaPrintTemplate ref={printRef} sekolah={sekolah} data={notaCetak} />
+      )}
+      {kuitansiCetak && (
+        <KuitansiPrintTemplate ref={printKuitansiRef} sekolah={sekolah} data={kuitansiCetak} />
       )}
     </div>
   )
