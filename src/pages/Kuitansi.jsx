@@ -4,7 +4,7 @@ import Layout from '../components/Layout'
 import KuitansiModal from '../components/KuitansiModal'
 import KuitansiPrintTemplate from '../lib/KuitansiPrintTemplate'
 import BulkImportModal from '../components/BulkImportModal'
-import { Plus, Printer, Search, Loader2, Receipt, Trash2, FileSpreadsheet, Pencil, AlertTriangle } from 'lucide-react'
+import { Plus, Printer, Search, Loader2, Receipt, Trash2, FileSpreadsheet } from 'lucide-react'
 
 function formatRupiah(angka) {
   return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(angka || 0)
@@ -63,18 +63,44 @@ function tanggalDariNilaiImpor(nilai) {
   return teks
 }
 
+// BARU: hitung tahun anggaran otomatis dari tanggal transaksi, dengan format
+// "AAAA/BBBB" (mis. Juli 2025 s/d Juni 2026 -> "2025/2026").
+// Ini dipakai sebagai fallback kalau kolom tahun_anggaran di Excel kosong ATAU
+// isinya cuma satu tahun (mis. "2025") sehingga tidak jelas semesternya.
+function tahunAnggaranDariTanggal(tanggalIso) {
+  if (!tanggalIso) return ''
+  const d = new Date(tanggalIso)
+  if (Number.isNaN(d.getTime())) return ''
+  const bulan = d.getMonth() + 1 // 1-12
+  const tahun = d.getFullYear()
+  // Juli(7) - Desember(12) -> tahun berjalan / tahun+1
+  // Januari(1) - Juni(6)   -> tahun-1 / tahun berjalan
+  if (bulan >= 7) return `${tahun}/${tahun + 1}`
+  return `${tahun - 1}/${tahun}`
+}
+
 function mapRowKuitansi(row) {
   const diterimaDari = String(row['diterima_dari'] || '').trim()
   const jumlahTotal = Number(row['jumlah_total']) || 0
   if (!diterimaDari && !jumlahTotal) return null
+
+  const tanggal = tanggalDariNilaiImpor(row['tanggal(YYYY-MM-DD)'])
+
+  // BARU: kalau kolom tahun_anggaran di Excel kosong, atau isinya cuma satu
+  // tahun tunggal (mis. "2025") bukan format "2025/2026", hitung otomatis dari
+  // tanggal transaksi supaya konsisten dengan periode Juli-Juni.
+  const tahunAnggaranExcel = String(row['tahun_anggaran'] || '').trim()
+  const tahunAnggaranFinal = /^\d{4}\/\d{4}$/.test(tahunAnggaranExcel)
+    ? tahunAnggaranExcel
+    : tahunAnggaranDariTanggal(tanggal)
 
   return {
     jenis: 'kuitansi',
     no_bukti: String(row['no_bukti'] || '').trim(),
     lembar: String(row['lembar'] || 'I/II/III/IV/V').trim(),
     mata_anggaran: String(row['mata_anggaran'] || '').trim(),
-    tahun_anggaran: String(row['tahun_anggaran'] || String(new Date().getFullYear())).trim(),
-    tanggal: tanggalDariNilaiImpor(row['tanggal(YYYY-MM-DD)']),
+    tahun_anggaran: tahunAnggaranFinal,
+    tanggal,
     diterima_dari: diterimaDari,
     jumlah_total: jumlahTotal,
     untuk_pembayaran: String(row['untuk_pembayaran'] || '').trim(),
@@ -92,14 +118,11 @@ export default function Kuitansi() {
   const [data, setData] = useState([])
   const [loading, setLoading] = useState(true)
   const [pencarian, setPencarian] = useState('')
+  const [tahunAnggaranFilter, setTahunAnggaranFilter] = useState('semua') // BARU
   const [showBuat, setShowBuat] = useState(false)
   const [showImport, setShowImport] = useState(false)
   const [sekolah, setSekolah] = useState(null)
   const [menghapus, setMenghapus] = useState(null) // id yang sedang dihapus
-  const [menghapusSemua, setMenghapusSemua] = useState(false) // status proses hapus semua
-
-  // Baris yang sedang diedit (null = mode buat baru)
-  const [editData, setEditData] = useState(null)
 
   // Baris yang sedang dicetak ulang
   const [cetakUlang, setCetakUlang] = useState(null)
@@ -130,8 +153,21 @@ export default function Kuitansi() {
     })
   }, [])
 
+  // BARU: daftar tahun anggaran yang benar-benar ada di data, urut terbaru dulu.
+  const daftarTahunAnggaran = useMemo(() => {
+    const set = new Set()
+    data.forEach((d) => {
+      if (d.tahun_anggaran) set.add(d.tahun_anggaran)
+    })
+    return Array.from(set).sort((a, b) => (a < b ? 1 : -1))
+  }, [data])
+
   const dataTersaring = useMemo(() => {
     return data.filter((d) => {
+      // BARU: filter tahun anggaran
+      if (tahunAnggaranFilter !== 'semua' && d.tahun_anggaran !== tahunAnggaranFilter) {
+        return false
+      }
       if (!pencarian.trim()) return true
       const q = pencarian.toLowerCase()
       return (
@@ -140,7 +176,7 @@ export default function Kuitansi() {
         (d.untuk_pembayaran || '').toLowerCase().includes(q)
       )
     })
-  }, [data, pencarian])
+  }, [data, pencarian, tahunAnggaranFilter])
 
   function handleCetakUlang(row) {
     setCetakUlang(row)
@@ -168,41 +204,8 @@ export default function Kuitansi() {
     loadData()
   }
 
-  // Hapus SEMUA kuitansi (jenis = 'kuitansi'). Ada dua kali konfirmasi
-  // karena ini tindakan destruktif dan tidak bisa dibatalkan.
-  async function handleHapusSemua() {
-    if (data.length === 0) return
-
-    const konfirmasi1 = confirm(
-      `Anda akan menghapus SEMUA ${data.length} kuitansi. Tindakan ini tidak bisa dibatalkan. Lanjutkan?`
-    )
-    if (!konfirmasi1) return
-
-    const konfirmasi2 = confirm(
-      'Konfirmasi sekali lagi: semua data kuitansi akan dihapus permanen. Ketik OK untuk benar-benar melanjutkan.'
-    )
-    if (!konfirmasi2) return
-
-    setMenghapusSemua(true)
-    const { error } = await supabase.from('kuitansi').delete().eq('jenis', 'kuitansi')
-    setMenghapusSemua(false)
-
-    if (error) {
-      alert('Gagal menghapus semua data: ' + error.message)
-      return
-    }
-    loadData()
-  }
-
-  // Buka modal dalam mode edit, mengisi data dari baris yang dipilih
-  function handleEdit(row) {
-    setEditData(row)
-  }
-
-  // Menutup modal, baik dari mode buat baru maupun mode edit
   function handleTutupBuat() {
     setShowBuat(false)
-    setEditData(null)
     loadData()
   }
 
@@ -258,14 +261,6 @@ export default function Kuitansi() {
           <button className="btn-secondary" onClick={() => setShowImport(true)}>
             <FileSpreadsheet size={16} /> Impor Massal (Excel)
           </button>
-          <button
-            className="btn-secondary text-red-600"
-            onClick={handleHapusSemua}
-            disabled={menghapusSemua || data.length === 0}
-          >
-            {menghapusSemua ? <Loader2 size={16} className="animate-spin" /> : <AlertTriangle size={16} />}
-            Hapus Semua
-          </button>
           <button className="btn-primary" onClick={() => setShowBuat(true)}>
             <Plus size={16} /> Buat Kuitansi Baru
           </button>
@@ -285,6 +280,21 @@ export default function Kuitansi() {
             />
           </div>
         </div>
+
+        {/* BARU: filter Tahun Anggaran */}
+        <div className="min-w-[180px]">
+          <label className="label-field">Tahun Anggaran</label>
+          <select
+            className="input-field"
+            value={tahunAnggaranFilter}
+            onChange={(e) => setTahunAnggaranFilter(e.target.value)}
+          >
+            <option value="semua">Semua Tahun Anggaran</option>
+            {daftarTahunAnggaran.map((ta) => (
+              <option key={ta} value={ta}>{ta}</option>
+            ))}
+          </select>
+        </div>
       </div>
 
       <div className="card overflow-x-auto">
@@ -293,6 +303,7 @@ export default function Kuitansi() {
             <tr>
               <th>Nomor</th>
               <th>Tanggal</th>
+              <th>Tahun Anggaran</th>
               <th>Diterima Dari</th>
               <th>Keterangan</th>
               <th>Jumlah</th>
@@ -301,11 +312,11 @@ export default function Kuitansi() {
           </thead>
           <tbody>
             {loading && (
-              <tr><td colSpan={6} className="text-center py-8 text-ink-700/50">Memuat data...</td></tr>
+              <tr><td colSpan={7} className="text-center py-8 text-ink-700/50">Memuat data...</td></tr>
             )}
             {!loading && dataTersaring.length === 0 && (
               <tr>
-                <td colSpan={6} className="text-center py-10 text-ink-700/50">
+                <td colSpan={7} className="text-center py-10 text-ink-700/50">
                   <div className="flex flex-col items-center gap-2">
                     <Receipt size={28} className="text-ink-700/25" />
                     <span>Belum ada kuitansi yang cocok.</span>
@@ -317,18 +328,12 @@ export default function Kuitansi() {
               <tr key={d.id}>
                 <td className="font-medium">{d.nomor || '-'}</td>
                 <td>{formatTanggal(d.tanggal)}</td>
+                <td>{d.tahun_anggaran || '-'}</td>
                 <td>{d.diterima_dari || '-'}</td>
                 <td className="max-w-[220px] truncate">{d.untuk_pembayaran || '-'}</td>
                 <td className="font-medium">{formatRupiah(d.jumlah_total)}</td>
                 <td>
                   <div className="flex items-center gap-1 justify-end">
-                    <button
-                      className="icon-btn"
-                      title="Edit"
-                      onClick={() => handleEdit(d)}
-                    >
-                      <Pencil size={15} />
-                    </button>
                     <button
                       className="icon-btn"
                       title="Cetak Ulang"
@@ -352,9 +357,9 @@ export default function Kuitansi() {
         </table>
       </div>
 
-      {(showBuat || editData) && (
+      {showBuat && (
         <KuitansiModal
-          keuanganRow={editData}
+          keuanganRow={null}
           sekolah={sekolah}
           onClose={handleTutupBuat}
         />
