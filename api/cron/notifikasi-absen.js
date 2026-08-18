@@ -35,10 +35,14 @@ export default async function handler(req, res) {
     if (guruError) throw guruError
 
     // Ambil guru yang SUDAH presensi hari ini
+    // PENTING: hanya hitung "sudah absen" kalau jam_absen benar-benar terisi.
+    // Baris presensi_guru untuk hari ini bisa sudah dibuat lebih dulu (jam_absen masih null),
+    // jadi kalau tidak difilter, guru itu akan salah dianggap sudah absen.
     const { data: sudahAbsen, error: presensiError } = await supabase
       .from('presensi_guru')
       .select('guru_id')
       .eq('tanggal', hariIni)
+      .not('jam_absen', 'is', null)
 
     if (presensiError) throw presensiError
 
