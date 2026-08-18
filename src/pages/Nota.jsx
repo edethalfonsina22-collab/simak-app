@@ -174,16 +174,43 @@ export default function Nota({ sekolah }) {
     setTimeout(() => window.print(), 100)
   }
 
-  // Cetak SEMUA nota yang dicentang sekaligus -> satu kali window.print()
-  // yang menghasilkan banyak halaman (satu nota per halaman A4), bukan
-  // satu-satu seperti sebelumnya.
+  // Gabungkan beberapa baris nota (No Nota berbeda-beda) jadi SATU nota
+  // dengan SATU tabel barang -> dipakai kalau belanjanya berasal dari satu
+  // mata anggaran yang sama walau dicatat sebagai beberapa nota terpisah.
+  // - items dari semua nota terpilih digabung jadi satu daftar
+  // - Tuan/Toko dipakai dari nota pertama (asumsi sama, karena satu mata
+  //   anggaran biasanya belanja di toko yang sama)
+  // - No. Nota digabung jadi satu teks (mis. "001 / 002 / 003")
+  // - Tanggal dipakai tanggal PALING AKHIR dari nota-nota yang digabung
+  function gabungkanNota(rows) {
+    const urutan = [...rows].sort((a, b) => String(a.tanggal || '').localeCompare(String(b.tanggal || '')))
+    const items = urutan.flatMap((r) =>
+      (r.items || []).map((it) => ({
+        ...it,
+        banyaknya: [it.banyaknya, it.satuan].filter(Boolean).join(' '),
+        jumlah: it.jumlah ?? hitungJumlahBaris(it),
+      }))
+    )
+    return {
+      no_nota: urutan.map((r) => r.no_nota).join(' / '),
+      tanggal: urutan[urutan.length - 1]?.tanggal,
+      tuan: urutan[0]?.tuan,
+      toko: urutan[0]?.toko,
+      alamat_lanjutan: urutan[0]?.alamat_lanjutan,
+      items,
+      jumlah_total: items.reduce((sum, it) => sum + (Number(it.jumlah) || 0), 0),
+    }
+  }
+
+  // Cetak SEMUA nota yang dicentang sekaligus, DIGABUNG jadi satu tabel di
+  // satu nota (bukan satu nota per halaman) -> satu kali window.print().
   function cetakTerpilih() {
     const rows = daftar.filter((r) => terpilih.has(r.id))
     if (rows.length === 0) {
       alert('Pilih dulu minimal satu nota yang mau dicetak.')
       return
     }
-    setNotaCetak(rows.map(mapUntukCetak))
+    setNotaCetak([gabungkanNota(rows)])
     setTimeout(() => window.print(), 150)
   }
 
@@ -319,7 +346,7 @@ export default function Nota({ sekolah }) {
                 terpilih.size === 0 ? 'bg-gray-300 cursor-not-allowed' : 'bg-purple-600'
               }`}
             >
-              Cetak Terpilih ({terpilih.size})
+              Gabung & Cetak ({terpilih.size})
             </button>
             <button onClick={bukaTambah} className="px-3 py-2 rounded bg-blue-600 text-white text-sm">
               + Tambah Nota
