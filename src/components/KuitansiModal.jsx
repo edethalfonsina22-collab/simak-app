@@ -1,129 +1,62 @@
 import { useEffect, useRef, useState } from 'react'
 import { supabase } from '../lib/supabaseClient'
-import { X, Loader2, Printer } from 'lucide-react'
+import { X, Loader2, Printer, Save } from 'lucide-react'
 import KuitansiPrintTemplate from '../lib/KuitansiPrintTemplate'
 
-const emptyForm = (keuanganRow) => ({
-  no_bukti: '',
-  lembar: 'I/II/III/IV/V',
-  mata_anggaran: '',
-  tahun_anggaran: String(new Date().getFullYear()),
-  tanggal: keuanganRow?.tanggal || new Date().toISOString().slice(0, 10),
-  diterima_dari: '',
-  jumlah: keuanganRow?.jumlah || '',
-  untuk_pembayaran: keuanganRow?.catatan || keuanganRow?.kategori || '',
-  catatan: '',
-  disetujui_oleh: '',
-  jabatan_disetujui: 'Atasan Langsung',
-  nip_disetujui: '',
-  dibayar_oleh: '',
-  jabatan_dibayar: 'Pemegang Kas',
-  nip_dibayar: '',
-  nama_penerima: '',
-  alamat_penerima: '',
+// BARU: emptyForm sekarang juga menerima editingRow (baris kuitansi yang
+// sedang diedit). Kalau editingRow ada, semua field diisi dari situ.
+// Kalau tidak, perilaku lama tetap jalan (isi dari keuanganRow kalau ada).
+const emptyForm = (keuanganRow, editingRow) => ({
+  no_bukti: editingRow?.no_bukti || '',
+  lembar: editingRow?.lembar || 'I/II/III/IV/V',
+  mata_anggaran: editingRow?.mata_anggaran || '',
+  tahun_anggaran: editingRow?.tahun_anggaran || String(new Date().getFullYear()),
+  tanggal: editingRow?.tanggal || keuanganRow?.tanggal || new Date().toISOString().slice(0, 10),
+  diterima_dari: editingRow?.diterima_dari || '',
+  jumlah: editingRow?.jumlah_total ?? keuanganRow?.jumlah ?? '',
+  untuk_pembayaran: editingRow?.untuk_pembayaran || keuanganRow?.catatan || keuanganRow?.kategori || '',
+  catatan: editingRow?.catatan || '',
+  disetujui_oleh: editingRow?.disetujui_oleh || '',
+  jabatan_disetujui: editingRow?.jabatan_disetujui || 'Atasan Langsung',
+  nip_disetujui: editingRow?.nip_disetujui || '',
+  dibayar_oleh: editingRow?.dibayar_oleh || '',
+  jabatan_dibayar: editingRow?.jabatan_dibayar || 'Pemegang Kas',
+  nip_dibayar: editingRow?.nip_dibayar || '',
+  nama_penerima: editingRow?.nama_penerima || '',
+  alamat_penerima: editingRow?.alamat_penerima || '',
 })
 
 /**
- * Form untuk membuat Kuitansi (khusus Kwitansi — bagian Nota belum didukung di sini).
- * Nominal diisi langsung lewat field "Uang Sejumlah" (tidak lagi dihitung dari
- * rincian barang, karena rincian barang/item hanya relevan untuk Nota).
+ * Form untuk membuat ATAU mengedit Kuitansi (khusus Kwitansi — bagian Nota
+ * belum didukung di sini). Nominal diisi langsung lewat field "Uang
+ * Sejumlah" (tidak lagi dihitung dari rincian barang, karena rincian
+ * barang/item hanya relevan untuk Nota).
  *
  * Dipanggil dari Keuangan.jsx atau Kuitansi.jsx:
  *   <KuitansiModal
  *     keuanganRow={row}          // baris transaksi keuangan yang mau dibuatkan kuitansi (boleh null)
+ *     editingRow={row}           // BARU: baris kuitansi yang mau DIEDIT (boleh null -> mode buat baru)
  *     sekolah={{ nama, alamat, kota }}
  *     onClose={() => setKuitansiFor(null)}
  *   />
  */
-export default function KuitansiModal({ keuanganRow, sekolah, onClose }) {
-  const [form, setForm] = useState(emptyForm(keuanganRow))
+export default function KuitansiModal({ keuanganRow, editingRow, sekolah, onClose }) {
+  const [form, setForm] = useState(emptyForm(keuanganRow, editingRow))
   const [saving, setSaving] = useState(false)
   const [savedData, setSavedData] = useState(null) // { ...kuitansi row } setelah tersimpan, siap dicetak
   const printRef = useRef(null)
 
-  // ==== Riwayat nama/NIP untuk dropdown auto-isi ====
-  // Diambil dari data kuitansi yang sudah pernah disimpan sebelumnya (tidak perlu
-  // tabel baru — insert ke tabel "kuitansi" yang sudah ada otomatis jadi sumber datanya).
-  const [riwayat, setRiwayat] = useState({
-    diterimaDari: [],
-    disetujui: new Map(), // nama -> nip
-    dibayar: new Map(),   // nama -> nip
-    penerima: new Map(),  // nama -> alamat
-  })
-
-  useEffect(() => {
-    let aktif = true
-    async function muatRiwayat() {
-      try {
-        const { data, error } = await supabase
-          .from('kuitansi')
-          .select('diterima_dari, disetujui_oleh, nip_disetujui, dibayar_oleh, nip_dibayar, nama_penerima, alamat_penerima')
-          .order('id', { ascending: false })
-          .limit(300)
-        if (error) throw error
-        if (!aktif || !data) return
-
-        const diterimaDariSet = new Set()
-        const disetujuiMap = new Map()
-        const dibayarMap = new Map()
-        const penerimaMap = new Map()
-
-        for (const row of data) {
-          const dd = (row.diterima_dari || '').trim()
-          if (dd) diterimaDariSet.add(dd)
-
-          const so = (row.disetujui_oleh || '').trim()
-          if (so && !disetujuiMap.has(so)) disetujuiMap.set(so, row.nip_disetujui || '')
-
-          const db = (row.dibayar_oleh || '').trim()
-          if (db && !dibayarMap.has(db)) dibayarMap.set(db, row.nip_dibayar || '')
-
-          const np = (row.nama_penerima || '').trim()
-          if (np && !penerimaMap.has(np)) penerimaMap.set(np, row.alamat_penerima || '')
-        }
-
-        setRiwayat({
-          diterimaDari: Array.from(diterimaDariSet),
-          disetujui: disetujuiMap,
-          dibayar: dibayarMap,
-          penerima: penerimaMap,
-        })
-      } catch (err) {
-        // Gagal memuat riwayat bukan hal fatal — form tetap bisa dipakai manual
-        console.error('Gagal memuat riwayat nama/NIP kuitansi:', err.message)
-      }
-    }
-    muatRiwayat()
-    return () => { aktif = false }
-  }, [])
+  const isEdit = Boolean(editingRow)
 
   function ubah(field, value) {
     setForm((prev) => ({ ...prev, [field]: value }))
-  }
-
-  // Saat field nama dipilih/diketik persis sama dengan salah satu di riwayat,
-  // isi otomatis field pasangannya (NIP / alamat).
-  function ubahDenganAutoIsi(namaField, pasanganField, mapRiwayat, value) {
-    setForm((prev) => {
-      const next = { ...prev, [namaField]: value }
-      if (mapRiwayat.has(value)) {
-        next[pasanganField] = mapRiwayat.get(value)
-      }
-      return next
-    })
   }
 
   async function handleSimpan(e) {
     e.preventDefault()
     setSaving(true)
     try {
-      const { data: nomorData, error: nomorErr } = await supabase.rpc('next_nomor_kuitansi', { p_jenis: 'kuitansi' })
-      if (nomorErr) throw nomorErr
-
-      const payload = {
-        keuangan_id: keuanganRow?.id || null,
-        jenis: 'kuitansi',
-        nomor: nomorData,
+      const payloadDasar = {
         no_bukti: form.no_bukti,
         lembar: form.lembar,
         mata_anggaran: form.mata_anggaran,
@@ -143,12 +76,36 @@ export default function KuitansiModal({ keuanganRow, sekolah, onClose }) {
         catatan: form.catatan,
       }
 
-      const { data: inserted, error: insertErr } = await supabase.from('kuitansi').insert(payload).select().single()
-      if (insertErr) throw insertErr
+      if (isEdit) {
+        // BARU: mode edit -> UPDATE baris yang sudah ada, nomor & jenis
+        // tidak diubah. Trigger database (kalau sudah dipasang) otomatis
+        // menyinkron perubahan ini ke Nota terkait.
+        const { data: updated, error: updateErr } = await supabase
+          .from('kuitansi')
+          .update(payloadDasar)
+          .eq('id', editingRow.id)
+          .select()
+          .single()
+        if (updateErr) throw updateErr
+        setSavedData(updated)
+      } else {
+        // Mode lama: buat baru, minta nomor urut baru
+        const { data: nomorData, error: nomorErr } = await supabase.rpc('next_nomor_kuitansi', { p_jenis: 'kuitansi' })
+        if (nomorErr) throw nomorErr
 
-      setSavedData(inserted)
+        const payload = {
+          ...payloadDasar,
+          keuangan_id: keuanganRow?.id || null,
+          jenis: 'kuitansi',
+          nomor: nomorData,
+        }
+
+        const { data: inserted, error: insertErr } = await supabase.from('kuitansi').insert(payload).select().single()
+        if (insertErr) throw insertErr
+        setSavedData(inserted)
+      }
     } catch (err) {
-      alert('Gagal menyimpan kuitansi: ' + err.message)
+      alert(`Gagal menyimpan kuitansi: ${err.message}`)
     } finally {
       setSaving(false)
     }
@@ -167,7 +124,9 @@ export default function KuitansiModal({ keuanganRow, sekolah, onClose }) {
       <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4 no-print">
         <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl p-6 max-h-[90vh] overflow-y-auto">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="font-display text-lg font-semibold">Buat Kuitansi</h2>
+            <h2 className="font-display text-lg font-semibold">
+              {isEdit ? 'Edit Kuitansi' : 'Buat Kuitansi'}
+            </h2>
             <button className="icon-btn" onClick={onClose}><X size={18} /></button>
           </div>
 
@@ -228,16 +187,9 @@ export default function KuitansiModal({ keuanganRow, sekolah, onClose }) {
               <input
                 className="input-field"
                 placeholder="Nama orang tua / pihak pembayar"
-                list="daftar-diterima-dari"
-                autoComplete="off"
                 value={form.diterima_dari}
                 onChange={(e) => ubah('diterima_dari', e.target.value)}
               />
-              <datalist id="daftar-diterima-dari">
-                {riwayat.diterimaDari.map((nama) => (
-                  <option key={nama} value={nama} />
-                ))}
-              </datalist>
             </div>
 
             <div>
@@ -267,18 +219,9 @@ export default function KuitansiModal({ keuanganRow, sekolah, onClose }) {
                 <label className="label-field">Setuju Dibayar (nama)</label>
                 <input
                   className="input-field"
-                  list="daftar-disetujui"
-                  autoComplete="off"
                   value={form.disetujui_oleh}
-                  onChange={(e) =>
-                    ubahDenganAutoIsi('disetujui_oleh', 'nip_disetujui', riwayat.disetujui, e.target.value)
-                  }
+                  onChange={(e) => ubah('disetujui_oleh', e.target.value)}
                 />
-                <datalist id="daftar-disetujui">
-                  {Array.from(riwayat.disetujui.keys()).map((nama) => (
-                    <option key={nama} value={nama} />
-                  ))}
-                </datalist>
               </div>
               <div>
                 <label className="label-field">NIP Penyetuju</label>
@@ -295,18 +238,9 @@ export default function KuitansiModal({ keuanganRow, sekolah, onClose }) {
                 <label className="label-field">Lunas Dibayar (nama)</label>
                 <input
                   className="input-field"
-                  list="daftar-dibayar"
-                  autoComplete="off"
                   value={form.dibayar_oleh}
-                  onChange={(e) =>
-                    ubahDenganAutoIsi('dibayar_oleh', 'nip_dibayar', riwayat.dibayar, e.target.value)
-                  }
+                  onChange={(e) => ubah('dibayar_oleh', e.target.value)}
                 />
-                <datalist id="daftar-dibayar">
-                  {Array.from(riwayat.dibayar.keys()).map((nama) => (
-                    <option key={nama} value={nama} />
-                  ))}
-                </datalist>
               </div>
               <div>
                 <label className="label-field">NIP Pembayar</label>
@@ -323,18 +257,9 @@ export default function KuitansiModal({ keuanganRow, sekolah, onClose }) {
                 <label className="label-field">Yang Menerima (nama)</label>
                 <input
                   className="input-field"
-                  list="daftar-penerima"
-                  autoComplete="off"
                   value={form.nama_penerima}
-                  onChange={(e) =>
-                    ubahDenganAutoIsi('nama_penerima', 'alamat_penerima', riwayat.penerima, e.target.value)
-                  }
+                  onChange={(e) => ubah('nama_penerima', e.target.value)}
                 />
-                <datalist id="daftar-penerima">
-                  {Array.from(riwayat.penerima.keys()).map((nama) => (
-                    <option key={nama} value={nama} />
-                  ))}
-                </datalist>
               </div>
               <div>
                 <label className="label-field">Alamat Penerima</label>
@@ -349,8 +274,14 @@ export default function KuitansiModal({ keuanganRow, sekolah, onClose }) {
             <div className="flex justify-end gap-3 pt-2">
               <button type="button" className="btn-secondary" onClick={onClose}>Batal</button>
               <button type="submit" className="btn-primary" disabled={saving}>
-                {saving ? <Loader2 size={16} className="animate-spin" /> : <Printer size={16} />}
-                Simpan & Cetak
+                {saving ? (
+                  <Loader2 size={16} className="animate-spin" />
+                ) : isEdit ? (
+                  <Save size={16} />
+                ) : (
+                  <Printer size={16} />
+                )}
+                {isEdit ? 'Simpan Perubahan' : 'Simpan & Cetak'}
               </button>
             </div>
           </form>
