@@ -100,6 +100,8 @@ const groupsAdmin = [
 ]
 
 // Menu GURU: tetap ringkas, tidak perlu dikelompokkan
+// Kuitansi & Nota Belanja SENGAJA TIDAK ada di sini — kedua fitur ini
+// admin-only (lihat RLS policy nota_hanya_admin di Supabase).
 const linksGuru = [
   { to: '/', label: 'Dasbor', icon: LayoutDashboard, end: true },
   { to: '/profil-saya', label: 'Profil Saya', icon: UserCircle },
@@ -119,8 +121,6 @@ const linksGuru = [
   { to: '/hasil-ujian', label: 'Hasil Ujian', icon: ClipboardList },
   { to: '/bank-soal', label: 'Bank Soal', icon: Database },
   { to: '/perpustakaan', label: 'Perpustakaan', icon: Library },
-  { to: '/kuitansi', label: 'Kuitansi', icon: Receipt },
-  { to: '/nota', label: 'Nota Belanja', icon: ShoppingCart },
   { to: '/jadwal', label: 'Jadwal Pelajaran', icon: CalendarClock },
   { to: '/agenda', label: 'Agenda Sekolah', icon: CalendarDays },
   { to: '/pengumuman', label: 'Pengumuman', icon: Megaphone },
