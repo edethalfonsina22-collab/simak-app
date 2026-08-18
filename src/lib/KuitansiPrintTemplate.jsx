@@ -10,11 +10,12 @@ function formatTanggal(tgl) {
   return new Date(tgl).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })
 }
 
-// Watermark bintang berulang di latar, meniru kertas blanko kwitansi asli
-// (kertas blanko fisik punya pola bintang tipis di seluruh halaman).
+// Watermark bintang tersebar di latar, meniru kertas blanko kwitansi asli
+// (dua bintang per ubin dengan posisi & rotasi sedikit berbeda supaya terasa acak,
+// lalu diulang memenuhi halaman).
 const STAR_WATERMARK_STYLE = {
   backgroundImage:
-    "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='64'%3E%3Ctext x='32' y='40' font-size='24' text-anchor='middle' fill='%23000000' fill-opacity='0.07'%3E%E2%98%85%3C/text%3E%3C/svg%3E\")",
+    "url(\"data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='72'%20height='72'%3E%3Ctext%20x='14'%20y='26'%20font-size='20'%20fill='%23000000'%20fill-opacity='0.08'%20text-anchor='middle'%20transform='rotate(-8%2014%2026)'%3E%E2%98%85%3C/text%3E%3Ctext%20x='50'%20y='60'%20font-size='16'%20fill='%23000000'%20fill-opacity='0.08'%20text-anchor='middle'%20transform='rotate(10%2050%2060)'%3E%E2%98%85%3C/text%3E%3C/svg%3E\")",
   backgroundRepeat: 'repeat',
   backgroundPosition: '0 0',
 }
@@ -25,23 +26,21 @@ const STAR_WATERMARK_STYLE = {
  * baris Sudah Terima Dari / Uang Sejumlah / Untuk Pembayaran, TERBILANG,
  * dan tiga kolom tanda tangan (Pemegang Kas, Atasan Langsung, Yang Menerima).
  *
- * Sengaja tidak lagi menampilkan bagian Nota (tabel rincian barang / "NOTA No.")
- * — dokumen ini fokus khusus pada Kwitansi.
+ * Fokus khusus Kwitansi — tidak ada lagi bagian Nota / rincian barang.
+ * Nominal langsung diambil dari `data.jumlah_total` (diisi lewat field
+ * "Uang Sejumlah" di form), bukan dihitung dari daftar item.
+ *
+ * PENTING: komponen ini HARUS dirender di luar elemen manapun yang berclass
+ * "no-print" — kalau induknya "no-print", seluruh lembar ini ikut hilang saat
+ * dicetak walaupun class "print-only" di sini diberi visibility:visible
+ * (display:none pada induk menang atas visibility pada anak).
  *
  * Props:
  *  - sekolah: { nama, alamat, kota } (disediakan untuk pemakaian di masa depan)
  *  - data: baris dari tabel `kuitansi`
- *  - items: baris-baris dari tabel `kuitansi_item` (hanya dipakai untuk menghitung total
- *           dan sebagai isi default kolom "Untuk Pembayaran" jika field itu kosong)
  */
-const KuitansiPrintTemplate = forwardRef(function KuitansiPrintTemplate({ sekolah, data, items = [] }, ref) {
-  const total = items.reduce((a, b) => a + Number(b.jumlah) * Number(b.harga_satuan), 0) || Number(data?.jumlah_total) || 0
-
-  const untukPembayaran =
-    data?.untuk_pembayaran?.trim() ||
-    (items.length > 0
-      ? items.map((it) => `${it.nama_barang} (${it.jumlah} x ${formatRupiah(it.harga_satuan)})`).join('\n')
-      : '-')
+const KuitansiPrintTemplate = forwardRef(function KuitansiPrintTemplate({ sekolah, data }, ref) {
+  const total = Number(data?.jumlah_total) || 0
 
   return (
     <div
@@ -82,7 +81,7 @@ const KuitansiPrintTemplate = forwardRef(function KuitansiPrintTemplate({ sekola
             <tr>
               <td className="py-1 align-top">Untuk Pembayaran</td>
               <td className="align-top">:</td>
-              <td className="py-1 align-top whitespace-pre-line">{untukPembayaran}</td>
+              <td className="py-1 align-top whitespace-pre-line">{data?.untuk_pembayaran || '-'}</td>
             </tr>
           </tbody>
         </table>
