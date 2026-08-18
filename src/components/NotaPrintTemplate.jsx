@@ -131,21 +131,23 @@ const NotaPrintTemplate = forwardRef(function NotaPrintTemplate({ sekolah, data 
           <div className="border-b-2 border-black w-48 h-2" aria-hidden="true" />
         </div>
 
-        {/* Tabel item belanja — garis kotak PENUH di tiap sel, meniru blanko fisik */}
-        <table className="w-full border-collapse border border-black">
+        {/* Tabel item belanja — garis kotak PENUH di tiap sel, meniru blanko fisik.
+            table-layout: fixed + lebar persen di setiap kolom supaya kolom
+            NAMA BARANG tidak otomatis melebar mengambil semua sisa ruang. */}
+        <table className="w-full border-collapse border border-black" style={{ tableLayout: 'fixed' }}>
           <thead>
             <tr>
-              <th className="w-20 border border-black py-1 px-1 text-left font-bold">BANYAKNYA</th>
-              <th className="border border-black py-1 px-1 text-left font-bold">NAMA BARANG</th>
-              <th className="w-24 border border-black py-1 px-1 text-left font-bold">HARGA</th>
-              <th className="w-28 border border-black py-1 px-1 text-left font-bold">JUMLAH</th>
+              <th className="border border-black py-1 px-1 text-left font-bold" style={{ width: '14%' }}>BANYAKNYA</th>
+              <th className="border border-black py-1 px-1 text-left font-bold" style={{ width: '42%' }}>NAMA BARANG</th>
+              <th className="border border-black py-1 px-1 text-left font-bold" style={{ width: '20%' }}>HARGA</th>
+              <th className="border border-black py-1 px-1 text-left font-bold" style={{ width: '24%' }}>JUMLAH</th>
             </tr>
           </thead>
           <tbody>
             {rows.map((item, idx) => (
               <tr key={idx}>
                 <td className="border border-black py-1 px-1 align-top">{item?.banyaknya || '\u00A0'}</td>
-                <td className="border border-black py-1 px-1 align-top">{item?.nama_barang || '\u00A0'}</td>
+                <td className="border border-black py-1 px-1 align-top break-words">{item?.nama_barang || '\u00A0'}</td>
                 <td className="border border-black py-1 px-1 align-top">{item?.harga ? formatRupiah(item.harga) : '\u00A0'}</td>
                 <td className="border border-black py-1 px-1 align-top">{item?.jumlah ? formatRupiah(item.jumlah) : '\u00A0'}</td>
               </tr>
