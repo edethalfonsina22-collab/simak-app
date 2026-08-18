@@ -11,26 +11,27 @@ function formatTanggal(tgl) {
 }
 
 // Kolom isian bertitik-titik — meniru blanko kwitansi fisik (lihat gambar acuan).
-// Kalau `value` kosong: tampil deretan titik selebar `width`.
-// Kalau `value` ada: teks ditulis menimpa area yang sama, titik-titik tetap
-// tampak di sisa ruang kosong (persis seperti tulisan tangan di atas blanko cetak).
+// PENTING: `width` di sini adalah lebar TETAP (bukan minimum) supaya kotak ini
+// tidak pernah melebar sendiri dan merusak layout kop surat — beda dari versi
+// sebelumnya yang memakai 60 karakter "." literal (lebarnya tidak terkendali,
+// menyebabkan baris pecah / teks lain kepotong).
+// Kalau `value` kosong: tampil garis titik-titik CSS selebar `width`.
+// Kalau `value` ada: teks ditumpuk di atas garis titik itu (dengan background
+// putih di belakangnya) supaya tidak tabrakan dengan titik-titik.
 function Blank({ value, width = 140 }) {
   return (
     <span
-      className="relative inline-block align-bottom px-1 leading-tight overflow-hidden"
-      style={{ minWidth: width }}
+      className="relative inline-block align-bottom"
+      style={{ width, height: '1.1em' }}
     >
-      {/* Baris titik-titik selalu dirender sebagai lapisan dasar */}
       <span
         aria-hidden="true"
-        className="block whitespace-nowrap tracking-[0.2em] text-black/70 select-none"
-      >
-        {'.'.repeat(60)}
-      </span>
-      {/* Isian sebenarnya ditumpuk di atas titik-titik, dengan background putih
-          supaya titik di belakang teks tidak tembus/tabrakan dengan huruf */}
+        className="absolute left-0 right-0 bottom-[2px] border-b border-dotted border-black/70"
+      />
       {value && (
-        <span className="absolute inset-0 bg-white px-1 whitespace-nowrap">
+        <span
+          className="absolute inset-0 bg-white px-1 whitespace-nowrap overflow-hidden text-ellipsis"
+        >
           {value}
         </span>
       )}
