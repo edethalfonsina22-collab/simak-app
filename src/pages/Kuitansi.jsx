@@ -15,17 +15,15 @@ function formatTanggal(tgl) {
   return new Date(tgl).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })
 }
 
-// Kolom template Excel untuk impor massal Kuitansi/Nota.
-// Satu baris Excel = satu kuitansi/nota dengan satu baris rincian barang.
+// Kolom template Excel untuk impor massal Kuitansi.
+// Satu baris Excel = satu kuitansi dengan satu baris rincian barang.
 const TEMPLATE_HEADERS = [
-  'jenis(kuitansi/nota)',
   'no_bukti',
   'lembar',
   'mata_anggaran',
   'tahun_anggaran',
   'tanggal(YYYY-MM-DD)',
-  'diterima_dari_atau_tuan',
-  'toko',
+  'diterima_dari',
   'untuk_pembayaran',
   'nama_barang',
   'jumlah',
@@ -42,21 +40,17 @@ const TEMPLATE_HEADERS = [
 function mapRowKuitansi(row) {
   const namaBarang = String(row['nama_barang'] || '').trim()
   if (!namaBarang) return null
-  const jenis = String(row['jenis(kuitansi/nota)'] || 'kuitansi').trim().toLowerCase() === 'nota' ? 'nota' : 'kuitansi'
   const jumlah = Number(row['jumlah']) || 1
   const hargaSatuan = Number(row['harga_satuan']) || 0
-  const pihak = String(row['diterima_dari_atau_tuan'] || '').trim()
 
   return {
-    jenis,
+    jenis: 'kuitansi',
     no_bukti: String(row['no_bukti'] || '').trim(),
     lembar: String(row['lembar'] || 'I/II/III/IV/V').trim(),
     mata_anggaran: String(row['mata_anggaran'] || '').trim(),
     tahun_anggaran: String(row['tahun_anggaran'] || String(new Date().getFullYear())).trim(),
     tanggal: String(row['tanggal(YYYY-MM-DD)'] || new Date().toISOString().slice(0, 10)).trim(),
-    diterima_dari: jenis === 'kuitansi' ? pihak : '',
-    tuan: jenis === 'nota' ? pihak : '',
-    toko: String(row['toko'] || '').trim(),
+    diterima_dari: String(row['diterima_dari'] || '').trim(),
     untuk_pembayaran: String(row['untuk_pembayaran'] || '').trim(),
     disetujui_oleh: String(row['disetujui_oleh'] || '').trim(),
     nip_disetujui: String(row['nip_disetujui'] || '').trim(),
@@ -76,7 +70,6 @@ export default function Kuitansi() {
   const [data, setData] = useState([])
   const [loading, setLoading] = useState(true)
   const [pencarian, setPencarian] = useState('')
-  const [filterJenis, setFilterJenis] = useState('semua')
   const [showBuat, setShowBuat] = useState(false)
   const [showImport, setShowImport] = useState(false)
   const [sekolah, setSekolah] = useState(null)
@@ -92,6 +85,7 @@ export default function Kuitansi() {
     const { data: rows, error } = await supabase
       .from('kuitansi')
       .select('*')
+      .eq('jenis', 'kuitansi')
       .order('tanggal', { ascending: false })
       .order('id', { ascending: false })
     if (!error) setData(rows || [])
@@ -113,17 +107,15 @@ export default function Kuitansi() {
 
   const dataTersaring = useMemo(() => {
     return data.filter((d) => {
-      if (filterJenis !== 'semua' && d.jenis !== filterJenis) return false
       if (!pencarian.trim()) return true
       const q = pencarian.toLowerCase()
       return (
         (d.nomor || '').toLowerCase().includes(q) ||
         (d.diterima_dari || '').toLowerCase().includes(q) ||
-        (d.untuk_pembayaran || '').toLowerCase().includes(q) ||
-        (d.tuan || '').toLowerCase().includes(q)
+        (d.untuk_pembayaran || '').toLowerCase().includes(q)
       )
     })
-  }, [data, pencarian, filterJenis])
+  }, [data, pencarian])
 
   async function handleCetakUlang(row) {
     setMemuatCetak(row.id)
@@ -151,7 +143,7 @@ export default function Kuitansi() {
   }, [cetakUlang])
 
   async function handleHapus(row) {
-    if (!confirm(`Hapus ${row.jenis === 'nota' ? 'nota' : 'kuitansi'} nomor "${row.nomor || '-'}"? Tindakan ini tidak bisa dibatalkan.`)) return
+    if (!confirm(`Hapus kuitansi nomor "${row.nomor || '-'}"? Tindakan ini tidak bisa dibatalkan.`)) return
     setMenghapus(row.id)
     // Hapus rincian item dulu, baru baris kuitansinya, supaya tidak ganjal foreign key.
     const { error: itemErr } = await supabase.from('kuitansi_item').delete().eq('kuitansi_id', row.id)
@@ -179,11 +171,11 @@ export default function Kuitansi() {
     const gagal = []
     for (const row of rows) {
       try {
-        const { data: nomorData, error: nomorErr } = await supabase.rpc('next_nomor_kuitansi', { p_jenis: row.jenis })
+        const { data: nomorData, error: nomorErr } = await supabase.rpc('next_nomor_kuitansi', { p_jenis: 'kuitansi' })
         if (nomorErr) throw nomorErr
 
         const payload = {
-          jenis: row.jenis,
+          jenis: 'kuitansi',
           nomor: nomorData,
           no_bukti: row.no_bukti,
           lembar: row.lembar,
@@ -191,8 +183,6 @@ export default function Kuitansi() {
           tahun_anggaran: row.tahun_anggaran,
           tanggal: row.tanggal,
           diterima_dari: row.diterima_dari,
-          tuan: row.tuan,
-          toko: row.toko,
           untuk_pembayaran: row.untuk_pembayaran,
           jumlah_total: row.jumlah_total,
           disetujui_oleh: row.disetujui_oleh,
@@ -230,8 +220,8 @@ export default function Kuitansi() {
 
   return (
     <Layout
-      title="Kuitansi & Nota"
-      subtitle="Riwayat semua kuitansi dan nota yang pernah dibuat"
+      title="Kuitansi"
+      subtitle="Riwayat semua kuitansi yang pernah dibuat"
       actions={
         <>
           <button className="btn-secondary" onClick={() => setShowImport(true)}>
@@ -256,14 +246,6 @@ export default function Kuitansi() {
             />
           </div>
         </div>
-        <div>
-          <label className="label-field">Jenis</label>
-          <select className="input-field" value={filterJenis} onChange={(e) => setFilterJenis(e.target.value)}>
-            <option value="semua">Semua</option>
-            <option value="kuitansi">Kuitansi</option>
-            <option value="nota">Nota</option>
-          </select>
-        </div>
       </div>
 
       <div className="card overflow-x-auto">
@@ -272,8 +254,7 @@ export default function Kuitansi() {
             <tr>
               <th>Nomor</th>
               <th>Tanggal</th>
-              <th>Jenis</th>
-              <th>Diterima Dari / Tuan</th>
+              <th>Diterima Dari</th>
               <th>Keterangan</th>
               <th>Jumlah</th>
               <th></th>
@@ -281,14 +262,14 @@ export default function Kuitansi() {
           </thead>
           <tbody>
             {loading && (
-              <tr><td colSpan={7} className="text-center py-8 text-ink-700/50">Memuat data...</td></tr>
+              <tr><td colSpan={6} className="text-center py-8 text-ink-700/50">Memuat data...</td></tr>
             )}
             {!loading && dataTersaring.length === 0 && (
               <tr>
-                <td colSpan={7} className="text-center py-10 text-ink-700/50">
+                <td colSpan={6} className="text-center py-10 text-ink-700/50">
                   <div className="flex flex-col items-center gap-2">
                     <Receipt size={28} className="text-ink-700/25" />
-                    <span>Belum ada kuitansi/nota yang cocok.</span>
+                    <span>Belum ada kuitansi yang cocok.</span>
                   </div>
                 </td>
               </tr>
@@ -297,14 +278,7 @@ export default function Kuitansi() {
               <tr key={d.id}>
                 <td className="font-medium">{d.nomor || '-'}</td>
                 <td>{formatTanggal(d.tanggal)}</td>
-                <td>
-                  <span className={`text-xs px-2 py-1 rounded-full font-medium ${
-                    d.jenis === 'nota' ? 'bg-brass-400/20 text-brass-600' : 'bg-sage-500/10 text-sage-500'
-                  }`}>
-                    {d.jenis === 'nota' ? 'Nota' : 'Kuitansi'}
-                  </span>
-                </td>
-                <td>{d.diterima_dari || d.tuan || '-'}</td>
+                <td>{d.diterima_dari || '-'}</td>
                 <td className="max-w-[220px] truncate">{d.untuk_pembayaran || '-'}</td>
                 <td className="font-medium">{formatRupiah(d.jumlah_total)}</td>
                 <td>
@@ -344,7 +318,7 @@ export default function Kuitansi() {
       <BulkImportModal
         open={showImport}
         onClose={() => { setShowImport(false); loadData() }}
-        title="Impor Kuitansi & Nota"
+        title="Impor Kuitansi"
         templateHeaders={TEMPLATE_HEADERS}
         mapRow={mapRowKuitansi}
         onImport={handleImportKuitansi}
