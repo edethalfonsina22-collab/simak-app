@@ -95,10 +95,24 @@ const KuitansiPrintTemplate = forwardRef(function KuitansiPrintTemplate({ sekola
       {/* Konten di atas watermark */}
       <div className="relative">
         <div className="flex items-start justify-between mb-2">
-          <div>
-            <p>No. Bukti <Blank value={data?.no_bukti} width={170} /></p>
-            <p>Lembar : {data?.lembar || 'I/II/III/IV/V'}</p>
-          </div>
+          {/* No. Bukti & Lembar sekarang pakai struktur tabel yang sama dengan
+              Mata Anggaran / Tahun di sebelah kanan, supaya label, titik dua,
+              dan nilainya sejajar rapi (sebelumnya "No. Bukti" ditulis polos
+              tanpa titik dua dan tidak sejajar dengan nilainya). */}
+          <table>
+            <tbody>
+              <tr>
+                <td className="text-left whitespace-nowrap pr-1">No. Bukti</td>
+                <td className="pr-1">:</td>
+                <td><Blank value={data?.no_bukti} width={170} /></td>
+              </tr>
+              <tr>
+                <td className="text-left whitespace-nowrap pr-1">Lembar</td>
+                <td className="pr-1">:</td>
+                <td>{data?.lembar || 'I/II/III/IV/V'}</td>
+              </tr>
+            </tbody>
+          </table>
           {/* Tabel kecil supaya "Mata Anggaran" & "Tahun" sejajar: label rata kiri
               dalam kolomnya sendiri, titik dua & kolom isian ikut sejajar di
               bawahnya — sebelumnya pakai <p> + text-right sehingga label yang
@@ -174,9 +188,12 @@ const KuitansiPrintTemplate = forwardRef(function KuitansiPrintTemplate({ sekola
             </div>
           </div>
 
-          {/* Yang Menerima — tanggal dipindah ke sini (dari kolom Setuju dibayar) */}
+          {/* Yang Menerima — tanggal di atas sekarang disertai nama kota (diambil
+              dari field Alamat Penerima), jadi formatnya "Dobo, 9 Maret 2025"
+              sama seperti pola tanggal+kota yang lazim di surat, dan konsisten
+              dengan alamat yang sudah tampil di bawah nama penerima. */}
           <div className="text-center">
-            <p>{formatTanggal(data?.tanggal)}</p>
+            <p>{data?.alamat_penerima ? `${data.alamat_penerima}, ` : ''}{formatTanggal(data?.tanggal)}</p>
             <p>Yang Menerima,</p>
             <div className="h-16" />
             <div className="border-b border-black pb-1">
