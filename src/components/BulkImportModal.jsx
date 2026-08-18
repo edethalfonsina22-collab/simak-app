@@ -2,6 +2,15 @@ import { useState } from 'react'
 import * as XLSX from 'xlsx'
 import { X, UploadCloud, Loader2, CheckCircle2, AlertCircle } from 'lucide-react'
 
+// Ubah objek Date jadi teks "YYYY-MM-DD" memakai komponen tanggal lokal
+// (bukan toISOString, supaya tidak bergeser sehari akibat konversi ke UTC).
+function toYMD(d) {
+  const yyyy = d.getFullYear()
+  const mm = String(d.getMonth() + 1).padStart(2, '0')
+  const dd = String(d.getDate()).padStart(2, '0')
+  return `${yyyy}-${mm}-${dd}`
+}
+
 /**
  * Modal generik untuk input data massal dari file Excel (.xlsx) atau CSV.
  * - `templateHeaders`: kolom yang diharapkan, ditampilkan sebagai contoh unduhan template.
@@ -27,10 +36,25 @@ export default function BulkImportModal({ open, onClose, title, templateHeaders,
     const reader = new FileReader()
     reader.onload = (evt) => {
       try {
-        const wb = XLSX.read(evt.target.result, { type: 'binary' })
+        // cellDates: true supaya kolom bertipe Tanggal di Excel dibaca sebagai
+        // objek Date, bukan angka serial mentah (mis. 46255) yang bikin gagal
+        // saat dikirim ke kolom bertipe date di database.
+        const wb = XLSX.read(evt.target.result, { type: 'binary', cellDates: true })
         const sheet = wb.Sheets[wb.SheetNames[0]]
         const json = XLSX.utils.sheet_to_json(sheet, { defval: '' })
-        const mapped = json.map(mapRow).filter(Boolean)
+
+        // Normalisasi: setiap sel yang berupa Date (kolom tanggal manapun,
+        // di file manapun yang pakai modal ini) diubah jadi teks "YYYY-MM-DD"
+        // supaya mapRow() tidak perlu tahu-menahu soal parsing Excel.
+        const normalized = json.map((row) => {
+          const out = {}
+          for (const [key, val] of Object.entries(row)) {
+            out[key] = val instanceof Date ? toYMD(val) : val
+          }
+          return out
+        })
+
+        const mapped = normalized.map(mapRow).filter(Boolean)
         setRows(mapped)
         setStatus('parsed')
       } catch (err) {
