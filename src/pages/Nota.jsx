@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from 'react'
 import * as XLSX from 'xlsx'
 import { supabase } from '../lib/supabaseClient' // sesuaikan path kalau berbeda di project kamu
 import NotaPrintTemplate from '../components/NotaPrintTemplate'
-import KuitansiPrintTemplate from '../components/KuitansiPrintTemplate'
 
 // -----------------------------------------------------------------
 // Baris item kosong untuk form manual
@@ -45,82 +44,23 @@ function mapUntukCetak(nota) {
   }
 }
 
-// -----------------------------------------------------------------
-// Terbilang sederhana (angka -> teks) untuk mengisi "Uang sejumlah"
-// di kwitansi secara otomatis dari jumlah_total. Cukup untuk kebutuhan
-// nominal rupiah pada umumnya; silakan ganti dengan library terbilang
-// kalau butuh yang lebih lengkap/akurat.
-// -----------------------------------------------------------------
-const SATUAN = ['', 'satu', 'dua', 'tiga', 'empat', 'lima', 'enam', 'tujuh', 'delapan', 'sembilan']
-
-function tigaAngka(n) {
-  n = Number(n)
-  let hasil = ''
-  if (n >= 100) {
-    hasil += (n / 100 === 1 ? 'seratus' : SATUAN[Math.floor(n / 100)] + ' ratus') + ' '
-    n %= 100
-  }
-  if (n >= 10 && n < 20) {
-    const belasan = ['sepuluh', 'sebelas', 'dua belas', 'tiga belas', 'empat belas', 'lima belas', 'enam belas', 'tujuh belas', 'delapan belas', 'sembilan belas']
-    hasil += belasan[n - 10] + ' '
-    n = 0
-  } else if (n >= 20) {
-    hasil += SATUAN[Math.floor(n / 10)] + ' puluh '
-    n %= 10
-  }
-  if (n > 0) hasil += SATUAN[n] + ' '
-  return hasil.trim()
-}
-
-function angkaKeTerbilang(angka) {
-  angka = Math.floor(Number(angka) || 0)
-  if (angka === 0) return 'nol rupiah'
-
-  const jutaan = Math.floor(angka / 1000000)
-  const ribuan = Math.floor((angka % 1000000) / 1000)
-  const sisaRatusan = angka % 1000
-
-  let bagian = []
-  if (jutaan > 0) bagian.push(`${tigaAngka(jutaan)} juta`)
-  if (ribuan > 0) bagian.push(ribuan === 1 ? 'seribu' : `${tigaAngka(ribuan)} ribu`)
-  if (sisaRatusan > 0) bagian.push(tigaAngka(sisaRatusan))
-
-  const teks = bagian.join(' ').trim()
-  return teks.charAt(0).toUpperCase() + teks.slice(1) + ' rupiah'
-}
-
-// Ubah data nota jadi bentuk yang dipahami KuitansiPrintTemplate.
-// Sesuaikan pemetaan field ini kalau kebutuhan kwitansi kamu beda
-// (mis. dari = nama pembeli, untuk_pembayaran = ringkasan barang, dst).
-function mapUntukCetakKuitansi(nota) {
-  const ringkasanBarang = (nota.items || [])
-    .map((it) => it.nama_barang)
-    .filter(Boolean)
-    .join(', ')
-
-  return {
-    no_kwitansi: nota.no_nota,
-    tanggal: nota.tanggal,
-    dari: nota.tuan,
-    uang_sejumlah: angkaKeTerbilang(nota.jumlah_total),
-    untuk_pembayaran: ringkasanBarang || 'Pembayaran barang',
-    jumlah: nota.jumlah_total,
-  }
-}
-
 export default function Nota({ sekolah }) {
   const [daftar, setDaftar] = useState([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState(null)
   const [form, setForm] = useState(formKosong())
-  const [notaCetak, setNotaCetak] = useState(null) // data yang lagi disiapkan untuk print nota
-  const [kuitansiCetak, setKuitansiCetak] = useState(null) // data yang lagi disiapkan untuk print kwitansi
+  // notaCetak sekarang berupa ARRAY nota (bisa isi 1 nota atau banyak
+  // sekaligus), supaya cetak massal bisa memuat semua nota terpilih dalam
+  // satu kali window.print() -> satu print job banyak halaman, bukan
+  // satu-satu.
+  const [notaCetak, setNotaCetak] = useState([])
   const [importBusy, setImportBusy] = useState(false)
   const [importRingkasan, setImportRingkasan] = useState(null)
+  // Set berisi id nota yang dicentang di tabel, untuk cetak massal.
+  const [terpilih, setTerpilih] = useState(new Set())
 
   const printRef = useRef(null)
-  const printKuitansiRef = useRef(null)
   const fileInputRef = useRef(null)
 
   async function muatDaftar() {
@@ -210,19 +150,41 @@ export default function Nota({ sekolah }) {
     muatDaftar()
   }
 
+  // ------------------------- Pilih baris (untuk cetak massal) -------------------------
+  function toggleTerpilih(id) {
+    setTerpilih((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  function toggleTerpilihSemua() {
+    setTerpilih((prev) =>
+      prev.size === daftar.length ? new Set() : new Set(daftar.map((r) => r.id))
+    )
+  }
+
   // ------------------------- Cetak -------------------------
+  // Cetak satu nota saja (tombol "Cetak" per baris).
   function cetakNota(row) {
-    setKuitansiCetak(null)
-    setNotaCetak(mapUntukCetak(row))
+    setNotaCetak([mapUntukCetak(row)])
     // beri waktu render sebelum memanggil print
     setTimeout(() => window.print(), 100)
   }
 
-  function cetakKuitansi(row) {
-    setNotaCetak(null)
-    setKuitansiCetak(mapUntukCetakKuitansi(row))
-    // beri waktu render sebelum memanggil print
-    setTimeout(() => window.print(), 100)
+  // Cetak SEMUA nota yang dicentang sekaligus -> satu kali window.print()
+  // yang menghasilkan banyak halaman (satu nota per halaman A4), bukan
+  // satu-satu seperti sebelumnya.
+  function cetakTerpilih() {
+    const rows = daftar.filter((r) => terpilih.has(r.id))
+    if (rows.length === 0) {
+      alert('Pilih dulu minimal satu nota yang mau dicetak.')
+      return
+    }
+    setNotaCetak(rows.map(mapUntukCetak))
+    setTimeout(() => window.print(), 150)
   }
 
   // ------------------------- Impor Massal -------------------------
@@ -328,6 +290,7 @@ export default function Nota({ sekolah }) {
   }
 
   const totalForm = hitungTotal(form.items)
+  const semuaTerpilih = daftar.length > 0 && terpilih.size === daftar.length
 
   return (
     <div className="p-4">
@@ -349,6 +312,15 @@ export default function Nota({ sekolah }) {
                 onChange={handleFileImpor}
               />
             </label>
+            <button
+              onClick={cetakTerpilih}
+              disabled={terpilih.size === 0}
+              className={`px-3 py-2 rounded text-white text-sm ${
+                terpilih.size === 0 ? 'bg-gray-300 cursor-not-allowed' : 'bg-purple-600'
+              }`}
+            >
+              Cetak Terpilih ({terpilih.size})
+            </button>
             <button onClick={bukaTambah} className="px-3 py-2 rounded bg-blue-600 text-white text-sm">
               + Tambah Nota
             </button>
@@ -372,6 +344,14 @@ export default function Nota({ sekolah }) {
           <table className="w-full text-sm">
             <thead className="bg-gray-100">
               <tr>
+                <th className="p-2 text-center w-8">
+                  <input
+                    type="checkbox"
+                    checked={semuaTerpilih}
+                    onChange={toggleTerpilihSemua}
+                    aria-label="Pilih semua nota"
+                  />
+                </th>
                 <th className="p-2 text-left">No. Nota</th>
                 <th className="p-2 text-left">Tanggal</th>
                 <th className="p-2 text-left">Tuan</th>
@@ -382,12 +362,20 @@ export default function Nota({ sekolah }) {
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={6} className="p-4 text-center text-gray-500">Memuat...</td></tr>
+                <tr><td colSpan={7} className="p-4 text-center text-gray-500">Memuat...</td></tr>
               ) : daftar.length === 0 ? (
-                <tr><td colSpan={6} className="p-4 text-center text-gray-500">Belum ada nota</td></tr>
+                <tr><td colSpan={7} className="p-4 text-center text-gray-500">Belum ada nota</td></tr>
               ) : (
                 daftar.map((row) => (
                   <tr key={row.id} className="border-t">
+                    <td className="p-2 text-center">
+                      <input
+                        type="checkbox"
+                        checked={terpilih.has(row.id)}
+                        onChange={() => toggleTerpilih(row.id)}
+                        aria-label={`Pilih nota ${row.no_nota}`}
+                      />
+                    </td>
                     <td className="p-2">{row.no_nota}</td>
                     <td className="p-2">{row.tanggal}</td>
                     <td className="p-2">{row.tuan}</td>
@@ -397,8 +385,7 @@ export default function Nota({ sekolah }) {
                     </td>
                     <td className="p-2">
                       <div className="flex justify-center gap-2 text-xs">
-                        <button onClick={() => cetakNota(row)} className="text-blue-600">Cetak Nota</button>
-                        <button onClick={() => cetakKuitansi(row)} className="text-purple-600">Cetak Kwitansi</button>
+                        <button onClick={() => cetakNota(row)} className="text-blue-600">Cetak</button>
                         <button onClick={() => bukaEdit(row)} className="text-amber-600">Edit</button>
                         <button onClick={() => hapusNota(row.id)} className="text-red-600">Hapus</button>
                       </div>
@@ -531,13 +518,20 @@ export default function Nota({ sekolah }) {
         )}
       </div>
 
-      {/* Wajib DI LUAR elemen "no-print" — ini yang tampil saat window.print() */}
-      {notaCetak && (
-        <NotaPrintTemplate ref={printRef} sekolah={sekolah} data={notaCetak} />
-      )}
-      {kuitansiCetak && (
-        <KuitansiPrintTemplate ref={printKuitansiRef} sekolah={sekolah} data={kuitansiCetak} />
-      )}
+      {/* Wajib DI LUAR elemen "no-print" — ini yang tampil saat window.print().
+          Setiap nota di-render di dalam pembungkusnya sendiri dengan
+          "break-after: page" (kecuali yang terakhir) supaya kalau nota
+          terpilih lebih dari satu, printer otomatis pindah ke halaman baru
+          untuk tiap nota dalam SATU kali print job — bukan print job
+          terpisah satu-satu seperti sebelumnya. */}
+      {notaCetak.map((n, idx) => (
+        <div
+          key={n.id ?? idx}
+          style={idx < notaCetak.length - 1 ? { breakAfter: 'page', pageBreakAfter: 'always' } : undefined}
+        >
+          <NotaPrintTemplate ref={idx === 0 ? printRef : null} sekolah={sekolah} data={n} />
+        </div>
+      ))}
     </div>
   )
 }
