@@ -48,6 +48,44 @@ export default function KuitansiModal({ keuanganRow, editingRow, sekolah, onClos
 
   const isEdit = Boolean(editingRow)
 
+  // BARU: daftar saran (autocomplete) untuk field yang sering diulang-ulang
+  // nilainya, diambil dari data kuitansi yang sudah pernah diinput.
+  // Karena ini di-fetch ulang tiap kali form dibuka, nama baru yang baru saja
+  // disimpan otomatis ikut muncul jadi saran berikutnya -- tidak perlu
+  // penyimpanan daftar terpisah.
+  const [saran, setSaran] = useState({
+    diterima_dari: [],
+    disetujui_oleh: [],
+    dibayar_oleh: [],
+    nama_penerima: [],
+    mata_anggaran: [],
+  })
+
+  useEffect(() => {
+    let batal = false
+    supabase
+      .from('kuitansi')
+      .select('diterima_dari, disetujui_oleh, dibayar_oleh, nama_penerima, mata_anggaran')
+      .eq('jenis', 'kuitansi')
+      .order('id', { ascending: false })
+      .limit(500)
+      .then(({ data, error }) => {
+        if (error || batal || !data) return
+        const uniqueSorted = (field) =>
+          Array.from(new Set(data.map((r) => (r[field] || '').trim()).filter(Boolean))).sort((a, b) =>
+            a.localeCompare(b, 'id')
+          )
+        setSaran({
+          diterima_dari: uniqueSorted('diterima_dari'),
+          disetujui_oleh: uniqueSorted('disetujui_oleh'),
+          dibayar_oleh: uniqueSorted('dibayar_oleh'),
+          nama_penerima: uniqueSorted('nama_penerima'),
+          mata_anggaran: uniqueSorted('mata_anggaran'),
+        })
+      })
+    return () => { batal = true }
+  }, [])
+
   function ubah(field, value) {
     setForm((prev) => ({ ...prev, [field]: value }))
   }
@@ -179,7 +217,11 @@ export default function KuitansiModal({ keuanganRow, editingRow, sekolah, onClos
                 placeholder="Contoh: 5.1.02.01.01.0055"
                 value={form.mata_anggaran}
                 onChange={(e) => ubah('mata_anggaran', e.target.value)}
+                list="saran-mata-anggaran"
               />
+              <datalist id="saran-mata-anggaran">
+                {saran.mata_anggaran.map((v) => <option key={v} value={v} />)}
+              </datalist>
             </div>
 
             <div>
@@ -189,7 +231,11 @@ export default function KuitansiModal({ keuanganRow, editingRow, sekolah, onClos
                 placeholder="Nama orang tua / pihak pembayar"
                 value={form.diterima_dari}
                 onChange={(e) => ubah('diterima_dari', e.target.value)}
+                list="saran-diterima-dari"
               />
+              <datalist id="saran-diterima-dari">
+                {saran.diterima_dari.map((v) => <option key={v} value={v} />)}
+              </datalist>
             </div>
 
             <div>
@@ -221,7 +267,11 @@ export default function KuitansiModal({ keuanganRow, editingRow, sekolah, onClos
                   className="input-field"
                   value={form.disetujui_oleh}
                   onChange={(e) => ubah('disetujui_oleh', e.target.value)}
+                  list="saran-disetujui-oleh"
                 />
+                <datalist id="saran-disetujui-oleh">
+                  {saran.disetujui_oleh.map((v) => <option key={v} value={v} />)}
+                </datalist>
               </div>
               <div>
                 <label className="label-field">NIP Penyetuju</label>
@@ -240,7 +290,11 @@ export default function KuitansiModal({ keuanganRow, editingRow, sekolah, onClos
                   className="input-field"
                   value={form.dibayar_oleh}
                   onChange={(e) => ubah('dibayar_oleh', e.target.value)}
+                  list="saran-dibayar-oleh"
                 />
+                <datalist id="saran-dibayar-oleh">
+                  {saran.dibayar_oleh.map((v) => <option key={v} value={v} />)}
+                </datalist>
               </div>
               <div>
                 <label className="label-field">NIP Pembayar</label>
@@ -259,7 +313,11 @@ export default function KuitansiModal({ keuanganRow, editingRow, sekolah, onClos
                   className="input-field"
                   value={form.nama_penerima}
                   onChange={(e) => ubah('nama_penerima', e.target.value)}
+                  list="saran-nama-penerima"
                 />
+                <datalist id="saran-nama-penerima">
+                  {saran.nama_penerima.map((v) => <option key={v} value={v} />)}
+                </datalist>
               </div>
               <div>
                 <label className="label-field">Alamat Penerima</label>
