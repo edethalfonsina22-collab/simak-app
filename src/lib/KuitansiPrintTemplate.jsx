@@ -10,14 +10,11 @@ function formatTanggal(tgl) {
   return new Date(tgl).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })
 }
 
-// Kolom isian bergaris bawah (pengganti deretan titik "..........." yang sering
-// terlihat tidak rata saat dicetak — lebar tetap & garis lurus, isi teks kalau ada).
+// Kolom isian (pengganti deretan titik "..........." yang sering terlihat tidak
+// rata saat dicetak) — lebar tetap, tanpa garis bawah, isi teks kalau ada.
 function Blank({ value, width = 140 }) {
   return (
-    <span
-      className="inline-block border-b border-black align-bottom px-1 leading-tight"
-      style={{ minWidth: width }}
-    >
+    <span className="inline-block align-bottom px-1 leading-tight" style={{ minWidth: width }}>
       {value || '\u00A0'}
     </span>
   )
