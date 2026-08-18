@@ -99,10 +99,24 @@ const KuitansiPrintTemplate = forwardRef(function KuitansiPrintTemplate({ sekola
             <p>No. Bukti <Blank value={data?.no_bukti} width={170} /></p>
             <p>Lembar : {data?.lembar || 'I/II/III/IV/V'}</p>
           </div>
-          <div className="text-right">
-            <p>Mata Anggaran : <Blank value={data?.mata_anggaran} width={150} /></p>
-            <p>Tahun : <Blank value={data?.tahun_anggaran} width={90} /></p>
-          </div>
+          {/* Tabel kecil supaya "Mata Anggaran" & "Tahun" sejajar: label rata kiri
+              dalam kolomnya sendiri, titik dua & kolom isian ikut sejajar di
+              bawahnya — sebelumnya pakai <p> + text-right sehingga label yang
+              lebih pendek ("Tahun") ikut terdorong ke kanan dan tidak sejajar. */}
+          <table className="ml-auto">
+            <tbody>
+              <tr>
+                <td className="text-left whitespace-nowrap pr-1">Mata Anggaran</td>
+                <td className="pr-1">:</td>
+                <td><Blank value={data?.mata_anggaran} width={150} /></td>
+              </tr>
+              <tr>
+                <td className="text-left whitespace-nowrap pr-1">Tahun</td>
+                <td className="pr-1">:</td>
+                <td><Blank value={data?.tahun_anggaran} width={90} /></td>
+              </tr>
+            </tbody>
+          </table>
         </div>
 
         <h1 className="text-center text-xl font-bold underline tracking-wide mb-4">KWITANSI</h1>
