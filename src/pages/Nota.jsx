@@ -561,12 +561,26 @@ export default function Nota({ sekolah }) {
           Dibungkus "hidden print:block" (Tailwind) supaya PASTI tersembunyi
           di layar biasa (tidak mendorong/menutupi sidebar), terlepas dari
           ada-tidaknya aturan CSS ".print-only" di file global — dan hanya
-          muncul saat proses cetak berjalan. */}
+          muncul saat proses cetak berjalan.
+
+          Nota SENDIRI (148mm) dibungkus wrapper 1 halaman A4 penuh (297mm)
+          dengan flex+justify-end, supaya menempel ke bagian PALING BAWAH
+          kertas (bukan menempel di atas). Wrapper ini HANYA di sini, tidak
+          ikut masuk ke NotaPrintTemplate.jsx sendiri, supaya komponen itu
+          tetap 148mm apa adanya dan aman dipakai bareng Kuitansi di
+          LaporanPrintTemplate.jsx (148mm Kuitansi + 148mm Nota = 1 lembar). */}
       <div className="hidden print:block">
         {notaCetak.map((n, idx) => (
           <div
             key={n.id ?? idx}
-            style={idx < notaCetak.length - 1 ? { breakAfter: 'page', pageBreakAfter: 'always' } : undefined}
+            style={{
+              width: '210mm',
+              height: '297mm',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'flex-end',
+              ...(idx < notaCetak.length - 1 ? { breakAfter: 'page', pageBreakAfter: 'always' } : {}),
+            }}
           >
             <NotaPrintTemplate ref={idx === 0 ? printRef : null} sekolah={sekolah} data={n} />
           </div>
