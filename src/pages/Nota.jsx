@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from 'react'
 import * as XLSX from 'xlsx'
 import { supabase } from '../lib/supabaseClient' // sesuaikan path kalau berbeda di project kamu
 import NotaPrintTemplate from '../components/NotaPrintTemplate'
-import Layout from '../components/Layout'
 
 // -----------------------------------------------------------------
 // Baris item kosong untuk form manual
@@ -56,9 +55,7 @@ function mapUntukCetak(nota) {
 //   - "9 Maret 2025", "9 Mar 2025"        (nama bulan Indonesia)
 //   - "March 9, 2025", "Mar 9 2025"       (nama bulan Inggris)
 // Semua ditampung dan diubah jadi teks "YYYY-MM-DD" yang valid untuk kolom
-// date di Postgres. Kalau benar-benar tidak bisa dikenali, kembalikan null
-// supaya baris tsb ditandai gagal (bukan diam-diam diisi tanggal hari ini,
-// yang bisa menyesatkan data).
+// date di Postgres.
 
 const NAMA_BULAN_ID = {
   jan: 1, januari: 1,
@@ -94,8 +91,6 @@ function pad2(n) {
   return String(n).padStart(2, '0')
 }
 
-// Susun "YYYY-MM-DD" dari komponen, dengan validasi dasar (bulan 1-12,
-// tanggal masuk akal). Tahun 2 digit dianggap 2000-an.
 function susunTanggal(tahun, bulan, tanggal) {
   let y = Number(tahun)
   const m = Number(bulan)
@@ -105,7 +100,6 @@ function susunTanggal(tahun, bulan, tanggal) {
   if (m < 1 || m > 12) return null
   if (d < 1 || d > 31) return null
   const dt = new Date(Date.UTC(y, m - 1, d))
-  // Pastikan tanggal tidak "meluber" (mis. 31 Februari -> jadi Maret)
   if (dt.getUTCFullYear() !== y || dt.getUTCMonth() !== m - 1 || dt.getUTCDate() !== d) {
     return null
   }
@@ -113,7 +107,6 @@ function susunTanggal(tahun, bulan, tanggal) {
 }
 
 function tanggalDariAngkaSerialExcel(n) {
-  // Basis tanggal Excel: 30 Desember 1899 (memperhitungkan bug tahun kabisat 1900 Excel)
   const epoch = Date.UTC(1899, 11, 30)
   const ms = epoch + Math.round(n) * 86400000
   const dt = new Date(ms)
@@ -125,15 +118,12 @@ function tanggalDariTeks(teks) {
   const s = String(teks).trim()
   if (!s) return null
 
-  // 1) ISO / tahun-dulu: YYYY-MM-DD atau YYYY/MM/DD
   let m = s.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})$/)
   if (m) return susunTanggal(m[1], m[2], m[3])
 
-  // 2) Tanggal-Bulan-Tahun angka: DD-MM-YYYY, DD/MM/YYYY, DD-MM-YY, DD.MM.YYYY, dst
   m = s.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{2,4})$/)
   if (m) return susunTanggal(m[3], m[2], m[1])
 
-  // 3) "9 Maret 2025" / "9 Mar 2025" (nama bulan Indonesia)
   m = s.match(/^(\d{1,2})\s+([A-Za-z]+)\.?\s+(\d{2,4})$/)
   if (m) {
     const kunci = m[2].toLowerCase().replace(/\./g, '')
@@ -141,7 +131,6 @@ function tanggalDariTeks(teks) {
     if (bulan) return susunTanggal(m[3], bulan, m[1])
   }
 
-  // 4) "Maret 9, 2025" / "March 9, 2025" (nama bulan di depan, gaya Inggris)
   m = s.match(/^([A-Za-z]+)\.?\s+(\d{1,2}),?\s+(\d{2,4})$/)
   if (m) {
     const kunci = m[1].toLowerCase().replace(/\./g, '')
@@ -149,14 +138,11 @@ function tanggalDariTeks(teks) {
     if (bulan) return susunTanggal(m[3], bulan, m[2])
   }
 
-  // 5) Angka serial Excel yang ketulis sebagai teks, mis. "45725"
   if (/^\d{4,6}$/.test(s)) {
     const hasil = tanggalDariAngkaSerialExcel(Number(s))
     if (hasil) return hasil
   }
 
-  // 6) Terakhir, coba serahkan ke parser bawaan JavaScript (mis. format ISO
-  //    dengan waktu, atau format lain yang belum tertangkap di atas)
   const coba = new Date(s)
   if (!isNaN(coba.getTime())) {
     return `${coba.getUTCFullYear()}-${pad2(coba.getUTCMonth() + 1)}-${pad2(coba.getUTCDate())}`
@@ -167,23 +153,19 @@ function tanggalDariTeks(teks) {
 
 // Fungsi utama: terima nilai apa pun dari sel Excel ("Tanggal") dan
 // kembalikan teks "YYYY-MM-DD" yang valid, atau null kalau tidak bisa
-// dikenali sama sekali (baris ini nanti akan ditandai gagal saat impor,
-// bukan diam-diam diisi tanggal hari ini).
+// dikenali sama sekali.
 function tanggalDariExcel(nilai) {
   if (nilai === '' || nilai === null || nilai === undefined) return null
 
-  // Date object asli (karena workbook dibaca dengan cellDates: true)
   if (nilai instanceof Date) {
     if (isNaN(nilai.getTime())) return null
     return `${nilai.getUTCFullYear()}-${pad2(nilai.getUTCMonth() + 1)}-${pad2(nilai.getUTCDate())}`
   }
 
-  // Angka serial Excel (fallback kalau cellDates tidak berlaku utk sel ini)
   if (typeof nilai === 'number') {
     return tanggalDariAngkaSerialExcel(nilai)
   }
 
-  // Segala bentuk teks
   return tanggalDariTeks(nilai)
 }
 
@@ -193,15 +175,9 @@ export default function Nota({ sekolah }) {
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState(null)
   const [form, setForm] = useState(formKosong())
-  // notaCetak sekarang berupa ARRAY nota (bisa isi 1 nota atau banyak
-  // sekaligus), supaya cetak massal bisa memuat semua nota terpilih dalam
-  // satu kali window.print() -> satu print job banyak halaman, bukan
-  // satu-satu.
-  const [notaCetak, setNotaCetak] = useState([])
+  const [notaCetak, setNotaCetak] = useState(null) // data yang lagi disiapkan untuk print
   const [importBusy, setImportBusy] = useState(false)
   const [importRingkasan, setImportRingkasan] = useState(null)
-  // Set berisi id nota yang dicentang di tabel, untuk cetak massal.
-  const [terpilih, setTerpilih] = useState(new Set())
 
   const printRef = useRef(null)
   const fileInputRef = useRef(null)
@@ -221,13 +197,11 @@ export default function Nota({ sekolah }) {
     muatDaftar()
   }, [])
 
-  // Setelah dialog print ditutup (baik jadi dicetak atau dibatalkan),
-  // kosongkan lagi notaCetak supaya blok pratinjau cetak (yang tingginya
-  // satu halaman A4 penuh) tidak tertinggal di DOM dan mengganggu layout
-  // layar biasa (mis. menutupi sidebar).
+  // Setelah dialog print ditutup, kosongkan notaCetak supaya blok pratinjau
+  // cetak tidak tertinggal di DOM.
   useEffect(() => {
     function bersihkanSetelahPrint() {
-      setNotaCetak([])
+      setNotaCetak(null)
     }
     window.addEventListener('afterprint', bersihkanSetelahPrint)
     return () => window.removeEventListener('afterprint', bersihkanSetelahPrint)
@@ -305,68 +279,11 @@ export default function Nota({ sekolah }) {
     muatDaftar()
   }
 
-  // ------------------------- Pilih baris (untuk cetak massal) -------------------------
-  function toggleTerpilih(id) {
-    setTerpilih((prev) => {
-      const next = new Set(prev)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
-      return next
-    })
-  }
-
-  function toggleTerpilihSemua() {
-    setTerpilih((prev) =>
-      prev.size === daftar.length ? new Set() : new Set(daftar.map((r) => r.id))
-    )
-  }
-
   // ------------------------- Cetak -------------------------
-  // Cetak satu nota saja (tombol "Cetak" per baris).
   function cetakNota(row) {
-    setNotaCetak([mapUntukCetak(row)])
+    setNotaCetak(mapUntukCetak(row))
     // beri waktu render sebelum memanggil print
     setTimeout(() => window.print(), 100)
-  }
-
-  // Gabungkan beberapa baris nota (No Nota berbeda-beda) jadi SATU nota
-  // dengan SATU tabel barang -> dipakai kalau belanjanya berasal dari satu
-  // mata anggaran yang sama walau dicatat sebagai beberapa nota terpisah.
-  // - items dari semua nota terpilih digabung jadi satu daftar
-  // - Tuan/Toko dipakai dari nota pertama (asumsi sama, karena satu mata
-  //   anggaran biasanya belanja di toko yang sama)
-  // - No. Nota digabung jadi satu teks (mis. "001 / 002 / 003")
-  // - Tanggal dipakai tanggal PALING AKHIR dari nota-nota yang digabung
-  function gabungkanNota(rows) {
-    const urutan = [...rows].sort((a, b) => String(a.tanggal || '').localeCompare(String(b.tanggal || '')))
-    const items = urutan.flatMap((r) =>
-      (r.items || []).map((it) => ({
-        ...it,
-        banyaknya: [it.banyaknya, it.satuan].filter(Boolean).join(' '),
-        jumlah: it.jumlah ?? hitungJumlahBaris(it),
-      }))
-    )
-    return {
-      no_nota: urutan.map((r) => r.no_nota).join(' / '),
-      tanggal: urutan[urutan.length - 1]?.tanggal,
-      tuan: urutan[0]?.tuan,
-      toko: urutan[0]?.toko,
-      alamat_lanjutan: urutan[0]?.alamat_lanjutan,
-      items,
-      jumlah_total: items.reduce((sum, it) => sum + (Number(it.jumlah) || 0), 0),
-    }
-  }
-
-  // Cetak SEMUA nota yang dicentang sekaligus, DIGABUNG jadi satu tabel di
-  // satu nota (bukan satu nota per halaman) -> satu kali window.print().
-  function cetakTerpilih() {
-    const rows = daftar.filter((r) => terpilih.has(r.id))
-    if (rows.length === 0) {
-      alert('Pilih dulu minimal satu nota yang mau dicetak.')
-      return
-    }
-    setNotaCetak([gabungkanNota(rows)])
-    setTimeout(() => window.print(), 150)
   }
 
   // ------------------------- Impor Massal -------------------------
@@ -418,31 +335,24 @@ export default function Nota({ sekolah }) {
     try {
       const buf = await file.arrayBuffer()
       // cellDates: true -> sel bertipe tanggal di Excel dibaca sebagai Date
-      // object, bukan angka serial (mis. 45725). Kalau sel "Tanggal" bukan
-      // bertipe Date asli (mis. ditulis sebagai teks bebas), tanggalDariExcel()
-      // di bawah tetap akan mencoba mengenali berbagai format teks umum.
+      // object, bukan angka serial (mis. 45725).
       const wb = XLSX.read(buf, { type: 'array', cellDates: true })
       const ws = wb.Sheets[wb.SheetNames[0]]
       const rows = XLSX.utils.sheet_to_json(ws, { defval: '' })
 
       // Kelompokkan baris berdasarkan "No Nota"
       const kelompok = new Map()
-      // Simpan baris Excel (nomor baris asli, 1-based + header) yang
-      // tanggalnya gagal dikenali, supaya bisa ditampilkan ke user.
       const tanggalGagal = []
 
       rows.forEach((r, i) => {
         const noNota = String(r['No Nota'] ?? '').trim()
         if (!noNota) return
 
-        const nomorBarisExcel = i + 2 // +1 karena index 0-based, +1 lagi karena baris 1 = header
+        const nomorBarisExcel = i + 2
 
         if (!kelompok.has(noNota)) {
           let tanggal = tanggalDariExcel(r['Tanggal'])
           if (!tanggal) {
-            // Tanggal tidak dikenali / kosong di baris pertama grup ini ->
-            // pakai tanggal hari ini sebagai fallback, tapi catat sebagai
-            // peringatan supaya user bisa cek & perbaiki manual kalau perlu.
             tanggal = new Date().toISOString().slice(0, 10)
             if (r['Tanggal']) {
               tanggalGagal.push(`Baris ${nomorBarisExcel} (No Nota ${noNota}): "${r['Tanggal']}"`)
@@ -459,13 +369,8 @@ export default function Nota({ sekolah }) {
         }
 
         const grup = kelompok.get(noNota)
-        // Isi tuan/toko kalau baris pertama grup kosong tapi baris ini ada isinya
         if (!grup.tuan && r['Tuan']) grup.tuan = r['Tuan']
         if (!grup.toko && r['Toko']) grup.toko = r['Toko']
-        // Kalau baris lanjutan (bukan baris pertama grup) membawa tanggal
-        // sendiri yang valid, dan grup belum sempat dapat tanggal yang jelas,
-        // boleh dipakai juga -> tapi umumnya tanggal cukup diisi di baris
-        // pertama tiap grup, jadi ini hanya jaring pengaman tambahan.
         if (r['Nama Barang']) {
           grup.items.push({
             banyaknya: Number(r['Banyaknya']) || 0,
@@ -506,47 +411,33 @@ export default function Nota({ sekolah }) {
   }
 
   const totalForm = hitungTotal(form.items)
-  const semuaTerpilih = daftar.length > 0 && terpilih.size === daftar.length
-
-  // Tombol-tombol aksi ini dipindah ke prop `actions` milik <Layout>, persis
-  // pola yang dipakai halaman lain (mis. "Data Guru": Impor Massal, + Tambah
-  // Guru tampil di header sebelah kanan) — supaya sidebar & header konsisten
-  // dan selalu tampil, bukan hilang seperti sebelumnya saat Nota.jsx
-  // render div penuh sendirian tanpa <Layout>.
-  const aksiHeader = (
-    <>
-      <button onClick={unduhTemplateExcel} className="px-3 py-2 rounded bg-gray-200 text-sm">
-        Unduh Template
-      </button>
-      <label className="px-3 py-2 rounded bg-emerald-600 text-white text-sm cursor-pointer">
-        {importBusy ? 'Mengimpor...' : 'Impor Massal'}
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept=".xlsx,.xls,.csv"
-          className="hidden"
-          disabled={importBusy}
-          onChange={handleFileImpor}
-        />
-      </label>
-      <button
-        onClick={cetakTerpilih}
-        disabled={terpilih.size === 0}
-        className={`px-3 py-2 rounded text-white text-sm ${
-          terpilih.size === 0 ? 'bg-gray-300 cursor-not-allowed' : 'bg-purple-600'
-        }`}
-      >
-        Gabung & Cetak ({terpilih.size})
-      </button>
-      <button onClick={bukaTambah} className="px-3 py-2 rounded bg-blue-600 text-white text-sm">
-        + Tambah Nota
-      </button>
-    </>
-  )
 
   return (
-    <>
-      <Layout title="Nota Belanja" subtitle={`${daftar.length} nota tercatat`} actions={aksiHeader}>
+    <div className="p-4">
+      <div className="no-print">
+        <div className="flex items-center justify-between mb-4">
+          <h1 className="text-xl font-bold">Nota Belanja</h1>
+          <div className="flex gap-2">
+            <button onClick={unduhTemplateExcel} className="px-3 py-2 rounded bg-gray-200 text-sm">
+              Unduh Template
+            </button>
+            <label className="px-3 py-2 rounded bg-emerald-600 text-white text-sm cursor-pointer">
+              {importBusy ? 'Mengimpor...' : 'Impor Massal'}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".xlsx,.xls,.csv"
+                className="hidden"
+                disabled={importBusy}
+                onChange={handleFileImpor}
+              />
+            </label>
+            <button onClick={bukaTambah} className="px-3 py-2 rounded bg-blue-600 text-white text-sm">
+              + Tambah Nota
+            </button>
+          </div>
+        </div>
+
         {importRingkasan && (
           <div
             className={`mb-4 p-3 rounded text-sm ${
@@ -564,14 +455,6 @@ export default function Nota({ sekolah }) {
           <table className="w-full text-sm">
             <thead className="bg-gray-100">
               <tr>
-                <th className="p-2 text-center w-8">
-                  <input
-                    type="checkbox"
-                    checked={semuaTerpilih}
-                    onChange={toggleTerpilihSemua}
-                    aria-label="Pilih semua nota"
-                  />
-                </th>
                 <th className="p-2 text-left">No. Nota</th>
                 <th className="p-2 text-left">Tanggal</th>
                 <th className="p-2 text-left">Tuan</th>
@@ -582,20 +465,12 @@ export default function Nota({ sekolah }) {
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={7} className="p-4 text-center text-gray-500">Memuat...</td></tr>
+                <tr><td colSpan={6} className="p-4 text-center text-gray-500">Memuat...</td></tr>
               ) : daftar.length === 0 ? (
-                <tr><td colSpan={7} className="p-4 text-center text-gray-500">Belum ada nota</td></tr>
+                <tr><td colSpan={6} className="p-4 text-center text-gray-500">Belum ada nota</td></tr>
               ) : (
                 daftar.map((row) => (
                   <tr key={row.id} className="border-t">
-                    <td className="p-2 text-center">
-                      <input
-                        type="checkbox"
-                        checked={terpilih.has(row.id)}
-                        onChange={() => toggleTerpilih(row.id)}
-                        aria-label={`Pilih nota ${row.no_nota}`}
-                      />
-                    </td>
                     <td className="p-2">{row.no_nota}</td>
                     <td className="p-2">{row.tanggal}</td>
                     <td className="p-2">{row.tuan}</td>
@@ -605,7 +480,7 @@ export default function Nota({ sekolah }) {
                     </td>
                     <td className="p-2">
                       <div className="flex justify-center gap-2 text-xs">
-                        <button onClick={() => cetakNota(row)} className="text-blue-600">Cetak Nota</button>
+                        <button onClick={() => cetakNota(row)} className="text-blue-600">Cetak</button>
                         <button onClick={() => bukaEdit(row)} className="text-amber-600">Edit</button>
                         <button onClick={() => hapusNota(row.id)} className="text-red-600">Hapus</button>
                       </div>
@@ -736,47 +611,19 @@ export default function Nota({ sekolah }) {
             </form>
           </div>
         )}
-      </Layout>
-
-      {/* Wajib DI LUAR <Layout> — ini yang tampil saat window.print().
-          Dibungkus "hidden print:block" (Tailwind) supaya PASTI tersembunyi
-          di layar biasa (tidak ikut memengaruhi layout sidebar), dan hanya
-          muncul saat proses cetak berjalan.
-
-          Cara paling sederhana & paling tahan banting untuk mendorong Nota
-          ke bagian bawah kertas: pakai `marginTop` biasa (alur dokumen
-          normal), BUKAN position:absolute/fixed atau trik ukuran 297mm.
-          Cara-cara sebelumnya (flex+justify-end, absolute+@page) gagal /
-          bikin halaman kosong karena sangat bergantung pada bagaimana
-          browser/print-engine menghitung ukuran halaman & margin cetak
-          bawaan, yang ternyata tidak konsisten. `marginTop` di sini tidak
-          butuh trik apa pun — nota-nya cuma "didorong" turun sebelum mulai
-          dicetak, sisanya browser yang urus secara normal, jadi hasilnya
-          selalu 1 halaman.
-
-          MENGATUR SEBERAPA TURUN: ubah angka `marginTop` di bawah ini.
-          Kertas A4 tingginya 297mm, dan Nota-nya sendiri tingginya sekitar
-          148mm. Kalau kamu mau Nota-nya menempel PAS di bagian paling
-          bawah kertas, coba naikkan angkanya sedikit demi sedikit dari
-          nilai sekarang (mis. dari 120mm -> 130mm -> 140mm) sambil cek
-          hasil print preview, sampai pas — jangan langsung diset ke
-          "297mm - 148mm = 149mm", karena browser tetap punya margin cetak
-          bawaan sendiri (biasanya sekitar 10-15mm) yang bisa membuatnya
-          malah meluber ke halaman ke-2 kalau angkanya terlalu mepet. */}
-      <div className="hidden print:block">
-        {notaCetak.map((n, idx) => (
-          <div
-            key={n.id ?? idx}
-            style={{
-              width: '210mm',
-              marginTop: '120mm',
-              ...(idx < notaCetak.length - 1 ? { breakAfter: 'page', pageBreakAfter: 'always' } : {}),
-            }}
-          >
-            <NotaPrintTemplate ref={idx === 0 ? printRef : null} sekolah={sekolah} data={n} />
-          </div>
-        ))}
       </div>
-    </>
+
+      {/* Wajib DI LUAR elemen "no-print" — ini yang tampil saat window.print().
+          marginTop mendorong nota turun ke bagian bawah kertas A4 (297mm).
+          Nota-nya sendiri tingginya sekitar 148mm. Kalau posisinya masih
+          kurang turun / malah kepotong ke halaman 2, sesuaikan angka
+          marginTop ini sedikit demi sedikit (mis. dari 120mm ke 130mm)
+          sambil cek hasil print preview. */}
+      {notaCetak && (
+        <div style={{ marginTop: '120mm' }}>
+          <NotaPrintTemplate ref={printRef} sekolah={sekolah} data={notaCetak} />
+        </div>
+      )}
+    </div>
   )
 }
