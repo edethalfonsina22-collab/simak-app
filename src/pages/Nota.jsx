@@ -88,6 +88,148 @@ function mapUntukCetak(nota) {
   }
 }
 
+// ------------------------- Parser tanggal (impor Excel) -------------------------
+// Kolom "Tanggal" di file Excel yang diimpor bisa datang dalam berbagai
+// macam bentuk tergantung cara user mengetik/format sel di Excel, misalnya:
+//   - Date object asli dari Excel (karena kita baca dengan cellDates: true)
+//   - Angka serial Excel, mis. 45725 (kalau cellDates gagal / sel "General")
+//   - "2025-03-09" atau "2025/03/09"      (ISO / tahun dulu)
+//   - "09-03-2025" atau "09/03/2025"      (tanggal-bulan-tahun, gaya ID)
+//   - "9-3-2025", "9/3/25"                (tanpa nol di depan, tahun 2 digit)
+//   - "9 Maret 2025", "9 Mar 2025"        (nama bulan Indonesia)
+//   - "March 9, 2025", "Mar 9 2025"       (nama bulan Inggris)
+// Semua ditampung dan diubah jadi teks "YYYY-MM-DD" yang valid untuk kolom
+// date di Postgres. Kalau benar-benar tidak bisa dikenali, kembalikan null
+// supaya baris tsb ditandai gagal (bukan diam-diam diisi tanggal hari ini,
+// yang bisa menyesatkan data).
+
+const NAMA_BULAN_ID = {
+  jan: 1, januari: 1,
+  feb: 2, februari: 2,
+  mar: 3, maret: 3,
+  apr: 4, april: 4,
+  mei: 5,
+  jun: 6, juni: 6,
+  jul: 7, juli: 7,
+  agu: 8, agt: 8, agustus: 8,
+  sep: 9, sept: 9, september: 9,
+  okt: 10, oktober: 10,
+  nov: 11, november: 11,
+  des: 12, desember: 12,
+}
+
+const NAMA_BULAN_EN = {
+  jan: 1, january: 1,
+  feb: 2, february: 2,
+  mar: 3, march: 3,
+  apr: 4, april: 4,
+  may: 5,
+  jun: 6, june: 6,
+  jul: 7, july: 7,
+  aug: 8, august: 8,
+  sep: 9, sept: 9, september: 9,
+  oct: 10, october: 10,
+  nov: 11, november: 11,
+  dec: 12, december: 12,
+}
+
+function pad2(n) {
+  return String(n).padStart(2, '0')
+}
+
+// Susun "YYYY-MM-DD" dari komponen, dengan validasi dasar (bulan 1-12,
+// tanggal masuk akal). Tahun 2 digit dianggap 2000-an.
+function susunTanggal(tahun, bulan, tanggal) {
+  let y = Number(tahun)
+  const m = Number(bulan)
+  const d = Number(tanggal)
+  if (y < 100) y += 2000
+  if (!y || !m || !d) return null
+  if (m < 1 || m > 12) return null
+  if (d < 1 || d > 31) return null
+  const dt = new Date(Date.UTC(y, m - 1, d))
+  // Pastikan tanggal tidak "meluber" (mis. 31 Februari -> jadi Maret)
+  if (dt.getUTCFullYear() !== y || dt.getUTCMonth() !== m - 1 || dt.getUTCDate() !== d) {
+    return null
+  }
+  return `${y}-${pad2(m)}-${pad2(d)}`
+}
+
+function tanggalDariAngkaSerialExcel(n) {
+  // Basis tanggal Excel: 30 Desember 1899 (memperhitungkan bug tahun kabisat 1900 Excel)
+  const epoch = Date.UTC(1899, 11, 30)
+  const ms = epoch + Math.round(n) * 86400000
+  const dt = new Date(ms)
+  if (isNaN(dt.getTime())) return null
+  return `${dt.getUTCFullYear()}-${pad2(dt.getUTCMonth() + 1)}-${pad2(dt.getUTCDate())}`
+}
+
+function tanggalDariTeks(teks) {
+  const s = String(teks).trim()
+  if (!s) return null
+
+  // 1) ISO / tahun-dulu: YYYY-MM-DD atau YYYY/MM/DD
+  let m = s.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})$/)
+  if (m) return susunTanggal(m[1], m[2], m[3])
+
+  // 2) Tanggal-Bulan-Tahun angka: DD-MM-YYYY, DD/MM/YYYY, DD-MM-YY, DD.MM.YYYY, dst
+  m = s.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{2,4})$/)
+  if (m) return susunTanggal(m[3], m[2], m[1])
+
+  // 3) "9 Maret 2025" / "9 Mar 2025" (nama bulan Indonesia)
+  m = s.match(/^(\d{1,2})\s+([A-Za-z]+)\.?\s+(\d{2,4})$/)
+  if (m) {
+    const kunci = m[2].toLowerCase().replace(/\./g, '')
+    const bulan = NAMA_BULAN_ID[kunci] || NAMA_BULAN_EN[kunci]
+    if (bulan) return susunTanggal(m[3], bulan, m[1])
+  }
+
+  // 4) "Maret 9, 2025" / "March 9, 2025" (nama bulan di depan, gaya Inggris)
+  m = s.match(/^([A-Za-z]+)\.?\s+(\d{1,2}),?\s+(\d{2,4})$/)
+  if (m) {
+    const kunci = m[1].toLowerCase().replace(/\./g, '')
+    const bulan = NAMA_BULAN_ID[kunci] || NAMA_BULAN_EN[kunci]
+    if (bulan) return susunTanggal(m[3], bulan, m[2])
+  }
+
+  // 5) Angka serial Excel yang ketulis sebagai teks, mis. "45725"
+  if (/^\d{4,6}$/.test(s)) {
+    const hasil = tanggalDariAngkaSerialExcel(Number(s))
+    if (hasil) return hasil
+  }
+
+  // 6) Terakhir, coba serahkan ke parser bawaan JavaScript (mis. format ISO
+  //    dengan waktu, atau format lain yang belum tertangkap di atas)
+  const coba = new Date(s)
+  if (!isNaN(coba.getTime())) {
+    return `${coba.getUTCFullYear()}-${pad2(coba.getUTCMonth() + 1)}-${pad2(coba.getUTCDate())}`
+  }
+
+  return null
+}
+
+// Fungsi utama: terima nilai apa pun dari sel Excel ("Tanggal") dan
+// kembalikan teks "YYYY-MM-DD" yang valid, atau null kalau tidak bisa
+// dikenali sama sekali (baris ini nanti akan ditandai gagal saat impor,
+// bukan diam-diam diisi tanggal hari ini).
+function tanggalDariExcel(nilai) {
+  if (nilai === '' || nilai === null || nilai === undefined) return null
+
+  // Date object asli (karena workbook dibaca dengan cellDates: true)
+  if (nilai instanceof Date) {
+    if (isNaN(nilai.getTime())) return null
+    return `${nilai.getUTCFullYear()}-${pad2(nilai.getUTCMonth() + 1)}-${pad2(nilai.getUTCDate())}`
+  }
+
+  // Angka serial Excel (fallback kalau cellDates tidak berlaku utk sel ini)
+  if (typeof nilai === 'number') {
+    return tanggalDariAngkaSerialExcel(nilai)
+  }
+
+  // Segala bentuk teks
+  return tanggalDariTeks(nilai)
+}
+
 export default function Nota({ sekolah }) {
   const [daftar, setDaftar] = useState([])
   const [loading, setLoading] = useState(true)
@@ -286,6 +428,10 @@ export default function Nota({ sekolah }) {
   // Beberapa baris dengan "No Nota" yang sama akan digabung jadi satu nota
   // dengan banyak baris barang (items). Tanggal/Tuan/Toko cukup diisi di
   // baris pertama tiap kelompok No Nota, baris berikutnya boleh dikosongkan.
+  //
+  // Kolom "Tanggal" boleh ditulis dalam format apa pun yang wajar: sel
+  // bertipe Date asli di Excel, angka serial, "2025-03-09", "09/03/2025",
+  // "9 Maret 2025", "March 9, 2025", dst. Lihat tanggalDariExcel() di atas.
   function unduhTemplateExcel() {
     const contoh = [
       {
@@ -323,29 +469,55 @@ export default function Nota({ sekolah }) {
 
     try {
       const buf = await file.arrayBuffer()
-      const wb = XLSX.read(buf, { type: 'array' })
+      // cellDates: true -> sel bertipe tanggal di Excel dibaca sebagai Date
+      // object, bukan angka serial (mis. 45725). Kalau sel "Tanggal" bukan
+      // bertipe Date asli (mis. ditulis sebagai teks bebas), tanggalDariExcel()
+      // di bawah tetap akan mencoba mengenali berbagai format teks umum.
+      const wb = XLSX.read(buf, { type: 'array', cellDates: true })
       const ws = wb.Sheets[wb.SheetNames[0]]
       const rows = XLSX.utils.sheet_to_json(ws, { defval: '' })
 
       // Kelompokkan baris berdasarkan "No Nota"
       const kelompok = new Map()
-      for (const r of rows) {
+      // Simpan baris Excel (nomor baris asli, 1-based + header) yang
+      // tanggalnya gagal dikenali, supaya bisa ditampilkan ke user.
+      const tanggalGagal = []
+
+      rows.forEach((r, i) => {
         const noNota = String(r['No Nota'] ?? '').trim()
-        if (!noNota) continue
+        if (!noNota) return
+
+        const nomorBarisExcel = i + 2 // +1 karena index 0-based, +1 lagi karena baris 1 = header
+
         if (!kelompok.has(noNota)) {
+          let tanggal = tanggalDariExcel(r['Tanggal'])
+          if (!tanggal) {
+            // Tanggal tidak dikenali / kosong di baris pertama grup ini ->
+            // pakai tanggal hari ini sebagai fallback, tapi catat sebagai
+            // peringatan supaya user bisa cek & perbaiki manual kalau perlu.
+            tanggal = new Date().toISOString().slice(0, 10)
+            if (r['Tanggal']) {
+              tanggalGagal.push(`Baris ${nomorBarisExcel} (No Nota ${noNota}): "${r['Tanggal']}"`)
+            }
+          }
           kelompok.set(noNota, {
             no_nota: noNota,
-            tanggal: r['Tanggal'] || new Date().toISOString().slice(0, 10),
+            tanggal,
             tuan: r['Tuan'] || '',
             toko: r['Toko'] || '',
             alamat_lanjutan: '',
             items: [],
           })
         }
+
         const grup = kelompok.get(noNota)
-        // Isi tuan/toko/tanggal kalau baris pertama grup kosong tapi baris ini ada isinya
+        // Isi tuan/toko kalau baris pertama grup kosong tapi baris ini ada isinya
         if (!grup.tuan && r['Tuan']) grup.tuan = r['Tuan']
         if (!grup.toko && r['Toko']) grup.toko = r['Toko']
+        // Kalau baris lanjutan (bukan baris pertama grup) membawa tanggal
+        // sendiri yang valid, dan grup belum sempat dapat tanggal yang jelas,
+        // boleh dipakai juga -> tapi umumnya tanggal cukup diisi di baris
+        // pertama tiap grup, jadi ini hanya jaring pengaman tambahan.
         if (r['Nama Barang']) {
           grup.items.push({
             banyaknya: Number(r['Banyaknya']) || 0,
@@ -354,7 +526,7 @@ export default function Nota({ sekolah }) {
             harga: Number(r['Harga']) || 0,
           })
         }
-      }
+      })
 
       const records = Array.from(kelompok.values()).map((n) => ({
         ...n,
@@ -370,7 +542,11 @@ export default function Nota({ sekolah }) {
       if (error) {
         setImportRingkasan({ sukses: 0, gagal: records.length, pesan: error.message })
       } else {
-        setImportRingkasan({ sukses: records.length, gagal: 0, pesan: null })
+        const pesanPeringatan =
+          tanggalGagal.length > 0
+            ? `Perhatian: ${tanggalGagal.length} nota memakai tanggal hari ini karena format tanggal di Excel tidak dikenali -> ${tanggalGagal.join('; ')}`
+            : null
+        setImportRingkasan({ sukses: records.length, gagal: 0, pesan: pesanPeringatan })
         muatDaftar()
       }
     } catch (err) {
