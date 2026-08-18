@@ -16,7 +16,8 @@ function formatTanggal(tgl) {
 }
 
 // Kolom template Excel untuk impor massal Kuitansi.
-// Satu baris Excel = satu kuitansi dengan satu baris rincian barang.
+// Satu baris Excel = satu kuitansi. Nominal diisi langsung lewat kolom jumlah_total
+// (tidak ada lagi rincian barang — itu khusus Nota).
 const TEMPLATE_HEADERS = [
   'no_bukti',
   'lembar',
@@ -24,10 +25,8 @@ const TEMPLATE_HEADERS = [
   'tahun_anggaran',
   'tanggal(YYYY-MM-DD)',
   'diterima_dari',
+  'jumlah_total',
   'untuk_pembayaran',
-  'nama_barang',
-  'jumlah',
-  'harga_satuan',
   'disetujui_oleh',
   'nip_disetujui',
   'dibayar_oleh',
@@ -38,10 +37,9 @@ const TEMPLATE_HEADERS = [
 ]
 
 function mapRowKuitansi(row) {
-  const namaBarang = String(row['nama_barang'] || '').trim()
-  if (!namaBarang) return null
-  const jumlah = Number(row['jumlah']) || 1
-  const hargaSatuan = Number(row['harga_satuan']) || 0
+  const diterimaDari = String(row['diterima_dari'] || '').trim()
+  const jumlahTotal = Number(row['jumlah_total']) || 0
+  if (!diterimaDari && !jumlahTotal) return null
 
   return {
     jenis: 'kuitansi',
@@ -50,7 +48,8 @@ function mapRowKuitansi(row) {
     mata_anggaran: String(row['mata_anggaran'] || '').trim(),
     tahun_anggaran: String(row['tahun_anggaran'] || String(new Date().getFullYear())).trim(),
     tanggal: String(row['tanggal(YYYY-MM-DD)'] || new Date().toISOString().slice(0, 10)).trim(),
-    diterima_dari: String(row['diterima_dari'] || '').trim(),
+    diterima_dari: diterimaDari,
+    jumlah_total: jumlahTotal,
     untuk_pembayaran: String(row['untuk_pembayaran'] || '').trim(),
     disetujui_oleh: String(row['disetujui_oleh'] || '').trim(),
     nip_disetujui: String(row['nip_disetujui'] || '').trim(),
@@ -59,10 +58,6 @@ function mapRowKuitansi(row) {
     nama_penerima: String(row['nama_penerima'] || '').trim(),
     alamat_penerima: String(row['alamat_penerima'] || '').trim(),
     catatan: String(row['catatan'] || '').trim(),
-    nama_barang: namaBarang,
-    jumlah,
-    harga_satuan: hargaSatuan,
-    jumlah_total: jumlah * hargaSatuan,
   }
 }
 
@@ -75,9 +70,8 @@ export default function Kuitansi() {
   const [sekolah, setSekolah] = useState(null)
   const [menghapus, setMenghapus] = useState(null) // id yang sedang dihapus
 
-  // Data yang sedang dicetak ulang: { ...row, items: [...] }
+  // Baris yang sedang dicetak ulang
   const [cetakUlang, setCetakUlang] = useState(null)
-  const [memuatCetak, setMemuatCetak] = useState(null) // id kuitansi yang sedang disiapkan untuk cetak
   const printRef = useRef(null)
 
   async function loadData() {
@@ -117,19 +111,8 @@ export default function Kuitansi() {
     })
   }, [data, pencarian])
 
-  async function handleCetakUlang(row) {
-    setMemuatCetak(row.id)
-    const { data: items, error } = await supabase
-      .from('kuitansi_item')
-      .select('*')
-      .eq('kuitansi_id', row.id)
-      .order('urutan', { ascending: true })
-    setMemuatCetak(null)
-    if (error) {
-      alert('Gagal memuat rincian kuitansi: ' + error.message)
-      return
-    }
-    setCetakUlang({ ...row, items: items || [] })
+  function handleCetakUlang(row) {
+    setCetakUlang(row)
   }
 
   useEffect(() => {
@@ -145,13 +128,6 @@ export default function Kuitansi() {
   async function handleHapus(row) {
     if (!confirm(`Hapus kuitansi nomor "${row.nomor || '-'}"? Tindakan ini tidak bisa dibatalkan.`)) return
     setMenghapus(row.id)
-    // Hapus rincian item dulu, baru baris kuitansinya, supaya tidak ganjal foreign key.
-    const { error: itemErr } = await supabase.from('kuitansi_item').delete().eq('kuitansi_id', row.id)
-    if (itemErr) {
-      setMenghapus(null)
-      alert('Gagal menghapus rincian item: ' + itemErr.message)
-      return
-    }
     const { error } = await supabase.from('kuitansi').delete().eq('id', row.id)
     setMenghapus(null)
     if (error) {
@@ -194,17 +170,8 @@ export default function Kuitansi() {
           catatan: row.catatan,
         }
 
-        const { data: inserted, error: insertErr } = await supabase.from('kuitansi').insert(payload).select().single()
+        const { error: insertErr } = await supabase.from('kuitansi').insert(payload)
         if (insertErr) throw insertErr
-
-        const { error: itemErr } = await supabase.from('kuitansi_item').insert({
-          kuitansi_id: inserted.id,
-          nama_barang: row.nama_barang,
-          jumlah: row.jumlah,
-          harga_satuan: row.harga_satuan,
-          urutan: 0,
-        })
-        if (itemErr) throw itemErr
 
         sukses += 1
       } catch (err) {
@@ -286,10 +253,9 @@ export default function Kuitansi() {
                     <button
                       className="icon-btn"
                       title="Cetak Ulang"
-                      disabled={memuatCetak === d.id}
                       onClick={() => handleCetakUlang(d)}
                     >
-                      {memuatCetak === d.id ? <Loader2 size={15} className="animate-spin" /> : <Printer size={15} />}
+                      <Printer size={15} />
                     </button>
                     <button
                       className="icon-btn text-red-600"
@@ -324,12 +290,13 @@ export default function Kuitansi() {
         onImport={handleImportKuitansi}
       />
 
+      {/* Print template dirender langsung di sini (bukan di dalam elemen "no-print"),
+          supaya tidak ikut disembunyikan saat window.print() dipanggil. */}
       {cetakUlang && (
         <KuitansiPrintTemplate
           ref={printRef}
           sekolah={sekolah}
           data={cetakUlang}
-          items={cetakUlang.items}
         />
       )}
     </Layout>
