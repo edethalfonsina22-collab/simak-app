@@ -6,7 +6,6 @@ import KuitansiPrintTemplate from '../lib/KuitansiPrintTemplate'
 const emptyItem = () => ({ id: crypto.randomUUID(), nama_barang: '', jumlah: 1, harga_satuan: 0 })
 
 const emptyForm = (keuanganRow) => ({
-  // umum
   no_bukti: '',
   lembar: 'I/II/III/IV/V',
   mata_anggaran: '',
@@ -14,7 +13,6 @@ const emptyForm = (keuanganRow) => ({
   tanggal: keuanganRow?.tanggal || new Date().toISOString().slice(0, 10),
   untuk_pembayaran: keuanganRow?.catatan || keuanganRow?.kategori || '',
   catatan: '',
-  // khusus kuitansi
   diterima_dari: '',
   disetujui_oleh: '',
   jabatan_disetujui: 'Atasan Langsung',
@@ -24,12 +22,11 @@ const emptyForm = (keuanganRow) => ({
   nip_dibayar: '',
   nama_penerima: '',
   alamat_penerima: '',
-  // khusus nota
-  tuan: '',
-  toko: '',
 })
 
 /**
+ * Form untuk membuat Kuitansi (khusus Kwitansi — bagian Nota belum didukung di sini).
+ *
  * Dipanggil dari Keuangan.jsx atau Kuitansi.jsx:
  *   <KuitansiModal
  *     keuanganRow={row}          // baris transaksi keuangan yang mau dibuatkan kuitansi (boleh null)
@@ -38,7 +35,6 @@ const emptyForm = (keuanganRow) => ({
  *   />
  */
 export default function KuitansiModal({ keuanganRow, sekolah, onClose }) {
-  const [jenis, setJenis] = useState('kuitansi')
   const [form, setForm] = useState(emptyForm(keuanganRow))
   const [items, setItems] = useState([
     { ...emptyItem(), nama_barang: keuanganRow?.catatan || keuanganRow?.kategori || '', jumlah: 1, harga_satuan: keuanganRow?.jumlah || 0 },
@@ -69,12 +65,12 @@ export default function KuitansiModal({ keuanganRow, sekolah, onClose }) {
     e.preventDefault()
     setSaving(true)
     try {
-      const { data: nomorData, error: nomorErr } = await supabase.rpc('next_nomor_kuitansi', { p_jenis: jenis })
+      const { data: nomorData, error: nomorErr } = await supabase.rpc('next_nomor_kuitansi', { p_jenis: 'kuitansi' })
       if (nomorErr) throw nomorErr
 
       const payload = {
         keuangan_id: keuanganRow?.id || null,
-        jenis,
+        jenis: 'kuitansi',
         nomor: nomorData,
         no_bukti: form.no_bukti,
         lembar: form.lembar,
@@ -92,8 +88,6 @@ export default function KuitansiModal({ keuanganRow, sekolah, onClose }) {
         nip_dibayar: form.nip_dibayar,
         nama_penerima: form.nama_penerima,
         alamat_penerima: form.alamat_penerima,
-        tuan: form.tuan,
-        toko: form.toko,
         catatan: form.catatan,
       }
 
@@ -135,7 +129,7 @@ export default function KuitansiModal({ keuanganRow, sekolah, onClose }) {
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4 no-print">
       <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl p-6 max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="font-display text-lg font-semibold">Buat Kuitansi / Nota</h2>
+          <h2 className="font-display text-lg font-semibold">Buat Kuitansi</h2>
           <button className="icon-btn" onClick={onClose}><X size={18} /></button>
         </div>
 
@@ -143,11 +137,13 @@ export default function KuitansiModal({ keuanganRow, sekolah, onClose }) {
           {/* ==== Header dokumen ==== */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="label-field">Jenis Dokumen</label>
-              <select className="input-field" value={jenis} onChange={(e) => setJenis(e.target.value)}>
-                <option value="kuitansi">Kuitansi</option>
-                <option value="nota">Nota</option>
-              </select>
+              <label className="label-field">No. Bukti</label>
+              <input
+                className="input-field"
+                placeholder="Contoh: BNU-12"
+                value={form.no_bukti}
+                onChange={(e) => ubah('no_bukti', e.target.value)}
+              />
             </div>
             <div>
               <label className="label-field">Tanggal</label>
@@ -162,32 +158,11 @@ export default function KuitansiModal({ keuanganRow, sekolah, onClose }) {
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="label-field">No. Bukti</label>
-              <input
-                className="input-field"
-                placeholder="Contoh: BNU-12"
-                value={form.no_bukti}
-                onChange={(e) => ubah('no_bukti', e.target.value)}
-              />
-            </div>
-            <div>
               <label className="label-field">Lembar</label>
               <input
                 className="input-field"
                 value={form.lembar}
                 onChange={(e) => ubah('lembar', e.target.value)}
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="label-field">Mata Anggaran</label>
-              <input
-                className="input-field"
-                placeholder="Contoh: 5.1.02.01.01.0055"
-                value={form.mata_anggaran}
-                onChange={(e) => ubah('mata_anggaran', e.target.value)}
               />
             </div>
             <div>
@@ -200,48 +175,37 @@ export default function KuitansiModal({ keuanganRow, sekolah, onClose }) {
             </div>
           </div>
 
-          {/* ==== Pihak terkait, beda untuk Kuitansi vs Nota ==== */}
-          {jenis === 'kuitansi' ? (
-            <div>
-              <label className="label-field">Sudah Terima Dari</label>
-              <input
-                className="input-field"
-                placeholder="Nama orang tua / pihak pembayar"
-                value={form.diterima_dari}
-                onChange={(e) => ubah('diterima_dari', e.target.value)}
-              />
-            </div>
-          ) : (
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="label-field">Tuan</label>
-                <input
-                  className="input-field"
-                  value={form.tuan}
-                  onChange={(e) => ubah('tuan', e.target.value)}
-                />
-              </div>
-              <div>
-                <label className="label-field">Toko</label>
-                <input
-                  className="input-field"
-                  value={form.toko}
-                  onChange={(e) => ubah('toko', e.target.value)}
-                />
-              </div>
-            </div>
-          )}
+          <div>
+            <label className="label-field">Mata Anggaran</label>
+            <input
+              className="input-field"
+              placeholder="Contoh: 5.1.02.01.01.0055"
+              value={form.mata_anggaran}
+              onChange={(e) => ubah('mata_anggaran', e.target.value)}
+            />
+          </div>
+
+          <div>
+            <label className="label-field">Sudah Terima Dari</label>
+            <input
+              className="input-field"
+              placeholder="Nama orang tua / pihak pembayar"
+              value={form.diterima_dari}
+              onChange={(e) => ubah('diterima_dari', e.target.value)}
+            />
+          </div>
 
           <div>
             <label className="label-field">Untuk Pembayaran / Keterangan</label>
             <input
               className="input-field"
+              placeholder="Kosongkan untuk otomatis diisi dari rincian barang di bawah"
               value={form.untuk_pembayaran}
               onChange={(e) => ubah('untuk_pembayaran', e.target.value)}
             />
           </div>
 
-          {/* ==== Rincian barang ==== */}
+          {/* ==== Rincian barang (dipakai untuk menghitung total, tidak dicetak sebagai tabel) ==== */}
           <div>
             <div className="flex items-center justify-between mb-1">
               <label className="label-field mb-0">Rincian Barang / Item</label>
@@ -283,67 +247,63 @@ export default function KuitansiModal({ keuanganRow, sekolah, onClose }) {
             </p>
           </div>
 
-          {/* ==== Tanda tangan (khusus Kuitansi) ==== */}
-          {jenis === 'kuitansi' && (
-            <>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="label-field">Setuju Dibayar (nama)</label>
-                  <input
-                    className="input-field"
-                    value={form.disetujui_oleh}
-                    onChange={(e) => ubah('disetujui_oleh', e.target.value)}
-                  />
-                </div>
-                <div>
-                  <label className="label-field">NIP Penyetuju</label>
-                  <input
-                    className="input-field"
-                    value={form.nip_disetujui}
-                    onChange={(e) => ubah('nip_disetujui', e.target.value)}
-                  />
-                </div>
-              </div>
+          {/* ==== Tanda tangan ==== */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="label-field">Setuju Dibayar (nama)</label>
+              <input
+                className="input-field"
+                value={form.disetujui_oleh}
+                onChange={(e) => ubah('disetujui_oleh', e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="label-field">NIP Penyetuju</label>
+              <input
+                className="input-field"
+                value={form.nip_disetujui}
+                onChange={(e) => ubah('nip_disetujui', e.target.value)}
+              />
+            </div>
+          </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="label-field">Lunas Dibayar (nama)</label>
-                  <input
-                    className="input-field"
-                    value={form.dibayar_oleh}
-                    onChange={(e) => ubah('dibayar_oleh', e.target.value)}
-                  />
-                </div>
-                <div>
-                  <label className="label-field">NIP Pembayar</label>
-                  <input
-                    className="input-field"
-                    value={form.nip_dibayar}
-                    onChange={(e) => ubah('nip_dibayar', e.target.value)}
-                  />
-                </div>
-              </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="label-field">Lunas Dibayar (nama)</label>
+              <input
+                className="input-field"
+                value={form.dibayar_oleh}
+                onChange={(e) => ubah('dibayar_oleh', e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="label-field">NIP Pembayar</label>
+              <input
+                className="input-field"
+                value={form.nip_dibayar}
+                onChange={(e) => ubah('nip_dibayar', e.target.value)}
+              />
+            </div>
+          </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="label-field">Yang Menerima (nama)</label>
-                  <input
-                    className="input-field"
-                    value={form.nama_penerima}
-                    onChange={(e) => ubah('nama_penerima', e.target.value)}
-                  />
-                </div>
-                <div>
-                  <label className="label-field">Alamat Penerima</label>
-                  <input
-                    className="input-field"
-                    value={form.alamat_penerima}
-                    onChange={(e) => ubah('alamat_penerima', e.target.value)}
-                  />
-                </div>
-              </div>
-            </>
-          )}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="label-field">Yang Menerima (nama)</label>
+              <input
+                className="input-field"
+                value={form.nama_penerima}
+                onChange={(e) => ubah('nama_penerima', e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="label-field">Alamat Penerima</label>
+              <input
+                className="input-field"
+                value={form.alamat_penerima}
+                onChange={(e) => ubah('alamat_penerima', e.target.value)}
+              />
+            </div>
+          </div>
 
           <div className="flex justify-end gap-3 pt-2">
             <button type="button" className="btn-secondary" onClick={onClose}>Batal</button>
