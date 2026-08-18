@@ -4,7 +4,7 @@ import Layout from '../components/Layout'
 import KuitansiModal from '../components/KuitansiModal'
 import KuitansiPrintTemplate from '../lib/KuitansiPrintTemplate'
 import BulkImportModal from '../components/BulkImportModal'
-import { Plus, Printer, Search, Loader2, Receipt, Trash2, FileSpreadsheet } from 'lucide-react'
+import { Plus, Printer, Search, Loader2, Receipt, Trash2, FileSpreadsheet, Pencil, RefreshCw } from 'lucide-react'
 
 function formatRupiah(angka) {
   return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(angka || 0)
@@ -74,7 +74,7 @@ function tahunAnggaranDariTanggal(tanggalIso) {
   const bulan = d.getMonth() + 1 // 1-12
   const tahun = d.getFullYear()
   // Juli(7) - Desember(12) -> tahun berjalan / tahun+1
-  // Januari(1) - Juni(6)   -> tahun-1 / tahun berjalan
+  // Januari(1) - Juni(6) -> tahun-1 / tahun berjalan
   if (bulan >= 7) return `${tahun}/${tahun + 1}`
   return `${tahun - 1}/${tahun}`
 }
@@ -120,9 +120,11 @@ export default function Kuitansi() {
   const [pencarian, setPencarian] = useState('')
   const [tahunAnggaranFilter, setTahunAnggaranFilter] = useState('semua') // BARU
   const [showBuat, setShowBuat] = useState(false)
+  const [editRow, setEditRow] = useState(null) // BARU: baris kuitansi yang sedang diedit (null = mode buat baru)
   const [showImport, setShowImport] = useState(false)
   const [sekolah, setSekolah] = useState(null)
   const [menghapus, setMenghapus] = useState(null) // id yang sedang dihapus
+  const [menyinkron, setMenyinkron] = useState(null) // BARU: id yang sedang disinkron manual ke Nota
 
   // Baris yang sedang dicetak ulang
   const [cetakUlang, setCetakUlang] = useState(null)
@@ -204,9 +206,40 @@ export default function Kuitansi() {
     loadData()
   }
 
+  // BARU: buka modal dalam mode BUAT BARU (bukan edit)
+  function handleBukaBuat() {
+    setEditRow(null)
+    setShowBuat(true)
+  }
+
+  // BARU: buka modal dalam mode EDIT untuk baris tertentu
+  function handleEdit(row) {
+    setEditRow(row)
+    setShowBuat(true)
+  }
+
   function handleTutupBuat() {
     setShowBuat(false)
+    setEditRow(null) // BARU: reset mode edit setiap modal ditutup
     loadData()
+  }
+
+  // BARU: sinkron manual ke Nota. Berguna untuk kuitansi yang dibuat SEBELUM
+  // trigger database dipasang, jadi belum otomatis punya baris Nota terkait.
+  // Caranya: "sentuh" baris ini dengan UPDATE tanpa mengubah nilai apa pun —
+  // ini otomatis memicu trigger sync_kuitansi_ke_nota di database.
+  async function handleSinkronNota(row) {
+    setMenyinkron(row.id)
+    const { error } = await supabase
+      .from('kuitansi')
+      .update({ jumlah_total: row.jumlah_total })
+      .eq('id', row.id)
+    setMenyinkron(null)
+    if (error) {
+      alert('Gagal menyinkron ke Nota: ' + error.message)
+      return
+    }
+    alert('Berhasil disinkron ke Nota.')
   }
 
   async function handleImportKuitansi(rows) {
@@ -239,13 +272,14 @@ export default function Kuitansi() {
 
         const { error: insertErr } = await supabase.from('kuitansi').insert(payload)
         if (insertErr) throw insertErr
-
         sukses += 1
       } catch (err) {
         gagal.push(err.message)
       }
     }
+
     loadData()
+
     if (gagal.length > 0) {
       throw new Error(`${sukses} baris berhasil, ${gagal.length} baris gagal. Contoh error: ${gagal[0]}`)
     }
@@ -261,7 +295,7 @@ export default function Kuitansi() {
           <button className="btn-secondary" onClick={() => setShowImport(true)}>
             <FileSpreadsheet size={16} /> Impor Massal (Excel)
           </button>
-          <button className="btn-primary" onClick={() => setShowBuat(true)}>
+          <button className="btn-primary" onClick={handleBukaBuat}>
             <Plus size={16} /> Buat Kuitansi Baru
           </button>
         </>
@@ -336,6 +370,21 @@ export default function Kuitansi() {
                   <div className="flex items-center gap-1 justify-end">
                     <button
                       className="icon-btn"
+                      title="Sinkron ke Nota"
+                      disabled={menyinkron === d.id}
+                      onClick={() => handleSinkronNota(d)}
+                    >
+                      {menyinkron === d.id ? <Loader2 size={15} className="animate-spin" /> : <RefreshCw size={15} />}
+                    </button>
+                    <button
+                      className="icon-btn"
+                      title="Edit"
+                      onClick={() => handleEdit(d)}
+                    >
+                      <Pencil size={15} />
+                    </button>
+                    <button
+                      className="icon-btn"
                       title="Cetak Ulang"
                       onClick={() => handleCetakUlang(d)}
                     >
@@ -360,6 +409,7 @@ export default function Kuitansi() {
       {showBuat && (
         <KuitansiModal
           keuanganRow={null}
+          editingRow={editRow}
           sekolah={sekolah}
           onClose={handleTutupBuat}
         />
