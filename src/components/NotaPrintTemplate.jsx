@@ -42,11 +42,6 @@ function Blank({ value, width = 160, align = 'left' }) {
 // yang sama, bukan menghabiskan satu lembar A4 penuh untuk dirinya sendiri.
 // Jumlah baris tabel diperkecil (dari 11 -> 6) supaya tetap muat tanpa
 // memotong bagian tanda tangan di bawahnya.
-//
-// PERUBAHAN: bungkus (wrapper) sekarang berukuran satu HALAMAN A4 PENUH
-// (297mm) dan memakai flexbox `justify-content: flex-end`, supaya blok
-// nota (yang tingginya tetap 148mm) otomatis terdorong ke BAGIAN PALING
-// BAWAH kertas saat dicetak — bukan menempel di atas seperti sebelumnya.
 const MIN_ROWS = 6
 
 /**
@@ -79,91 +74,95 @@ const NotaPrintTemplate = forwardRef(function NotaPrintTemplate({ sekolah, data 
   return (
     <div
       ref={ref}
-      className="print-only relative bg-white text-black p-6 text-xs"
+      className="print-only relative bg-white text-black"
       style={{
         width: '210mm',
-        minHeight: '148mm',
         WebkitPrintColorAdjust: 'exact',
         printColorAdjust: 'exact',
         colorAdjust: 'exact',
       }}
     >
-      {/* Baris tanggal / kota di kanan atas */}
-      <div className="text-right mb-1">
-        <Blank value={formatTanggal(data?.tanggal)} width={220} align="right" />
-      </div>
+      {/* Spacer kosong 148mm — mendorong seluruh konten Nota ke separuh BAWAH
+          kertas A4, supaya tidak tumpang tindih dengan Kuitansi yang mengisi
+          separuh atas kertas yang sama saat dicetak ulang (dua kali jalan). */}
+      <div style={{ height: '148mm' }} aria-hidden="true" />
 
-      {/* Tuan / Toko */}
-      <div className="mb-2">
-        <p className="flex items-baseline gap-1">
-          <span className="font-semibold underline">Tuan</span>
-          <Blank value={data?.tuan} width={380} />
-        </p>
-        <p className="flex items-baseline gap-1">
-          <span className="font-semibold underline">Toko</span>
-          <Blank value={data?.toko} width={380} />
-        </p>
-        {data?.alamat_lanjutan && (
-          <p className="pl-10">
-            <Blank value={data.alamat_lanjutan} width={380} />
+      <div className="p-6 text-xs" style={{ minHeight: '148mm' }}>
+        {/* Baris tanggal / kota di kanan atas */}
+        <div className="text-right mb-1">
+          <Blank value={formatTanggal(data?.tanggal)} width={220} align="right" />
+        </div>
+
+        {/* Tuan / Toko */}
+        <div className="mb-2">
+          <p className="flex items-baseline gap-1">
+            <span className="font-semibold underline">Tuan</span>
+            <Blank value={data?.tuan} width={380} />
           </p>
-        )}
-      </div>
+          <p className="flex items-baseline gap-1">
+            <span className="font-semibold underline">Toko</span>
+            <Blank value={data?.toko} width={380} />
+          </p>
+          {data?.alamat_lanjutan && (
+            <p className="pl-10">
+              <Blank value={data.alamat_lanjutan} width={380} />
+            </p>
+          )}
+        </div>
 
-      {/* NOTA No. */}
-      <div className="flex items-baseline justify-between mb-1">
-        <p className="flex items-baseline gap-1">
-          <span className="text-lg font-bold">NOTA No.</span>
-          <Blank value={data?.no_nota} width={140} />
-        </p>
-        <div className="border-b-2 border-black w-48 h-2" aria-hidden="true" />
-      </div>
+        {/* NOTA No. */}
+        <div className="flex items-baseline justify-between mb-1">
+          <p className="flex items-baseline gap-1">
+            <span className="text-lg font-bold">NOTA No.</span>
+            <Blank value={data?.no_nota} width={140} />
+          </p>
+          <div className="border-b-2 border-black w-48 h-2" aria-hidden="true" />
+        </div>
 
-      {/* Tabel item belanja — garis kotak PENUH di tiap sel, meniru blanko fisik.
-          table-layout: fixed + lebar persen di setiap kolom supaya kolom
-          NAMA BARANG tidak otomatis melebar mengambil semua sisa ruang. */}
-      <table className="w-full border-collapse border border-black" style={{ tableLayout: 'fixed' }}>
-        <thead>
-          <tr>
-            <th className="border border-black py-1 px-1 text-left font-bold" style={{ width: '14%' }}>BANYAKNYA</th>
-            <th className="border border-black py-1 px-1 text-left font-bold" style={{ width: '42%' }}>NAMA BARANG</th>
-            <th className="border border-black py-1 px-1 text-left font-bold" style={{ width: '20%' }}>HARGA</th>
-            <th className="border border-black py-1 px-1 text-left font-bold" style={{ width: '24%' }}>JUMLAH</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((item, idx) => (
-            <tr key={idx}>
-              <td className="border border-black py-1 px-1 align-top">{item?.banyaknya || '\u00A0'}</td>
-              <td className="border border-black py-1 px-1 align-top break-words">{item?.nama_barang || '\u00A0'}</td>
-              <td className="border border-black py-1 px-1 align-top">{item?.harga ? formatRupiah(item.harga) : '\u00A0'}</td>
-              <td className="border border-black py-1 px-1 align-top">{item?.jumlah ? formatRupiah(item.jumlah) : '\u00A0'}</td>
+        {/* Tabel item belanja — garis kotak PENUH di tiap sel, meniru blanko fisik */}
+        <table className="w-full border-collapse border border-black">
+          <thead>
+            <tr>
+              <th className="w-20 border border-black py-1 px-1 text-left font-bold">BANYAKNYA</th>
+              <th className="border border-black py-1 px-1 text-left font-bold">NAMA BARANG</th>
+              <th className="w-24 border border-black py-1 px-1 text-left font-bold">HARGA</th>
+              <th className="w-28 border border-black py-1 px-1 text-left font-bold">JUMLAH</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {rows.map((item, idx) => (
+              <tr key={idx}>
+                <td className="border border-black py-1 px-1 align-top">{item?.banyaknya || '\u00A0'}</td>
+                <td className="border border-black py-1 px-1 align-top">{item?.nama_barang || '\u00A0'}</td>
+                <td className="border border-black py-1 px-1 align-top">{item?.harga ? formatRupiah(item.harga) : '\u00A0'}</td>
+                <td className="border border-black py-1 px-1 align-top">{item?.jumlah ? formatRupiah(item.jumlah) : '\u00A0'}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
 
-      {/* Jumlah Rp. */}
-      <div className="flex justify-end mt-1 mb-4">
-        <div className="flex items-baseline gap-2">
-          <span className="font-semibold">Jumlah Rp.</span>
-          <span className="inline-block min-w-[120px] text-right px-2 border-b-4 border-double border-black font-semibold">
-            {formatRupiah(total)}
-          </span>
+        {/* Jumlah Rp. */}
+        <div className="flex justify-end mt-1 mb-4">
+          <div className="flex items-baseline gap-2">
+            <span className="font-semibold">Jumlah Rp.</span>
+            <span className="inline-block min-w-[120px] text-right px-2 border-b-4 border-double border-black font-semibold">
+              {formatRupiah(total)}
+            </span>
+          </div>
         </div>
-      </div>
 
-      {/* Tanda tangan */}
-      <div className="flex justify-between px-4">
-        <div className="text-center">
-          <p>Tanda Terima</p>
-          <div className="h-8" />
-          <div className="border-b border-black w-36" />
-        </div>
-        <div className="text-center">
-          <p>Hormat kami,</p>
-          <div className="h-8" />
-          <div className="border-b border-black w-36" />
+        {/* Tanda tangan */}
+        <div className="flex justify-between px-4">
+          <div className="text-center">
+            <p>Tanda Terima</p>
+            <div className="h-8" />
+            <div className="border-b border-black w-36" />
+          </div>
+          <div className="text-center">
+            <p>Hormat kami,</p>
+            <div className="h-8" />
+            <div className="border-b border-black w-36" />
+          </div>
         </div>
       </div>
     </div>
