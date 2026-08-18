@@ -41,8 +41,76 @@ export default function KuitansiModal({ keuanganRow, sekolah, onClose }) {
   const [savedData, setSavedData] = useState(null) // { ...kuitansi row } setelah tersimpan, siap dicetak
   const printRef = useRef(null)
 
+  // ==== Riwayat nama/NIP untuk dropdown auto-isi ====
+  // Diambil dari data kuitansi yang sudah pernah disimpan sebelumnya (tidak perlu
+  // tabel baru — insert ke tabel "kuitansi" yang sudah ada otomatis jadi sumber datanya).
+  const [riwayat, setRiwayat] = useState({
+    diterimaDari: [],
+    disetujui: new Map(), // nama -> nip
+    dibayar: new Map(),   // nama -> nip
+    penerima: new Map(),  // nama -> alamat
+  })
+
+  useEffect(() => {
+    let aktif = true
+    async function muatRiwayat() {
+      try {
+        const { data, error } = await supabase
+          .from('kuitansi')
+          .select('diterima_dari, disetujui_oleh, nip_disetujui, dibayar_oleh, nip_dibayar, nama_penerima, alamat_penerima')
+          .order('id', { ascending: false })
+          .limit(300)
+        if (error) throw error
+        if (!aktif || !data) return
+
+        const diterimaDariSet = new Set()
+        const disetujuiMap = new Map()
+        const dibayarMap = new Map()
+        const penerimaMap = new Map()
+
+        for (const row of data) {
+          const dd = (row.diterima_dari || '').trim()
+          if (dd) diterimaDariSet.add(dd)
+
+          const so = (row.disetujui_oleh || '').trim()
+          if (so && !disetujuiMap.has(so)) disetujuiMap.set(so, row.nip_disetujui || '')
+
+          const db = (row.dibayar_oleh || '').trim()
+          if (db && !dibayarMap.has(db)) dibayarMap.set(db, row.nip_dibayar || '')
+
+          const np = (row.nama_penerima || '').trim()
+          if (np && !penerimaMap.has(np)) penerimaMap.set(np, row.alamat_penerima || '')
+        }
+
+        setRiwayat({
+          diterimaDari: Array.from(diterimaDariSet),
+          disetujui: disetujuiMap,
+          dibayar: dibayarMap,
+          penerima: penerimaMap,
+        })
+      } catch (err) {
+        // Gagal memuat riwayat bukan hal fatal — form tetap bisa dipakai manual
+        console.error('Gagal memuat riwayat nama/NIP kuitansi:', err.message)
+      }
+    }
+    muatRiwayat()
+    return () => { aktif = false }
+  }, [])
+
   function ubah(field, value) {
     setForm((prev) => ({ ...prev, [field]: value }))
+  }
+
+  // Saat field nama dipilih/diketik persis sama dengan salah satu di riwayat,
+  // isi otomatis field pasangannya (NIP / alamat).
+  function ubahDenganAutoIsi(namaField, pasanganField, mapRiwayat, value) {
+    setForm((prev) => {
+      const next = { ...prev, [namaField]: value }
+      if (mapRiwayat.has(value)) {
+        next[pasanganField] = mapRiwayat.get(value)
+      }
+      return next
+    })
   }
 
   async function handleSimpan(e) {
@@ -160,9 +228,16 @@ export default function KuitansiModal({ keuanganRow, sekolah, onClose }) {
               <input
                 className="input-field"
                 placeholder="Nama orang tua / pihak pembayar"
+                list="daftar-diterima-dari"
+                autoComplete="off"
                 value={form.diterima_dari}
                 onChange={(e) => ubah('diterima_dari', e.target.value)}
               />
+              <datalist id="daftar-diterima-dari">
+                {riwayat.diterimaDari.map((nama) => (
+                  <option key={nama} value={nama} />
+                ))}
+              </datalist>
             </div>
 
             <div>
@@ -192,9 +267,18 @@ export default function KuitansiModal({ keuanganRow, sekolah, onClose }) {
                 <label className="label-field">Setuju Dibayar (nama)</label>
                 <input
                   className="input-field"
+                  list="daftar-disetujui"
+                  autoComplete="off"
                   value={form.disetujui_oleh}
-                  onChange={(e) => ubah('disetujui_oleh', e.target.value)}
+                  onChange={(e) =>
+                    ubahDenganAutoIsi('disetujui_oleh', 'nip_disetujui', riwayat.disetujui, e.target.value)
+                  }
                 />
+                <datalist id="daftar-disetujui">
+                  {Array.from(riwayat.disetujui.keys()).map((nama) => (
+                    <option key={nama} value={nama} />
+                  ))}
+                </datalist>
               </div>
               <div>
                 <label className="label-field">NIP Penyetuju</label>
@@ -211,9 +295,18 @@ export default function KuitansiModal({ keuanganRow, sekolah, onClose }) {
                 <label className="label-field">Lunas Dibayar (nama)</label>
                 <input
                   className="input-field"
+                  list="daftar-dibayar"
+                  autoComplete="off"
                   value={form.dibayar_oleh}
-                  onChange={(e) => ubah('dibayar_oleh', e.target.value)}
+                  onChange={(e) =>
+                    ubahDenganAutoIsi('dibayar_oleh', 'nip_dibayar', riwayat.dibayar, e.target.value)
+                  }
                 />
+                <datalist id="daftar-dibayar">
+                  {Array.from(riwayat.dibayar.keys()).map((nama) => (
+                    <option key={nama} value={nama} />
+                  ))}
+                </datalist>
               </div>
               <div>
                 <label className="label-field">NIP Pembayar</label>
@@ -230,9 +323,18 @@ export default function KuitansiModal({ keuanganRow, sekolah, onClose }) {
                 <label className="label-field">Yang Menerima (nama)</label>
                 <input
                   className="input-field"
+                  list="daftar-penerima"
+                  autoComplete="off"
                   value={form.nama_penerima}
-                  onChange={(e) => ubah('nama_penerima', e.target.value)}
+                  onChange={(e) =>
+                    ubahDenganAutoIsi('nama_penerima', 'alamat_penerima', riwayat.penerima, e.target.value)
+                  }
                 />
+                <datalist id="daftar-penerima">
+                  {Array.from(riwayat.penerima.keys()).map((nama) => (
+                    <option key={nama} value={nama} />
+                  ))}
+                </datalist>
               </div>
               <div>
                 <label className="label-field">Alamat Penerima</label>
