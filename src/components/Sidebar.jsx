@@ -16,7 +16,6 @@ import {
   FileText,
   FileSignature,
   Wallet,
-  Receipt,
   DatabaseBackup,
   UserPlus,
   Landmark,
@@ -35,6 +34,7 @@ import {
   UserCog,
   Award,
   Video,
+  Receipt,
 } from 'lucide-react'
 import { useAuth } from '../lib/AuthContext'
 import { supabase } from '../lib/supabaseClient'
@@ -74,7 +74,6 @@ const groupsAdmin = [
     label: 'Keuangan & Aset',
     links: [
       { to: '/keuangan', label: 'Keuangan', icon: Wallet },
-      { to: '/kuitansi', label: 'Kuitansi', icon: Receipt },
       { to: '/nota', label: 'Nota Belanja', icon: Receipt },
       { to: '/perpustakaan', label: 'Perpustakaan', icon: Library },
       { to: '/inventaris', label: 'Inventaris', icon: Boxes },
