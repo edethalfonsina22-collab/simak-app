@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import * as XLSX from 'xlsx'
 import { supabase } from '../lib/supabaseClient' // sesuaikan path kalau berbeda di project kamu
+import Layout from '../components/Layout'
 import NotaPrintTemplate from '../components/NotaPrintTemplate'
 
 // -----------------------------------------------------------------
@@ -44,131 +45,6 @@ function mapUntukCetak(nota) {
   }
 }
 
-// ------------------------- Parser tanggal (impor Excel) -------------------------
-// Kolom "Tanggal" di file Excel yang diimpor bisa datang dalam berbagai
-// macam bentuk tergantung cara user mengetik/format sel di Excel, misalnya:
-//   - Date object asli dari Excel (karena kita baca dengan cellDates: true)
-//   - Angka serial Excel, mis. 45725 (kalau cellDates gagal / sel "General")
-//   - "2025-03-09" atau "2025/03/09"      (ISO / tahun dulu)
-//   - "09-03-2025" atau "09/03/2025"      (tanggal-bulan-tahun, gaya ID)
-//   - "9-3-2025", "9/3/25"                (tanpa nol di depan, tahun 2 digit)
-//   - "9 Maret 2025", "9 Mar 2025"        (nama bulan Indonesia)
-//   - "March 9, 2025", "Mar 9 2025"       (nama bulan Inggris)
-// Semua ditampung dan diubah jadi teks "YYYY-MM-DD" yang valid untuk kolom
-// date di Postgres.
-
-const NAMA_BULAN_ID = {
-  jan: 1, januari: 1,
-  feb: 2, februari: 2,
-  mar: 3, maret: 3,
-  apr: 4, april: 4,
-  mei: 5,
-  jun: 6, juni: 6,
-  jul: 7, juli: 7,
-  agu: 8, agt: 8, agustus: 8,
-  sep: 9, sept: 9, september: 9,
-  okt: 10, oktober: 10,
-  nov: 11, november: 11,
-  des: 12, desember: 12,
-}
-
-const NAMA_BULAN_EN = {
-  jan: 1, january: 1,
-  feb: 2, february: 2,
-  mar: 3, march: 3,
-  apr: 4, april: 4,
-  may: 5,
-  jun: 6, june: 6,
-  jul: 7, july: 7,
-  aug: 8, august: 8,
-  sep: 9, sept: 9, september: 9,
-  oct: 10, october: 10,
-  nov: 11, november: 11,
-  dec: 12, december: 12,
-}
-
-function pad2(n) {
-  return String(n).padStart(2, '0')
-}
-
-function susunTanggal(tahun, bulan, tanggal) {
-  let y = Number(tahun)
-  const m = Number(bulan)
-  const d = Number(tanggal)
-  if (y < 100) y += 2000
-  if (!y || !m || !d) return null
-  if (m < 1 || m > 12) return null
-  if (d < 1 || d > 31) return null
-  const dt = new Date(Date.UTC(y, m - 1, d))
-  if (dt.getUTCFullYear() !== y || dt.getUTCMonth() !== m - 1 || dt.getUTCDate() !== d) {
-    return null
-  }
-  return `${y}-${pad2(m)}-${pad2(d)}`
-}
-
-function tanggalDariAngkaSerialExcel(n) {
-  const epoch = Date.UTC(1899, 11, 30)
-  const ms = epoch + Math.round(n) * 86400000
-  const dt = new Date(ms)
-  if (isNaN(dt.getTime())) return null
-  return `${dt.getUTCFullYear()}-${pad2(dt.getUTCMonth() + 1)}-${pad2(dt.getUTCDate())}`
-}
-
-function tanggalDariTeks(teks) {
-  const s = String(teks).trim()
-  if (!s) return null
-
-  let m = s.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})$/)
-  if (m) return susunTanggal(m[1], m[2], m[3])
-
-  m = s.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{2,4})$/)
-  if (m) return susunTanggal(m[3], m[2], m[1])
-
-  m = s.match(/^(\d{1,2})\s+([A-Za-z]+)\.?\s+(\d{2,4})$/)
-  if (m) {
-    const kunci = m[2].toLowerCase().replace(/\./g, '')
-    const bulan = NAMA_BULAN_ID[kunci] || NAMA_BULAN_EN[kunci]
-    if (bulan) return susunTanggal(m[3], bulan, m[1])
-  }
-
-  m = s.match(/^([A-Za-z]+)\.?\s+(\d{1,2}),?\s+(\d{2,4})$/)
-  if (m) {
-    const kunci = m[1].toLowerCase().replace(/\./g, '')
-    const bulan = NAMA_BULAN_ID[kunci] || NAMA_BULAN_EN[kunci]
-    if (bulan) return susunTanggal(m[3], bulan, m[2])
-  }
-
-  if (/^\d{4,6}$/.test(s)) {
-    const hasil = tanggalDariAngkaSerialExcel(Number(s))
-    if (hasil) return hasil
-  }
-
-  const coba = new Date(s)
-  if (!isNaN(coba.getTime())) {
-    return `${coba.getUTCFullYear()}-${pad2(coba.getUTCMonth() + 1)}-${pad2(coba.getUTCDate())}`
-  }
-
-  return null
-}
-
-// Fungsi utama: terima nilai apa pun dari sel Excel ("Tanggal") dan
-// kembalikan teks "YYYY-MM-DD" yang valid, atau null kalau tidak bisa
-// dikenali sama sekali.
-function tanggalDariExcel(nilai) {
-  if (nilai === '' || nilai === null || nilai === undefined) return null
-
-  if (nilai instanceof Date) {
-    if (isNaN(nilai.getTime())) return null
-    return `${nilai.getUTCFullYear()}-${pad2(nilai.getUTCMonth() + 1)}-${pad2(nilai.getUTCDate())}`
-  }
-
-  if (typeof nilai === 'number') {
-    return tanggalDariAngkaSerialExcel(nilai)
-  }
-
-  return tanggalDariTeks(nilai)
-}
-
 export default function Nota({ sekolah }) {
   const [daftar, setDaftar] = useState([])
   const [loading, setLoading] = useState(true)
@@ -195,16 +71,6 @@ export default function Nota({ sekolah }) {
 
   useEffect(() => {
     muatDaftar()
-  }, [])
-
-  // Setelah dialog print ditutup, kosongkan notaCetak supaya blok pratinjau
-  // cetak tidak tertinggal di DOM.
-  useEffect(() => {
-    function bersihkanSetelahPrint() {
-      setNotaCetak(null)
-    }
-    window.addEventListener('afterprint', bersihkanSetelahPrint)
-    return () => window.removeEventListener('afterprint', bersihkanSetelahPrint)
   }, [])
 
   // ------------------------- Form manual -------------------------
@@ -293,10 +159,6 @@ export default function Nota({ sekolah }) {
   // Beberapa baris dengan "No Nota" yang sama akan digabung jadi satu nota
   // dengan banyak baris barang (items). Tanggal/Tuan/Toko cukup diisi di
   // baris pertama tiap kelompok No Nota, baris berikutnya boleh dikosongkan.
-  //
-  // Kolom "Tanggal" boleh ditulis dalam format apa pun yang wajar: sel
-  // bertipe Date asli di Excel, angka serial, "2025-03-09", "09/03/2025",
-  // "9 Maret 2025", "March 9, 2025", dst. Lihat tanggalDariExcel() di atas.
   function unduhTemplateExcel() {
     const contoh = [
       {
@@ -334,41 +196,27 @@ export default function Nota({ sekolah }) {
 
     try {
       const buf = await file.arrayBuffer()
-      // cellDates: true -> sel bertipe tanggal di Excel dibaca sebagai Date
-      // object, bukan angka serial (mis. 45725).
-      const wb = XLSX.read(buf, { type: 'array', cellDates: true })
+      const wb = XLSX.read(buf, { type: 'array' })
       const ws = wb.Sheets[wb.SheetNames[0]]
       const rows = XLSX.utils.sheet_to_json(ws, { defval: '' })
 
       // Kelompokkan baris berdasarkan "No Nota"
       const kelompok = new Map()
-      const tanggalGagal = []
-
-      rows.forEach((r, i) => {
+      for (const r of rows) {
         const noNota = String(r['No Nota'] ?? '').trim()
-        if (!noNota) return
-
-        const nomorBarisExcel = i + 2
-
+        if (!noNota) continue
         if (!kelompok.has(noNota)) {
-          let tanggal = tanggalDariExcel(r['Tanggal'])
-          if (!tanggal) {
-            tanggal = new Date().toISOString().slice(0, 10)
-            if (r['Tanggal']) {
-              tanggalGagal.push(`Baris ${nomorBarisExcel} (No Nota ${noNota}): "${r['Tanggal']}"`)
-            }
-          }
           kelompok.set(noNota, {
             no_nota: noNota,
-            tanggal,
+            tanggal: r['Tanggal'] || new Date().toISOString().slice(0, 10),
             tuan: r['Tuan'] || '',
             toko: r['Toko'] || '',
             alamat_lanjutan: '',
             items: [],
           })
         }
-
         const grup = kelompok.get(noNota)
+        // Isi tuan/toko/tanggal kalau baris pertama grup kosong tapi baris ini ada isinya
         if (!grup.tuan && r['Tuan']) grup.tuan = r['Tuan']
         if (!grup.toko && r['Toko']) grup.toko = r['Toko']
         if (r['Nama Barang']) {
@@ -379,7 +227,7 @@ export default function Nota({ sekolah }) {
             harga: Number(r['Harga']) || 0,
           })
         }
-      })
+      }
 
       const records = Array.from(kelompok.values()).map((n) => ({
         ...n,
@@ -395,11 +243,7 @@ export default function Nota({ sekolah }) {
       if (error) {
         setImportRingkasan({ sukses: 0, gagal: records.length, pesan: error.message })
       } else {
-        const pesanPeringatan =
-          tanggalGagal.length > 0
-            ? `Perhatian: ${tanggalGagal.length} nota memakai tanggal hari ini karena format tanggal di Excel tidak dikenali -> ${tanggalGagal.join('; ')}`
-            : null
-        setImportRingkasan({ sukses: records.length, gagal: 0, pesan: pesanPeringatan })
+        setImportRingkasan({ sukses: records.length, gagal: 0, pesan: null })
         muatDaftar()
       }
     } catch (err) {
@@ -413,31 +257,32 @@ export default function Nota({ sekolah }) {
   const totalForm = hitungTotal(form.items)
 
   return (
-    <div className="p-4">
+    <Layout
+      title="Nota Belanja"
+      subtitle="Riwayat semua nota belanja yang pernah dibuat"
+      actions={
+        <>
+          <button onClick={unduhTemplateExcel} className="px-3 py-2 rounded bg-gray-200 text-sm">
+            Unduh Template
+          </button>
+          <label className="px-3 py-2 rounded bg-emerald-600 text-white text-sm cursor-pointer">
+            {importBusy ? 'Mengimpor...' : 'Impor Massal'}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".xlsx,.xls,.csv"
+              className="hidden"
+              disabled={importBusy}
+              onChange={handleFileImpor}
+            />
+          </label>
+          <button onClick={bukaTambah} className="px-3 py-2 rounded bg-blue-600 text-white text-sm">
+            + Tambah Nota
+          </button>
+        </>
+      }
+    >
       <div className="no-print">
-        <div className="flex items-center justify-between mb-4">
-          <h1 className="text-xl font-bold">Nota Belanja</h1>
-          <div className="flex gap-2">
-            <button onClick={unduhTemplateExcel} className="px-3 py-2 rounded bg-gray-200 text-sm">
-              Unduh Template
-            </button>
-            <label className="px-3 py-2 rounded bg-emerald-600 text-white text-sm cursor-pointer">
-              {importBusy ? 'Mengimpor...' : 'Impor Massal'}
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".xlsx,.xls,.csv"
-                className="hidden"
-                disabled={importBusy}
-                onChange={handleFileImpor}
-              />
-            </label>
-            <button onClick={bukaTambah} className="px-3 py-2 rounded bg-blue-600 text-white text-sm">
-              + Tambah Nota
-            </button>
-          </div>
-        </div>
-
         {importRingkasan && (
           <div
             className={`mb-4 p-3 rounded text-sm ${
@@ -613,17 +458,10 @@ export default function Nota({ sekolah }) {
         )}
       </div>
 
-      {/* Wajib DI LUAR elemen "no-print" — ini yang tampil saat window.print().
-          marginTop mendorong nota turun ke bagian bawah kertas A4 (297mm).
-          Nota-nya sendiri tingginya sekitar 148mm. Kalau posisinya masih
-          kurang turun / malah kepotong ke halaman 2, sesuaikan angka
-          marginTop ini sedikit demi sedikit (mis. dari 120mm ke 130mm)
-          sambil cek hasil print preview. */}
+      {/* Wajib DI LUAR elemen "no-print" — ini yang tampil saat window.print() */}
       {notaCetak && (
-        <div style={{ marginTop: '120mm' }}>
-          <NotaPrintTemplate ref={printRef} sekolah={sekolah} data={notaCetak} />
-        </div>
+        <NotaPrintTemplate ref={printRef} sekolah={sekolah} data={notaCetak} />
       )}
-    </div>
+    </Layout>
   )
 }
