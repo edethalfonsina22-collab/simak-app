@@ -10,14 +10,33 @@ function formatTanggal(tgl) {
   return new Date(tgl).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })
 }
 
+// Kolom isian bergaris bawah (pengganti deretan titik "..........." yang sering
+// terlihat tidak rata saat dicetak — lebar tetap & garis lurus, isi teks kalau ada).
+function Blank({ value, width = 140 }) {
+  return (
+    <span
+      className="inline-block border-b border-black align-bottom px-1 leading-tight"
+      style={{ minWidth: width }}
+    >
+      {value || '\u00A0'}
+    </span>
+  )
+}
+
 // Watermark bintang tersebar di latar, meniru kertas blanko kwitansi asli
 // (dua bintang per ubin dengan posisi & rotasi sedikit berbeda supaya terasa acak,
 // lalu diulang memenuhi halaman).
 const STAR_WATERMARK_STYLE = {
   backgroundImage:
-    "url(\"data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='72'%20height='72'%3E%3Ctext%20x='14'%20y='26'%20font-size='20'%20fill='%23000000'%20fill-opacity='0.08'%20text-anchor='middle'%20transform='rotate(-8%2014%2026)'%3E%E2%98%85%3C/text%3E%3Ctext%20x='50'%20y='60'%20font-size='16'%20fill='%23000000'%20fill-opacity='0.08'%20text-anchor='middle'%20transform='rotate(10%2050%2060)'%3E%E2%98%85%3C/text%3E%3C/svg%3E\")",
+    "url(\"data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='72'%20height='72'%3E%3Ctext%20x='14'%20y='26'%20font-size='22'%20fill='%23000000'%20fill-opacity='0.16'%20text-anchor='middle'%20transform='rotate(-8%2014%2026)'%3E%E2%98%85%3C/text%3E%3Ctext%20x='50'%20y='60'%20font-size='18'%20fill='%23000000'%20fill-opacity='0.16'%20text-anchor='middle'%20transform='rotate(10%2050%2060)'%3E%E2%98%85%3C/text%3E%3C/svg%3E\")",
   backgroundRepeat: 'repeat',
   backgroundPosition: '0 0',
+  // Beberapa browser (terutama Chrome) tidak mencetak background sama sekali kecuali
+  // property ini diset — tanpa ini, watermark akan hilang total saat print walaupun
+  // tampil normal di layar / preview biasa.
+  WebkitPrintColorAdjust: 'exact',
+  printColorAdjust: 'exact',
+  colorAdjust: 'exact',
 }
 
 /**
@@ -46,7 +65,13 @@ const KuitansiPrintTemplate = forwardRef(function KuitansiPrintTemplate({ sekola
     <div
       ref={ref}
       className="print-only relative bg-white text-black p-10 text-sm overflow-hidden"
-      style={{ width: '210mm', minHeight: '148mm' }}
+      style={{
+        width: '210mm',
+        minHeight: '148mm',
+        WebkitPrintColorAdjust: 'exact',
+        printColorAdjust: 'exact',
+        colorAdjust: 'exact',
+      }}
     >
       {/* Watermark bintang */}
       <div className="absolute inset-0" style={STAR_WATERMARK_STYLE} aria-hidden="true" />
@@ -55,12 +80,12 @@ const KuitansiPrintTemplate = forwardRef(function KuitansiPrintTemplate({ sekola
       <div className="relative">
         <div className="flex items-start justify-between mb-2">
           <div>
-            <p>No. Bukti <span className="ml-2">{data?.no_bukti || '..........................'}</span></p>
+            <p>No. Bukti <Blank value={data?.no_bukti} width={170} /></p>
             <p>Lembar : {data?.lembar || 'I/II/III/IV/V'}</p>
           </div>
           <div className="text-right">
-            <p>Mata Anggaran : <span className="ml-1">{data?.mata_anggaran || '..........................'}</span></p>
-            <p>Tahun : <span className="ml-1">{data?.tahun_anggaran || '..........................'}</span></p>
+            <p>Mata Anggaran : <Blank value={data?.mata_anggaran} width={150} /></p>
+            <p>Tahun : <Blank value={data?.tahun_anggaran} width={90} /></p>
           </div>
         </div>
 
@@ -92,27 +117,38 @@ const KuitansiPrintTemplate = forwardRef(function KuitansiPrintTemplate({ sekola
         </div>
 
         <div className="grid grid-cols-3 gap-4 mb-8">
+          {/* Lunas dibayar */}
           <div className="text-center">
             <p>Lunas dibayar</p>
             <p>Pemegang Kas,</p>
             <div className="h-16" />
-            <p className="border-t border-black pt-1">{data?.dibayar_oleh || '.......................'}</p>
-            <p className="text-xs">NIP. {data?.nip_dibayar || '.......................'}</p>
+            <div className="border-b border-black pb-1">
+              <p>{data?.dibayar_oleh || '.......................'}</p>
+              <p className="text-xs">NIP. {data?.nip_dibayar || '.......................'}</p>
+            </div>
             <p className="text-xs mt-2 text-left">Tgl. Dibayarkan : {formatTanggal(data?.tanggal)}</p>
           </div>
+
+          {/* Setuju dibayar */}
           <div className="text-center">
-            <p>{formatTanggal(data?.tanggal)}</p>
             <p>Setuju dibayar :</p>
             <p>{data?.jabatan_disetujui || 'Atasan Langsung'},</p>
             <div className="h-16" />
-            <p className="border-t border-black pt-1">{data?.disetujui_oleh || '.......................'}</p>
-            <p className="text-xs">NIP. {data?.nip_disetujui || '.......................'}</p>
+            <div className="border-b border-black pb-1">
+              <p>{data?.disetujui_oleh || '.......................'}</p>
+              <p className="text-xs">NIP. {data?.nip_disetujui || '.......................'}</p>
+            </div>
           </div>
+
+          {/* Yang Menerima — tanggal dipindah ke sini (dari kolom Setuju dibayar) */}
           <div className="text-center">
+            <p>{formatTanggal(data?.tanggal)}</p>
             <p>Yang Menerima,</p>
             <div className="h-16" />
-            <p className="border-t border-black pt-1">{data?.nama_penerima || '.......................'}</p>
-            <p className="text-xs">Alamat : {data?.alamat_penerima || '-'}</p>
+            <div className="border-b border-black pb-1">
+              <p>{data?.nama_penerima || '.......................'}</p>
+              <p className="text-xs">Alamat : {data?.alamat_penerima || '-'}</p>
+            </div>
           </div>
         </div>
 
