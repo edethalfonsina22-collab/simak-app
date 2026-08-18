@@ -10,12 +10,30 @@ function formatTanggal(tgl) {
   return new Date(tgl).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })
 }
 
-// Kolom isian (pengganti deretan titik "..........." yang sering terlihat tidak
-// rata saat dicetak) — lebar tetap, tanpa garis bawah, isi teks kalau ada.
+// Kolom isian bertitik-titik — meniru blanko kwitansi fisik (lihat gambar acuan).
+// Kalau `value` kosong: tampil deretan titik selebar `width`.
+// Kalau `value` ada: teks ditulis menimpa area yang sama, titik-titik tetap
+// tampak di sisa ruang kosong (persis seperti tulisan tangan di atas blanko cetak).
 function Blank({ value, width = 140 }) {
   return (
-    <span className="inline-block align-bottom px-1 leading-tight" style={{ minWidth: width }}>
-      {value || '\u00A0'}
+    <span
+      className="relative inline-block align-bottom px-1 leading-tight overflow-hidden"
+      style={{ minWidth: width }}
+    >
+      {/* Baris titik-titik selalu dirender sebagai lapisan dasar */}
+      <span
+        aria-hidden="true"
+        className="block whitespace-nowrap tracking-[0.2em] text-black/70 select-none"
+      >
+        {'.'.repeat(60)}
+      </span>
+      {/* Isian sebenarnya ditumpuk di atas titik-titik, dengan background putih
+          supaya titik di belakang teks tidak tembus/tabrakan dengan huruf */}
+      {value && (
+        <span className="absolute inset-0 bg-white px-1 whitespace-nowrap">
+          {value}
+        </span>
+      )}
     </span>
   )
 }
