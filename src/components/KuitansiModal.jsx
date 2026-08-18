@@ -56,8 +56,11 @@ export default function KuitansiModal({ keuanganRow, editingRow, sekolah, onClos
   const [saran, setSaran] = useState({
     diterima_dari: [],
     disetujui_oleh: [],
+    nip_disetujui: [],
     dibayar_oleh: [],
+    nip_dibayar: [],
     nama_penerima: [],
+    alamat_penerima: [],
     mata_anggaran: [],
   })
 
@@ -65,7 +68,7 @@ export default function KuitansiModal({ keuanganRow, editingRow, sekolah, onClos
     let batal = false
     supabase
       .from('kuitansi')
-      .select('diterima_dari, disetujui_oleh, dibayar_oleh, nama_penerima, mata_anggaran')
+      .select('diterima_dari, disetujui_oleh, nip_disetujui, dibayar_oleh, nip_dibayar, nama_penerima, alamat_penerima, mata_anggaran')
       .eq('jenis', 'kuitansi')
       .order('id', { ascending: false })
       .limit(500)
@@ -78,8 +81,11 @@ export default function KuitansiModal({ keuanganRow, editingRow, sekolah, onClos
         setSaran({
           diterima_dari: uniqueSorted('diterima_dari'),
           disetujui_oleh: uniqueSorted('disetujui_oleh'),
+          nip_disetujui: uniqueSorted('nip_disetujui'),
           dibayar_oleh: uniqueSorted('dibayar_oleh'),
+          nip_dibayar: uniqueSorted('nip_dibayar'),
           nama_penerima: uniqueSorted('nama_penerima'),
+          alamat_penerima: uniqueSorted('alamat_penerima'),
           mata_anggaran: uniqueSorted('mata_anggaran'),
         })
       })
@@ -279,7 +285,11 @@ export default function KuitansiModal({ keuanganRow, editingRow, sekolah, onClos
                   className="input-field"
                   value={form.nip_disetujui}
                   onChange={(e) => ubah('nip_disetujui', e.target.value)}
+                  list="saran-nip-disetujui"
                 />
+                <datalist id="saran-nip-disetujui">
+                  {saran.nip_disetujui.map((v) => <option key={v} value={v} />)}
+                </datalist>
               </div>
             </div>
 
@@ -302,7 +312,11 @@ export default function KuitansiModal({ keuanganRow, editingRow, sekolah, onClos
                   className="input-field"
                   value={form.nip_dibayar}
                   onChange={(e) => ubah('nip_dibayar', e.target.value)}
+                  list="saran-nip-dibayar"
                 />
+                <datalist id="saran-nip-dibayar">
+                  {saran.nip_dibayar.map((v) => <option key={v} value={v} />)}
+                </datalist>
               </div>
             </div>
 
@@ -325,7 +339,11 @@ export default function KuitansiModal({ keuanganRow, editingRow, sekolah, onClos
                   className="input-field"
                   value={form.alamat_penerima}
                   onChange={(e) => ubah('alamat_penerima', e.target.value)}
+                  list="saran-alamat-penerima"
                 />
+                <datalist id="saran-alamat-penerima">
+                  {saran.alamat_penerima.map((v) => <option key={v} value={v} />)}
+                </datalist>
               </div>
             </div>
 
