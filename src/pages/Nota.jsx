@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import * as XLSX from 'xlsx'
 import { supabase } from '../lib/supabaseClient' // sesuaikan path kalau berbeda di project kamu
 import NotaPrintTemplate from '../components/NotaPrintTemplate'
+import KuitansiPrintTemplate from '../components/KuitansiPrintTemplate'
+import Layout from '../components/Layout'
 
 // -----------------------------------------------------------------
 // Baris item kosong untuk form manual
@@ -31,6 +33,48 @@ function hitungTotal(items) {
   return items.reduce((sum, it) => sum + hitungJumlahBaris(it), 0)
 }
 
+// ------------------------- Terbilang (angka -> teks) -------------------------
+// Dipakai untuk kolom "Uang sejumlah" di Kuitansi resmi, yang harus berupa
+// teks (mis. "Tiga ratus lima puluh ribu rupiah"), bukan angka.
+const SATUAN_TERBILANG = [
+  '', 'satu', 'dua', 'tiga', 'empat', 'lima', 'enam', 'tujuh', 'delapan', 'sembilan',
+  'sepuluh', 'sebelas',
+]
+
+function angkaKeTerbilang(n) {
+  n = Math.floor(Math.abs(Number(n) || 0))
+  if (n < 12) return SATUAN_TERBILANG[n]
+  if (n < 20) return `${angkaKeTerbilang(n - 10)} belas`
+  if (n < 100) return `${angkaKeTerbilang(Math.floor(n / 10))} puluh ${angkaKeTerbilang(n % 10)}`.trim()
+  if (n < 200) return `seratus ${angkaKeTerbilang(n - 100)}`.trim()
+  if (n < 1000) return `${angkaKeTerbilang(Math.floor(n / 100))} ratus ${angkaKeTerbilang(n % 100)}`.trim()
+  if (n < 2000) return `seribu ${angkaKeTerbilang(n - 1000)}`.trim()
+  if (n < 1000000) return `${angkaKeTerbilang(Math.floor(n / 1000))} ribu ${angkaKeTerbilang(n % 1000)}`.trim()
+  if (n < 1000000000) return `${angkaKeTerbilang(Math.floor(n / 1000000))} juta ${angkaKeTerbilang(n % 1000000)}`.trim()
+  return `${angkaKeTerbilang(Math.floor(n / 1000000000))} miliar ${angkaKeTerbilang(n % 1000000000)}`.trim()
+}
+
+function rupiahTerbilang(n) {
+  const teks = angkaKeTerbilang(n).replace(/\s+/g, ' ').trim()
+  const kapital = teks.charAt(0).toUpperCase() + teks.slice(1)
+  return `${kapital} rupiah`
+}
+
+// Ubah satu baris nota jadi data yang dipahami KuitansiPrintTemplate.
+// "Telah terima dari" diisi nama sekolah (pembeli/pembayar), karena
+// kwitansi ini dikeluarkan toko sebagai bukti sekolah sudah membayar.
+function mapUntukKwitansi(row, sekolah) {
+  const namaBarang = (row.items || []).map((it) => it.nama_barang).filter(Boolean).join(', ')
+  return {
+    no_kwitansi: row.no_nota,
+    tanggal: row.tanggal,
+    dari: sekolah?.nama || '',
+    uang_sejumlah: rupiahTerbilang(row.jumlah_total || 0),
+    untuk_pembayaran: `Pembayaran belanja ${namaBarang ? `(${namaBarang}) ` : ''}sesuai Nota No. ${row.no_nota}`,
+    jumlah: row.jumlah_total || 0,
+  }
+}
+
 // Ubah item tersimpan (banyaknya angka + satuan terpisah) jadi bentuk yang
 // dipahami NotaPrintTemplate (banyaknya sebagai satu teks, mis. "2 buah").
 function mapUntukCetak(nota) {
@@ -55,6 +99,8 @@ export default function Nota({ sekolah }) {
   // satu kali window.print() -> satu print job banyak halaman, bukan
   // satu-satu.
   const [notaCetak, setNotaCetak] = useState([])
+  // Data kwitansi yang lagi disiapkan untuk print (null = tidak ada).
+  const [kuitansiCetak, setKuitansiCetak] = useState(null)
   const [importBusy, setImportBusy] = useState(false)
   const [importRingkasan, setImportRingkasan] = useState(null)
   // Set berisi id nota yang dicentang di tabel, untuk cetak massal.
@@ -85,6 +131,7 @@ export default function Nota({ sekolah }) {
   useEffect(() => {
     function bersihkanSetelahPrint() {
       setNotaCetak([])
+      setKuitansiCetak(null)
     }
     window.addEventListener('afterprint', bersihkanSetelahPrint)
     return () => window.removeEventListener('afterprint', bersihkanSetelahPrint)
@@ -183,6 +230,12 @@ export default function Nota({ sekolah }) {
   function cetakNota(row) {
     setNotaCetak([mapUntukCetak(row)])
     // beri waktu render sebelum memanggil print
+    setTimeout(() => window.print(), 100)
+  }
+
+  // Cetak Kwitansi resmi untuk satu nota (tombol "Cetak Kwitansi" per baris).
+  function cetakKuitansi(row) {
+    setKuitansiCetak(mapUntukKwitansi(row, sekolah))
     setTimeout(() => window.print(), 100)
   }
 
@@ -331,41 +384,45 @@ export default function Nota({ sekolah }) {
   const totalForm = hitungTotal(form.items)
   const semuaTerpilih = daftar.length > 0 && terpilih.size === daftar.length
 
-  return (
-    <div className="p-4">
-      <div className="no-print">
-        <div className="flex items-center justify-between mb-4">
-          <h1 className="text-xl font-bold">Nota Belanja</h1>
-          <div className="flex gap-2">
-            <button onClick={unduhTemplateExcel} className="px-3 py-2 rounded bg-gray-200 text-sm">
-              Unduh Template
-            </button>
-            <label className="px-3 py-2 rounded bg-emerald-600 text-white text-sm cursor-pointer">
-              {importBusy ? 'Mengimpor...' : 'Impor Massal'}
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".xlsx,.xls,.csv"
-                className="hidden"
-                disabled={importBusy}
-                onChange={handleFileImpor}
-              />
-            </label>
-            <button
-              onClick={cetakTerpilih}
-              disabled={terpilih.size === 0}
-              className={`px-3 py-2 rounded text-white text-sm ${
-                terpilih.size === 0 ? 'bg-gray-300 cursor-not-allowed' : 'bg-purple-600'
-              }`}
-            >
-              Gabung & Cetak ({terpilih.size})
-            </button>
-            <button onClick={bukaTambah} className="px-3 py-2 rounded bg-blue-600 text-white text-sm">
-              + Tambah Nota
-            </button>
-          </div>
-        </div>
+  // Tombol-tombol aksi ini dipindah ke prop `actions` milik <Layout>, persis
+  // pola yang dipakai halaman lain (mis. "Data Guru": Impor Massal, + Tambah
+  // Guru tampil di header sebelah kanan) — supaya sidebar & header konsisten
+  // dan selalu tampil, bukan hilang seperti sebelumnya saat Nota.jsx
+  // render div penuh sendirian tanpa <Layout>.
+  const aksiHeader = (
+    <>
+      <button onClick={unduhTemplateExcel} className="px-3 py-2 rounded bg-gray-200 text-sm">
+        Unduh Template
+      </button>
+      <label className="px-3 py-2 rounded bg-emerald-600 text-white text-sm cursor-pointer">
+        {importBusy ? 'Mengimpor...' : 'Impor Massal'}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".xlsx,.xls,.csv"
+          className="hidden"
+          disabled={importBusy}
+          onChange={handleFileImpor}
+        />
+      </label>
+      <button
+        onClick={cetakTerpilih}
+        disabled={terpilih.size === 0}
+        className={`px-3 py-2 rounded text-white text-sm ${
+          terpilih.size === 0 ? 'bg-gray-300 cursor-not-allowed' : 'bg-purple-600'
+        }`}
+      >
+        Gabung & Cetak ({terpilih.size})
+      </button>
+      <button onClick={bukaTambah} className="px-3 py-2 rounded bg-blue-600 text-white text-sm">
+        + Tambah Nota
+      </button>
+    </>
+  )
 
+  return (
+    <>
+      <Layout title="Nota Belanja" subtitle={`${daftar.length} nota tercatat`} actions={aksiHeader}>
         {importRingkasan && (
           <div
             className={`mb-4 p-3 rounded text-sm ${
@@ -424,7 +481,8 @@ export default function Nota({ sekolah }) {
                     </td>
                     <td className="p-2">
                       <div className="flex justify-center gap-2 text-xs">
-                        <button onClick={() => cetakNota(row)} className="text-blue-600">Cetak</button>
+                        <button onClick={() => cetakNota(row)} className="text-blue-600">Cetak Nota</button>
+                        <button onClick={() => cetakKuitansi(row)} className="text-purple-600">Cetak Kwitansi</button>
                         <button onClick={() => bukaEdit(row)} className="text-amber-600">Edit</button>
                         <button onClick={() => hapusNota(row.id)} className="text-red-600">Hapus</button>
                       </div>
@@ -555,12 +613,11 @@ export default function Nota({ sekolah }) {
             </form>
           </div>
         )}
-      </div>
+      </Layout>
 
-      {/* Wajib DI LUAR elemen "no-print" — ini yang tampil saat window.print().
+      {/* Wajib DI LUAR <Layout> — ini yang tampil saat window.print().
           Dibungkus "hidden print:block" (Tailwind) supaya PASTI tersembunyi
-          di layar biasa (tidak mendorong/menutupi sidebar), terlepas dari
-          ada-tidaknya aturan CSS ".print-only" di file global — dan hanya
+          di layar biasa (tidak ikut memengaruhi layout sidebar), dan hanya
           muncul saat proses cetak berjalan.
 
           Nota SENDIRI (148mm) dibungkus wrapper 1 halaman A4 penuh (297mm)
@@ -585,7 +642,10 @@ export default function Nota({ sekolah }) {
             <NotaPrintTemplate ref={idx === 0 ? printRef : null} sekolah={sekolah} data={n} />
           </div>
         ))}
+        {kuitansiCetak && (
+          <KuitansiPrintTemplate sekolah={sekolah} data={kuitansiCetak} />
+        )}
       </div>
-    </div>
+    </>
   )
 }
