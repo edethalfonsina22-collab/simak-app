@@ -796,21 +796,33 @@ export default function Nota({ sekolah }) {
           di layar biasa (tidak ikut memengaruhi layout sidebar), dan hanya
           muncul saat proses cetak berjalan.
 
+          PENTING soal kenapa sebelumnya jadi 2-3 halaman: browser secara
+          default menambahkan margin cetak sendiri (biasanya ~12-13mm di
+          setiap sisi) di luar kendali CSS biasa. Jadi kotak "297mm" yang
+          kita buat sebenarnya lebih tinggi daripada area cetak yang benar-
+          benar tersedia di satu lembar, dan kelebihannya meluber jadi
+          halaman tambahan. Aturan `@page { size: A4; margin: 0 }` di bawah
+          ini memaksa area cetak benar-benar 297mm x 210mm penuh tanpa
+          margin bawaan browser, supaya wrapper 1-halaman kita pas persis.
+
           Nota SENDIRI (148mm) dibungkus wrapper 1 halaman A4 penuh (297mm)
           yang `position: relative`, lalu NotaPrintTemplate ditempel dengan
           `position: absolute; bottom: 0` supaya nempel PERSIS di bagian
-          paling bawah kertas. Ini dipakai ketimbang trik flex+justify-end
-          karena absolute-positioning jauh lebih konsisten di berbagai
-          browser/engine cetak-ke-PDF — flex kadang tidak menghormati
-          height:297mm pada elemen print-only kalau ada CSS lain yang ikut
-          memengaruhi ukurannya. Wrapper ini HANYA di sini, tidak ikut masuk
-          ke NotaPrintTemplate.jsx sendiri, supaya komponen itu tetap 148mm
-          apa adanya dan aman dipakai bareng Kuitansi di
-          LaporanPrintTemplate.jsx (148mm Kuitansi + 148mm Nota = 1 lembar).
+          paling bawah kertas.
+
+          Kuitansi SEMENTARA tidak diikutsertakan di sini (fokus benerin
+          Nota dulu sesuai permintaan) — tinggal aktifkan lagi nanti kalau
+          template Kuitansi-nya sudah siap.
 
           Kalau kamu ingin jarak nota dari TEPI BAWAH kertas (bukan mepet
           0mm), ubah angka `bottom: 0` di bawah ini, mis. `bottom: '10mm'`. */}
       <div className="hidden print:block">
+        <style>{`
+          @page { size: A4; margin: 0; }
+          @media print {
+            html, body { margin: 0 !important; padding: 0 !important; }
+          }
+        `}</style>
         {notaCetak.map((n, idx) => (
           <div
             key={n.id ?? idx}
@@ -818,6 +830,8 @@ export default function Nota({ sekolah }) {
               position: 'relative',
               width: '210mm',
               height: '297mm',
+              boxSizing: 'border-box',
+              overflow: 'hidden',
               ...(idx < notaCetak.length - 1 ? { breakAfter: 'page', pageBreakAfter: 'always' } : {}),
             }}
           >
@@ -826,9 +840,6 @@ export default function Nota({ sekolah }) {
             </div>
           </div>
         ))}
-        {kuitansiCetak && (
-          <KuitansiPrintTemplate sekolah={sekolah} data={kuitansiCetak} />
-        )}
       </div>
     </>
   )
