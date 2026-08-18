@@ -35,6 +35,7 @@ import {
   Award,
   Video,
   Receipt,
+  ShoppingCart,
 } from 'lucide-react'
 import { useAuth } from '../lib/AuthContext'
 import { supabase } from '../lib/supabaseClient'
@@ -74,7 +75,8 @@ const groupsAdmin = [
     label: 'Keuangan & Aset',
     links: [
       { to: '/keuangan', label: 'Keuangan', icon: Wallet },
-      { to: '/nota', label: 'Nota Belanja', icon: Receipt },
+      { to: '/kuitansi', label: 'Kuitansi', icon: Receipt },
+      { to: '/nota', label: 'Nota Belanja', icon: ShoppingCart },
       { to: '/perpustakaan', label: 'Perpustakaan', icon: Library },
       { to: '/inventaris', label: 'Inventaris', icon: Boxes },
     ],
@@ -117,6 +119,8 @@ const linksGuru = [
   { to: '/hasil-ujian', label: 'Hasil Ujian', icon: ClipboardList },
   { to: '/bank-soal', label: 'Bank Soal', icon: Database },
   { to: '/perpustakaan', label: 'Perpustakaan', icon: Library },
+  { to: '/kuitansi', label: 'Kuitansi', icon: Receipt },
+  { to: '/nota', label: 'Nota Belanja', icon: ShoppingCart },
   { to: '/jadwal', label: 'Jadwal Pelajaran', icon: CalendarClock },
   { to: '/agenda', label: 'Agenda Sekolah', icon: CalendarDays },
   { to: '/pengumuman', label: 'Pengumuman', icon: Megaphone },
