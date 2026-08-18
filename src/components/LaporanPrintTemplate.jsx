@@ -53,14 +53,20 @@ const LaporanPrintTemplate = forwardRef(function LaporanPrintTemplate(
           kalau kertas fisiknya sudah punya garis potong sendiri */}
       <div className="border-t border-dashed border-black/40" style={{ margin: '2mm 0' }} />
 
-      {/* ================= BAGIAN BAWAH: Nota atau Kwitansi Jasa ================= */}
-      <div style={{ minHeight: '148mm' }}>
-        {jenisBelanja === 'jasa' ? (
+      {/* ================= BAGIAN BAWAH: Nota atau Kwitansi Jasa =================
+          Nota memang didesain memenuhi 148mm (rincian barang bisa panjang).
+          Kwitansi Jasa BEDA — ukuran fisiknya kecil (~12.5cm x 5.5cm), jadi
+          sengaja TIDAK dipaksa memenuhi ruang 148mm, cukup ditaruh di area
+          kosong sisa halaman. */}
+      {jenisBelanja === 'jasa' ? (
+        <div className="pt-2">
           <KuitansiJasaPrintTemplate sekolah={sekolah} data={dataBawah} />
-        ) : (
+        </div>
+      ) : (
+        <div style={{ minHeight: '148mm' }}>
           <NotaPrintTemplate sekolah={sekolah} data={dataBawah} />
-        )}
-      </div>
+        </div>
+      )}
     </div>
   )
 })
