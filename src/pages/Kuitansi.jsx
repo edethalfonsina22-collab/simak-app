@@ -4,7 +4,7 @@ import Layout from '../components/Layout'
 import KuitansiModal from '../components/KuitansiModal'
 import KuitansiPrintTemplate from '../lib/KuitansiPrintTemplate'
 import BulkImportModal from '../components/BulkImportModal'
-import { Plus, Printer, Search, Loader2, Receipt, Trash2, FileSpreadsheet, Pencil } from 'lucide-react'
+import { Plus, Printer, Search, Loader2, Receipt, Trash2, FileSpreadsheet, Pencil, AlertTriangle } from 'lucide-react'
 
 function formatRupiah(angka) {
   return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(angka || 0)
@@ -96,6 +96,7 @@ export default function Kuitansi() {
   const [showImport, setShowImport] = useState(false)
   const [sekolah, setSekolah] = useState(null)
   const [menghapus, setMenghapus] = useState(null) // id yang sedang dihapus
+  const [menghapusSemua, setMenghapusSemua] = useState(false) // status proses hapus semua
 
   // Baris yang sedang diedit (null = mode buat baru)
   const [editData, setEditData] = useState(null)
@@ -167,6 +168,32 @@ export default function Kuitansi() {
     loadData()
   }
 
+  // Hapus SEMUA kuitansi (jenis = 'kuitansi'). Ada dua kali konfirmasi
+  // karena ini tindakan destruktif dan tidak bisa dibatalkan.
+  async function handleHapusSemua() {
+    if (data.length === 0) return
+
+    const konfirmasi1 = confirm(
+      `Anda akan menghapus SEMUA ${data.length} kuitansi. Tindakan ini tidak bisa dibatalkan. Lanjutkan?`
+    )
+    if (!konfirmasi1) return
+
+    const konfirmasi2 = confirm(
+      'Konfirmasi sekali lagi: semua data kuitansi akan dihapus permanen. Ketik OK untuk benar-benar melanjutkan.'
+    )
+    if (!konfirmasi2) return
+
+    setMenghapusSemua(true)
+    const { error } = await supabase.from('kuitansi').delete().eq('jenis', 'kuitansi')
+    setMenghapusSemua(false)
+
+    if (error) {
+      alert('Gagal menghapus semua data: ' + error.message)
+      return
+    }
+    loadData()
+  }
+
   // Buka modal dalam mode edit, mengisi data dari baris yang dipilih
   function handleEdit(row) {
     setEditData(row)
@@ -230,6 +257,14 @@ export default function Kuitansi() {
         <>
           <button className="btn-secondary" onClick={() => setShowImport(true)}>
             <FileSpreadsheet size={16} /> Impor Massal (Excel)
+          </button>
+          <button
+            className="btn-secondary text-red-600"
+            onClick={handleHapusSemua}
+            disabled={menghapusSemua || data.length === 0}
+          >
+            {menghapusSemua ? <Loader2 size={16} className="animate-spin" /> : <AlertTriangle size={16} />}
+            Hapus Semua
           </button>
           <button className="btn-primary" onClick={() => setShowBuat(true)}>
             <Plus size={16} /> Buat Kuitansi Baru
