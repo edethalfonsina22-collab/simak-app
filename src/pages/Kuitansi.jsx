@@ -36,6 +36,33 @@ const TEMPLATE_HEADERS = [
   'catatan',
 ]
 
+// Pengaman tambahan: kalau nilai tanggal dari file impor ternyata masih berupa
+// angka serial Excel mentah (mis. karena dibuka lewat CSV atau parser lain yang
+// tidak mengubahnya ke Date — BulkImportModal sudah menangani kasus umumnya),
+// konversi manual di sini supaya tidak terkirim sebagai teks angka ke database.
+function tanggalDariNilaiImpor(nilai) {
+  if (nilai === undefined || nilai === null || nilai === '') {
+    return new Date().toISOString().slice(0, 10)
+  }
+  // Angka serial Excel (basis 1899-12-30) — hanya cocok untuk range tahun wajar.
+  if (typeof nilai === 'number' && nilai > 20000 && nilai < 80000) {
+    const epoch = new Date(Date.UTC(1899, 11, 30))
+    const hasil = new Date(epoch.getTime() + nilai * 86400000)
+    return hasil.toISOString().slice(0, 10)
+  }
+  const teks = String(nilai).trim()
+  // Jaga-jaga kalau angka serial itu lolos sebagai teks (mis. "46255").
+  if (/^\d{4,6}$/.test(teks)) {
+    const angka = Number(teks)
+    if (angka > 20000 && angka < 80000) {
+      const epoch = new Date(Date.UTC(1899, 11, 30))
+      const hasil = new Date(epoch.getTime() + angka * 86400000)
+      return hasil.toISOString().slice(0, 10)
+    }
+  }
+  return teks
+}
+
 function mapRowKuitansi(row) {
   const diterimaDari = String(row['diterima_dari'] || '').trim()
   const jumlahTotal = Number(row['jumlah_total']) || 0
@@ -47,7 +74,7 @@ function mapRowKuitansi(row) {
     lembar: String(row['lembar'] || 'I/II/III/IV/V').trim(),
     mata_anggaran: String(row['mata_anggaran'] || '').trim(),
     tahun_anggaran: String(row['tahun_anggaran'] || String(new Date().getFullYear())).trim(),
-    tanggal: String(row['tanggal(YYYY-MM-DD)'] || new Date().toISOString().slice(0, 10)).trim(),
+    tanggal: tanggalDariNilaiImpor(row['tanggal(YYYY-MM-DD)']),
     diterima_dari: diterimaDari,
     jumlah_total: jumlahTotal,
     untuk_pembayaran: String(row['untuk_pembayaran'] || '').trim(),
