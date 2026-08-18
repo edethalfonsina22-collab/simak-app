@@ -4,7 +4,7 @@ import Layout from '../components/Layout'
 import KuitansiModal from '../components/KuitansiModal'
 import KuitansiPrintTemplate from '../lib/KuitansiPrintTemplate'
 import BulkImportModal from '../components/BulkImportModal'
-import { Plus, Printer, Search, Loader2, Receipt, Trash2, FileSpreadsheet } from 'lucide-react'
+import { Plus, Printer, Search, Loader2, Receipt, Trash2, FileSpreadsheet, Pencil } from 'lucide-react'
 
 function formatRupiah(angka) {
   return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(angka || 0)
@@ -97,6 +97,9 @@ export default function Kuitansi() {
   const [sekolah, setSekolah] = useState(null)
   const [menghapus, setMenghapus] = useState(null) // id yang sedang dihapus
 
+  // Baris yang sedang diedit (null = mode buat baru)
+  const [editData, setEditData] = useState(null)
+
   // Baris yang sedang dicetak ulang
   const [cetakUlang, setCetakUlang] = useState(null)
   const printRef = useRef(null)
@@ -164,8 +167,15 @@ export default function Kuitansi() {
     loadData()
   }
 
+  // Buka modal dalam mode edit, mengisi data dari baris yang dipilih
+  function handleEdit(row) {
+    setEditData(row)
+  }
+
+  // Menutup modal, baik dari mode buat baru maupun mode edit
   function handleTutupBuat() {
     setShowBuat(false)
+    setEditData(null)
     loadData()
   }
 
@@ -279,6 +289,13 @@ export default function Kuitansi() {
                   <div className="flex items-center gap-1 justify-end">
                     <button
                       className="icon-btn"
+                      title="Edit"
+                      onClick={() => handleEdit(d)}
+                    >
+                      <Pencil size={15} />
+                    </button>
+                    <button
+                      className="icon-btn"
                       title="Cetak Ulang"
                       onClick={() => handleCetakUlang(d)}
                     >
@@ -300,9 +317,9 @@ export default function Kuitansi() {
         </table>
       </div>
 
-      {showBuat && (
+      {(showBuat || editData) && (
         <KuitansiModal
-          keuanganRow={null}
+          keuanganRow={editData}
           sekolah={sekolah}
           onClose={handleTutupBuat}
         />
