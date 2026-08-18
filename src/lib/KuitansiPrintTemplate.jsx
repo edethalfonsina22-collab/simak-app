@@ -121,7 +121,7 @@ const KuitansiPrintTemplate = forwardRef(function KuitansiPrintTemplate({ sekola
 
         <h1 className="text-center text-xl font-bold underline tracking-wide mb-4">KWITANSI</h1>
 
-        <table className="w-full mb-2">
+        <table className="w-full mb-6">
           <tbody>
             <tr>
               <td className="w-40 py-1 align-top">Sudah Terima Dari</td>
@@ -138,13 +138,17 @@ const KuitansiPrintTemplate = forwardRef(function KuitansiPrintTemplate({ sekola
               <td className="align-top">:</td>
               <td className="py-1 align-top whitespace-pre-line">{data?.untuk_pembayaran || '-'}</td>
             </tr>
+            {/* TERBILANG sekarang jadi baris tabel juga (bukan <div> terpisah lagi)
+                supaya label & garis bawah nominalnya sejajar rata kiri dengan
+                "Sudah Terima Dari / Uang Sejumlah / Untuk Pembayaran" di atasnya. */}
+            <tr>
+              <td className="py-1 align-top font-semibold" colSpan={2}>TERBILANG : Rp.</td>
+              <td className="py-1 align-top font-semibold">
+                <span className="border-b-2 border-black px-3">{formatRupiah(total)}</span>
+              </td>
+            </tr>
           </tbody>
         </table>
-
-        <div className="flex items-center gap-2 mb-6">
-          <span className="font-semibold">TERBILANG : Rp.</span>
-          <span className="border-b-2 border-black px-3 font-semibold">{formatRupiah(total)}</span>
-        </div>
 
         <div className="grid grid-cols-3 gap-4 mb-8">
           {/* Lunas dibayar */}
