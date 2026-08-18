@@ -37,15 +37,20 @@ function Blank({ value, width = 160, align = 'left' }) {
   )
 }
 
-// Jumlah baris minimum supaya tabel tetap terlihat seperti kertas nota
-// bergaris walau item belanjanya sedikit — sisanya diisi baris kosong.
-const MIN_ROWS = 11
+// Nota sekarang SETENGAH HALAMAN (148mm — sama seperti KuitansiPrintTemplate)
+// supaya bisa ditempatkan di ruang kosong di bawah Kuitansi pada lembar cetak
+// yang sama, bukan menghabiskan satu lembar A4 penuh untuk dirinya sendiri.
+// Jumlah baris tabel diperkecil (dari 11 -> 6) supaya tetap muat tanpa
+// memotong bagian tanda tangan di bawahnya.
+const MIN_ROWS = 6
 
 /**
- * Template cetak Nota Belanja — meniru blanko nota fisik:
- * baris tanggal, "Tuan / Toko", "NOTA No.", tabel
- * Banyaknya / Nama Barang / Harga / Jumlah, baris "Jumlah Rp." di kanan bawah
- * tabel, lalu "Tanda Terima" (kiri) & "Hormat kami," (kanan) untuk tanda tangan.
+ * Template cetak Nota Belanja — meniru blanko nota fisik (lihat contoh
+ * blanko kosong yang dipakai sebagai acuan): baris tanggal, "Tuan / Toko",
+ * "NOTA No.", tabel Banyaknya / Nama Barang / Harga / Jumlah dengan GARIS
+ * KOTAK PENUH di setiap sel (persis blanko aslinya — sebelumnya cuma garis
+ * horizontal tanpa garis vertikal antar kolom), baris "Jumlah Rp." di kanan
+ * bawah tabel, lalu "Tanda Terima" (kiri) & "Hormat kami," (kanan).
  *
  * Props:
  *  - sekolah: { nama, alamat, kota } (opsional, dipakai untuk keterangan toko/pengirim)
@@ -69,10 +74,10 @@ const NotaPrintTemplate = forwardRef(function NotaPrintTemplate({ sekolah, data 
   return (
     <div
       ref={ref}
-      className="print-only relative bg-white text-black p-10 text-sm"
+      className="print-only relative bg-white text-black p-6 text-xs"
       style={{
         width: '210mm',
-        minHeight: '297mm',
+        minHeight: '148mm',
         WebkitPrintColorAdjust: 'exact',
         printColorAdjust: 'exact',
         colorAdjust: 'exact',
@@ -80,62 +85,62 @@ const NotaPrintTemplate = forwardRef(function NotaPrintTemplate({ sekolah, data 
     >
       {/* Baris tanggal / kota di kanan atas */}
       <div className="text-right mb-1">
-        <Blank value={formatTanggal(data?.tanggal)} width={260} align="right" />
+        <Blank value={formatTanggal(data?.tanggal)} width={220} align="right" />
       </div>
 
       {/* Tuan / Toko */}
-      <div className="mb-4">
+      <div className="mb-2">
         <p className="flex items-baseline gap-1">
           <span className="font-semibold underline">Tuan</span>
-          <Blank value={data?.tuan} width={420} />
+          <Blank value={data?.tuan} width={380} />
         </p>
         <p className="flex items-baseline gap-1">
           <span className="font-semibold underline">Toko</span>
-          <Blank value={data?.toko} width={420} />
+          <Blank value={data?.toko} width={380} />
         </p>
         {data?.alamat_lanjutan && (
           <p className="pl-10">
-            <Blank value={data.alamat_lanjutan} width={420} />
+            <Blank value={data.alamat_lanjutan} width={380} />
           </p>
         )}
       </div>
 
       {/* NOTA No. */}
-      <div className="flex items-baseline justify-between mb-2">
+      <div className="flex items-baseline justify-between mb-1">
         <p className="flex items-baseline gap-1">
-          <span className="text-xl font-bold">NOTA No.</span>
-          <Blank value={data?.no_nota} width={160} />
+          <span className="text-lg font-bold">NOTA No.</span>
+          <Blank value={data?.no_nota} width={140} />
         </p>
-        <div className="border-b-2 border-black w-56 h-2" aria-hidden="true" />
+        <div className="border-b-2 border-black w-48 h-2" aria-hidden="true" />
       </div>
 
-      {/* Tabel item belanja */}
-      <table className="w-full border-collapse">
+      {/* Tabel item belanja — garis kotak PENUH di tiap sel, meniru blanko fisik */}
+      <table className="w-full border-collapse border border-black">
         <thead>
-          <tr className="border-t-2 border-b-2 border-black">
-            <th className="w-24 py-1 text-left font-bold">BANYAKNYA</th>
-            <th className="py-1 text-left font-bold">NAMA BARANG</th>
-            <th className="w-28 py-1 text-left font-bold">HARGA</th>
-            <th className="w-32 py-1 text-left font-bold">JUMLAH</th>
+          <tr>
+            <th className="w-20 border border-black py-1 px-1 text-left font-bold">BANYAKNYA</th>
+            <th className="border border-black py-1 px-1 text-left font-bold">NAMA BARANG</th>
+            <th className="w-24 border border-black py-1 px-1 text-left font-bold">HARGA</th>
+            <th className="w-28 border border-black py-1 px-1 text-left font-bold">JUMLAH</th>
           </tr>
         </thead>
         <tbody>
           {rows.map((item, idx) => (
-            <tr key={idx} className="border-b border-black">
-              <td className="py-2 align-top">{item?.banyaknya || '\u00A0'}</td>
-              <td className="py-2 align-top">{item?.nama_barang || '\u00A0'}</td>
-              <td className="py-2 align-top">{item?.harga ? formatRupiah(item.harga) : '\u00A0'}</td>
-              <td className="py-2 align-top">{item?.jumlah ? formatRupiah(item.jumlah) : '\u00A0'}</td>
+            <tr key={idx}>
+              <td className="border border-black py-1 px-1 align-top">{item?.banyaknya || '\u00A0'}</td>
+              <td className="border border-black py-1 px-1 align-top">{item?.nama_barang || '\u00A0'}</td>
+              <td className="border border-black py-1 px-1 align-top">{item?.harga ? formatRupiah(item.harga) : '\u00A0'}</td>
+              <td className="border border-black py-1 px-1 align-top">{item?.jumlah ? formatRupiah(item.jumlah) : '\u00A0'}</td>
             </tr>
           ))}
         </tbody>
       </table>
 
       {/* Jumlah Rp. */}
-      <div className="flex justify-end mt-1 mb-10">
+      <div className="flex justify-end mt-1 mb-4">
         <div className="flex items-baseline gap-2">
           <span className="font-semibold">Jumlah Rp.</span>
-          <span className="inline-block min-w-[140px] text-right px-2 border-b-4 border-double border-black font-semibold">
+          <span className="inline-block min-w-[120px] text-right px-2 border-b-4 border-double border-black font-semibold">
             {formatRupiah(total)}
           </span>
         </div>
@@ -145,13 +150,13 @@ const NotaPrintTemplate = forwardRef(function NotaPrintTemplate({ sekolah, data 
       <div className="flex justify-between px-4">
         <div className="text-center">
           <p>Tanda Terima</p>
-          <div className="h-16" />
-          <div className="border-b border-black w-40" />
+          <div className="h-8" />
+          <div className="border-b border-black w-36" />
         </div>
         <div className="text-center">
           <p>Hormat kami,</p>
-          <div className="h-16" />
-          <div className="border-b border-black w-40" />
+          <div className="h-8" />
+          <div className="border-b border-black w-36" />
         </div>
       </div>
     </div>
