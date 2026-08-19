@@ -1,12 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import * as XLSX from 'xlsx'
-import { supabase } from '../lib/supabaseClient'
-import Layout from '../components/Layout'
+import { supabase } from '../lib/supabaseClient' // sesuaikan path kalau berbeda di project kamu
 import NotaPrintTemplate from '../components/NotaPrintTemplate'
-import KuitansiJasaPrintTemplate from '../components/KuitansiJasaPrintTemplate'
 
 // -----------------------------------------------------------------
-// Baris item kosong untuk form manual (khusus jenis "barang")
+// Baris item kosong untuk form manual
 // -----------------------------------------------------------------
 function itemKosong() {
   return { banyaknya: '', satuan: '', nama_barang: '', harga: '' }
@@ -14,18 +12,12 @@ function itemKosong() {
 
 function formKosong() {
   return {
-    jenis: 'barang', // 'barang' | 'jasa'
     no_nota: '',
     tanggal: new Date().toISOString().slice(0, 10),
     tuan: '',
     toko: '',
     alamat_lanjutan: '',
     items: [itemKosong()],
-    // field khusus jenis "jasa"
-    dari: '',
-    uang_sejumlah: '',
-    untuk_pembayaran: '',
-    jumlah_jasa: '',
   }
 }
 
@@ -52,32 +44,18 @@ function mapUntukCetak(nota) {
   }
 }
 
-// Ubah baris nota (jenis "jasa") jadi bentuk yang dipahami
-// KuitansiJasaPrintTemplate: { no_kwitansi, tanggal, dari, uang_sejumlah, untuk_pembayaran, jumlah }
-function mapUntukCetakJasa(nota) {
-  return {
-    no_kwitansi: nota.no_nota,
-    tanggal: nota.tanggal,
-    dari: nota.dari,
-    uang_sejumlah: nota.uang_sejumlah,
-    untuk_pembayaran: nota.untuk_pembayaran,
-    jumlah: nota.jumlah_total,
-  }
-}
-
 export default function Nota({ sekolah }) {
   const [daftar, setDaftar] = useState([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState(null)
   const [form, setForm] = useState(formKosong())
-  const [notaCetak, setNotaCetak] = useState(null) // data siap cetak (jenis barang)
-  const [jasaCetak, setJasaCetak] = useState(null) // data siap cetak (jenis jasa)
+  const [notaCetak, setNotaCetak] = useState(null) // data yang lagi disiapkan untuk print
+  const [notaLihat, setNotaLihat] = useState(null) // data yang lagi ditampilkan di modal "Lihat" (read-only)
   const [importBusy, setImportBusy] = useState(false)
   const [importRingkasan, setImportRingkasan] = useState(null)
 
   const printRef = useRef(null)
-  const printRefJasa = useRef(null)
   const fileInputRef = useRef(null)
 
   async function muatDaftar() {
@@ -105,19 +83,23 @@ export default function Nota({ sekolah }) {
   function bukaEdit(row) {
     setEditingId(row.id)
     setForm({
-      jenis: row.jenis || 'barang',
       no_nota: row.no_nota || '',
       tanggal: row.tanggal || new Date().toISOString().slice(0, 10),
       tuan: row.tuan || '',
       toko: row.toko || '',
       alamat_lanjutan: row.alamat_lanjutan || '',
       items: row.items?.length ? row.items : [itemKosong()],
-      dari: row.dari || '',
-      uang_sejumlah: row.uang_sejumlah || '',
-      untuk_pembayaran: row.untuk_pembayaran || '',
-      jumlah_jasa: row.jenis === 'jasa' ? (row.jumlah_total ?? '') : '',
     })
     setShowForm(true)
+  }
+
+  // ------------------------- Lihat (read-only) -------------------------
+  function bukaLihat(row) {
+    setNotaLihat(row)
+  }
+
+  function tutupLihat() {
+    setNotaLihat(null)
   }
 
   function ubahItem(idx, field, value) {
@@ -138,38 +120,15 @@ export default function Nota({ sekolah }) {
 
   async function simpanForm(e) {
     e.preventDefault()
-
-    let payload
-
-    if (form.jenis === 'jasa') {
-      payload = {
-        jenis: 'jasa',
-        no_nota: form.no_nota,
-        tanggal: form.tanggal,
-        tuan: '',
-        toko: '',
-        alamat_lanjutan: '',
-        items: [],
-        dari: form.dari,
-        uang_sejumlah: form.uang_sejumlah,
-        untuk_pembayaran: form.untuk_pembayaran,
-        jumlah_total: Number(form.jumlah_jasa) || 0,
-      }
-    } else {
-      const items = form.items.filter((it) => it.nama_barang?.trim())
-      payload = {
-        jenis: 'barang',
-        no_nota: form.no_nota,
-        tanggal: form.tanggal,
-        tuan: form.tuan,
-        toko: form.toko,
-        alamat_lanjutan: form.alamat_lanjutan,
-        items,
-        dari: '',
-        uang_sejumlah: '',
-        untuk_pembayaran: '',
-        jumlah_total: hitungTotal(items),
-      }
+    const items = form.items.filter((it) => it.nama_barang?.trim())
+    const payload = {
+      no_nota: form.no_nota,
+      tanggal: form.tanggal,
+      tuan: form.tuan,
+      toko: form.toko,
+      alamat_lanjutan: form.alamat_lanjutan,
+      items,
+      jumlah_total: hitungTotal(items),
     }
 
     const query = editingId
@@ -197,24 +156,18 @@ export default function Nota({ sekolah }) {
 
   // ------------------------- Cetak -------------------------
   function cetakNota(row) {
-    if (row.jenis === 'jasa') {
-      setJasaCetak(mapUntukCetakJasa(row))
-    } else {
-      setNotaCetak(mapUntukCetak(row))
-    }
+    setNotaCetak(mapUntukCetak(row))
     // beri waktu render sebelum memanggil print
     setTimeout(() => window.print(), 100)
   }
 
-  // ------------------------- Impor Massal (khusus jenis "barang") -------------------------
+  // ------------------------- Impor Massal -------------------------
   // Template Excel yang diharapkan (baris pertama = header):
   // No Nota | Tanggal | Tuan | Toko | Banyaknya | Satuan | Nama Barang | Harga
   //
   // Beberapa baris dengan "No Nota" yang sama akan digabung jadi satu nota
   // dengan banyak baris barang (items). Tanggal/Tuan/Toko cukup diisi di
   // baris pertama tiap kelompok No Nota, baris berikutnya boleh dikosongkan.
-  // Catatan: impor massal untuk jenis "jasa" belum ditambahkan di tahap ini —
-  // input jasa dilakukan lewat form manual dulu.
   function unduhTemplateExcel() {
     const contoh = [
       {
@@ -256,25 +209,23 @@ export default function Nota({ sekolah }) {
       const ws = wb.Sheets[wb.SheetNames[0]]
       const rows = XLSX.utils.sheet_to_json(ws, { defval: '' })
 
+      // Kelompokkan baris berdasarkan "No Nota"
       const kelompok = new Map()
       for (const r of rows) {
         const noNota = String(r['No Nota'] ?? '').trim()
         if (!noNota) continue
         if (!kelompok.has(noNota)) {
           kelompok.set(noNota, {
-            jenis: 'barang',
             no_nota: noNota,
             tanggal: r['Tanggal'] || new Date().toISOString().slice(0, 10),
             tuan: r['Tuan'] || '',
             toko: r['Toko'] || '',
             alamat_lanjutan: '',
             items: [],
-            dari: '',
-            uang_sejumlah: '',
-            untuk_pembayaran: '',
           })
         }
         const grup = kelompok.get(noNota)
+        // Isi tuan/toko/tanggal kalau baris pertama grup kosong tapi baris ini ada isinya
         if (!grup.tuan && r['Tuan']) grup.tuan = r['Tuan']
         if (!grup.toko && r['Toko']) grup.toko = r['Toko']
         if (r['Nama Barang']) {
@@ -312,36 +263,34 @@ export default function Nota({ sekolah }) {
     }
   }
 
-  const totalForm =
-    form.jenis === 'jasa' ? Number(form.jumlah_jasa) || 0 : hitungTotal(form.items)
+  const totalForm = hitungTotal(form.items)
 
   return (
-    <Layout
-      title="Nota Belanja"
-      subtitle="Riwayat semua nota belanja (barang & jasa) yang pernah dibuat"
-      actions={
-        <>
-          <button onClick={unduhTemplateExcel} className="px-3 py-2 rounded bg-gray-200 text-sm">
-            Unduh Template
-          </button>
-          <label className="px-3 py-2 rounded bg-emerald-600 text-white text-sm cursor-pointer">
-            {importBusy ? 'Mengimpor...' : 'Impor Massal'}
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".xlsx,.xls,.csv"
-              className="hidden"
-              disabled={importBusy}
-              onChange={handleFileImpor}
-            />
-          </label>
-          <button onClick={bukaTambah} className="px-3 py-2 rounded bg-blue-600 text-white text-sm">
-            + Tambah Nota
-          </button>
-        </>
-      }
-    >
+    <div className="p-4">
       <div className="no-print">
+        <div className="flex items-center justify-between mb-4">
+          <h1 className="text-xl font-bold">Nota Belanja</h1>
+          <div className="flex gap-2">
+            <button onClick={unduhTemplateExcel} className="px-3 py-2 rounded bg-gray-200 text-sm">
+              Unduh Template
+            </button>
+            <label className="px-3 py-2 rounded bg-emerald-600 text-white text-sm cursor-pointer">
+              {importBusy ? 'Mengimpor...' : 'Impor Massal'}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".xlsx,.xls,.csv"
+                className="hidden"
+                disabled={importBusy}
+                onChange={handleFileImpor}
+              />
+            </label>
+            <button onClick={bukaTambah} className="px-3 py-2 rounded bg-blue-600 text-white text-sm">
+              + Tambah Nota
+            </button>
+          </div>
+        </div>
+
         {importRingkasan && (
           <div
             className={`mb-4 p-3 rounded text-sm ${
@@ -359,41 +308,32 @@ export default function Nota({ sekolah }) {
           <table className="w-full text-sm">
             <thead className="bg-gray-100">
               <tr>
-                <th className="p-2 text-left">Jenis</th>
                 <th className="p-2 text-left">No. Nota</th>
                 <th className="p-2 text-left">Tanggal</th>
-                <th className="p-2 text-left">Tuan / Dari</th>
-                <th className="p-2 text-left">Toko / Untuk Pembayaran</th>
+                <th className="p-2 text-left">Tuan</th>
+                <th className="p-2 text-left">Toko</th>
                 <th className="p-2 text-right">Jumlah</th>
                 <th className="p-2 text-center">Aksi</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={7} className="p-4 text-center text-gray-500">Memuat...</td></tr>
+                <tr><td colSpan={6} className="p-4 text-center text-gray-500">Memuat...</td></tr>
               ) : daftar.length === 0 ? (
-                <tr><td colSpan={7} className="p-4 text-center text-gray-500">Belum ada nota</td></tr>
+                <tr><td colSpan={6} className="p-4 text-center text-gray-500">Belum ada nota</td></tr>
               ) : (
                 daftar.map((row) => (
                   <tr key={row.id} className="border-t">
-                    <td className="p-2">
-                      <span
-                        className={`px-2 py-0.5 rounded text-xs ${
-                          row.jenis === 'jasa' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'
-                        }`}
-                      >
-                        {row.jenis === 'jasa' ? 'Jasa' : 'Barang'}
-                      </span>
-                    </td>
                     <td className="p-2">{row.no_nota}</td>
                     <td className="p-2">{row.tanggal}</td>
-                    <td className="p-2">{row.jenis === 'jasa' ? row.dari : row.tuan}</td>
-                    <td className="p-2">{row.jenis === 'jasa' ? row.untuk_pembayaran : row.toko}</td>
+                    <td className="p-2">{row.tuan}</td>
+                    <td className="p-2">{row.toko}</td>
                     <td className="p-2 text-right">
                       {new Intl.NumberFormat('id-ID').format(row.jumlah_total || 0)}
                     </td>
                     <td className="p-2">
                       <div className="flex justify-center gap-2 text-xs">
+                        <button onClick={() => bukaLihat(row)} className="text-gray-600">Lihat</button>
                         <button onClick={() => cetakNota(row)} className="text-blue-600">Cetak</button>
                         <button onClick={() => bukaEdit(row)} className="text-amber-600">Edit</button>
                         <button onClick={() => hapusNota(row.id)} className="text-red-600">Hapus</button>
@@ -417,28 +357,6 @@ export default function Nota({ sekolah }) {
                 {editingId ? 'Edit Nota' : 'Tambah Nota'}
               </h2>
 
-              <div className="mb-4">
-                <label className="block text-xs mb-1">Jenis</label>
-                <div className="flex gap-4 text-sm">
-                  <label className="flex items-center gap-1">
-                    <input
-                      type="radio"
-                      checked={form.jenis === 'barang'}
-                      onChange={() => setForm((f) => ({ ...f, jenis: 'barang' }))}
-                    />
-                    Barang
-                  </label>
-                  <label className="flex items-center gap-1">
-                    <input
-                      type="radio"
-                      checked={form.jenis === 'jasa'}
-                      onChange={() => setForm((f) => ({ ...f, jenis: 'jasa' }))}
-                    />
-                    Jasa
-                  </label>
-                </div>
-              </div>
-
               <div className="grid grid-cols-2 gap-3 mb-3">
                 <div>
                   <label className="block text-xs mb-1">No. Nota</label>
@@ -458,122 +376,75 @@ export default function Nota({ sekolah }) {
                     onChange={(e) => setForm((f) => ({ ...f, tanggal: e.target.value }))}
                   />
                 </div>
+                <div>
+                  <label className="block text-xs mb-1">Tuan</label>
+                  <input
+                    className="border rounded w-full p-2 text-sm"
+                    value={form.tuan}
+                    onChange={(e) => setForm((f) => ({ ...f, tuan: e.target.value }))}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs mb-1">Toko</label>
+                  <input
+                    className="border rounded w-full p-2 text-sm"
+                    value={form.toko}
+                    onChange={(e) => setForm((f) => ({ ...f, toko: e.target.value }))}
+                  />
+                </div>
               </div>
 
-              {form.jenis === 'barang' ? (
-                <>
-                  <div className="grid grid-cols-2 gap-3 mb-3">
-                    <div>
-                      <label className="block text-xs mb-1">Tuan</label>
-                      <input
-                        className="border rounded w-full p-2 text-sm"
-                        value={form.tuan}
-                        onChange={(e) => setForm((f) => ({ ...f, tuan: e.target.value }))}
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs mb-1">Toko</label>
-                      <input
-                        className="border rounded w-full p-2 text-sm"
-                        value={form.toko}
-                        onChange={(e) => setForm((f) => ({ ...f, toko: e.target.value }))}
-                      />
-                    </div>
-                  </div>
-
-                  <h3 className="text-sm font-semibold mt-4 mb-2">Daftar Barang</h3>
-                  <div className="space-y-2">
-                    {form.items.map((it, idx) => (
-                      <div key={idx} className="grid grid-cols-12 gap-2 items-center">
-                        <input
-                          className="col-span-2 border rounded p-2 text-sm"
-                          placeholder="Qty"
-                          type="number"
-                          value={it.banyaknya}
-                          onChange={(e) => ubahItem(idx, 'banyaknya', e.target.value)}
-                        />
-                        <input
-                          className="col-span-2 border rounded p-2 text-sm"
-                          placeholder="Satuan"
-                          value={it.satuan}
-                          onChange={(e) => ubahItem(idx, 'satuan', e.target.value)}
-                        />
-                        <input
-                          className="col-span-4 border rounded p-2 text-sm"
-                          placeholder="Nama barang"
-                          value={it.nama_barang}
-                          onChange={(e) => ubahItem(idx, 'nama_barang', e.target.value)}
-                        />
-                        <input
-                          className="col-span-2 border rounded p-2 text-sm"
-                          placeholder="Harga satuan"
-                          type="number"
-                          value={it.harga}
-                          onChange={(e) => ubahItem(idx, 'harga', e.target.value)}
-                        />
-                        <div className="col-span-1 text-xs text-right">
-                          {new Intl.NumberFormat('id-ID').format(hitungJumlahBaris(it))}
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => hapusBarisItem(idx)}
-                          className="col-span-1 text-red-600 text-xs"
-                        >
-                          Hapus
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={tambahBarisItem}
-                    className="mt-2 text-sm text-blue-600"
-                  >
-                    + Tambah baris barang
-                  </button>
-                </>
-              ) : (
-                <div className="grid grid-cols-2 gap-3 mb-3">
-                  <div className="col-span-2">
-                    <label className="block text-xs mb-1">Telah terima dari</label>
+              <h3 className="text-sm font-semibold mt-4 mb-2">Daftar Barang</h3>
+              <div className="space-y-2">
+                {form.items.map((it, idx) => (
+                  <div key={idx} className="grid grid-cols-12 gap-2 items-center">
                     <input
-                      className="border rounded w-full p-2 text-sm"
-                      value={form.dari}
-                      onChange={(e) => setForm((f) => ({ ...f, dari: e.target.value }))}
-                    />
-                  </div>
-                  <div className="col-span-2">
-                    <label className="block text-xs mb-1">
-                      Uang sejumlah (terbilang — ditulis dengan huruf)
-                    </label>
-                    <input
-                      className="border rounded w-full p-2 text-sm"
-                      placeholder="mis. Lima ratus ribu rupiah"
-                      value={form.uang_sejumlah}
-                      onChange={(e) => setForm((f) => ({ ...f, uang_sejumlah: e.target.value }))}
-                    />
-                  </div>
-                  <div className="col-span-2">
-                    <label className="block text-xs mb-1">Untuk pembayaran</label>
-                    <textarea
-                      className="border rounded w-full p-2 text-sm"
-                      rows={2}
-                      value={form.untuk_pembayaran}
-                      onChange={(e) => setForm((f) => ({ ...f, untuk_pembayaran: e.target.value }))}
-                    />
-                  </div>
-                  <div className="col-span-2">
-                    <label className="block text-xs mb-1">Jumlah (Rp, angka)</label>
-                    <input
+                      className="col-span-2 border rounded p-2 text-sm"
+                      placeholder="Qty"
                       type="number"
-                      className="border rounded w-full p-2 text-sm"
-                      value={form.jumlah_jasa}
-                      onChange={(e) => setForm((f) => ({ ...f, jumlah_jasa: e.target.value }))}
+                      value={it.banyaknya}
+                      onChange={(e) => ubahItem(idx, 'banyaknya', e.target.value)}
                     />
+                    <input
+                      className="col-span-2 border rounded p-2 text-sm"
+                      placeholder="Satuan"
+                      value={it.satuan}
+                      onChange={(e) => ubahItem(idx, 'satuan', e.target.value)}
+                    />
+                    <input
+                      className="col-span-4 border rounded p-2 text-sm"
+                      placeholder="Nama barang"
+                      value={it.nama_barang}
+                      onChange={(e) => ubahItem(idx, 'nama_barang', e.target.value)}
+                    />
+                    <input
+                      className="col-span-2 border rounded p-2 text-sm"
+                      placeholder="Harga satuan"
+                      type="number"
+                      value={it.harga}
+                      onChange={(e) => ubahItem(idx, 'harga', e.target.value)}
+                    />
+                    <div className="col-span-1 text-xs text-right">
+                      {new Intl.NumberFormat('id-ID').format(hitungJumlahBaris(it))}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => hapusBarisItem(idx)}
+                      className="col-span-1 text-red-600 text-xs"
+                    >
+                      Hapus
+                    </button>
                   </div>
-                </div>
-              )}
+                ))}
+              </div>
+
+              <button
+                type="button"
+                onClick={tambahBarisItem}
+                className="mt-2 text-sm text-blue-600"
+              >
+                + Tambah baris barang
+              </button>
 
               <div className="flex justify-end mt-4 font-semibold text-sm">
                 Jumlah Total: Rp {new Intl.NumberFormat('id-ID').format(totalForm)}
@@ -594,15 +465,111 @@ export default function Nota({ sekolah }) {
             </form>
           </div>
         )}
+
+        {/* Modal Lihat (read-only) */}
+        {notaLihat && (
+          <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg shadow-lg w-full max-w-3xl max-h-[90vh] overflow-y-auto p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-bold">Detail Nota</h2>
+                <button onClick={tutupLihat} className="text-gray-500 text-sm">
+                  ✕ Tutup
+                </button>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 mb-4 text-sm">
+                <div>
+                  <div className="text-xs text-gray-500">No. Nota</div>
+                  <div className="font-medium">{notaLihat.no_nota || '-'}</div>
+                </div>
+                <div>
+                  <div className="text-xs text-gray-500">Tanggal</div>
+                  <div className="font-medium">{notaLihat.tanggal || '-'}</div>
+                </div>
+                <div>
+                  <div className="text-xs text-gray-500">Tuan</div>
+                  <div className="font-medium">{notaLihat.tuan || '-'}</div>
+                </div>
+                <div>
+                  <div className="text-xs text-gray-500">Toko</div>
+                  <div className="font-medium">{notaLihat.toko || '-'}</div>
+                </div>
+                {notaLihat.alamat_lanjutan && (
+                  <div className="col-span-2">
+                    <div className="text-xs text-gray-500">Alamat Lanjutan</div>
+                    <div className="font-medium">{notaLihat.alamat_lanjutan}</div>
+                  </div>
+                )}
+              </div>
+
+              <h3 className="text-sm font-semibold mb-2">Daftar Barang</h3>
+              <div className="overflow-x-auto border rounded mb-4">
+                <table className="w-full text-sm">
+                  <thead className="bg-gray-100">
+                    <tr>
+                      <th className="p-2 text-left">Banyaknya</th>
+                      <th className="p-2 text-left">Nama Barang</th>
+                      <th className="p-2 text-right">Harga</th>
+                      <th className="p-2 text-right">Jumlah</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(notaLihat.items || []).length === 0 ? (
+                      <tr><td colSpan={4} className="p-3 text-center text-gray-500">Tidak ada barang</td></tr>
+                    ) : (
+                      notaLihat.items.map((it, idx) => (
+                        <tr key={idx} className="border-t">
+                          <td className="p-2">{[it.banyaknya, it.satuan].filter(Boolean).join(' ')}</td>
+                          <td className="p-2">{it.nama_barang}</td>
+                          <td className="p-2 text-right">
+                            {new Intl.NumberFormat('id-ID').format(Number(it.harga) || 0)}
+                          </td>
+                          <td className="p-2 text-right">
+                            {new Intl.NumberFormat('id-ID').format(it.jumlah ?? hitungJumlahBaris(it))}
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="flex justify-end font-semibold text-sm mb-4">
+                Jumlah Total: Rp {new Intl.NumberFormat('id-ID').format(notaLihat.jumlah_total || 0)}
+              </div>
+
+              <div className="flex justify-end gap-2">
+                <button
+                  onClick={() => {
+                    tutupLihat()
+                    cetakNota(notaLihat)
+                  }}
+                  className="px-4 py-2 rounded bg-blue-600 text-white text-sm"
+                >
+                  Cetak
+                </button>
+                <button
+                  onClick={() => {
+                    tutupLihat()
+                    bukaEdit(notaLihat)
+                  }}
+                  className="px-4 py-2 rounded bg-amber-500 text-white text-sm"
+                >
+                  Edit
+                </button>
+                <button onClick={tutupLihat} className="px-4 py-2 rounded bg-gray-200 text-sm">
+                  Tutup
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Wajib DI LUAR elemen "no-print" — ini yang tampil saat window.print() */}
       {notaCetak && (
         <NotaPrintTemplate ref={printRef} sekolah={sekolah} data={notaCetak} />
       )}
-      {jasaCetak && (
-        <KuitansiJasaPrintTemplate ref={printRefJasa} sekolah={sekolah} data={jasaCetak} />
-      )}
-    </Layout>
+    </div>
   )
 }
