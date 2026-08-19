@@ -23,6 +23,15 @@ const GUILLOCHE_SOFT = 'rgba(41,95,109,0.14)'
 // bukan menempel di pojok atas).
 const TOP_OFFSET_MM = 123
 
+// Ukuran kwitansi (lebar & tinggi) — sebelumnya lebar tetap 125mm dan
+// tinggi mengikuti konten (h-fit). Diperbesar sesuai permintaan:
+// lebar +80mm (8cm), tinggi +40mm (4cm) — tinggi ditambahkan lewat
+// padding vertikal ekstra pada slip (bukan angka tinggi absolut),
+// supaya tetap fleksibel mengikuti konten tapi selalu lebih tinggi 4cm.
+const SLIP_WIDTH_MM = 205 // 125mm + 80mm
+const EXTRA_HEIGHT_MM = 40 // total tinggi tambahan (4cm)
+const EXTRA_PAD_V_MM = EXTRA_HEIGHT_MM / 2 // dibagi rata atas & bawah
+
 // Latar motif guilloche: pola ubin (tile) berisi lingkaran-lingkaran
 // bersinggungan, menghasilkan efek jalinan garis khas kertas berharga.
 // (Beda dengan NotaPrintTemplate yang polos hitam-putih — kwitansi meniru
@@ -141,8 +150,11 @@ const KuitansiJasaPrintTemplate = forwardRef(function KuitansiJasaPrintTemplate(
       <div
         className="flex box-border h-fit"
         style={{
-          width: '125mm',
-          padding: '2mm',
+          width: `${SLIP_WIDTH_MM}mm`,
+          paddingTop: `${2 + EXTRA_PAD_V_MM}mm`,
+          paddingBottom: `${2 + EXTRA_PAD_V_MM}mm`,
+          paddingLeft: '2mm',
+          paddingRight: '2mm',
           background: PAPER_DEEP,
           fontFamily: 'Georgia, "Times New Roman", serif',
         }}
