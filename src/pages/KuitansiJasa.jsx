@@ -4,7 +4,7 @@ import Layout from '../components/Layout'
 import KuitansiJasaModal from '../components/KuitansiJasaModal'
 import KuitansiJasaPrintTemplate from '../lib/KuitansiJasaPrintTemplate'
 import { terbilangRupiah } from '../lib/terbilang'
-import { Plus, Printer, Search, Loader2, Receipt, Trash2 } from 'lucide-react'
+import { Plus, Printer, Search, Loader2, Receipt, Trash2, Copy } from 'lucide-react'
 
 function formatRupiah(angka) {
   return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(angka || 0)
@@ -22,6 +22,10 @@ export default function KuitansiJasa() {
   const [showBuat, setShowBuat] = useState(false)
   const [sekolah, setSekolah] = useState(null)
   const [menghapus, setMenghapus] = useState(null) // id yang sedang dihapus
+
+  // Baris sumber saat user menekan tombol "Duplikat" — dipakai untuk pre-fill
+  // KuitansiJasaModal. null berarti form dibuka kosong seperti biasa.
+  const [duplikatDari, setDuplikatDari] = useState(null)
 
   // Baris yang sedang dicetak ulang
   const [cetakUlang, setCetakUlang] = useState(null)
@@ -68,6 +72,21 @@ export default function KuitansiJasa() {
     setCetakUlang(row)
   }
 
+  // Membuka form "Buat Kuitansi Jasa" dengan Telah Terima Dari, Jumlah, dan
+  // Untuk Pembayaran/Keterangan sudah terisi dari baris yang dipilih — supaya
+  // transaksi berulang (transport kegiatan, honor, dsb.) tidak perlu diketik
+  // ulang dari nol. No. Bukti dan Tanggal tetap dikosongkan/direset di dalam
+  // modal karena keduanya harus baru untuk tiap transaksi.
+  function handleDuplikat(row) {
+    setDuplikatDari(row)
+    setShowBuat(true)
+  }
+
+  function handleBuatBaru() {
+    setDuplikatDari(null)
+    setShowBuat(true)
+  }
+
   useEffect(() => {
     if (cetakUlang) {
       const t = setTimeout(() => {
@@ -92,6 +111,7 @@ export default function KuitansiJasa() {
 
   function handleTutupBuat() {
     setShowBuat(false)
+    setDuplikatDari(null)
     loadData()
   }
 
@@ -113,7 +133,7 @@ export default function KuitansiJasa() {
       title="Kuitansi Jasa"
       subtitle="Riwayat kuitansi jasa (transport, honor kegiatan, dsb.)"
       actions={
-        <button className="btn-primary" onClick={() => setShowBuat(true)}>
+        <button className="btn-primary" onClick={handleBuatBaru}>
           <Plus size={16} /> Buat Kuitansi Jasa
         </button>
       }
@@ -170,6 +190,13 @@ export default function KuitansiJasa() {
                   <div className="flex items-center gap-1 justify-end">
                     <button
                       className="icon-btn"
+                      title="Duplikat (isi ulang dari transaksi ini)"
+                      onClick={() => handleDuplikat(d)}
+                    >
+                      <Copy size={15} />
+                    </button>
+                    <button
+                      className="icon-btn"
                       title="Cetak Ulang"
                       onClick={() => handleCetakUlang(d)}
                     >
@@ -194,6 +221,7 @@ export default function KuitansiJasa() {
       {showBuat && (
         <KuitansiJasaModal
           sekolah={sekolah}
+          initialData={duplikatDari}
           onClose={handleTutupBuat}
         />
       )}
