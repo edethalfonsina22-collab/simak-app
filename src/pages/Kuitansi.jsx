@@ -4,7 +4,7 @@ import Layout from '../components/Layout'
 import KuitansiModal from '../components/KuitansiModal'
 import KuitansiPrintTemplate from '../lib/KuitansiPrintTemplate'
 import BulkImportModal from '../components/BulkImportModal'
-import { Plus, Printer, Search, Loader2, Receipt, Trash2, FileSpreadsheet, Pencil, RefreshCw } from 'lucide-react'
+import { Plus, Printer, Search, Loader2, Receipt, Trash2, FileSpreadsheet, Pencil, RefreshCw, Repeat } from 'lucide-react'
 
 function formatRupiah(angka) {
   return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(angka || 0)
@@ -63,7 +63,7 @@ function tanggalDariNilaiImpor(nilai) {
   return teks
 }
 
-// BARU: hitung tahun anggaran otomatis dari tanggal transaksi, dengan format
+// Hitung tahun anggaran otomatis dari tanggal transaksi, dengan format
 // "AAAA/BBBB" (mis. Juli 2025 s/d Juni 2026 -> "2025/2026").
 // Ini dipakai sebagai fallback kalau kolom tahun_anggaran di Excel kosong ATAU
 // isinya cuma satu tahun (mis. "2025") sehingga tidak jelas semesternya.
@@ -86,7 +86,7 @@ function mapRowKuitansi(row) {
 
   const tanggal = tanggalDariNilaiImpor(row['tanggal(YYYY-MM-DD)'])
 
-  // BARU: kalau kolom tahun_anggaran di Excel kosong, atau isinya cuma satu
+  // Kalau kolom tahun_anggaran di Excel kosong, atau isinya cuma satu
   // tahun tunggal (mis. "2025") bukan format "2025/2026", hitung otomatis dari
   // tanggal transaksi supaya konsisten dengan periode Juli-Juni.
   const tahunAnggaranExcel = String(row['tahun_anggaran'] || '').trim()
@@ -118,13 +118,14 @@ export default function Kuitansi() {
   const [data, setData] = useState([])
   const [loading, setLoading] = useState(true)
   const [pencarian, setPencarian] = useState('')
-  const [tahunAnggaranFilter, setTahunAnggaranFilter] = useState('semua') // BARU
+  const [tahunAnggaranFilter, setTahunAnggaranFilter] = useState('semua')
   const [showBuat, setShowBuat] = useState(false)
-  const [editRow, setEditRow] = useState(null) // BARU: baris kuitansi yang sedang diedit (null = mode buat baru)
+  const [editRow, setEditRow] = useState(null) // baris kuitansi yang sedang diedit (null = mode buat baru)
   const [showImport, setShowImport] = useState(false)
   const [sekolah, setSekolah] = useState(null)
   const [menghapus, setMenghapus] = useState(null) // id yang sedang dihapus
-  const [menyinkron, setMenyinkron] = useState(null) // BARU: id yang sedang disinkron manual ke Nota
+  const [menyinkron, setMenyinkron] = useState(null) // id yang sedang disinkron manual ke Nota
+  const [menyinkronJasa, setMenyinkronJasa] = useState(null) // BARU: id yang sedang disinkron ke Kuitansi Jasa
 
   // Baris yang sedang dicetak ulang
   const [cetakUlang, setCetakUlang] = useState(null)
@@ -155,7 +156,7 @@ export default function Kuitansi() {
     })
   }, [])
 
-  // BARU: daftar tahun anggaran yang benar-benar ada di data, urut terbaru dulu.
+  // Daftar tahun anggaran yang benar-benar ada di data, urut terbaru dulu.
   const daftarTahunAnggaran = useMemo(() => {
     const set = new Set()
     data.forEach((d) => {
@@ -166,7 +167,7 @@ export default function Kuitansi() {
 
   const dataTersaring = useMemo(() => {
     return data.filter((d) => {
-      // BARU: filter tahun anggaran
+      // Filter tahun anggaran
       if (tahunAnggaranFilter !== 'semua' && d.tahun_anggaran !== tahunAnggaranFilter) {
         return false
       }
@@ -206,13 +207,13 @@ export default function Kuitansi() {
     loadData()
   }
 
-  // BARU: buka modal dalam mode BUAT BARU (bukan edit)
+  // Buka modal dalam mode BUAT BARU (bukan edit)
   function handleBukaBuat() {
     setEditRow(null)
     setShowBuat(true)
   }
 
-  // BARU: buka modal dalam mode EDIT untuk baris tertentu
+  // Buka modal dalam mode EDIT untuk baris tertentu
   function handleEdit(row) {
     setEditRow(row)
     setShowBuat(true)
@@ -220,11 +221,11 @@ export default function Kuitansi() {
 
   function handleTutupBuat() {
     setShowBuat(false)
-    setEditRow(null) // BARU: reset mode edit setiap modal ditutup
+    setEditRow(null) // reset mode edit setiap modal ditutup
     loadData()
   }
 
-  // BARU: sinkron manual ke Nota. Berguna untuk kuitansi yang dibuat SEBELUM
+  // Sinkron manual ke Nota. Berguna untuk kuitansi yang dibuat SEBELUM
   // trigger database dipasang, jadi belum otomatis punya baris Nota terkait.
   // Caranya: "sentuh" baris ini dengan UPDATE tanpa mengubah nilai apa pun —
   // ini otomatis memicu trigger sync_kuitansi_ke_nota di database.
@@ -240,6 +241,42 @@ export default function Kuitansi() {
       return
     }
     alert('Berhasil disinkron ke Nota.')
+  }
+
+  // BARU: sinkron manual ke Kuitansi Jasa. Beda dari sinkron ke Nota — tidak
+  // ada trigger database untuk arah ini, jadi dibuat baris BARU langsung di
+  // tabel `kuitansi` dengan jenis = 'kuitansi_jasa', menyalin data dari baris
+  // Kuitansi ini (nomor baru digenerate otomatis lewat next_nomor_kuitansi,
+  // seperti alur "Buat Kuitansi Jasa" biasa). Tanggal & data lain disalin apa
+  // adanya karena mewakili transaksi yang sama, cukup dicatat di dua sisi.
+  // Berguna untuk transaksi lama yang sudah ada di Kuitansi tapi belum
+  // tercatat di riwayat Kuitansi Jasa.
+  async function handleSinkronKuitansiJasa(row) {
+    if (!confirm(`Salin kuitansi "${row.nomor || '-'}" ke riwayat Kuitansi Jasa?`)) return
+    setMenyinkronJasa(row.id)
+    try {
+      const { data: nomorData, error: nomorErr } = await supabase.rpc('next_nomor_kuitansi', { p_jenis: 'kuitansi_jasa' })
+      if (nomorErr) throw nomorErr
+
+      const payload = {
+        jenis: 'kuitansi_jasa',
+        nomor: nomorData,
+        no_bukti: row.no_bukti,
+        tanggal: row.tanggal,
+        diterima_dari: row.diterima_dari,
+        untuk_pembayaran: row.untuk_pembayaran,
+        jumlah_total: row.jumlah_total,
+      }
+
+      const { error: insertErr } = await supabase.from('kuitansi').insert(payload)
+      if (insertErr) throw insertErr
+
+      alert('Berhasil disinkron ke Kuitansi Jasa.')
+    } catch (err) {
+      alert('Gagal menyinkron ke Kuitansi Jasa: ' + err.message)
+    } finally {
+      setMenyinkronJasa(null)
+    }
   }
 
   async function handleImportKuitansi(rows) {
@@ -315,7 +352,7 @@ export default function Kuitansi() {
           </div>
         </div>
 
-        {/* BARU: filter Tahun Anggaran */}
+        {/* Filter Tahun Anggaran */}
         <div className="min-w-[180px]">
           <label className="label-field">Tahun Anggaran</label>
           <select
@@ -375,6 +412,14 @@ export default function Kuitansi() {
                       onClick={() => handleSinkronNota(d)}
                     >
                       {menyinkron === d.id ? <Loader2 size={15} className="animate-spin" /> : <RefreshCw size={15} />}
+                    </button>
+                    <button
+                      className="icon-btn"
+                      title="Sinkron ke Kuitansi Jasa"
+                      disabled={menyinkronJasa === d.id}
+                      onClick={() => handleSinkronKuitansiJasa(d)}
+                    >
+                      {menyinkronJasa === d.id ? <Loader2 size={15} className="animate-spin" /> : <Repeat size={15} />}
                     </button>
                     <button
                       className="icon-btn"
