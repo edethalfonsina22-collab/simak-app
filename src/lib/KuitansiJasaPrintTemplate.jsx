@@ -39,6 +39,13 @@ const mm = (v) => `${+(v * SCALE).toFixed(2)}mm`
 const px = (v) => `${+(v * SCALE).toFixed(2)}px`
 const num = (v) => +(v * SCALE).toFixed(2)
 
+// Tambahan halus di atas hasil SCALE: +1cm lebar, +1cm panjang (tinggi).
+// Ini nilai TETAP (bukan ikut dikalikan SCALE) supaya persis +1cm berapa
+// pun SCALE-nya nanti. Tinggi ditambahkan merata ke padding atas & bawah
+// slip supaya isi kwitansi tetap center secara vertikal.
+const EXTRA_WIDTH_MM = 10
+const EXTRA_HEIGHT_MM = 10
+
 // Ukuran dasar (pada SCALE = 1) — meniru proporsi sampel_kwitansi.docx.
 const BASE = {
   slipWidth: 125,
@@ -144,9 +151,9 @@ const KuitansiJasaPrintTemplate = forwardRef(function KuitansiJasaPrintTemplate(
       <div
         className="flex box-border h-fit"
         style={{
-          width: mm(BASE.slipWidth),
-          paddingTop: mm(BASE.outerPadTop),
-          paddingBottom: mm(BASE.outerPadBottom),
+          width: `${num(BASE.slipWidth) + EXTRA_WIDTH_MM}mm`,
+          paddingTop: `${num(BASE.outerPadTop) + EXTRA_HEIGHT_MM / 2}mm`,
+          paddingBottom: `${num(BASE.outerPadBottom) + EXTRA_HEIGHT_MM / 2}mm`,
           paddingLeft: mm(BASE.outerPadX),
           paddingRight: mm(BASE.outerPadX),
           background: 'transparent',
