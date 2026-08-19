@@ -102,8 +102,6 @@ function Blank({ value, italic = false }) {
 
 const doubleFrame = {
   border: `1.1px solid ${LINE}`,
-  outline: `0.4px solid ${LINE}`,
-  outlineOffset: '1mm',
 }
 
 // Kwitansi Jasa — blanko kwitansi bergaya dokumen resmi (cek/giro) dengan
