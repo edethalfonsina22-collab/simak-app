@@ -57,16 +57,24 @@ function Rosette({ size = 26 }) {
 /**
  * Template cetak Kwitansi SEDERHANA khusus belanja JASA — pasangan dari
  * NotaPrintTemplate.jsx (belanja BARANG). Beda dengan Nota, ukuran fisik
- * blanko kwitansi ini KECIL — 205mm x 95mm (diperbesar dari ukuran awal
- * 125mm x 55mm: +8cm lebar, +4cm tinggi, atas permintaan pengguna). Posisi
- * & tata letak isi di dalamnya TIDAK diubah — komponen ini pakai flex
- * "justify-between" mengikuti tinggi container (h-full), jadi menambah
- * height container otomatis menambah jarak/ruang di antara baris-baris
- * yang sudah ada tanpa mengubah urutan atau posisi relatifnya.
+ * blanko kwitansi ini KECIL — kira-kira 12-13cm x 5-6cm (seukuran blanko
+ * kwitansi umum di toko alat tulis), BUKAN selebar/setinggi setengah
+ * halaman A4. Ditempel di ruang kosong sisa halaman laporan (lihat
+ * LaporanPrintTemplate.jsx), bukan memenuhi seluruh area bawah.
  *
  * JANGAN disamakan/ditimpa dengan src/lib/KuitansiPrintTemplate.jsx —
  * itu kuitansi resmi instansi (No. Bukti, Mata Anggaran, tanda tangan
  * Disetujui/Dibayar/dll) yang tampil di BAGIAN ATAS lembar laporan.
+ *
+ * CATATAN UKURAN & POSISI: kartu kwitansi di dalam SENGAJA dipertahankan
+ * persis 125mm x 55mm dengan seluruh layout flex/h-full aslinya tidak
+ * disentuh — supaya posisi & proporsi semua elemen di dalamnya (kolom
+ * sobekan kiri, rosette, garis isian, dst.) tetap pas seperti sebelumnya.
+ * Yang diperbesar hanya WRAPPER di luarnya (205mm x 95mm, +8cm lebar +4cm
+ * tinggi atas permintaan pengguna). Kartu diposisikan menempel di
+ * KIRI-BAWAH wrapper (bukan kiri-atas) — bagian atas area cetak dipakai
+ * untuk kuitansi resmi (KuitansiPrintTemplate), jadi ruang kosong hasil
+ * pembesaran sengaja diletakkan di ATAS & kanan kartu, bukan di bawahnya.
  *
  * Props:
  *  - sekolah: { nama, alamat, kota } (opsional)
@@ -77,69 +85,78 @@ const KuitansiJasaPrintTemplate = forwardRef(function KuitansiJasaPrintTemplate(
   return (
     <div
       ref={ref}
-      className="print-only relative bg-white text-black text-[8px] leading-tight"
+      className="print-only"
       style={{
         width: '205mm',
-        height: '95mm',
+        minHeight: '95mm',
+        display: 'flex',
+        alignItems: 'flex-end', // kartu menempel di BAWAH wrapper, bukan atas
+        justifyContent: 'flex-start', // tetap rata kiri seperti semula
         WebkitPrintColorAdjust: 'exact',
         printColorAdjust: 'exact',
         colorAdjust: 'exact',
       }}
     >
-      {/* Border ganda ala blanko kwitansi */}
-      <div className="border border-black p-[2px] h-full">
-        <div className="border border-black flex h-full" style={polaLatar}>
-          {/* Kolom sobekan kiri */}
-          <div className="w-[18%] border-r border-black flex flex-col items-center justify-between py-1 px-1 text-center">
-            <p className="font-semibold tracking-wide leading-none text-[7px]">
-              {sekolah?.nama ? sekolah.nama.slice(0, 12) : 'KWITANSI'}
-            </p>
-            <Rosette />
-            <div className="w-full">
-              <p className="text-[6px]">No.</p>
-              <p className="border-b border-black px-1 min-h-[1em]">{d.no_kwitansi || '\u00A0'}</p>
-            </div>
-            <div className="w-full mt-0.5">
-              <p className="text-[6px]">Rp.</p>
-              <p className="border-b border-black px-1 min-h-[1em] font-semibold">
-                {d.jumlah ? formatRupiah(d.jumlah) : '\u00A0'}
+      {/* Kartu asli — ukuran & layout internal TIDAK diubah sama sekali. */}
+      <div
+        className="relative bg-white text-black text-[8px] leading-tight"
+        style={{ width: '125mm', height: '55mm', flexShrink: 0 }}
+      >
+        {/* Border ganda ala blanko kwitansi */}
+        <div className="border border-black p-[2px] h-full">
+          <div className="border border-black flex h-full" style={polaLatar}>
+            {/* Kolom sobekan kiri */}
+            <div className="w-[18%] border-r border-black flex flex-col items-center justify-between py-1 px-1 text-center">
+              <p className="font-semibold tracking-wide leading-none text-[7px]">
+                {sekolah?.nama ? sekolah.nama.slice(0, 12) : 'KWITANSI'}
               </p>
-            </div>
-          </div>
-
-          {/* Badan kwitansi kanan */}
-          <div className="flex-1 px-2 py-1.5 flex flex-col justify-between">
-            <div>
-              <div className="flex items-baseline justify-between mb-1">
-                <p className="flex items-baseline gap-1">
-                  <span className="font-semibold">No.</span>
-                  <Blank value={d.no_kwitansi} width={70} />
+              <Rosette />
+              <div className="w-full">
+                <p className="text-[6px]">No.</p>
+                <p className="border-b border-black px-1 min-h-[1em]">{d.no_kwitansi || '\u00A0'}</p>
+              </div>
+              <div className="w-full mt-0.5">
+                <p className="text-[6px]">Rp.</p>
+                <p className="border-b border-black px-1 min-h-[1em] font-semibold">
+                  {d.jumlah ? formatRupiah(d.jumlah) : '\u00A0'}
                 </p>
-                <Blank value={formatTanggal(d.tanggal)} width={110} align="right" />
+              </div>
+            </div>
+
+            {/* Badan kwitansi kanan */}
+            <div className="flex-1 px-2 py-1.5 flex flex-col justify-between">
+              <div>
+                <div className="flex items-baseline justify-between mb-1">
+                  <p className="flex items-baseline gap-1">
+                    <span className="font-semibold">No.</span>
+                    <Blank value={d.no_kwitansi} width={70} />
+                  </p>
+                  <Blank value={formatTanggal(d.tanggal)} width={110} align="right" />
+                </div>
+
+                <p className="flex items-baseline gap-1 mb-0.5">
+                  <span className="font-semibold shrink-0">Telah terima dari</span>
+                  <Blank value={d.dari} width={230} />
+                </p>
+                <p className="flex items-baseline gap-1 mb-0.5">
+                  <span className="font-semibold shrink-0">Uang sejumlah</span>
+                  <Blank value={d.uang_sejumlah} width={230} />
+                </p>
+                <p className="flex items-baseline gap-1 mb-0.5">
+                  <span className="font-semibold shrink-0">Untuk pembayaran</span>
+                  <Blank value={d.untuk_pembayaran} width={230} />
+                </p>
               </div>
 
-              <p className="flex items-baseline gap-1 mb-0.5">
-                <span className="font-semibold shrink-0">Telah terima dari</span>
-                <Blank value={d.dari} width={230} />
-              </p>
-              <p className="flex items-baseline gap-1 mb-0.5">
-                <span className="font-semibold shrink-0">Uang sejumlah</span>
-                <Blank value={d.uang_sejumlah} width={230} />
-              </p>
-              <p className="flex items-baseline gap-1 mb-0.5">
-                <span className="font-semibold shrink-0">Untuk pembayaran</span>
-                <Blank value={d.untuk_pembayaran} width={230} />
-              </p>
-            </div>
-
-            <div className="flex items-end justify-between mt-1">
-              <p className="flex items-baseline gap-1">
-                <span className="font-semibold">Rp.</span>
-                <span className="inline-block min-w-[80px] text-center px-1 border-b-2 border-black font-semibold">
-                  {d.jumlah ? formatRupiah(d.jumlah) : ''}
-                </span>
-              </p>
-              <div className="border-b border-black w-24" />
+              <div className="flex items-end justify-between mt-1">
+                <p className="flex items-baseline gap-1">
+                  <span className="font-semibold">Rp.</span>
+                  <span className="inline-block min-w-[80px] text-center px-1 border-b-2 border-black font-semibold">
+                    {d.jumlah ? formatRupiah(d.jumlah) : ''}
+                  </span>
+                </p>
+                <div className="border-b border-black w-24" />
+              </div>
             </div>
           </div>
         </div>
