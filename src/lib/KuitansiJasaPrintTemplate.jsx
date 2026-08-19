@@ -14,44 +14,65 @@ const INK = '#173438'
 const LINE = '#2c5a66'
 const LINE_SOFT = 'rgba(44,90,102,0.45)'
 const PAPER = '#eaf7f8'
-const PAPER_DEEP = '#d7edf1'
 const GUILLOCHE = 'rgba(41,95,109,0.34)'
 const GUILLOCHE_SOFT = 'rgba(41,95,109,0.14)'
 
-// Jarak dari tepi atas kertas A4 ke kwitansi, meniru posisi pada
-// sampel_kwitansi.docx (kwitansi "diturunkan" ke bagian bawah kertas,
-// bukan menempel di pojok atas).
-const TOP_OFFSET_MM = 138
+// Jarak dari tepi atas kertas A4 ke kwitansi. Posisi (bukan ukuran), jadi
+// tidak ikut di-scale — kalau kwitansi makin besar dan mepet ke bawah
+// kertas, kurangi angka ini secukupnya.
+const TOP_OFFSET_MM = 118
 
-// Ukuran kwitansi (lebar & tinggi) — sebelumnya lebar tetap 125mm dan
-// tinggi mengikuti konten (h-fit). Diperbesar sesuai permintaan:
-// lebar +80mm (8cm), tinggi +40mm (4cm) — tinggi ditambahkan lewat
-// padding vertikal ekstra pada slip (bukan angka tinggi absolut),
-// supaya tetap fleksibel mengikuti konten tapi selalu lebih tinggi 4cm.
-const SLIP_WIDTH_MM = 205 // 125mm + 80mm
-const EXTRA_HEIGHT_MM = 40 // total tinggi tambahan (4cm)
-const EXTRA_PAD_V_MM = EXTRA_HEIGHT_MM / 2 // dibagi rata atas & bawah
+// ————————————————————————————————————————————————————————————
+// SATU faktor pembesar untuk SEMUA ukuran (lebar, tinggi lewat padding,
+// font, jarak, watermark). Sebelumnya lebar & tinggi dibesarkan dengan
+// angka mm yang tidak berhubungan (lebar +80mm, tinggi +40mm) sementara
+// font/spacing di dalamnya tetap ukuran semula — hasilnya kwitansi jadi
+// sangat lebar tapi isinya kecil dan "tenggelam", jadi tidak seimbang.
+//
+// Sekarang: tentukan ukuran DASAR (desain awal, lebar 125mm) lalu kalikan
+// semuanya dengan SCALE. Naikkan/turunkan SCALE saja untuk memperbesar
+// atau memperkecil kwitansi secara proporsional.
+// ————————————————————————————————————————————————————————————
+const SCALE = 1.4
 
-// Latar motif guilloche: pola ubin (tile) berisi lingkaran-lingkaran
-// bersinggungan, menghasilkan efek jalinan garis khas kertas berharga.
-// (Beda dengan NotaPrintTemplate yang polos hitam-putih — kwitansi meniru
-// blanko fisik bergaya cek/giro yang memang bermotif kertas berharga.)
+const mm = (v) => `${+(v * SCALE).toFixed(2)}mm`
+const px = (v) => `${+(v * SCALE).toFixed(2)}px`
+const num = (v) => +(v * SCALE).toFixed(2)
+
+// Ukuran dasar (pada SCALE = 1) — meniru proporsi sampel_kwitansi.docx.
+const BASE = {
+  slipWidth: 125,
+  counterfoilWidth: 24,
+  perforation: 2.5,
+  outerPadTop: 2,
+  outerPadBottom: 62, // dulu: 2mm dasar + 60mm ekstra supaya kwitansi tetap
+                       // tinggi walau kontennya pendek (h-fit)
+  outerPadX: 2,
+  slipPadY: 2.5,
+  slipPadX: 4,
+  counterfoilPadY: 2,
+  counterfoilPadX: 1,
+  rosetteStub: 26,
+  rosetteWatermark: 62,
+  blankMinHeight: 3.6,
+  headerGap: 1.5,
+  amountGap: 2.5,
+  signatureSpacer: 9,
+  signatureMinWidth: 28,
+}
+
 function GuillocheField({ patternId, opacity = 1 }) {
   return (
-    <svg
-      aria-hidden="true"
-      className="absolute inset-0 w-full h-full"
-      style={{ opacity }}
-    >
+    <svg aria-hidden="true" className="absolute inset-0 w-full h-full" style={{ opacity }}>
       <defs>
-        <pattern id={patternId} width="15" height="15" patternUnits="userSpaceOnUse">
-          <rect width="15" height="15" fill={PAPER} />
-          <circle cx="0" cy="0" r="7.4" fill="none" stroke={GUILLOCHE} strokeWidth="0.45" />
-          <circle cx="15" cy="0" r="7.4" fill="none" stroke={GUILLOCHE} strokeWidth="0.45" />
-          <circle cx="0" cy="15" r="7.4" fill="none" stroke={GUILLOCHE} strokeWidth="0.45" />
-          <circle cx="15" cy="15" r="7.4" fill="none" stroke={GUILLOCHE} strokeWidth="0.45" />
-          <circle cx="7.5" cy="7.5" r="5.6" fill="none" stroke={GUILLOCHE_SOFT} strokeWidth="0.4" />
-          <circle cx="7.5" cy="7.5" r="2.6" fill="none" stroke={GUILLOCHE} strokeWidth="0.35" />
+        <pattern id={patternId} width={num(15)} height={num(15)} patternUnits="userSpaceOnUse">
+          <rect width={num(15)} height={num(15)} fill={PAPER} />
+          <circle cx="0" cy="0" r={num(7.4)} fill="none" stroke={GUILLOCHE} strokeWidth={num(0.45)} />
+          <circle cx={num(15)} cy="0" r={num(7.4)} fill="none" stroke={GUILLOCHE} strokeWidth={num(0.45)} />
+          <circle cx="0" cy={num(15)} r={num(7.4)} fill="none" stroke={GUILLOCHE} strokeWidth={num(0.45)} />
+          <circle cx={num(15)} cy={num(15)} r={num(7.4)} fill="none" stroke={GUILLOCHE} strokeWidth={num(0.45)} />
+          <circle cx={num(7.5)} cy={num(7.5)} r={num(5.6)} fill="none" stroke={GUILLOCHE_SOFT} strokeWidth={num(0.4)} />
+          <circle cx={num(7.5)} cy={num(7.5)} r={num(2.6)} fill="none" stroke={GUILLOCHE} strokeWidth={num(0.35)} />
         </pattern>
       </defs>
       <rect width="100%" height="100%" fill={`url(#${patternId})`} />
@@ -59,8 +80,6 @@ function GuillocheField({ patternId, opacity = 1 }) {
   )
 }
 
-// Medali rosette (cincin konsentris) — elemen watermark tunggal yang
-// diulang di counterfoil dan sebagai watermark besar di tengah slip utama.
 function Rosette({ size = 40 }) {
   const rings = [19, 16.4, 13.8, 11.2, 8.6, 6, 3.4]
   return (
@@ -81,17 +100,14 @@ function Rosette({ size = 40 }) {
   )
 }
 
-// Kolom isian bertitik-titik (BUKAN garis solid seperti di NotaPrintTemplate)
-// — blanko kwitansi fisik yang jadi acuan pakai titik-titik untuk kolom
-// isiannya. Lebar TETAP (bukan minimum) supaya rapi mengikuti lebar kolom.
 function Blank({ value, italic = false }) {
   return (
     <span
       className="block whitespace-nowrap overflow-hidden text-ellipsis"
       style={{
         borderBottom: `0.6px dotted ${LINE}`,
-        minHeight: '3.6mm',
-        padding: '0 1mm 0.3mm',
+        minHeight: mm(BASE.blankMinHeight),
+        padding: `0 ${mm(1)} ${mm(0.3)}`,
         fontStyle: italic ? 'italic' : 'normal',
       }}
     >
@@ -100,28 +116,8 @@ function Blank({ value, italic = false }) {
   )
 }
 
-const doubleFrame = {
-  border: `1.1px solid ${LINE}`,
-}
+const doubleFrame = { border: `1.1px solid ${LINE}` }
 
-// Kwitansi Jasa — blanko kwitansi bergaya dokumen resmi (cek/giro) dengan
-// motif guilloche, counterfoil/sobekan arsip di kiri, dan watermark rosette
-// di slip utama. Dipakai KHUSUS untuk transaksi jasa (mis. transport,
-// honor kegiatan) — beda dari NotaPrintTemplate yang khusus belanja barang.
-//
-// SATU KWITANSI = SATU LEMBAR A4 SENDIRI (dicetak terpisah dari Nota, tidak
-// digabung dalam satu lembar). Kwitansi diposisikan turun ke bagian bawah
-// kertas (bukan menempel di pojok atas), mengikuti posisi pada sampel
-// referensi (sampel_kwitansi.docx).
-//
-// Catatan: strukturnya (helper formatRupiah/formatTanggal, className
-// Tailwind, forwardRef, printColorAdjust) mengikuti pola NotaPrintTemplate
-// supaya konsisten satu codebase — TIDAK mengubah atau bergantung pada
-// NotaPrintTemplate itu sendiri.
-//
-// Props:
-//   sekolah: { nama, alamat, kota }
-//   data: { no_kwitansi, tanggal, dari, uang_sejumlah, untuk_pembayaran, jumlah }
 const KuitansiJasaPrintTemplate = forwardRef(function KuitansiJasaPrintTemplate(
   { sekolah, data },
   ref
@@ -148,11 +144,11 @@ const KuitansiJasaPrintTemplate = forwardRef(function KuitansiJasaPrintTemplate(
       <div
         className="flex box-border h-fit"
         style={{
-          width: `${SLIP_WIDTH_MM}mm`,
-          paddingTop: `${2 + EXTRA_PAD_V_MM}mm`,
-          paddingBottom: `${2 + EXTRA_PAD_V_MM + 60}mm`,
-          paddingLeft: '2mm',
-          paddingRight: '2mm',
+          width: mm(BASE.slipWidth),
+          paddingTop: mm(BASE.outerPadTop),
+          paddingBottom: mm(BASE.outerPadBottom),
+          paddingLeft: mm(BASE.outerPadX),
+          paddingRight: mm(BASE.outerPadX),
           background: 'transparent',
           fontFamily: 'Georgia, "Times New Roman", serif',
         }}
@@ -160,16 +156,20 @@ const KuitansiJasaPrintTemplate = forwardRef(function KuitansiJasaPrintTemplate(
         {/* Counterfoil / sobekan arsip */}
         <div
           className="relative flex flex-shrink-0 flex-col items-center justify-between overflow-hidden"
-          style={{ ...doubleFrame, width: '24mm', padding: '2mm 1mm' }}
+          style={{
+            ...doubleFrame,
+            width: mm(BASE.counterfoilWidth),
+            padding: `${mm(BASE.counterfoilPadY)} ${mm(BASE.counterfoilPadX)}`,
+          }}
         >
           <GuillocheField patternId={stubPatternId} opacity={0.9} />
-          <div className="relative text-center leading-tight" style={{ fontSize: '7px', color: INK }}>
+          <div className="relative text-center leading-tight" style={{ fontSize: px(7), color: INK }}>
             {sekolah?.nama}
           </div>
           <div className="relative">
-            <Rosette size={26} />
+            <Rosette size={num(BASE.rosetteStub)} />
           </div>
-          <div className="relative text-center" style={{ fontSize: '7px', color: INK }}>
+          <div className="relative text-center" style={{ fontSize: px(7), color: INK }}>
             No. {data?.no_kwitansi}
           </div>
         </div>
@@ -178,7 +178,7 @@ const KuitansiJasaPrintTemplate = forwardRef(function KuitansiJasaPrintTemplate(
         <div
           className="flex-shrink-0"
           style={{
-            width: '2.5mm',
+            width: mm(BASE.perforation),
             borderLeft: `0.5px dashed ${LINE_SOFT}`,
             borderRight: `0.5px dashed ${LINE_SOFT}`,
           }}
@@ -187,50 +187,49 @@ const KuitansiJasaPrintTemplate = forwardRef(function KuitansiJasaPrintTemplate(
         {/* Slip utama */}
         <div
           className="relative flex-1 overflow-hidden"
-          style={{ ...doubleFrame, padding: '2.5mm 4mm' }}
+          style={{ ...doubleFrame, padding: `${mm(BASE.slipPadY)} ${mm(BASE.slipPadX)}` }}
         >
           <GuillocheField patternId={bodyPatternId} opacity={0.55} />
-          {/* Watermark rosette besar di tengah */}
           <div
             className="absolute opacity-50"
             style={{ top: '50%', left: '50%', transform: 'translate(-50%, -50%)' }}
           >
-            <Rosette size={62} />
+            <Rosette size={num(BASE.rosetteWatermark)} />
           </div>
 
           <div className="relative flex h-full flex-col">
-            <div className="text-center" style={{ marginBottom: '1.5mm' }}>
-              <div className="font-bold" style={{ fontSize: '12px', letterSpacing: '1.5px', color: INK }}>
+            <div className="text-center" style={{ marginBottom: mm(BASE.headerGap) }}>
+              <div className="font-bold" style={{ fontSize: px(12), letterSpacing: '1.5px', color: INK }}>
                 KWITANSI
               </div>
-              <div style={{ fontSize: '8px', color: INK }}>{sekolah?.nama}</div>
+              <div style={{ fontSize: px(8), color: INK }}>{sekolah?.nama}</div>
             </div>
 
-            <table className="w-full flex-1 border-collapse" style={{ color: INK, fontSize: '10px' }}>
+            <table className="w-full flex-1 border-collapse" style={{ color: INK, fontSize: px(10) }}>
               <tbody>
                 <tr>
-                  <td className="align-top whitespace-nowrap" style={{ width: '28%', paddingRight: '2mm' }}>
+                  <td className="align-top whitespace-nowrap" style={{ width: '28%', paddingRight: mm(2) }}>
                     No.
                   </td>
                   <td className="align-top">:</td>
                   <td><Blank value={data?.no_kwitansi} /></td>
                 </tr>
                 <tr>
-                  <td className="align-top whitespace-nowrap" style={{ paddingRight: '2mm' }}>
+                  <td className="align-top whitespace-nowrap" style={{ paddingRight: mm(2) }}>
                     Telah terima dari
                   </td>
                   <td className="align-top">:</td>
                   <td><Blank value={data?.dari} /></td>
                 </tr>
                 <tr>
-                  <td className="align-top whitespace-nowrap" style={{ paddingRight: '2mm' }}>
+                  <td className="align-top whitespace-nowrap" style={{ paddingRight: mm(2) }}>
                     Uang sejumlah
                   </td>
                   <td className="align-top">:</td>
                   <td><Blank value={data?.uang_sejumlah} italic /></td>
                 </tr>
                 <tr>
-                  <td className="align-top whitespace-nowrap" style={{ paddingRight: '2mm' }}>
+                  <td className="align-top whitespace-nowrap" style={{ paddingRight: mm(2) }}>
                     Untuk pembayaran
                   </td>
                   <td className="align-top">:</td>
@@ -239,23 +238,29 @@ const KuitansiJasaPrintTemplate = forwardRef(function KuitansiJasaPrintTemplate(
               </tbody>
             </table>
 
-            <div className="flex items-end justify-between" style={{ marginTop: '2.5mm' }}>
+            <div className="flex items-end justify-between" style={{ marginTop: mm(BASE.amountGap) }}>
               <div
                 className="font-bold"
                 style={{
-                  fontSize: '13px',
+                  fontSize: px(13),
                   color: INK,
                   border: `0.6px solid ${LINE}`,
-                  padding: '0.8mm 2mm',
+                  padding: `${mm(0.8)} ${mm(2)}`,
                   background: 'rgba(255,255,255,0.35)',
                 }}
               >
                 Rp {formatRupiah(data?.jumlah || 0)}
               </div>
-              <div className="text-center" style={{ fontSize: '9px', color: INK }}>
+              <div className="text-center" style={{ fontSize: px(9), color: INK }}>
                 <div>{sekolah?.kota}{sekolah?.kota ? ', ' : ''}{tanggal}</div>
-                <div style={{ height: '9mm' }} />
-                <div style={{ borderTop: `0.6px solid ${LINE}`, paddingTop: '0.5mm', minWidth: '28mm' }}>
+                <div style={{ height: mm(BASE.signatureSpacer) }} />
+                <div
+                  style={{
+                    borderTop: `0.6px solid ${LINE}`,
+                    paddingTop: mm(0.5),
+                    minWidth: mm(BASE.signatureMinWidth),
+                  }}
+                >
                   Yang menerima
                 </div>
               </div>
