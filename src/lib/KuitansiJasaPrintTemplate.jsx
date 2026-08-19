@@ -1,4 +1,4 @@
-import { forwardRef, useId } from 'react'
+import { forwardRef } from 'react'
 
 function formatRupiah(angka) {
   if (angka === null || angka === undefined || angka === '') return ''
@@ -10,267 +10,134 @@ function formatTanggal(tgl) {
   return new Date(tgl).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })
 }
 
-const INK = '#173438'
-const LINE = '#2c5a66'
-const LINE_SOFT = 'rgba(44,90,102,0.45)'
-const PAPER = '#eaf7f8'
-const GUILLOCHE = 'rgba(41,95,109,0.34)'
-const GUILLOCHE_SOFT = 'rgba(41,95,109,0.14)'
-
-// Jarak dari tepi atas kertas A4 ke kwitansi. Posisi (bukan ukuran), jadi
-// tidak ikut di-scale — kalau kwitansi makin besar dan mepet ke bawah
-// kertas, kurangi angka ini secukupnya.
-const TOP_OFFSET_MM = 118
-
-// ————————————————————————————————————————————————————————————
-// SATU faktor pembesar untuk SEMUA ukuran (lebar, tinggi lewat padding,
-// font, jarak, watermark). Sebelumnya lebar & tinggi dibesarkan dengan
-// angka mm yang tidak berhubungan (lebar +80mm, tinggi +40mm) sementara
-// font/spacing di dalamnya tetap ukuran semula — hasilnya kwitansi jadi
-// sangat lebar tapi isinya kecil dan "tenggelam", jadi tidak seimbang.
-//
-// Sekarang: tentukan ukuran DASAR (desain awal, lebar 125mm) lalu kalikan
-// semuanya dengan SCALE. Naikkan/turunkan SCALE saja untuk memperbesar
-// atau memperkecil kwitansi secara proporsional.
-// ————————————————————————————————————————————————————————————
-const SCALE = 1.4
-
-const mm = (v) => `${+(v * SCALE).toFixed(2)}mm`
-const px = (v) => `${+(v * SCALE).toFixed(2)}px`
-const num = (v) => +(v * SCALE).toFixed(2)
-
-// Tambahan halus di atas hasil SCALE: +1cm lebar, +1cm panjang (tinggi).
-// Ini nilai TETAP (bukan ikut dikalikan SCALE) supaya persis +1cm berapa
-// pun SCALE-nya nanti. Tinggi ditambahkan merata ke padding atas & bawah
-// slip supaya isi kwitansi tetap center secara vertikal.
-const EXTRA_WIDTH_MM = 10
-const EXTRA_HEIGHT_MM = 10
-
-// Ukuran dasar (pada SCALE = 1) — meniru proporsi sampel_kwitansi.docx.
-const BASE = {
-  slipWidth: 125,
-  counterfoilWidth: 24,
-  perforation: 2.5,
-  outerPadTop: 2,
-  outerPadBottom: 62, // dulu: 2mm dasar + 60mm ekstra supaya kwitansi tetap
-                       // tinggi walau kontennya pendek (h-fit)
-  outerPadX: 2,
-  slipPadY: 2.5,
-  slipPadX: 4,
-  counterfoilPadY: 2,
-  counterfoilPadX: 1,
-  rosetteStub: 26,
-  rosetteWatermark: 62,
-  blankMinHeight: 3.6,
-  headerGap: 1.5,
-  amountGap: 2.5,
-  signatureSpacer: 9,
-  signatureMinWidth: 28,
-}
-
-function GuillocheField({ patternId, opacity = 1 }) {
+// Kolom isian bergaris — konsisten dengan pola Blank di NotaPrintTemplate.jsx.
+function Blank({ value, width = 100, align = 'left' }) {
   return (
-    <svg aria-hidden="true" className="absolute inset-0 w-full h-full" style={{ opacity }}>
-      <defs>
-        <pattern id={patternId} width={num(15)} height={num(15)} patternUnits="userSpaceOnUse">
-          <rect width={num(15)} height={num(15)} fill={PAPER} />
-          <circle cx="0" cy="0" r={num(7.4)} fill="none" stroke={GUILLOCHE} strokeWidth={num(0.45)} />
-          <circle cx={num(15)} cy="0" r={num(7.4)} fill="none" stroke={GUILLOCHE} strokeWidth={num(0.45)} />
-          <circle cx="0" cy={num(15)} r={num(7.4)} fill="none" stroke={GUILLOCHE} strokeWidth={num(0.45)} />
-          <circle cx={num(15)} cy={num(15)} r={num(7.4)} fill="none" stroke={GUILLOCHE} strokeWidth={num(0.45)} />
-          <circle cx={num(7.5)} cy={num(7.5)} r={num(5.6)} fill="none" stroke={GUILLOCHE_SOFT} strokeWidth={num(0.4)} />
-          <circle cx={num(7.5)} cy={num(7.5)} r={num(2.6)} fill="none" stroke={GUILLOCHE} strokeWidth={num(0.35)} />
-        </pattern>
-      </defs>
-      <rect width="100%" height="100%" fill={`url(#${patternId})`} />
-    </svg>
-  )
-}
-
-function Rosette({ size = 40 }) {
-  const rings = [19, 16.4, 13.8, 11.2, 8.6, 6, 3.4]
-  return (
-    <svg width={size} height={size} viewBox="0 0 40 40" aria-hidden="true">
-      {rings.map((r, i) => (
-        <circle
-          key={r}
-          cx="20"
-          cy="20"
-          r={r}
-          fill="none"
-          stroke={i % 2 === 0 ? LINE_SOFT : GUILLOCHE}
-          strokeWidth={i % 2 === 0 ? 0.6 : 0.4}
-        />
-      ))}
-      <circle cx="20" cy="20" r="1.6" fill={LINE_SOFT} />
-    </svg>
-  )
-}
-
-function Blank({ value, italic = false }) {
-  return (
-    <span
-      className="block whitespace-nowrap overflow-hidden text-ellipsis"
-      style={{
-        borderBottom: `0.6px dotted ${LINE}`,
-        minHeight: mm(BASE.blankMinHeight),
-        padding: `0 ${mm(1)} ${mm(0.3)}`,
-        fontStyle: italic ? 'italic' : 'normal',
-      }}
-    >
-      {value}
+    <span className="relative inline-block align-bottom" style={{ width, height: '1.1em' }}>
+      <span aria-hidden="true" className="absolute left-0 right-0 bottom-[1px] border-b border-black" />
+      {value && (
+        <span
+          className={`absolute inset-0 px-1 whitespace-nowrap overflow-hidden text-ellipsis ${
+            align === 'right' ? 'text-right' : 'text-left'
+          }`}
+        >
+          {value}
+        </span>
+      )}
     </span>
   )
 }
 
-const doubleFrame = { border: `1.1px solid ${LINE}` }
+// Pola latar tipis ala kertas berpengaman — kesan visual saja, BUKAN replika
+// presisi watermark/guilloche pada blanko kwitansi fisik asli.
+const polaLatar = {
+  backgroundImage:
+    'repeating-linear-gradient(45deg, rgba(37,99,235,0.06) 0px, rgba(37,99,235,0.06) 1px, transparent 1px, transparent 6px)',
+}
 
-const KuitansiJasaPrintTemplate = forwardRef(function KuitansiJasaPrintTemplate(
-  { sekolah, data },
-  ref
-) {
-  const reactId = useId()
-  const bodyPatternId = `guilloche-body-${reactId}`
-  const stubPatternId = `guilloche-stub-${reactId}`
-  const tanggal = formatTanggal(data?.tanggal)
+function Rosette({ size = 26 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 46 46" className="mx-auto" aria-hidden="true">
+      <circle cx="23" cy="23" r="21" fill="none" stroke="#2563eb" strokeOpacity="0.5" strokeWidth="0.7" />
+      <circle cx="23" cy="23" r="14" fill="none" stroke="#2563eb" strokeOpacity="0.5" strokeWidth="0.7" />
+      <circle cx="23" cy="23" r="7" fill="none" stroke="#2563eb" strokeOpacity="0.6" strokeWidth="0.7" />
+      {Array.from({ length: 8 }).map((_, i) => (
+        <line
+          key={i}
+          x1="23" y1="23"
+          x2={23 + 21 * Math.cos((i * Math.PI) / 4)}
+          y2={23 + 21 * Math.sin((i * Math.PI) / 4)}
+          stroke="#2563eb" strokeOpacity="0.25" strokeWidth="0.6"
+        />
+      ))}
+    </svg>
+  )
+}
 
+/**
+ * Template cetak Kwitansi SEDERHANA khusus belanja JASA — pasangan dari
+ * NotaPrintTemplate.jsx (belanja BARANG). Beda dengan Nota, ukuran fisik
+ * blanko kwitansi ini KECIL — kira-kira 12-13cm x 5-6cm (seukuran blanko
+ * kwitansi umum di toko alat tulis), BUKAN selebar/setinggi setengah
+ * halaman A4. Ditempel di ruang kosong sisa halaman laporan (lihat
+ * LaporanPrintTemplate.jsx), bukan memenuhi seluruh area bawah.
+ *
+ * JANGAN disamakan/ditimpa dengan src/lib/KuitansiPrintTemplate.jsx —
+ * itu kuitansi resmi instansi (No. Bukti, Mata Anggaran, tanda tangan
+ * Disetujui/Dibayar/dll) yang tampil di BAGIAN ATAS lembar laporan.
+ *
+ * Props:
+ *  - sekolah: { nama, alamat, kota } (opsional)
+ *  - data: { no_kwitansi, tanggal, dari, uang_sejumlah (terbilang), untuk_pembayaran, jumlah }
+ */
+const KuitansiJasaPrintTemplate = forwardRef(function KuitansiJasaPrintTemplate({ sekolah, data }, ref) {
+  const d = data || {}
   return (
     <div
       ref={ref}
-      className="print-only relative bg-white text-black text-xs flex justify-center"
+      className="print-only relative bg-white text-black text-[8px] leading-tight"
       style={{
-        width: '210mm',
-        minHeight: '297mm',
-        paddingTop: `${TOP_OFFSET_MM}mm`,
-        boxSizing: 'border-box',
+        width: '125mm',
+        height: '55mm',
         WebkitPrintColorAdjust: 'exact',
         printColorAdjust: 'exact',
         colorAdjust: 'exact',
       }}
     >
-      <div
-        className="flex box-border h-fit"
-        style={{
-          width: `${num(BASE.slipWidth) + EXTRA_WIDTH_MM}mm`,
-          paddingTop: `${num(BASE.outerPadTop) + EXTRA_HEIGHT_MM / 2}mm`,
-          paddingBottom: `${num(BASE.outerPadBottom) + EXTRA_HEIGHT_MM / 2}mm`,
-          paddingLeft: mm(BASE.outerPadX),
-          paddingRight: mm(BASE.outerPadX),
-          background: 'transparent',
-          fontFamily: 'Georgia, "Times New Roman", serif',
-        }}
-      >
-        {/* Counterfoil / sobekan arsip */}
-        <div
-          className="relative flex flex-shrink-0 flex-col items-center justify-between overflow-hidden"
-          style={{
-            ...doubleFrame,
-            width: mm(BASE.counterfoilWidth),
-            padding: `${mm(BASE.counterfoilPadY)} ${mm(BASE.counterfoilPadX)}`,
-          }}
-        >
-          <GuillocheField patternId={stubPatternId} opacity={0.9} />
-          <div className="relative text-center leading-tight" style={{ fontSize: px(7), color: INK }}>
-            {sekolah?.nama}
-          </div>
-          <div className="relative">
-            <Rosette size={num(BASE.rosetteStub)} />
-          </div>
-          <div className="relative text-center" style={{ fontSize: px(7), color: INK }}>
-            No. {data?.no_kwitansi}
-          </div>
-        </div>
-
-        {/* Garis perforasi */}
-        <div
-          className="flex-shrink-0"
-          style={{
-            width: mm(BASE.perforation),
-            borderLeft: `0.5px dashed ${LINE_SOFT}`,
-            borderRight: `0.5px dashed ${LINE_SOFT}`,
-          }}
-        />
-
-        {/* Slip utama */}
-        <div
-          className="relative flex-1 overflow-hidden"
-          style={{ ...doubleFrame, padding: `${mm(BASE.slipPadY)} ${mm(BASE.slipPadX)}` }}
-        >
-          <GuillocheField patternId={bodyPatternId} opacity={0.55} />
-          <div
-            className="absolute opacity-50"
-            style={{ top: '50%', left: '50%', transform: 'translate(-50%, -50%)' }}
-          >
-            <Rosette size={num(BASE.rosetteWatermark)} />
+      {/* Border ganda ala blanko kwitansi */}
+      <div className="border border-black p-[2px] h-full">
+        <div className="border border-black flex h-full" style={polaLatar}>
+          {/* Kolom sobekan kiri */}
+          <div className="w-[18%] border-r border-black flex flex-col items-center justify-between py-1 px-1 text-center">
+            <p className="font-semibold tracking-wide leading-none text-[7px]">
+              {sekolah?.nama ? sekolah.nama.slice(0, 12) : 'KWITANSI'}
+            </p>
+            <Rosette />
+            <div className="w-full">
+              <p className="text-[6px]">No.</p>
+              <p className="border-b border-black px-1 min-h-[1em]">{d.no_kwitansi || '\u00A0'}</p>
+            </div>
+            <div className="w-full mt-0.5">
+              <p className="text-[6px]">Rp.</p>
+              <p className="border-b border-black px-1 min-h-[1em] font-semibold -mx-2">
+                {d.jumlah ? formatRupiah(d.jumlah) : '\u00A0'}
+              </p>
+            </div>
           </div>
 
-          <div className="relative flex h-full flex-col">
-            <div className="text-center" style={{ marginBottom: mm(BASE.headerGap) }}>
-              <div className="font-bold" style={{ fontSize: px(12), letterSpacing: '1.5px', color: INK }}>
-                KWITANSI
+          {/* Badan kwitansi kanan */}
+          <div className="flex-1 px-2 py-1.5 flex flex-col justify-between">
+            <div>
+              <div className="flex items-baseline justify-between mb-1">
+                <p className="flex items-baseline gap-1">
+                  <span className="font-semibold">No.</span>
+                  <Blank value={d.no_kwitansi} width={70} />
+                </p>
+                <Blank value={formatTanggal(d.tanggal)} width={110} align="right" />
               </div>
-              <div style={{ fontSize: px(8), color: INK }}>{sekolah?.nama}</div>
+
+              <p className="flex items-baseline gap-1 mb-0.5">
+                <span className="font-semibold shrink-0">Telah terima dari</span>
+                <Blank value={d.dari} width={230} />
+              </p>
+              <p className="flex items-baseline gap-1 mb-0.5">
+                <span className="font-semibold shrink-0">Uang sejumlah</span>
+                <Blank value={d.uang_sejumlah} width={230} />
+              </p>
+              <p className="flex items-baseline gap-1 mb-0.5">
+                <span className="font-semibold shrink-0">Untuk pembayaran</span>
+                <Blank value={d.untuk_pembayaran} width={230} />
+              </p>
             </div>
 
-            <table className="w-full flex-1 border-collapse" style={{ color: INK, fontSize: px(10) }}>
-              <tbody>
-                <tr>
-                  <td className="align-top whitespace-nowrap" style={{ width: '28%', paddingRight: mm(2) }}>
-                    No.
-                  </td>
-                  <td className="align-top">:</td>
-                  <td><Blank value={data?.no_kwitansi} /></td>
-                </tr>
-                <tr>
-                  <td className="align-top whitespace-nowrap" style={{ paddingRight: mm(2) }}>
-                    Telah terima dari
-                  </td>
-                  <td className="align-top">:</td>
-                  <td><Blank value={data?.dari} /></td>
-                </tr>
-                <tr>
-                  <td className="align-top whitespace-nowrap" style={{ paddingRight: mm(2) }}>
-                    Uang sejumlah
-                  </td>
-                  <td className="align-top">:</td>
-                  <td><Blank value={data?.uang_sejumlah} italic /></td>
-                </tr>
-                <tr>
-                  <td className="align-top whitespace-nowrap" style={{ paddingRight: mm(2) }}>
-                    Untuk pembayaran
-                  </td>
-                  <td className="align-top">:</td>
-                  <td><Blank value={data?.untuk_pembayaran} /></td>
-                </tr>
-              </tbody>
-            </table>
-
-            <div className="flex items-end justify-between" style={{ marginTop: mm(BASE.amountGap) }}>
-              <div
-                className="font-bold"
-                style={{
-                  fontSize: px(13),
-                  color: INK,
-                  border: `0.6px solid ${LINE}`,
-                  padding: `${mm(0.8)} ${mm(2)}`,
-                  background: 'rgba(255,255,255,0.35)',
-                }}
-              >
-                Rp {formatRupiah(data?.jumlah || 0)}
-              </div>
-              <div className="text-center" style={{ fontSize: px(9), color: INK }}>
-                <div>{sekolah?.kota}{sekolah?.kota ? ', ' : ''}{tanggal}</div>
-                <div style={{ height: mm(BASE.signatureSpacer) }} />
-                <div
-                  style={{
-                    borderTop: `0.6px solid ${LINE}`,
-                    paddingTop: mm(0.5),
-                    minWidth: mm(BASE.signatureMinWidth),
-                  }}
-                >
-                  Yang menerima
-                </div>
-              </div>
+            <div className="flex items-end justify-between mt-1">
+              <p className="flex items-baseline gap-1">
+                <span className="font-semibold">Rp.</span>
+                <span className="inline-block min-w-[80px] text-center px-1 border-b-2 border-black font-semibold">
+                  {d.jumlah ? formatRupiah(d.jumlah) : ''}
+                </span>
+              </p>
+              <div className="border-b border-black w-24" />
             </div>
           </div>
         </div>
