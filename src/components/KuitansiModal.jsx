@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabaseClient'
 import { X, Loader2, Printer, FileText, Receipt } from 'lucide-react'
 import KuitansiPrintTemplate from '../lib/KuitansiPrintTemplate'
@@ -76,9 +76,22 @@ export default function KuitansiModal({ keuanganRow, sekolah, onClose }) {
   const { saran, namaKeNip } = useSaranFormKuitansi()
   const reactId = useId()
   const dl = (nama) => `saran-${nama}-${reactId}`
+  const navigate = useNavigate()
 
   function ubah(field, value) {
     setForm((prev) => ({ ...prev, [field]: value }))
+  }
+
+  // Satu fungsi navigasi yang dipakai kedua tombol pintasan (Nota Belanja &
+  // Kuitansi Jasa), dengan tujuan (`tujuan`) sebagai parameter — bukan
+  // dua handler terpisah yang di-copy-paste. Sebelumnya kedua tombol memakai
+  // <Link> terpisah dan salah satu sempat ikut mengarah ke /nota; dengan satu
+  // fungsi yang diparameterkan begini, tujuan tiap tombol eksplisit dan tidak
+  // bisa lagi ketukar.
+  function bukaHalamanLain(tujuan, label) {
+    if (confirm(`Buka halaman ${label}? Isian kuitansi yang belum disimpan akan hilang.`)) {
+      navigate(tujuan)
+    }
   }
 
   // Sama seperti ubah(), tapi khusus field nama penyetuju/pembayar: kalau nama
@@ -219,14 +232,32 @@ export default function KuitansiModal({ keuanganRow, sekolah, onClose }) {
 
             <div>
               <label className="label-field">Uang Sejumlah (Rp)</label>
-              <input
-                type="number"
-                min="0"
-                className="input-field"
-                placeholder="Contoh: 1250000"
-                value={form.jumlah}
-                onChange={(e) => ubah('jumlah', e.target.value)}
-              />
+              <div className="flex flex-wrap items-center gap-2">
+                <input
+                  type="number"
+                  min="0"
+                  className="input-field flex-1 min-w-[160px]"
+                  placeholder="Contoh: 1250000"
+                  value={form.jumlah}
+                  onChange={(e) => ubah('jumlah', e.target.value)}
+                />
+                {/* Pintasan ke jenis dokumen lain — meninggalkan halaman ini
+                    (isian yang belum disimpan akan hilang), jadi dikonfirmasi dulu. */}
+                <button
+                  type="button"
+                  className="flex items-center gap-1.5 rounded-lg px-4 py-2.5 text-sm font-medium text-white bg-amber-500 hover:bg-amber-600 transition-colors shadow-sm"
+                  onClick={() => bukaHalamanLain('/nota', 'Nota Belanja')}
+                >
+                  <FileText size={16} /> Nota Belanja
+                </button>
+                <button
+                  type="button"
+                  className="flex items-center gap-1.5 rounded-lg px-4 py-2.5 text-sm font-medium text-white bg-teal-600 hover:bg-teal-700 transition-colors shadow-sm"
+                  onClick={() => bukaHalamanLain('/kuitansi-jasa', 'Kuitansi Jasa')}
+                >
+                  <Receipt size={16} /> Kuitansi Jasa
+                </button>
+              </div>
             </div>
 
             <div>
@@ -303,41 +334,12 @@ export default function KuitansiModal({ keuanganRow, sekolah, onClose }) {
               </div>
             </div>
 
-            <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
-              {/* Pintasan ke jenis dokumen lain — meninggalkan halaman ini
-                  (isian yang belum disimpan akan hilang), jadi dikonfirmasi dulu. */}
-              <div className="flex items-center gap-2">
-                <Link
-                  to="/nota"
-                  className="flex items-center gap-1.5 rounded-lg px-4 py-2.5 text-sm font-medium text-white bg-amber-500 hover:bg-amber-600 transition-colors shadow-sm"
-                  onClick={(e) => {
-                    if (!confirm('Buka halaman Nota Belanja? Isian kuitansi yang belum disimpan akan hilang.')) {
-                      e.preventDefault()
-                    }
-                  }}
-                >
-                  <FileText size={16} /> Nota Belanja
-                </Link>
-                <Link
-                  to="/kuitansi-jasa"
-                  className="flex items-center gap-1.5 rounded-lg px-4 py-2.5 text-sm font-medium text-white bg-teal-600 hover:bg-teal-700 transition-colors shadow-sm"
-                  onClick={(e) => {
-                    if (!confirm('Buka halaman Kuitansi Jasa? Isian kuitansi yang belum disimpan akan hilang.')) {
-                      e.preventDefault()
-                    }
-                  }}
-                >
-                  <Receipt size={16} /> Kuitansi Jasa
-                </Link>
-              </div>
-
-              <div className="flex gap-3">
-                <button type="button" className="btn-secondary" onClick={onClose}>Batal</button>
-                <button type="submit" className="btn-primary" disabled={saving}>
-                  {saving ? <Loader2 size={16} className="animate-spin" /> : <Printer size={16} />}
-                  Simpan & Cetak
-                </button>
-              </div>
+            <div className="flex justify-end gap-3 pt-2">
+              <button type="button" className="btn-secondary" onClick={onClose}>Batal</button>
+              <button type="submit" className="btn-primary" disabled={saving}>
+                {saving ? <Loader2 size={16} className="animate-spin" /> : <Printer size={16} />}
+                Simpan & Cetak
+              </button>
             </div>
           </form>
         </div>
