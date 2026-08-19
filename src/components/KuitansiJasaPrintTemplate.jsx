@@ -18,6 +18,11 @@ const PAPER_DEEP = '#d7edf1'
 const GUILLOCHE = 'rgba(41,95,109,0.34)'
 const GUILLOCHE_SOFT = 'rgba(41,95,109,0.14)'
 
+// Jarak dari tepi atas kertas A4 ke kwitansi, meniru posisi pada
+// sampel_kwitansi.docx (kwitansi "diturunkan" ke bagian bawah kertas,
+// bukan menempel di pojok atas).
+const TOP_OFFSET_MM = 123
+
 // Latar motif guilloche: pola ubin (tile) berisi lingkaran-lingkaran
 // bersinggungan, menghasilkan efek jalinan garis khas kertas berharga.
 // (Beda dengan NotaPrintTemplate yang polos hitam-putih — kwitansi meniru
@@ -94,12 +99,18 @@ const doubleFrame = {
 
 // Kwitansi Jasa — blanko kwitansi bergaya dokumen resmi (cek/giro) dengan
 // motif guilloche, counterfoil/sobekan arsip di kiri, dan watermark rosette
-// di slip utama.
+// di slip utama. Dipakai KHUSUS untuk transaksi jasa (mis. transport,
+// honor kegiatan) — beda dari NotaPrintTemplate yang khusus belanja barang.
 //
-// SETENGAH HALAMAN (210mm x 148mm — sama seperti NotaPrintTemplate) supaya
-// Kuitansi & Nota bisa dicetak pada satu lembar A4 yang sama: Kuitansi di
-// paruh atas, Nota di ruang kosong paruh bawah, bukan masing-masing
-// menghabiskan satu lembar A4 sendiri.
+// SATU KWITANSI = SATU LEMBAR A4 SENDIRI (dicetak terpisah dari Nota, tidak
+// digabung dalam satu lembar). Kwitansi diposisikan turun ke bagian bawah
+// kertas (bukan menempel di pojok atas), mengikuti posisi pada sampel
+// referensi (sampel_kwitansi.docx).
+//
+// Catatan: strukturnya (helper formatRupiah/formatTanggal, className
+// Tailwind, forwardRef, printColorAdjust) mengikuti pola NotaPrintTemplate
+// supaya konsisten satu codebase — TIDAK mengubah atau bergantung pada
+// NotaPrintTemplate itu sendiri.
 //
 // Props:
 //   sekolah: { nama, alamat, kota }
@@ -116,17 +127,19 @@ const KuitansiJasaPrintTemplate = forwardRef(function KuitansiJasaPrintTemplate(
   return (
     <div
       ref={ref}
-      className="print-only relative bg-white text-black p-6 text-xs flex items-center justify-center"
+      className="print-only relative bg-white text-black text-xs flex justify-center"
       style={{
         width: '210mm',
-        minHeight: '148mm',
+        minHeight: '297mm',
+        paddingTop: `${TOP_OFFSET_MM}mm`,
+        boxSizing: 'border-box',
         WebkitPrintColorAdjust: 'exact',
         printColorAdjust: 'exact',
         colorAdjust: 'exact',
       }}
     >
       <div
-        className="flex box-border"
+        className="flex box-border h-fit"
         style={{
           width: '125mm',
           padding: '2mm',
