@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabaseClient'
-import { X, Loader2, Printer } from 'lucide-react'
+import { X, Loader2, Printer, FileText, Receipt } from 'lucide-react'
 import KuitansiPrintTemplate from '../lib/KuitansiPrintTemplate'
 import { useSaranFormKuitansi } from '../lib/useSaranFormKuitansi'
 
@@ -147,6 +148,34 @@ export default function KuitansiModal({ keuanganRow, sekolah, onClose }) {
           <div className="flex items-center justify-between mb-4">
             <h2 className="font-display text-lg font-semibold">Buat Kuitansi</h2>
             <button className="icon-btn" onClick={onClose}><X size={18} /></button>
+          </div>
+
+          {/* Tombol pintasan ke jenis dokumen lain — meninggalkan halaman ini
+              (isian form yang belum disimpan akan hilang), jadi dikonfirmasi dulu. */}
+          <div className="flex items-center gap-2 mb-4 -mt-1">
+            <span className="text-xs text-ink-700/50">Buat dokumen lain:</span>
+            <Link
+              to="/nota"
+              className="btn-secondary text-xs px-2.5 py-1.5"
+              onClick={(e) => {
+                if (!confirm('Buka halaman Nota Belanja? Isian kuitansi yang belum disimpan akan hilang.')) {
+                  e.preventDefault()
+                }
+              }}
+            >
+              <FileText size={13} /> Nota Belanja
+            </Link>
+            <Link
+              to="/kuitansi-jasa"
+              className="btn-secondary text-xs px-2.5 py-1.5"
+              onClick={(e) => {
+                if (!confirm('Buka halaman Kuitansi Jasa? Isian kuitansi yang belum disimpan akan hilang.')) {
+                  e.preventDefault()
+                }
+              }}
+            >
+              <Receipt size={13} /> Kuitansi Jasa
+            </Link>
           </div>
 
           <form onSubmit={handleSimpan} className="space-y-4">
