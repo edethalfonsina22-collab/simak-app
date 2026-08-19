@@ -21,7 +21,7 @@ const GUILLOCHE_SOFT = 'rgba(41,95,109,0.14)'
 // Jarak dari tepi atas kertas A4 ke kwitansi, meniru posisi pada
 // sampel_kwitansi.docx (kwitansi "diturunkan" ke bagian bawah kertas,
 // bukan menempel di pojok atas).
-const TOP_OFFSET_MM = 123
+const TOP_OFFSET_MM = 138
 
 // Ukuran kwitansi (lebar & tinggi) — sebelumnya lebar tetap 125mm dan
 // tinggi mengikuti konten (h-fit). Diperbesar sesuai permintaan:
@@ -150,7 +150,7 @@ const KuitansiJasaPrintTemplate = forwardRef(function KuitansiJasaPrintTemplate(
         style={{
           width: `${SLIP_WIDTH_MM}mm`,
           paddingTop: `${2 + EXTRA_PAD_V_MM}mm`,
-          paddingBottom: `${2 + EXTRA_PAD_V_MM + 40}mm`,
+          paddingBottom: `${2 + EXTRA_PAD_V_MM + 60}mm`,
           paddingLeft: '2mm',
           paddingRight: '2mm',
           background: 'transparent',
