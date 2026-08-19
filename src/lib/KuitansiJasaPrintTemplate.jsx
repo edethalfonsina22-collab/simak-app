@@ -150,7 +150,7 @@ const KuitansiJasaPrintTemplate = forwardRef(function KuitansiJasaPrintTemplate(
         style={{
           width: `${SLIP_WIDTH_MM}mm`,
           paddingTop: `${2 + EXTRA_PAD_V_MM}mm`,
-          paddingBottom: `${2 + EXTRA_PAD_V_MM}mm`,
+          paddingBottom: `${2 + EXTRA_PAD_V_MM + 40}mm`,
           paddingLeft: '2mm',
           paddingRight: '2mm',
           background: 'transparent',
