@@ -150,34 +150,6 @@ export default function KuitansiModal({ keuanganRow, sekolah, onClose }) {
             <button className="icon-btn" onClick={onClose}><X size={18} /></button>
           </div>
 
-          {/* Tombol pintasan ke jenis dokumen lain — meninggalkan halaman ini
-              (isian form yang belum disimpan akan hilang), jadi dikonfirmasi dulu. */}
-          <div className="flex items-center gap-2 mb-4 -mt-1">
-            <span className="text-xs text-ink-700/50">Buat dokumen lain:</span>
-            <Link
-              to="/nota"
-              className="btn-secondary text-xs px-2.5 py-1.5"
-              onClick={(e) => {
-                if (!confirm('Buka halaman Nota Belanja? Isian kuitansi yang belum disimpan akan hilang.')) {
-                  e.preventDefault()
-                }
-              }}
-            >
-              <FileText size={13} /> Nota Belanja
-            </Link>
-            <Link
-              to="/kuitansi-jasa"
-              className="btn-secondary text-xs px-2.5 py-1.5"
-              onClick={(e) => {
-                if (!confirm('Buka halaman Kuitansi Jasa? Isian kuitansi yang belum disimpan akan hilang.')) {
-                  e.preventDefault()
-                }
-              }}
-            >
-              <Receipt size={13} /> Kuitansi Jasa
-            </Link>
-          </div>
-
           <form onSubmit={handleSimpan} className="space-y-4">
             {/* ==== Header dokumen ==== */}
             <div className="grid grid-cols-2 gap-3">
@@ -331,12 +303,41 @@ export default function KuitansiModal({ keuanganRow, sekolah, onClose }) {
               </div>
             </div>
 
-            <div className="flex justify-end gap-3 pt-2">
-              <button type="button" className="btn-secondary" onClick={onClose}>Batal</button>
-              <button type="submit" className="btn-primary" disabled={saving}>
-                {saving ? <Loader2 size={16} className="animate-spin" /> : <Printer size={16} />}
-                Simpan & Cetak
-              </button>
+            <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
+              {/* Pintasan ke jenis dokumen lain — meninggalkan halaman ini
+                  (isian yang belum disimpan akan hilang), jadi dikonfirmasi dulu. */}
+              <div className="flex items-center gap-2">
+                <Link
+                  to="/nota"
+                  className="flex items-center gap-1.5 rounded-lg px-4 py-2.5 text-sm font-medium text-white bg-amber-500 hover:bg-amber-600 transition-colors shadow-sm"
+                  onClick={(e) => {
+                    if (!confirm('Buka halaman Nota Belanja? Isian kuitansi yang belum disimpan akan hilang.')) {
+                      e.preventDefault()
+                    }
+                  }}
+                >
+                  <FileText size={16} /> Nota Belanja
+                </Link>
+                <Link
+                  to="/kuitansi-jasa"
+                  className="flex items-center gap-1.5 rounded-lg px-4 py-2.5 text-sm font-medium text-white bg-teal-600 hover:bg-teal-700 transition-colors shadow-sm"
+                  onClick={(e) => {
+                    if (!confirm('Buka halaman Kuitansi Jasa? Isian kuitansi yang belum disimpan akan hilang.')) {
+                      e.preventDefault()
+                    }
+                  }}
+                >
+                  <Receipt size={16} /> Kuitansi Jasa
+                </Link>
+              </div>
+
+              <div className="flex gap-3">
+                <button type="button" className="btn-secondary" onClick={onClose}>Batal</button>
+                <button type="submit" className="btn-primary" disabled={saving}>
+                  {saving ? <Loader2 size={16} className="animate-spin" /> : <Printer size={16} />}
+                  Simpan & Cetak
+                </button>
+              </div>
             </div>
           </form>
         </div>
