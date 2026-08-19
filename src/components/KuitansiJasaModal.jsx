@@ -12,23 +12,10 @@ const emptyForm = () => ({
   untuk_pembayaran: '',
 })
 
-/**
- * Form untuk membuat Kuitansi Jasa (transport, honor kegiatan, dsb).
- * Berbeda dari KuitansiModal (kuitansi barang): field lebih ringkas dan
- * "Uang Sejumlah" pada hasil cetak digenerate OTOMATIS dari nominal
- * (terbilangRupiah), bukan diisi manual.
- *
- * Disimpan ke tabel yang sama dengan kuitansi biasa (`kuitansi`), dibedakan
- * lewat kolom jenis = 'kuitansi_jasa', supaya riwayat & penomoran tetap
- * terpusat di satu tabel.
- *
- * Dipanggil dari KuitansiJasa.jsx:
- *   <KuitansiJasaModal sekolah={{ nama, alamat, kota }} onClose={...} />
- */
 export default function KuitansiJasaModal({ sekolah, onClose }) {
   const [form, setForm] = useState(emptyForm())
   const [saving, setSaving] = useState(false)
-  const [savedData, setSavedData] = useState(null) // { ...kuitansi row } setelah tersimpan, siap dicetak
+  const [savedData, setSavedData] = useState(null)
   const printRef = useRef(null)
 
   function ubah(field, value) {
@@ -39,9 +26,6 @@ export default function KuitansiJasaModal({ sekolah, onClose }) {
     e.preventDefault()
     setSaving(true)
     try {
-      // Pakai nomor dari sumber (No. Bukti) kalau diisi user, mis. "BNU07".
-      // Hanya generate otomatis lewat RPC kalau field ini benar-benar kosong,
-      // supaya tetap ada nomor untuk kuitansi yang tidak diisi manual.
       let nomorFinal = form.no_bukti.trim()
       if (!nomorFinal) {
         const { data: nomorData, error: nomorErr } = await supabase.rpc('next_nomor_kuitansi', { p_jenis: 'kuitansi_jasa' })
@@ -72,23 +56,16 @@ export default function KuitansiJasaModal({ sekolah, onClose }) {
 
   useEffect(() => {
     if (savedData) {
-      // beri waktu render sebelum memanggil print dialog
       const t = setTimeout(() => window.print(), 150)
       return () => clearTimeout(t)
     }
   }, [savedData])
 
-  // Data yang dioper ke template cetak — memetakan nama kolom tabel (nomor,
-  // diterima_dari, jumlah_total) ke nama prop yang dipakai KuitansiJasaPrintTemplate
-  // (no_kwitansi, dari, uang_sejumlah, jumlah).
   const dataCetak = savedData
     ? {
         no_kwitansi: savedData.nomor,
         tanggal: savedData.tanggal,
         dari: savedData.diterima_dari,
-        // Kwitansi resmi menulis "Uang sejumlah" dalam huruf kapital semua —
-        // terbilangRupiah() sendiri menghasilkan huruf kecil/kapital awal,
-        // jadi di-uppercase di titik ini sebelum dikirim ke template cetak.
         uang_sejumlah: terbilangRupiah(savedData.jumlah_total).toUpperCase(),
         untuk_pembayaran: savedData.untuk_pembayaran,
         jumlah: savedData.jumlah_total,
@@ -174,9 +151,6 @@ export default function KuitansiJasaModal({ sekolah, onClose }) {
         </div>
       </div>
 
-      {/* Sengaja di luar div "no-print" di atas — kalau ada di dalamnya, lembar ini
-          ikut disembunyikan saat print (display:none pada induk menang atas
-          visibility:visible di sini), akibatnya hasil cetak jadi halaman kosong. */}
       {dataCetak && (
         <KuitansiJasaPrintTemplate
           ref={printRef}
