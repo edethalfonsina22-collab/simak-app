@@ -4,14 +4,12 @@ import { X, Loader2, Printer } from 'lucide-react'
 import KuitansiJasaPrintTemplate from '../lib/KuitansiJasaPrintTemplate'
 import { terbilangRupiah } from '../lib/terbilang'
 
-const emptyForm = (initialData) => ({
+const emptyForm = () => ({
   no_bukti: '',
-  // Tanggal SELALU direset ke hari ini — meski ini hasil duplikat dari
-  // transaksi lama, tanggal transaksi baru jelas berbeda.
   tanggal: new Date().toISOString().slice(0, 10),
-  diterima_dari: initialData?.diterima_dari || '',
-  jumlah: initialData?.jumlah_total ? String(initialData.jumlah_total) : '',
-  untuk_pembayaran: initialData?.untuk_pembayaran || '',
+  diterima_dari: '',
+  jumlah: '',
+  untuk_pembayaran: '',
 })
 
 /**
@@ -24,17 +22,11 @@ const emptyForm = (initialData) => ({
  * lewat kolom jenis = 'kuitansi_jasa', supaya riwayat & penomoran tetap
  * terpusat di satu tabel.
  *
- * Prop opsional `initialData`: baris kuitansi lama (dari tabel riwayat) yang
- * dipakai untuk pre-fill form saat user menekan tombol "Duplikat" — supaya
- * transaksi berulang (mis. transport kegiatan tiap bulan) tidak perlu
- * diketik ulang dari nol. No. Bukti & Tanggal tetap dikosongkan/direset
- * karena keduanya harus unik/baru untuk tiap transaksi.
- *
  * Dipanggil dari KuitansiJasa.jsx:
- *   <KuitansiJasaModal sekolah={{ nama, alamat, kota }} initialData={row} onClose={...} />
+ *   <KuitansiJasaModal sekolah={{ nama, alamat, kota }} onClose={...} />
  */
-export default function KuitansiJasaModal({ sekolah, onClose, initialData }) {
-  const [form, setForm] = useState(() => emptyForm(initialData))
+export default function KuitansiJasaModal({ sekolah, onClose }) {
+  const [form, setForm] = useState(emptyForm())
   const [saving, setSaving] = useState(false)
   const [savedData, setSavedData] = useState(null) // { ...kuitansi row } setelah tersimpan, siap dicetak
   const printRef = useRef(null)
@@ -47,12 +39,19 @@ export default function KuitansiJasaModal({ sekolah, onClose, initialData }) {
     e.preventDefault()
     setSaving(true)
     try {
-      const { data: nomorData, error: nomorErr } = await supabase.rpc('next_nomor_kuitansi', { p_jenis: 'kuitansi_jasa' })
-      if (nomorErr) throw nomorErr
+      // Pakai nomor dari sumber (No. Bukti) kalau diisi user, mis. "BNU07".
+      // Hanya generate otomatis lewat RPC kalau field ini benar-benar kosong,
+      // supaya tetap ada nomor untuk kuitansi yang tidak diisi manual.
+      let nomorFinal = form.no_bukti.trim()
+      if (!nomorFinal) {
+        const { data: nomorData, error: nomorErr } = await supabase.rpc('next_nomor_kuitansi', { p_jenis: 'kuitansi_jasa' })
+        if (nomorErr) throw nomorErr
+        nomorFinal = nomorData
+      }
 
       const payload = {
         jenis: 'kuitansi_jasa',
-        nomor: nomorData,
+        nomor: nomorFinal,
         no_bukti: form.no_bukti,
         tanggal: form.tanggal,
         diterima_dari: form.diterima_dari,
@@ -98,14 +97,7 @@ export default function KuitansiJasaModal({ sekolah, onClose, initialData }) {
       <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4 no-print">
         <div className="bg-white rounded-xl shadow-xl w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto">
           <div className="flex items-center justify-between mb-4">
-            <div>
-              <h2 className="font-display text-lg font-semibold">Buat Kuitansi Jasa</h2>
-              {initialData && (
-                <p className="text-xs text-ink-700/50 mt-0.5">
-                  Disalin dari kuitansi {initialData.nomor || '-'} — sesuaikan sebelum menyimpan.
-                </p>
-              )}
-            </div>
+            <h2 className="font-display text-lg font-semibold">Buat Kuitansi Jasa</h2>
             <button className="icon-btn" onClick={onClose}><X size={18} /></button>
           </div>
 
