@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabaseClient'
 import Layout from '../components/Layout'
 import KuitansiModal from '../components/KuitansiModal'
 import KuitansiPrintTemplate from '../lib/KuitansiPrintTemplate'
 import BulkImportModal from '../components/BulkImportModal'
-import { Plus, Printer, Search, Loader2, Receipt, Trash2, FileSpreadsheet } from 'lucide-react'
+import { Plus, Printer, Search, Loader2, Receipt, Trash2, FileSpreadsheet, FileText } from 'lucide-react'
 
 function formatRupiah(angka) {
   return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(angka || 0)
@@ -237,6 +238,33 @@ export default function Kuitansi() {
       subtitle="Riwayat semua kuitansi yang pernah dibuat"
       actions={
         <>
+          {/* Pintasan ke jenis dokumen lain — ditaruh di luar form pengisian
+              kuitansi (bukan di dalam modal "Buat Kuitansi"), supaya bisa
+              langsung dibuka dari halaman Kuitansi ini kapan saja. Kalau modal
+              "Buat Kuitansi Baru" sedang terbuka, konfirmasi dulu karena isian
+              yang belum disimpan akan hilang. */}
+          <Link
+            to="/nota"
+            className="flex items-center gap-1.5 rounded-lg px-4 py-2.5 text-sm font-medium text-white bg-amber-500 hover:bg-amber-600 transition-colors shadow-sm"
+            onClick={(e) => {
+              if (showBuat && !confirm('Buka halaman Nota Belanja? Isian kuitansi yang belum disimpan akan hilang.')) {
+                e.preventDefault()
+              }
+            }}
+          >
+            <FileText size={16} /> Nota Belanja
+          </Link>
+          <Link
+            to="/kuitansi-jasa"
+            className="flex items-center gap-1.5 rounded-lg px-4 py-2.5 text-sm font-medium text-white bg-teal-600 hover:bg-teal-700 transition-colors shadow-sm"
+            onClick={(e) => {
+              if (showBuat && !confirm('Buka halaman Kuitansi Jasa? Isian kuitansi yang belum disimpan akan hilang.')) {
+                e.preventDefault()
+              }
+            }}
+          >
+            <Receipt size={16} /> Kuitansi Jasa
+          </Link>
           <button className="btn-secondary" onClick={() => setShowImport(true)}>
             <FileSpreadsheet size={16} /> Impor Massal (Excel)
           </button>
