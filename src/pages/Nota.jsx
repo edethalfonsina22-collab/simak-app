@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import * as XLSX from 'xlsx'
 import { supabase } from '../lib/supabaseClient' // sesuaikan path kalau berbeda di project kamu
-import Layout from '../components/Layout'
 import NotaPrintTemplate from '../components/NotaPrintTemplate'
+import KuitansiModal from '../components/KuitansiModal' // KUITANSI: pakai ulang modal yang sudah ada, TIDAK diubah
 
 // -----------------------------------------------------------------
 // Baris item kosong untuk form manual
@@ -45,6 +45,23 @@ function mapUntukCetak(nota) {
   }
 }
 
+// ===================================================================
+// KUITANSI: ubah satu baris nota jadi bentuk "keuanganRow" palsu yang
+// dipahami KuitansiModal (lihat komentar di dalam KuitansiModal.jsx:
+// hanya membaca .tanggal, .jumlah, .catatan/.kategori — dan .id kalau
+// ada akan disimpan sebagai keuangan_id). Sengaja TIDAK menyertakan
+// field "id" di sini, supaya keuangan_id yang tersimpan di tabel
+// kuitansi tetap null (bukan id nota, yang bisa memicu error foreign
+// key kalau kolom itu mereferensikan tabel keuangan).
+// ===================================================================
+function notaKeKeuanganRow(row) {
+  return {
+    tanggal: row.tanggal,
+    jumlah: row.jumlah_total,
+    catatan: `Pembelian barang sesuai Nota No. ${row.no_nota}`,
+  }
+}
+
 export default function Nota({ sekolah }) {
   const [daftar, setDaftar] = useState([])
   const [loading, setLoading] = useState(true)
@@ -54,6 +71,10 @@ export default function Nota({ sekolah }) {
   const [notaCetak, setNotaCetak] = useState(null) // data yang lagi disiapkan untuk print
   const [importBusy, setImportBusy] = useState(false)
   const [importRingkasan, setImportRingkasan] = useState(null)
+
+  // KUITANSI: satu state baru saja — baris nota yang lagi mau dibuatkan kuitansi.
+  // null = modal tertutup.
+  const [kuitansiUntukNota, setKuitansiUntukNota] = useState(null)
 
   const printRef = useRef(null)
   const fileInputRef = useRef(null)
@@ -257,32 +278,31 @@ export default function Nota({ sekolah }) {
   const totalForm = hitungTotal(form.items)
 
   return (
-    <Layout
-      title="Nota Belanja"
-      subtitle="Riwayat semua nota belanja yang pernah dibuat"
-      actions={
-        <>
-          <button onClick={unduhTemplateExcel} className="px-3 py-2 rounded bg-gray-200 text-sm">
-            Unduh Template
-          </button>
-          <label className="px-3 py-2 rounded bg-emerald-600 text-white text-sm cursor-pointer">
-            {importBusy ? 'Mengimpor...' : 'Impor Massal'}
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".xlsx,.xls,.csv"
-              className="hidden"
-              disabled={importBusy}
-              onChange={handleFileImpor}
-            />
-          </label>
-          <button onClick={bukaTambah} className="px-3 py-2 rounded bg-blue-600 text-white text-sm">
-            + Tambah Nota
-          </button>
-        </>
-      }
-    >
+    <div className="p-4">
       <div className="no-print">
+        <div className="flex items-center justify-between mb-4">
+          <h1 className="text-xl font-bold">Nota Belanja</h1>
+          <div className="flex gap-2">
+            <button onClick={unduhTemplateExcel} className="px-3 py-2 rounded bg-gray-200 text-sm">
+              Unduh Template
+            </button>
+            <label className="px-3 py-2 rounded bg-emerald-600 text-white text-sm cursor-pointer">
+              {importBusy ? 'Mengimpor...' : 'Impor Massal'}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".xlsx,.xls,.csv"
+                className="hidden"
+                disabled={importBusy}
+                onChange={handleFileImpor}
+              />
+            </label>
+            <button onClick={bukaTambah} className="px-3 py-2 rounded bg-blue-600 text-white text-sm">
+              + Tambah Nota
+            </button>
+          </div>
+        </div>
+
         {importRingkasan && (
           <div
             className={`mb-4 p-3 rounded text-sm ${
@@ -327,6 +347,8 @@ export default function Nota({ sekolah }) {
                       <div className="flex justify-center gap-2 text-xs">
                         <button onClick={() => cetakNota(row)} className="text-blue-600">Cetak</button>
                         <button onClick={() => bukaEdit(row)} className="text-amber-600">Edit</button>
+                        {/* KUITANSI: tombol baru, membuka KuitansiModal yang sudah ada */}
+                        <button onClick={() => setKuitansiUntukNota(row)} className="text-emerald-600">Kuitansi</button>
                         <button onClick={() => hapusNota(row.id)} className="text-red-600">Hapus</button>
                       </div>
                     </td>
@@ -337,7 +359,7 @@ export default function Nota({ sekolah }) {
           </table>
         </div>
 
-        {/* Modal form manual */}
+        {/* Modal form manual (nota) — TIDAK berubah */}
         {showForm && (
           <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
             <form
@@ -462,6 +484,18 @@ export default function Nota({ sekolah }) {
       {notaCetak && (
         <NotaPrintTemplate ref={printRef} sekolah={sekolah} data={notaCetak} />
       )}
-    </Layout>
+
+      {/* KUITANSI: pakai ulang KuitansiModal apa adanya — modal ini sudah
+          menangani form, simpan ke tabel "kuitansi", dan cetak sendiri
+          (termasuk elemen print-nya sendiri di luar "no-print"). Tidak ada
+          duplikasi logic sama sekali. */}
+      {kuitansiUntukNota && (
+        <KuitansiModal
+          keuanganRow={notaKeKeuanganRow(kuitansiUntukNota)}
+          sekolah={sekolah}
+          onClose={() => setKuitansiUntukNota(null)}
+        />
+      )}
+    </div>
   )
 }
