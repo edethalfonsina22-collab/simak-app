@@ -4,7 +4,7 @@ import Layout from '../components/Layout'
 import KuitansiModal from '../components/KuitansiModal'
 import KuitansiPrintTemplate from '../lib/KuitansiPrintTemplate'
 import BulkImportModal from '../components/BulkImportModal'
-import { Plus, Printer, Search, Loader2, Receipt, Trash2, FileSpreadsheet, Pencil, RefreshCw, Repeat } from 'lucide-react'
+import { Plus, Printer, Search, Loader2, Receipt, Trash2, FileSpreadsheet } from 'lucide-react'
 
 function formatRupiah(angka) {
   return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(angka || 0)
@@ -63,44 +63,18 @@ function tanggalDariNilaiImpor(nilai) {
   return teks
 }
 
-// Hitung tahun anggaran otomatis dari tanggal transaksi, dengan format
-// "AAAA/BBBB" (mis. Juli 2025 s/d Juni 2026 -> "2025/2026").
-// Ini dipakai sebagai fallback kalau kolom tahun_anggaran di Excel kosong ATAU
-// isinya cuma satu tahun (mis. "2025") sehingga tidak jelas semesternya.
-function tahunAnggaranDariTanggal(tanggalIso) {
-  if (!tanggalIso) return ''
-  const d = new Date(tanggalIso)
-  if (Number.isNaN(d.getTime())) return ''
-  const bulan = d.getMonth() + 1 // 1-12
-  const tahun = d.getFullYear()
-  // Juli(7) - Desember(12) -> tahun berjalan / tahun+1
-  // Januari(1) - Juni(6) -> tahun-1 / tahun berjalan
-  if (bulan >= 7) return `${tahun}/${tahun + 1}`
-  return `${tahun - 1}/${tahun}`
-}
-
 function mapRowKuitansi(row) {
   const diterimaDari = String(row['diterima_dari'] || '').trim()
   const jumlahTotal = Number(row['jumlah_total']) || 0
   if (!diterimaDari && !jumlahTotal) return null
-
-  const tanggal = tanggalDariNilaiImpor(row['tanggal(YYYY-MM-DD)'])
-
-  // Kalau kolom tahun_anggaran di Excel kosong, atau isinya cuma satu
-  // tahun tunggal (mis. "2025") bukan format "2025/2026", hitung otomatis dari
-  // tanggal transaksi supaya konsisten dengan periode Juli-Juni.
-  const tahunAnggaranExcel = String(row['tahun_anggaran'] || '').trim()
-  const tahunAnggaranFinal = /^\d{4}\/\d{4}$/.test(tahunAnggaranExcel)
-    ? tahunAnggaranExcel
-    : tahunAnggaranDariTanggal(tanggal)
 
   return {
     jenis: 'kuitansi',
     no_bukti: String(row['no_bukti'] || '').trim(),
     lembar: String(row['lembar'] || 'I/II/III/IV/V').trim(),
     mata_anggaran: String(row['mata_anggaran'] || '').trim(),
-    tahun_anggaran: tahunAnggaranFinal,
-    tanggal,
+    tahun_anggaran: String(row['tahun_anggaran'] || String(new Date().getFullYear())).trim(),
+    tanggal: tanggalDariNilaiImpor(row['tanggal(YYYY-MM-DD)']),
     diterima_dari: diterimaDari,
     jumlah_total: jumlahTotal,
     untuk_pembayaran: String(row['untuk_pembayaran'] || '').trim(),
@@ -118,14 +92,11 @@ export default function Kuitansi() {
   const [data, setData] = useState([])
   const [loading, setLoading] = useState(true)
   const [pencarian, setPencarian] = useState('')
-  const [tahunAnggaranFilter, setTahunAnggaranFilter] = useState('semua')
   const [showBuat, setShowBuat] = useState(false)
-  const [editRow, setEditRow] = useState(null) // baris kuitansi yang sedang diedit (null = mode buat baru)
   const [showImport, setShowImport] = useState(false)
   const [sekolah, setSekolah] = useState(null)
   const [menghapus, setMenghapus] = useState(null) // id yang sedang dihapus
-  const [menyinkron, setMenyinkron] = useState(null) // id yang sedang disinkron manual ke Nota
-  const [menyinkronJasa, setMenyinkronJasa] = useState(null) // BARU: id yang sedang disinkron ke Kuitansi Jasa
+  const [menghapusSemua, setMenghapusSemua] = useState(false) // status hapus semua
 
   // Baris yang sedang dicetak ulang
   const [cetakUlang, setCetakUlang] = useState(null)
@@ -156,21 +127,8 @@ export default function Kuitansi() {
     })
   }, [])
 
-  // Daftar tahun anggaran yang benar-benar ada di data, urut terbaru dulu.
-  const daftarTahunAnggaran = useMemo(() => {
-    const set = new Set()
-    data.forEach((d) => {
-      if (d.tahun_anggaran) set.add(d.tahun_anggaran)
-    })
-    return Array.from(set).sort((a, b) => (a < b ? 1 : -1))
-  }, [data])
-
   const dataTersaring = useMemo(() => {
     return data.filter((d) => {
-      // Filter tahun anggaran
-      if (tahunAnggaranFilter !== 'semua' && d.tahun_anggaran !== tahunAnggaranFilter) {
-        return false
-      }
       if (!pencarian.trim()) return true
       const q = pencarian.toLowerCase()
       return (
@@ -179,7 +137,7 @@ export default function Kuitansi() {
         (d.untuk_pembayaran || '').toLowerCase().includes(q)
       )
     })
-  }, [data, pencarian, tahunAnggaranFilter])
+  }, [data, pencarian])
 
   function handleCetakUlang(row) {
     setCetakUlang(row)
@@ -207,76 +165,27 @@ export default function Kuitansi() {
     loadData()
   }
 
-  // Buka modal dalam mode BUAT BARU (bukan edit)
-  function handleBukaBuat() {
-    setEditRow(null)
-    setShowBuat(true)
-  }
+  // Menghapus SEMUA kuitansi (jenis = 'kuitansi') sekaligus dari database.
+  // Diberi dua kali konfirmasi karena aksi ini permanen dan tidak bisa dibatalkan.
+  async function handleHapusSemua() {
+    if (data.length === 0) return
+    if (!confirm(`Hapus SEMUA ${data.length} kuitansi? Tindakan ini tidak bisa dibatalkan.`)) return
+    if (!confirm('Sekali lagi untuk memastikan: semua data kuitansi akan hilang permanen. Lanjutkan?')) return
 
-  // Buka modal dalam mode EDIT untuk baris tertentu
-  function handleEdit(row) {
-    setEditRow(row)
-    setShowBuat(true)
+    setMenghapusSemua(true)
+    const { error } = await supabase.from('kuitansi').delete().eq('jenis', 'kuitansi')
+    setMenghapusSemua(false)
+
+    if (error) {
+      alert('Gagal menghapus semua: ' + error.message)
+      return
+    }
+    loadData()
   }
 
   function handleTutupBuat() {
     setShowBuat(false)
-    setEditRow(null) // reset mode edit setiap modal ditutup
     loadData()
-  }
-
-  // Sinkron manual ke Nota. Berguna untuk kuitansi yang dibuat SEBELUM
-  // trigger database dipasang, jadi belum otomatis punya baris Nota terkait.
-  // Caranya: "sentuh" baris ini dengan UPDATE tanpa mengubah nilai apa pun —
-  // ini otomatis memicu trigger sync_kuitansi_ke_nota di database.
-  async function handleSinkronNota(row) {
-    setMenyinkron(row.id)
-    const { error } = await supabase
-      .from('kuitansi')
-      .update({ jumlah_total: row.jumlah_total })
-      .eq('id', row.id)
-    setMenyinkron(null)
-    if (error) {
-      alert('Gagal menyinkron ke Nota: ' + error.message)
-      return
-    }
-    alert('Berhasil disinkron ke Nota.')
-  }
-
-  // BARU: sinkron manual ke Kuitansi Jasa. Beda dari sinkron ke Nota — tidak
-  // ada trigger database untuk arah ini, jadi dibuat baris BARU langsung di
-  // tabel `kuitansi` dengan jenis = 'kuitansi_jasa', menyalin data dari baris
-  // Kuitansi ini (nomor baru digenerate otomatis lewat next_nomor_kuitansi,
-  // seperti alur "Buat Kuitansi Jasa" biasa). Tanggal & data lain disalin apa
-  // adanya karena mewakili transaksi yang sama, cukup dicatat di dua sisi.
-  // Berguna untuk transaksi lama yang sudah ada di Kuitansi tapi belum
-  // tercatat di riwayat Kuitansi Jasa.
-  async function handleSinkronKuitansiJasa(row) {
-    if (!confirm(`Salin kuitansi "${row.nomor || '-'}" ke riwayat Kuitansi Jasa?`)) return
-    setMenyinkronJasa(row.id)
-    try {
-      const { data: nomorData, error: nomorErr } = await supabase.rpc('next_nomor_kuitansi', { p_jenis: 'kuitansi_jasa' })
-      if (nomorErr) throw nomorErr
-
-      const payload = {
-        jenis: 'kuitansi_jasa',
-        nomor: nomorData,
-        no_bukti: row.no_bukti,
-        tanggal: row.tanggal,
-        diterima_dari: row.diterima_dari,
-        untuk_pembayaran: row.untuk_pembayaran,
-        jumlah_total: row.jumlah_total,
-      }
-
-      const { error: insertErr } = await supabase.from('kuitansi').insert(payload)
-      if (insertErr) throw insertErr
-
-      alert('Berhasil disinkron ke Kuitansi Jasa.')
-    } catch (err) {
-      alert('Gagal menyinkron ke Kuitansi Jasa: ' + err.message)
-    } finally {
-      setMenyinkronJasa(null)
-    }
   }
 
   async function handleImportKuitansi(rows) {
@@ -309,14 +218,13 @@ export default function Kuitansi() {
 
         const { error: insertErr } = await supabase.from('kuitansi').insert(payload)
         if (insertErr) throw insertErr
+
         sukses += 1
       } catch (err) {
         gagal.push(err.message)
       }
     }
-
     loadData()
-
     if (gagal.length > 0) {
       throw new Error(`${sukses} baris berhasil, ${gagal.length} baris gagal. Contoh error: ${gagal[0]}`)
     }
@@ -332,7 +240,14 @@ export default function Kuitansi() {
           <button className="btn-secondary" onClick={() => setShowImport(true)}>
             <FileSpreadsheet size={16} /> Impor Massal (Excel)
           </button>
-          <button className="btn-primary" onClick={handleBukaBuat}>
+          <button
+            className="btn-secondary text-red-600"
+            onClick={handleHapusSemua}
+            disabled={menghapusSemua || data.length === 0}
+          >
+            {menghapusSemua ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />} Hapus Semua
+          </button>
+          <button className="btn-primary" onClick={() => setShowBuat(true)}>
             <Plus size={16} /> Buat Kuitansi Baru
           </button>
         </>
@@ -351,21 +266,6 @@ export default function Kuitansi() {
             />
           </div>
         </div>
-
-        {/* Filter Tahun Anggaran */}
-        <div className="min-w-[180px]">
-          <label className="label-field">Tahun Anggaran</label>
-          <select
-            className="input-field"
-            value={tahunAnggaranFilter}
-            onChange={(e) => setTahunAnggaranFilter(e.target.value)}
-          >
-            <option value="semua">Semua Tahun Anggaran</option>
-            {daftarTahunAnggaran.map((ta) => (
-              <option key={ta} value={ta}>{ta}</option>
-            ))}
-          </select>
-        </div>
       </div>
 
       <div className="card overflow-x-auto">
@@ -374,7 +274,6 @@ export default function Kuitansi() {
             <tr>
               <th>Nomor</th>
               <th>Tanggal</th>
-              <th>Tahun Anggaran</th>
               <th>Diterima Dari</th>
               <th>Keterangan</th>
               <th>Jumlah</th>
@@ -383,11 +282,11 @@ export default function Kuitansi() {
           </thead>
           <tbody>
             {loading && (
-              <tr><td colSpan={7} className="text-center py-8 text-ink-700/50">Memuat data...</td></tr>
+              <tr><td colSpan={6} className="text-center py-8 text-ink-700/50">Memuat data...</td></tr>
             )}
             {!loading && dataTersaring.length === 0 && (
               <tr>
-                <td colSpan={7} className="text-center py-10 text-ink-700/50">
+                <td colSpan={6} className="text-center py-10 text-ink-700/50">
                   <div className="flex flex-col items-center gap-2">
                     <Receipt size={28} className="text-ink-700/25" />
                     <span>Belum ada kuitansi yang cocok.</span>
@@ -399,35 +298,11 @@ export default function Kuitansi() {
               <tr key={d.id}>
                 <td className="font-medium">{d.nomor || '-'}</td>
                 <td>{formatTanggal(d.tanggal)}</td>
-                <td>{d.tahun_anggaran || '-'}</td>
                 <td>{d.diterima_dari || '-'}</td>
                 <td className="max-w-[220px] truncate">{d.untuk_pembayaran || '-'}</td>
                 <td className="font-medium">{formatRupiah(d.jumlah_total)}</td>
                 <td>
                   <div className="flex items-center gap-1 justify-end">
-                    <button
-                      className="icon-btn"
-                      title="Sinkron ke Nota"
-                      disabled={menyinkron === d.id}
-                      onClick={() => handleSinkronNota(d)}
-                    >
-                      {menyinkron === d.id ? <Loader2 size={15} className="animate-spin" /> : <RefreshCw size={15} />}
-                    </button>
-                    <button
-                      className="icon-btn"
-                      title="Sinkron ke Kuitansi Jasa"
-                      disabled={menyinkronJasa === d.id}
-                      onClick={() => handleSinkronKuitansiJasa(d)}
-                    >
-                      {menyinkronJasa === d.id ? <Loader2 size={15} className="animate-spin" /> : <Repeat size={15} />}
-                    </button>
-                    <button
-                      className="icon-btn"
-                      title="Edit"
-                      onClick={() => handleEdit(d)}
-                    >
-                      <Pencil size={15} />
-                    </button>
                     <button
                       className="icon-btn"
                       title="Cetak Ulang"
@@ -454,7 +329,6 @@ export default function Kuitansi() {
       {showBuat && (
         <KuitansiModal
           keuanganRow={null}
-          editingRow={editRow}
           sekolah={sekolah}
           onClose={handleTutupBuat}
         />
