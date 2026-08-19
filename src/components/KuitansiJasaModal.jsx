@@ -86,7 +86,10 @@ export default function KuitansiJasaModal({ sekolah, onClose }) {
         no_kwitansi: savedData.nomor,
         tanggal: savedData.tanggal,
         dari: savedData.diterima_dari,
-        uang_sejumlah: terbilangRupiah(savedData.jumlah_total),
+        // Kwitansi resmi menulis "Uang sejumlah" dalam huruf kapital semua —
+        // terbilangRupiah() sendiri menghasilkan huruf kecil/kapital awal,
+        // jadi di-uppercase di titik ini sebelum dikirim ke template cetak.
+        uang_sejumlah: terbilangRupiah(savedData.jumlah_total).toUpperCase(),
         untuk_pembayaran: savedData.untuk_pembayaran,
         jumlah: savedData.jumlah_total,
       }
@@ -145,7 +148,7 @@ export default function KuitansiJasaModal({ sekolah, onClose }) {
               />
               {form.jumlah > 0 && (
                 <p className="text-xs text-ink-700/50 mt-1 italic">
-                  Terbilang: {terbilangRupiah(form.jumlah)}
+                  Terbilang: {terbilangRupiah(form.jumlah).toUpperCase()}
                 </p>
               )}
             </div>
