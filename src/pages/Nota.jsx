@@ -51,9 +51,9 @@ export default function Nota({ sekolah }) {
   const [editingId, setEditingId] = useState(null)
   const [form, setForm] = useState(formKosong())
   const [notaCetak, setNotaCetak] = useState(null) // data yang lagi disiapkan untuk print
-  const [notaLihat, setNotaLihat] = useState(null) // data yang lagi ditampilkan di modal "Lihat" (read-only)
   const [importBusy, setImportBusy] = useState(false)
   const [importRingkasan, setImportRingkasan] = useState(null)
+  const [menghapusSemua, setMenghapusSemua] = useState(false)
 
   const printRef = useRef(null)
   const fileInputRef = useRef(null)
@@ -91,15 +91,6 @@ export default function Nota({ sekolah }) {
       items: row.items?.length ? row.items : [itemKosong()],
     })
     setShowForm(true)
-  }
-
-  // ------------------------- Lihat (read-only) -------------------------
-  function bukaLihat(row) {
-    setNotaLihat(row)
-  }
-
-  function tutupLihat() {
-    setNotaLihat(null)
   }
 
   function ubahItem(idx, field, value) {
@@ -149,6 +140,43 @@ export default function Nota({ sekolah }) {
     const { error } = await supabase.from('nota').delete().eq('id', id)
     if (error) {
       alert('Gagal menghapus: ' + error.message)
+      return
+    }
+    muatDaftar()
+  }
+
+  // Hapus SEMUA nota yang ada di tabel. Sengaja dua kali konfirmasi (window.confirm
+  // biasa + mengetik ulang jumlah data) supaya tidak kepencet tidak sengaja, karena
+  // aksi ini tidak bisa dibatalkan.
+  async function hapusSemuaNota() {
+    if (daftar.length === 0) return
+
+    const konfirmasi1 = confirm(
+      `Hapus SEMUA nota (${daftar.length} data)? Tindakan ini tidak bisa dibatalkan.`
+    )
+    if (!konfirmasi1) return
+
+    const ketik = prompt(
+      `Untuk konfirmasi, ketik angka ${daftar.length} (jumlah nota yang akan dihapus):`
+    )
+    if (ketik === null) return
+    if (ketik.trim() !== String(daftar.length)) {
+      alert('Angka tidak cocok, penghapusan dibatalkan.')
+      return
+    }
+
+    setMenghapusSemua(true)
+    // .neq('id', '00000000-0000-0000-0000-000000000000') dipakai supaya query
+    // punya klausa WHERE (Supabase menolak delete tanpa filter sama sekali),
+    // sekaligus mencakup semua baris karena id asli tidak mungkin bernilai itu.
+    const { error } = await supabase
+      .from('nota')
+      .delete()
+      .neq('id', '00000000-0000-0000-0000-000000000000')
+    setMenghapusSemua(false)
+
+    if (error) {
+      alert('Gagal menghapus semua nota: ' + error.message)
       return
     }
     muatDaftar()
@@ -288,6 +316,13 @@ export default function Nota({ sekolah }) {
             <button onClick={bukaTambah} className="px-3 py-2 rounded bg-blue-600 text-white text-sm">
               + Tambah Nota
             </button>
+            <button
+              onClick={hapusSemuaNota}
+              disabled={menghapusSemua || daftar.length === 0}
+              className="px-3 py-2 rounded bg-red-600 text-white text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {menghapusSemua ? 'Menghapus...' : 'Hapus Semua'}
+            </button>
           </div>
         </div>
 
@@ -333,7 +368,6 @@ export default function Nota({ sekolah }) {
                     </td>
                     <td className="p-2">
                       <div className="flex justify-center gap-2 text-xs">
-                        <button onClick={() => bukaLihat(row)} className="text-gray-600">Lihat</button>
                         <button onClick={() => cetakNota(row)} className="text-blue-600">Cetak</button>
                         <button onClick={() => bukaEdit(row)} className="text-amber-600">Edit</button>
                         <button onClick={() => hapusNota(row.id)} className="text-red-600">Hapus</button>
@@ -463,82 +497,6 @@ export default function Nota({ sekolah }) {
                 </button>
               </div>
             </form>
-          </div>
-        )}
-
-        {/* Modal Lihat (read-only) */}
-        {notaLihat && (
-          <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-lg shadow-lg w-full max-w-3xl max-h-[90vh] overflow-y-auto p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg font-bold">Detail Nota</h2>
-                <button onClick={tutupLihat} className="text-gray-500 text-sm">
-                  ✕ Tutup
-                </button>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3 mb-4 text-sm">
-                <div>
-                  <div className="text-xs text-gray-500">No. Nota</div>
-                  <div className="font-medium">{notaLihat.no_nota || '-'}</div>
-                </div>
-                <div>
-                  <div className="text-xs text-gray-500">Tanggal</div>
-                  <div className="font-medium">{notaLihat.tanggal || '-'}</div>
-                </div>
-                <div>
-                  <div className="text-xs text-gray-500">Tuan</div>
-                  <div className="font-medium">{notaLihat.tuan || '-'}</div>
-                </div>
-                <div>
-                  <div className="text-xs text-gray-500">Toko</div>
-                  <div className="font-medium">{notaLihat.toko || '-'}</div>
-                </div>
-                {notaLihat.alamat_lanjutan && (
-                  <div className="col-span-2">
-                    <div className="text-xs text-gray-500">Alamat Lanjutan</div>
-                    <div className="font-medium">{notaLihat.alamat_lanjutan}</div>
-                  </div>
-                )}
-              </div>
-
-              <h3 className="text-sm font-semibold mb-2">Daftar Barang</h3>
-              <div className="overflow-x-auto border rounded mb-4">
-                <table className="w-full text-sm">
-                  <thead className="bg-gray-100">
-                    <tr>
-                      <th className="p-2 text-left">Banyaknya</th>
-                      <th className="p-2 text-left">Nama Barang</th>
-                      <th className="p-2 text-right">Harga</th>
-                      <th className="p-2 text-right">Jumlah</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {(notaLihat.items || []).length === 0 ? (
-                      <tr><td colSpan={4} className="p-3 text-center text-gray-500">Tidak ada barang</td></tr>
-                    ) : (
-                      notaLihat.items.map((it, idx) => (
-                        <tr key={idx} className="border-t">
-                          <td className="p-2">{[it.banyaknya, it.satuan].filter(Boolean).join(' ')}</td>
-                          <td className="p-2">{it.nama_barang}</td>
-                          <td className="p-2 text-right">
-                            {new Intl.NumberFormat('id-ID').format(Number(it.harga) || 0)}
-                          </td>
-                          <td className="p-2 text-right">
-                            {new Intl.NumberFormat('id-ID').format(it.jumlah ?? hitungJumlahBaris(it))}
-                          </td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
-
-              <div className="flex justify-end font-semibold text-sm mb-4">
-                Jumlah Total: Rp {new Intl.NumberFormat('id-ID').format(notaLihat.jumlah_total || 0)}
-              </div>
-
-            </div>
           </div>
         )}
       </div>
