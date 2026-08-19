@@ -1,7 +1,6 @@
 import { useEffect, useId, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabaseClient'
-import { X, Loader2, Printer, FileText, Receipt } from 'lucide-react'
+import { X, Loader2, Printer } from 'lucide-react'
 import KuitansiPrintTemplate from '../lib/KuitansiPrintTemplate'
 import { useSaranFormKuitansi } from '../lib/useSaranFormKuitansi'
 
@@ -76,22 +75,9 @@ export default function KuitansiModal({ keuanganRow, sekolah, onClose }) {
   const { saran, namaKeNip } = useSaranFormKuitansi()
   const reactId = useId()
   const dl = (nama) => `saran-${nama}-${reactId}`
-  const navigate = useNavigate()
 
   function ubah(field, value) {
     setForm((prev) => ({ ...prev, [field]: value }))
-  }
-
-  // Satu fungsi navigasi yang dipakai kedua tombol pintasan (Nota Belanja &
-  // Kuitansi Jasa), dengan tujuan (`tujuan`) sebagai parameter — bukan
-  // dua handler terpisah yang di-copy-paste. Sebelumnya kedua tombol memakai
-  // <Link> terpisah dan salah satu sempat ikut mengarah ke /nota; dengan satu
-  // fungsi yang diparameterkan begini, tujuan tiap tombol eksplisit dan tidak
-  // bisa lagi ketukar.
-  function bukaHalamanLain(tujuan, label) {
-    if (confirm(`Buka halaman ${label}? Isian kuitansi yang belum disimpan akan hilang.`)) {
-      navigate(tujuan)
-    }
   }
 
   // Sama seperti ubah(), tapi khusus field nama penyetuju/pembayar: kalau nama
@@ -232,32 +218,14 @@ export default function KuitansiModal({ keuanganRow, sekolah, onClose }) {
 
             <div>
               <label className="label-field">Uang Sejumlah (Rp)</label>
-              <div className="flex flex-wrap items-center gap-2">
-                <input
-                  type="number"
-                  min="0"
-                  className="input-field flex-1 min-w-[160px]"
-                  placeholder="Contoh: 1250000"
-                  value={form.jumlah}
-                  onChange={(e) => ubah('jumlah', e.target.value)}
-                />
-                {/* Pintasan ke jenis dokumen lain — meninggalkan halaman ini
-                    (isian yang belum disimpan akan hilang), jadi dikonfirmasi dulu. */}
-                <button
-                  type="button"
-                  className="flex items-center gap-1.5 rounded-lg px-4 py-2.5 text-sm font-medium text-white bg-amber-500 hover:bg-amber-600 transition-colors shadow-sm"
-                  onClick={() => bukaHalamanLain('/nota', 'Nota Belanja')}
-                >
-                  <FileText size={16} /> Nota Belanja
-                </button>
-                <button
-                  type="button"
-                  className="flex items-center gap-1.5 rounded-lg px-4 py-2.5 text-sm font-medium text-white bg-teal-600 hover:bg-teal-700 transition-colors shadow-sm"
-                  onClick={() => bukaHalamanLain('/kuitansi-jasa', 'Kuitansi Jasa')}
-                >
-                  <Receipt size={16} /> Kuitansi Jasa
-                </button>
-              </div>
+              <input
+                type="number"
+                min="0"
+                className="input-field"
+                placeholder="Contoh: 1250000"
+                value={form.jumlah}
+                onChange={(e) => ubah('jumlah', e.target.value)}
+              />
             </div>
 
             <div>
