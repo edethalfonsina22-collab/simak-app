@@ -65,6 +65,12 @@ const STAR_WATERMARK_STYLE = {
  * Nominal langsung diambil dari `data.jumlah_total` (diisi lewat field
  * "Uang Sejumlah" di form), bukan dihitung dari daftar item.
  *
+ * Padding kiri-kanan dipersempit (p-10 -> px-4, py-10 tetap) supaya lebar
+ * konten mendekati tepi kertas A4 (~201mm dari 210mm), seimbang secara
+ * visual dengan KuitansiJasaPrintTemplate.jsx yang slip-nya juga dilebarkan
+ * ke ~202mm. Padding atas-bawah TIDAK diubah supaya jarak ke kop surat dan
+ * ke kolom tanda tangan tetap sama seperti sebelumnya.
+ *
  * PENTING: komponen ini HARUS dirender di luar elemen manapun yang berclass
  * "no-print" — kalau induknya "no-print", seluruh lembar ini ikut hilang saat
  * dicetak walaupun class "print-only" di sini diberi visibility:visible
@@ -80,7 +86,7 @@ const KuitansiPrintTemplate = forwardRef(function KuitansiPrintTemplate({ sekola
   return (
     <div
       ref={ref}
-      className="print-only relative bg-white text-black p-10 text-sm overflow-hidden"
+      className="print-only relative bg-white text-black py-10 px-4 text-sm overflow-hidden"
       style={{
         width: '210mm',
         minHeight: '148mm',
