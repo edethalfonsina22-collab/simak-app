@@ -5,7 +5,6 @@ import Galeri from './pages/Galeri'
 import Dokumen from './pages/Dokumen'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { useAuth } from './lib/AuthContext'
-import { supabase } from './lib/supabaseClient'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
 import Siswa from './pages/Siswa'
@@ -24,9 +23,8 @@ import Rapor from './pages/Rapor'
 import RaporCetak from './pages/RaporCetak'
 import LaporanBulanan from './pages/LaporanBulanan'
 import Keuangan from './pages/Keuangan'
+import AnggaranArkas from './pages/AnggaranArkas'
 import Kuitansi from './pages/Kuitansi'
-import Nota from './pages/Nota'
-import KuitansiJasa from './pages/KuitansiJasa'
 import Backup from './pages/Backup'
 import ProfilSekolah from './pages/ProfilSekolah'
 import PPDBPublik from './pages/PPDBPublik'
@@ -66,33 +64,6 @@ function ProtectedRoute({ children, adminOnly }) {
   return children
 }
 
-// Nota.jsx menerima `sekolah` lewat prop (beda dari Kuitansi.jsx/KuitansiJasa.jsx
-// yang mengambil sendiri profil sekolah secara internal) — wrapper kecil ini
-// mengambilkan profil sekolah dengan cara yang sama supaya kop surat di cetakan
-// nota tetap terisi.
-function NotaDenganSekolah() {
-  const [sekolah, setSekolah] = useState(null)
-
-  useEffect(() => {
-    supabase
-      .from('profil_sekolah')
-      .select('*')
-      .eq('id', 1)
-      .maybeSingle()
-      .then(({ data }) => {
-        if (data) {
-          setSekolah({
-            nama: data.nama_sekolah,
-            alamat: data.alamat,
-            kota: data.kabupaten,
-          })
-        }
-      })
-  }, [])
-
-  return <Nota sekolah={sekolah} />
-}
-
 export default function App() {
   return (
     <Routes>
@@ -117,11 +88,8 @@ export default function App() {
       <Route path="/laporan" element={<ProtectedRoute adminOnly><LaporanBulanan /></ProtectedRoute>} />
       <Route path="/hari-libur" element={<ProtectedRoute adminOnly><HariLibur /></ProtectedRoute>} />
       <Route path="/keuangan" element={<ProtectedRoute adminOnly><Keuangan /></ProtectedRoute>} />
+      <Route path="/anggaran-arkas" element={<ProtectedRoute adminOnly><AnggaranArkas /></ProtectedRoute>} />
       <Route path="/kuitansi" element={<ProtectedRoute adminOnly><Kuitansi /></ProtectedRoute>} />
-      {/* Sebelumnya belum terdaftar di sini meski halamannya sudah ada di src/pages —
-          jadi /nota dan /kuitansi-jasa tidak bisa dibuka sama sekali. */}
-      <Route path="/nota" element={<ProtectedRoute adminOnly><NotaDenganSekolah /></ProtectedRoute>} />
-      <Route path="/kuitansi-jasa" element={<ProtectedRoute adminOnly><KuitansiJasa /></ProtectedRoute>} />
       <Route path="/backup" element={<ProtectedRoute adminOnly><Backup /></ProtectedRoute>} />
       <Route path="/profil-sekolah" element={<ProtectedRoute adminOnly><ProfilSekolah /></ProtectedRoute>} />
       <Route path="/ppdb-admin" element={<ProtectedRoute adminOnly><PPDBAdmin /></ProtectedRoute>} />
