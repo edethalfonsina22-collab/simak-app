@@ -62,13 +62,20 @@ body {
      Kuitansi). Sebelumnya top:0; left:0 membuat Kuitansi menempel pojok
      kiri-atas ("berat sebelah") — sekarang cuma digeser ke tengah secara
      horizontal, posisi vertikal (atas) tidak diubah supaya tidak
-     mempengaruhi lembar lain yang mengandalkan posisi atas. */
+     mempengaruhi lembar lain yang mengandalkan posisi atas.
+     Diubah dari `position: absolute` + `left:50%; transform:translateX(-50%)`
+     ke `position: fixed` + `left:0; right:0; margin:auto` — supaya benar-benar
+     lepas dari tata letak halaman (mis. Sidebar aplikasi yang saat print cuma
+     disembunyikan lewat visibility:hidden, bukan display:none, sehingga masih
+     memakan ruang & bisa membuat lembar cetak jadi tampil sempit/tidak
+     terpusat penuh terhadap kertas A4). */
   .print-only {
-    position: absolute;
+    position: fixed;
     top: 0;
-    left: 50%;
-    right: auto;
-    transform: translateX(-50%);
+    left: 0;
+    right: 0;
+    margin-left: auto;
+    margin-right: auto;
   }
   /* Tambahan khusus untuk Nota & Kwitansi Jasa: didorong ke bagian PALING
      BAWAH kertas A4, tetap rata tengah horizontal. Tambahkan class ini
