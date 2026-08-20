@@ -80,7 +80,7 @@ const KuitansiPrintTemplate = forwardRef(function KuitansiPrintTemplate({ sekola
   return (
     <div
       ref={ref}
-      className="print-only relative bg-white text-black p-10 text-sm overflow-hidden"
+      className="print-only relative bg-white text-black p-10 text-sm overflow-hidden border border-black"
       style={{
         width: '210mm',
         minHeight: '148mm',
