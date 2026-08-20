@@ -45,7 +45,7 @@ function normalizeRow(row, tahunAnggaran, npsn) {
     kode_rekening: row.kode_rekening || null,
     item_no: row.item_no || null,
     uraian: (row.uraian || '').trim(),
-    is_item: ['true', 'TRUE', '1', 1, true].includes(row.is_item),
+    is_item: String(row.is_item).trim().toLowerCase() === 'true' || row.is_item === true,
     status: 'draft',
   }
   for (const f of NUMERIC_FIELDS) out[f] = toNumber(row[f])
