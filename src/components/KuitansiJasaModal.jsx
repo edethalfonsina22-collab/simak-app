@@ -6,9 +6,9 @@ import { terbilangRupiah } from '../lib/terbilang'
 
 // `initialData` (opsional) adalah baris kuitansi/kuitansi-jasa yang mau ditarik
 // datanya (dari tombol "Tarik dari Kuitansi" atau "Duplikat" di KuitansiJasa.jsx).
-// Telah Terima Dari, Jumlah, Untuk Pembayaran, dan Alamat diisi otomatis —
-// No. Bukti & Tanggal sengaja dikosongkan/direset karena keduanya harus baru
-// untuk tiap transaksi.
+// Semua field diisi otomatis dari initialData, termasuk No. Bukti dan Tanggal —
+// keduanya ikut ditarik sama persis dari kuitansi utama (bukan direset ke
+// kosong/hari ini lagi), sesuai konfirmasi user.
 //
 // `alamat` dipetakan ke kolom `alamat_penerima` di tabel `kuitansi` — kolom
 // yang sama dipakai Kuitansi Utama untuk baris "<kota>, <tanggal>" di
@@ -17,8 +17,8 @@ import { terbilangRupiah } from '../lib/terbilang'
 // nama instansi untuk kop surat (mis. "PEMERINTAH KABUPATEN KEPULAUAN ARU"),
 // bukan nama kota — makanya salah muncul di cetakan.
 const emptyForm = (initialData) => ({
-  no_bukti: '',
-  tanggal: new Date().toISOString().slice(0, 10),
+  no_bukti: initialData?.no_bukti || '',
+  tanggal: initialData?.tanggal || new Date().toISOString().slice(0, 10),
   diterima_dari: initialData?.diterima_dari || '',
   jumlah: initialData?.jumlah_total != null && initialData.jumlah_total !== ''
     ? String(initialData.jumlah_total)
