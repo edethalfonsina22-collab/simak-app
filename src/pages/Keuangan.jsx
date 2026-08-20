@@ -1,24 +1,20 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabaseClient'
-import ArkasImportModal from '../components/ArkasImportModal'
 import Layout from '../components/Layout'
 import { eksporExcel, eksporPDF } from '../lib/exportUtils'
+import ArkasImportModal from '../components/ArkasImportModal'
 import {
   Plus, Pencil, Trash2, X, Loader2, TrendingUp, TrendingDown, Wallet,
-  FileDown, FileSpreadsheet, ChevronDown,
+  FileDown, FileSpreadsheet,
 } from 'lucide-react'
 
 const KATEGORI_MASUK = ['SPP', 'Donasi', 'Dana BOS', 'Sumbangan', 'Lainnya']
 const KATEGORI_KELUAR = ['Gaji/Honor', 'ATK', 'Listrik & Air', 'Perawatan Gedung', 'Kegiatan Siswa', 'Lainnya']
 
-// Key localStorage untuk menyimpan riwayat Nama/NIP yang pernah diketik
-const RIWAYAT_NAMA_NIP_KEY = 'simak_riwayat_nama_nip'
-
 const emptyForm = {
   jenis: 'masuk',
   kategori: 'SPP',
   siswa_id: '',
-  nama_nip: '',
   jumlah: '',
   tanggal: new Date().toISOString().slice(0, 10),
   catatan: '',
@@ -26,97 +22,6 @@ const emptyForm = {
 
 function formatRupiah(angka) {
   return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(angka || 0)
-}
-
-function muatRiwayatNamaNip() {
-  try {
-    const raw = localStorage.getItem(RIWAYAT_NAMA_NIP_KEY)
-    return raw ? JSON.parse(raw) : []
-  } catch {
-    return []
-  }
-}
-
-function simpanRiwayatNamaNip(list) {
-  try {
-    localStorage.setItem(RIWAYAT_NAMA_NIP_KEY, JSON.stringify(list))
-  } catch {
-    // abaikan jika localStorage tidak tersedia
-  }
-}
-
-/**
- * Input dengan tombol dropdown di sampingnya.
- * - Klik tombol panah -> tampilkan semua nama/NIP yang pernah diisi sebelumnya.
- * - Ketik -> daftar otomatis tersaring (autocomplete).
- * - Klik salah satu item -> otomatis mengisi kolom.
- */
-function ComboboxNamaNip({ value, onChange, options, placeholder }) {
-  const [open, setOpen] = useState(false)
-  const wrapRef = useRef(null)
-
-  useEffect(() => {
-    function handleClickLuar(e) {
-      if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false)
-    }
-    document.addEventListener('mousedown', handleClickLuar)
-    return () => document.removeEventListener('mousedown', handleClickLuar)
-  }, [])
-
-  const teks = (value || '').toLowerCase()
-  const terfilter = teks
-    ? options.filter((o) => o.toLowerCase().includes(teks))
-    : options
-
-  return (
-    <div className="relative" ref={wrapRef}>
-      <div className="flex">
-        <input
-          type="text"
-          className="input-field flex-1 rounded-r-none"
-          placeholder={placeholder || 'Ketik atau pilih nama / NIP...'}
-          value={value}
-          onChange={(e) => {
-            onChange(e.target.value)
-            setOpen(true)
-          }}
-          onFocus={() => setOpen(true)}
-        />
-        <button
-          type="button"
-          className="icon-btn border border-l-0 border-ink-950/10 rounded-l-none rounded-r-lg px-2"
-          onClick={() => setOpen((o) => !o)}
-          title="Tampilkan riwayat nama / NIP"
-        >
-          <ChevronDown size={16} />
-        </button>
-      </div>
-
-      {open && (
-        <ul className="absolute z-20 mt-1 w-full max-h-52 overflow-y-auto bg-white border border-ink-950/10 rounded-lg shadow-lg">
-          {terfilter.length === 0 && (
-            <li className="px-3 py-2 text-sm text-ink-700/50">
-              {options.length === 0 ? 'Belum ada riwayat tersimpan.' : 'Tidak ada yang cocok.'}
-            </li>
-          )}
-          {terfilter.map((opt) => (
-            <li
-              key={opt}
-              className="px-3 py-2 text-sm cursor-pointer hover:bg-sage-500/10"
-              onMouseDown={(e) => {
-                // gunakan onMouseDown supaya berjalan sebelum input kehilangan fokus (blur)
-                e.preventDefault()
-                onChange(opt)
-                setOpen(false)
-              }}
-            >
-              {opt}
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
-  )
 }
 
 export default function Keuangan() {
@@ -130,7 +35,6 @@ export default function Keuangan() {
   const [editingId, setEditingId] = useState(null)
   const [form, setForm] = useState(emptyForm)
   const [saving, setSaving] = useState(false)
-  const [riwayatNamaNip, setRiwayatNamaNip] = useState([])
 
   async function loadData() {
     setLoading(true)
@@ -156,23 +60,6 @@ export default function Keuangan() {
     supabase.from('siswa').select('id, nama_lengkap').order('nama_lengkap').then(({ data }) => setSiswaList(data || []))
   }, [])
 
-  // Muat riwayat Nama/NIP dari localStorage saat komponen pertama kali dibuka
-  useEffect(() => {
-    setRiwayatNamaNip(muatRiwayatNamaNip())
-  }, [])
-
-  // Tambahkan nilai baru ke riwayat (tanpa duplikat), lalu simpan ke localStorage
-  function tambahKeRiwayat(nilai) {
-    const bersih = (nilai || '').trim()
-    if (!bersih) return
-    setRiwayatNamaNip((prev) => {
-      const tanpaDuplikat = prev.filter((p) => p.toLowerCase() !== bersih.toLowerCase())
-      const baru = [bersih, ...tanpaDuplikat].slice(0, 100) // simpan maksimal 100 entri terakhir
-      simpanRiwayatNamaNip(baru)
-      return baru
-    })
-  }
-
   function openAdd() {
     setForm(emptyForm)
     setEditingId(null)
@@ -180,7 +67,7 @@ export default function Keuangan() {
   }
 
   function openEdit(row) {
-    setForm({ ...emptyForm, ...row, siswa_id: row.siswa_id || '', nama_nip: row.nama_nip || '' })
+    setForm({ ...emptyForm, ...row, siswa_id: row.siswa_id || '' })
     setEditingId(row.id)
     setShowForm(true)
   }
@@ -192,7 +79,6 @@ export default function Keuangan() {
       ...form,
       jumlah: Number(form.jumlah) || 0,
       siswa_id: form.siswa_id || null,
-      nama_nip: form.nama_nip || null,
     }
     delete payload.siswa
     const { error } = editingId
@@ -200,7 +86,6 @@ export default function Keuangan() {
       : await supabase.from('keuangan').insert(payload)
     setSaving(false)
     if (!error) {
-      tambahKeRiwayat(form.nama_nip) // simpan otomatis ke riwayat dropdown
       setShowForm(false)
       loadData()
     } else {
@@ -225,7 +110,7 @@ export default function Keuangan() {
       d.tanggal,
       d.jenis === 'masuk' ? 'Masuk' : 'Keluar',
       d.kategori,
-      d.siswa?.nama_lengkap || d.nama_nip || d.catatan || '-',
+      d.siswa?.nama_lengkap || d.catatan || '-',
       formatRupiah(d.jumlah),
     ])
     baris.push(['', '', '', 'Total Masuk', formatRupiah(totalMasuk)])
@@ -241,7 +126,6 @@ export default function Keuangan() {
         Jenis: d.jenis === 'masuk' ? 'Masuk' : 'Keluar',
         Kategori: d.kategori,
         Siswa: d.siswa?.nama_lengkap || '-',
-        'Nama/NIP': d.nama_nip || '-',
         Keterangan: d.catatan || '-',
         Jumlah: d.jumlah,
       })),
@@ -254,8 +138,6 @@ export default function Keuangan() {
     <Layout
       title="Keuangan Sekolah"
       subtitle="Kas & SPP"
-      actions={
-        <>
       actions={
         <>
           <button className="btn-secondary" onClick={handleExportPDF}><FileDown size={16} /> PDF</button>
@@ -337,7 +219,7 @@ export default function Keuangan() {
                   </span>
                 </td>
                 <td>{d.kategori}</td>
-                <td>{d.siswa?.nama_lengkap || d.nama_nip || d.catatan || '-'}</td>
+                <td>{d.siswa?.nama_lengkap || d.catatan || '-'}</td>
                 <td className="font-medium">{formatRupiah(d.jumlah)}</td>
                 <td>
                   <div className="flex items-center gap-1 justify-end">
@@ -394,20 +276,6 @@ export default function Keuangan() {
                   </select>
                 </div>
               )}
-
-              {/* Kolom Nama / NIP dengan dropdown riwayat + auto-save */}
-              <div>
-                <label className="label-field">Nama / NIP</label>
-                <ComboboxNamaNip
-                  value={form.nama_nip}
-                  onChange={(val) => setForm({ ...form, nama_nip: val })}
-                  options={riwayatNamaNip}
-                  placeholder="Ketik nama / NIP, atau klik panah untuk riwayat"
-                />
-                <p className="text-xs text-ink-700/40 mt-1">
-                  Klik ikon panah untuk melihat nama/NIP yang pernah diisi sebelumnya. Nilai baru otomatis tersimpan setelah transaksi disimpan.
-                </p>
-              </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
