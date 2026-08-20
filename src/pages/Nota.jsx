@@ -3,6 +3,8 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import * as XLSX from 'xlsx'
 import { supabase } from '../lib/supabaseClient' // sesuaikan path kalau berbeda di project kamu
 import NotaPrintTemplate from '../components/NotaPrintTemplate'
+import PilihKuitansiModal from '../components/PilihKuitansiModal'
+import { ArrowDownToLine } from 'lucide-react'
 
 // -----------------------------------------------------------------
 // Baris item kosong untuk form manual
@@ -45,6 +47,28 @@ function mapUntukCetak(nota) {
   }
 }
 
+// Memetakan satu baris Kuitansi utama (tabel `kuitansi`, jenis = 'kuitansi')
+// jadi bentuk form Nota — dipakai baik saat datang dari tombol "Jadikan Nota"
+// di halaman Kuitansi (lewat router state) maupun dari tombol "Tarik dari
+// Kuitansi" di halaman ini sendiri, supaya cuma ada satu tempat pemetaan.
+// No. Nota & Toko sengaja dikosongkan karena keduanya spesifik untuk nota
+// dan belum ada padanannya di data kuitansi.
+function formDariKuitansi(row) {
+  return {
+    no_nota: '',
+    tanggal: row.tanggal || new Date().toISOString().slice(0, 10),
+    tuan: row.diterima_dari || '',
+    toko: '',
+    alamat_lanjutan: '',
+    items: [{
+      banyaknya: 1,
+      satuan: '',
+      nama_barang: row.untuk_pembayaran || '',
+      harga: row.jumlah_total || '',
+    }],
+  }
+}
+
 export default function Nota({ sekolah }) {
   const location = useLocation()
   const navigate = useNavigate()
@@ -57,6 +81,7 @@ export default function Nota({ sekolah }) {
   const [importBusy, setImportBusy] = useState(false)
   const [importRingkasan, setImportRingkasan] = useState(null)
   const [menghapusSemua, setMenghapusSemua] = useState(false)
+  const [showPilih, setShowPilih] = useState(false) // modal "Tarik dari Kuitansi"
 
   const printRef = useRef(null)
   const fileInputRef = useRef(null)
@@ -77,33 +102,27 @@ export default function Nota({ sekolah }) {
   }, [])
 
   // Datang dari tombol "Jadikan Nota" di halaman Kuitansi — buka form
-  // "Tambah Nota" otomatis dengan Tuan, Tanggal, dan satu baris barang
-  // (dari Keterangan + Jumlah kuitansi) sudah terisi, supaya tidak perlu
-  // diketik ulang. No. Nota & Toko sengaja dikosongkan karena keduanya
-  // spesifik untuk dokumen nota (belum ada padanannya di kuitansi).
+  // "Tambah Nota" otomatis dengan data kuitansi asal sudah terisi.
   // State langsung dibersihkan dari history supaya tidak terpicu lagi kalau
   // halaman ini di-refresh atau dibuka lewat tombol "back" browser.
   useEffect(() => {
-    const prefill = location.state?.prefillDariKuitansi
-    if (!prefill) return
+    const row = location.state?.prefillDariKuitansi
+    if (!row) return
     setEditingId(null)
-    setForm({
-      no_nota: '',
-      tanggal: prefill.tanggal || new Date().toISOString().slice(0, 10),
-      tuan: prefill.tuan || '',
-      toko: '',
-      alamat_lanjutan: '',
-      items: [{
-        banyaknya: 1,
-        satuan: '',
-        nama_barang: prefill.nama_barang || '',
-        harga: prefill.harga || '',
-      }],
-    })
+    setForm(formDariKuitansi(row))
     setShowForm(true)
     navigate(location.pathname, { replace: true, state: {} })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.state])
+
+  // Dipanggil dari PilihKuitansiModal saat user memilih satu kuitansi lewat
+  // tombol "Tarik dari Kuitansi" di halaman ini sendiri.
+  function handleTarikData(row) {
+    setShowPilih(false)
+    setEditingId(null)
+    setForm(formDariKuitansi(row))
+    setShowForm(true)
+  }
 
   // ------------------------- Form manual -------------------------
   function bukaTambah() {
@@ -331,6 +350,12 @@ export default function Nota({ sekolah }) {
         <div className="flex items-center justify-between mb-4">
           <h1 className="text-xl font-bold">Nota Belanja</h1>
           <div className="flex gap-2">
+            <button
+              onClick={() => setShowPilih(true)}
+              className="px-3 py-2 rounded bg-teal-600 text-white text-sm flex items-center gap-1.5"
+            >
+              <ArrowDownToLine size={15} /> Tarik dari Kuitansi
+            </button>
             <button onClick={unduhTemplateExcel} className="px-3 py-2 rounded bg-gray-200 text-sm">
               Unduh Template
             </button>
@@ -411,6 +436,14 @@ export default function Nota({ sekolah }) {
             </tbody>
           </table>
         </div>
+
+        {/* Modal "Tarik dari Kuitansi" */}
+        {showPilih && (
+          <PilihKuitansiModal
+            onPilih={handleTarikData}
+            onClose={() => setShowPilih(false)}
+          />
+        )}
 
         {/* Modal form manual */}
         {showForm && (
