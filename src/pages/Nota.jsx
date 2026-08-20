@@ -4,6 +4,7 @@ import * as XLSX from 'xlsx'
 import { supabase } from '../lib/supabaseClient' // sesuaikan path kalau berbeda di project kamu
 import NotaPrintTemplate from '../components/NotaPrintTemplate'
 import PilihKuitansiModal from '../components/PilihKuitansiModal'
+import Layout from '../components/Layout'
 import { ArrowDownToLine } from 'lucide-react'
 
 // -----------------------------------------------------------------
@@ -345,10 +346,11 @@ export default function Nota({ sekolah }) {
   const totalForm = hitungTotal(form.items)
 
   return (
-    <div className="p-4">
-      <div className="no-print">
-        <div className="flex items-center justify-between mb-4">
-          <h1 className="text-xl font-bold">Nota Belanja</h1>
+    <>
+      <Layout
+        title="Nota Belanja"
+        subtitle="Daftar semua nota belanja yang tersimpan"
+        actions={
           <div className="flex gap-2">
             <button
               onClick={() => setShowPilih(true)}
@@ -381,8 +383,8 @@ export default function Nota({ sekolah }) {
               {menghapusSemua ? 'Menghapus...' : 'Hapus Semua'}
             </button>
           </div>
-        </div>
-
+        }
+      >
         {importRingkasan && (
           <div
             className={`mb-4 p-3 rounded text-sm ${
@@ -564,12 +566,12 @@ export default function Nota({ sekolah }) {
             </form>
           </div>
         )}
-      </div>
+      </Layout>
 
-      {/* Wajib DI LUAR elemen "no-print" — ini yang tampil saat window.print() */}
+      {/* Wajib DI LUAR Layout — ini yang tampil saat window.print() */}
       {notaCetak && (
         <NotaPrintTemplate ref={printRef} sekolah={sekolah} data={notaCetak} />
       )}
-    </div>
+    </>
   )
 }
