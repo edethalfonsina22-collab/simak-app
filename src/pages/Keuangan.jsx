@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabaseClient'
 import Layout from '../components/Layout'
 import { eksporExcel, eksporPDF } from '../lib/exportUtils'
-import { loadArkasItemsDenganSisa, formatRupiahArkas } from '../lib/arkasUtils'
+import ArkasImportModal from '../components/ArkasImportModal'
 import {
   Plus, Pencil, Trash2, X, Loader2, TrendingUp, TrendingDown, Wallet,
   FileDown, FileSpreadsheet,
@@ -15,7 +15,6 @@ const emptyForm = {
   jenis: 'masuk',
   kategori: 'SPP',
   siswa_id: '',
-  arkas_item_id: '',
   jumlah: '',
   tanggal: new Date().toISOString().slice(0, 10),
   catatan: '',
@@ -31,7 +30,6 @@ export default function Keuangan() {
   const [tahun, setTahun] = useState(now.getFullYear())
   const [data, setData] = useState([])
   const [siswaList, setSiswaList] = useState([])
-  const [arkasItems, setArkasItems] = useState([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState(null)
@@ -45,21 +43,12 @@ export default function Keuangan() {
     const akhir = `${tahun}-${String(bulan).padStart(2, '0')}-${String(akhirDate).padStart(2, '0')}`
     const { data: rows } = await supabase
       .from('keuangan')
-      .select('*, siswa:siswa_id(nama_lengkap), arkas:arkas_item_id(kode_rekening, uraian)')
+      .select('*, siswa:siswa_id(nama_lengkap)')
       .gte('tanggal', awal)
       .lte('tanggal', akhir)
       .order('tanggal', { ascending: false })
     setData(rows || [])
     setLoading(false)
-  }
-
-  async function loadArkas() {
-    try {
-      const hasil = await loadArkasItemsDenganSisa()
-      setArkasItems(hasil)
-    } catch (error) {
-      console.error('Gagal memuat item ARKAS:', error.message)
-    }
   }
 
   useEffect(() => {
@@ -69,7 +58,6 @@ export default function Keuangan() {
 
   useEffect(() => {
     supabase.from('siswa').select('id, nama_lengkap').order('nama_lengkap').then(({ data }) => setSiswaList(data || []))
-    loadArkas()
   }, [])
 
   function openAdd() {
@@ -79,7 +67,7 @@ export default function Keuangan() {
   }
 
   function openEdit(row) {
-    setForm({ ...emptyForm, ...row, siswa_id: row.siswa_id || '', arkas_item_id: row.arkas_item_id || '' })
+    setForm({ ...emptyForm, ...row, siswa_id: row.siswa_id || '' })
     setEditingId(row.id)
     setShowForm(true)
   }
@@ -91,10 +79,8 @@ export default function Keuangan() {
       ...form,
       jumlah: Number(form.jumlah) || 0,
       siswa_id: form.siswa_id || null,
-      arkas_item_id: form.arkas_item_id || null,
     }
     delete payload.siswa
-    delete payload.arkas
     const { error } = editingId
       ? await supabase.from('keuangan').update(payload).eq('id', editingId)
       : await supabase.from('keuangan').insert(payload)
@@ -102,7 +88,6 @@ export default function Keuangan() {
     if (!error) {
       setShowForm(false)
       loadData()
-      loadArkas() // refresh sisa anggaran setelah transaksi baru/berubah
     } else {
       alert('Gagal menyimpan: ' + error.message)
     }
@@ -111,20 +96,13 @@ export default function Keuangan() {
   async function handleDelete(id) {
     if (!confirm('Hapus transaksi ini?')) return
     const { error } = await supabase.from('keuangan').delete().eq('id', id)
-    if (!error) {
-      loadData()
-      loadArkas()
-    } else {
-      alert('Gagal menghapus: ' + error.message)
-    }
+    if (!error) loadData()
+    else alert('Gagal menghapus: ' + error.message)
   }
 
   const totalMasuk = data.filter((d) => d.jenis === 'masuk').reduce((a, b) => a + Number(b.jumlah), 0)
   const totalKeluar = data.filter((d) => d.jenis === 'keluar').reduce((a, b) => a + Number(b.jumlah), 0)
   const saldo = totalMasuk - totalKeluar
-
-  // Item ARKAS yang sedang dipilih di form (untuk tampilkan sisa anggaran real-time)
-  const arkasTerpilih = arkasItems.find((it) => it.id === form.arkas_item_id)
 
   function handleExportPDF() {
     const kolom = ['Tanggal', 'Jenis', 'Kategori', 'Keterangan', 'Jumlah']
@@ -148,7 +126,6 @@ export default function Keuangan() {
         Jenis: d.jenis === 'masuk' ? 'Masuk' : 'Keluar',
         Kategori: d.kategori,
         Siswa: d.siswa?.nama_lengkap || '-',
-        'Item ARKAS': d.arkas?.uraian || '-',
         Keterangan: d.catatan || '-',
         Jumlah: d.jumlah,
       })),
@@ -165,6 +142,7 @@ export default function Keuangan() {
         <>
           <button className="btn-secondary" onClick={handleExportPDF}><FileDown size={16} /> PDF</button>
           <button className="btn-secondary" onClick={handleExportExcel}><FileSpreadsheet size={16} /> Excel</button>
+          <ArkasImportModal tahunAnggaran={String(tahun)} onSelesai={loadData} />
           <button className="btn-primary" onClick={openAdd}><Plus size={16} /> Tambah Transaksi</button>
         </>
       }
@@ -221,15 +199,14 @@ export default function Keuangan() {
               <th>Jenis</th>
               <th>Kategori</th>
               <th>Keterangan</th>
-              <th>Item ARKAS</th>
               <th>Jumlah</th>
               <th></th>
             </tr>
           </thead>
           <tbody>
-            {loading && <tr><td colSpan={7} className="text-center py-8 text-ink-700/50">Memuat data...</td></tr>}
+            {loading && <tr><td colSpan={6} className="text-center py-8 text-ink-700/50">Memuat data...</td></tr>}
             {!loading && data.length === 0 && (
-              <tr><td colSpan={7} className="text-center py-8 text-ink-700/50">Belum ada transaksi bulan ini.</td></tr>
+              <tr><td colSpan={6} className="text-center py-8 text-ink-700/50">Belum ada transaksi bulan ini.</td></tr>
             )}
             {data.map((d) => (
               <tr key={d.id}>
@@ -243,16 +220,6 @@ export default function Keuangan() {
                 </td>
                 <td>{d.kategori}</td>
                 <td>{d.siswa?.nama_lengkap || d.catatan || '-'}</td>
-                <td className="text-xs">
-                  {d.arkas ? (
-                    <span title={d.arkas.uraian}>
-                      {d.arkas.kode_rekening ? `${d.arkas.kode_rekening} — ` : ''}
-                      {d.arkas.uraian?.length > 28 ? d.arkas.uraian.slice(0, 28) + '…' : d.arkas.uraian}
-                    </span>
-                  ) : (
-                    <span className="text-ink-700/30">-</span>
-                  )}
-                </td>
                 <td className="font-medium">{formatRupiah(d.jumlah)}</td>
                 <td>
                   <div className="flex items-center gap-1 justify-end">
@@ -268,7 +235,7 @@ export default function Keuangan() {
 
       {showForm && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-lg p-6">
             <div className="flex items-center justify-between mb-4">
               <h2 className="font-display text-lg font-semibold">{editingId ? 'Ubah Transaksi' : 'Tambah Transaksi'}</h2>
               <button className="icon-btn" onClick={() => setShowForm(false)}><X size={18} /></button>
@@ -284,7 +251,6 @@ export default function Keuangan() {
                       ...form,
                       jenis: e.target.value,
                       kategori: e.target.value === 'masuk' ? KATEGORI_MASUK[0] : KATEGORI_KELUAR[0],
-                      arkas_item_id: e.target.value === 'masuk' ? '' : form.arkas_item_id,
                     })}
                   >
                     <option value="masuk">Pemasukan</option>
@@ -308,31 +274,6 @@ export default function Keuangan() {
                     <option value="">-- Pilih siswa --</option>
                     {siswaList.map((s) => <option key={s.id} value={s.id}>{s.nama_lengkap}</option>)}
                   </select>
-                </div>
-              )}
-
-              {form.jenis === 'keluar' && (
-                <div>
-                  <label className="label-field">Item ARKAS (opsional)</label>
-                  <select
-                    className="input-field"
-                    value={form.arkas_item_id}
-                    onChange={(e) => setForm({ ...form, arkas_item_id: e.target.value })}
-                  >
-                    <option value="">-- Tidak dikaitkan ke ARKAS --</option>
-                    {arkasItems.map((it) => (
-                      <option key={it.id} value={it.id}>
-                        {(it.kode_rekening ? `${it.kode_rekening} — ` : '') + it.uraian}
-                        {' '}(Sisa: {formatRupiahArkas(it.sisa)})
-                      </option>
-                    ))}
-                  </select>
-                  {arkasTerpilih && (
-                    <p className={`text-xs mt-1 ${arkasTerpilih.sisa < 0 ? 'text-red-600' : 'text-ink-700/50'}`}>
-                      Sisa anggaran item ini saat ini: {formatRupiahArkas(arkasTerpilih.sisa)}
-                      {arkasTerpilih.sisa < 0 && ' — anggaran sudah terlampaui!'}
-                    </p>
-                  )}
                 </div>
               )}
 
