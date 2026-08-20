@@ -4,16 +4,23 @@ import { X, Loader2, Printer } from 'lucide-react'
 import KuitansiJasaPrintTemplate from '../lib/KuitansiJasaPrintTemplate'
 import { terbilangRupiah } from '../lib/terbilang'
 
-const emptyForm = () => ({
+// `initialData` (opsional) adalah baris kuitansi/kuitansi-jasa yang mau ditarik
+// datanya (dari tombol "Tarik dari Kuitansi" atau "Duplikat" di KuitansiJasa.jsx).
+// Hanya Telah Terima Dari, Jumlah, dan Untuk Pembayaran yang diisi otomatis —
+// No. Bukti & Tanggal sengaja dikosongkan/direset karena keduanya harus baru
+// untuk tiap transaksi.
+const emptyForm = (initialData) => ({
   no_bukti: '',
   tanggal: new Date().toISOString().slice(0, 10),
-  diterima_dari: '',
-  jumlah: '',
-  untuk_pembayaran: '',
+  diterima_dari: initialData?.diterima_dari || '',
+  jumlah: initialData?.jumlah_total != null && initialData.jumlah_total !== ''
+    ? String(initialData.jumlah_total)
+    : '',
+  untuk_pembayaran: initialData?.untuk_pembayaran || '',
 })
 
-export default function KuitansiJasaModal({ sekolah, onClose }) {
-  const [form, setForm] = useState(emptyForm())
+export default function KuitansiJasaModal({ sekolah, initialData, onClose }) {
+  const [form, setForm] = useState(() => emptyForm(initialData))
   const [saving, setSaving] = useState(false)
   const [savedData, setSavedData] = useState(null)
   const printRef = useRef(null)
