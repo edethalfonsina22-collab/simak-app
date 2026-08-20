@@ -6,9 +6,16 @@ import { terbilangRupiah } from '../lib/terbilang'
 
 // `initialData` (opsional) adalah baris kuitansi/kuitansi-jasa yang mau ditarik
 // datanya (dari tombol "Tarik dari Kuitansi" atau "Duplikat" di KuitansiJasa.jsx).
-// Hanya Telah Terima Dari, Jumlah, dan Untuk Pembayaran yang diisi otomatis —
+// Telah Terima Dari, Jumlah, Untuk Pembayaran, dan Alamat diisi otomatis —
 // No. Bukti & Tanggal sengaja dikosongkan/direset karena keduanya harus baru
 // untuk tiap transaksi.
+//
+// `alamat` dipetakan ke kolom `alamat_penerima` di tabel `kuitansi` — kolom
+// yang sama dipakai Kuitansi Utama untuk baris "<kota>, <tanggal>" di
+// cetakan (mis. "Ambon, 27 November 2026"). Kwitansi Jasa sebelumnya malah
+// memakai field Kabupaten di Profil Sekolah untuk baris ini, yang isinya
+// nama instansi untuk kop surat (mis. "PEMERINTAH KABUPATEN KEPULAUAN ARU"),
+// bukan nama kota — makanya salah muncul di cetakan.
 const emptyForm = (initialData) => ({
   no_bukti: '',
   tanggal: new Date().toISOString().slice(0, 10),
@@ -17,6 +24,7 @@ const emptyForm = (initialData) => ({
     ? String(initialData.jumlah_total)
     : '',
   untuk_pembayaran: initialData?.untuk_pembayaran || '',
+  alamat: initialData?.alamat_penerima || '',
 })
 
 export default function KuitansiJasaModal({ sekolah, initialData, onClose }) {
@@ -48,6 +56,7 @@ export default function KuitansiJasaModal({ sekolah, initialData, onClose }) {
         diterima_dari: form.diterima_dari,
         untuk_pembayaran: form.untuk_pembayaran,
         jumlah_total: Number(form.jumlah) || 0,
+        alamat_penerima: form.alamat,
       }
 
       const { data: inserted, error: insertErr } = await supabase.from('kuitansi').insert(payload).select().single()
@@ -76,6 +85,7 @@ export default function KuitansiJasaModal({ sekolah, initialData, onClose }) {
         uang_sejumlah: terbilangRupiah(savedData.jumlah_total).toUpperCase(),
         untuk_pembayaran: savedData.untuk_pembayaran,
         jumlah: savedData.jumlah_total,
+        alamat: savedData.alamat_penerima,
       }
     : null
 
@@ -145,6 +155,19 @@ export default function KuitansiJasaModal({ sekolah, initialData, onClose }) {
                 value={form.untuk_pembayaran}
                 onChange={(e) => ubah('untuk_pembayaran', e.target.value)}
               />
+            </div>
+
+            <div>
+              <label className="label-field">Alamat (kota untuk tanggal di cetakan)</label>
+              <input
+                className="input-field"
+                placeholder="Contoh: Ambon"
+                value={form.alamat}
+                onChange={(e) => ubah('alamat', e.target.value)}
+              />
+              <p className="text-xs text-ink-700/50 mt-1">
+                Akan muncul di cetakan sebagai &quot;{form.alamat || 'Ambon'}, {new Date(form.tanggal || Date.now()).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}&quot;
+              </p>
             </div>
 
             <div className="flex justify-end gap-3 pt-2">
