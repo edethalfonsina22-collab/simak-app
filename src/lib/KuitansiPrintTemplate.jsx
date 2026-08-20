@@ -82,8 +82,9 @@ const KuitansiPrintTemplate = forwardRef(function KuitansiPrintTemplate({ sekola
       ref={ref}
       className="print-only relative bg-white text-black p-10 text-sm overflow-hidden border border-black"
       style={{
-        width: '210mm',
+        width: '180mm',
         minHeight: '148mm',
+        margin: '0 auto',
         WebkitPrintColorAdjust: 'exact',
         printColorAdjust: 'exact',
         colorAdjust: 'exact',
@@ -102,14 +103,18 @@ const KuitansiPrintTemplate = forwardRef(function KuitansiPrintTemplate({ sekola
           <table>
             <tbody>
               <tr>
-                <td className="text-left whitespace-nowrap pr-1">No. Bukti</td>
-                <td className="pr-1">:</td>
-                <td><Blank value={data?.no_bukti} width={170} /></td>
+                <td className="text-left whitespace-nowrap align-bottom pr-1" style={{ width: 68 }}>No. Bukti</td>
+                <td className="align-bottom pr-1">:</td>
+                <td className="align-bottom"><Blank value={data?.no_bukti} width={170} /></td>
               </tr>
               <tr>
-                <td className="text-left whitespace-nowrap pr-1">Lembar</td>
-                <td className="pr-1">:</td>
-                <td>{data?.lembar || 'I/II/III/IV/V'}</td>
+                <td className="text-left whitespace-nowrap align-bottom pr-1" style={{ width: 68 }}>Lembar</td>
+                <td className="align-bottom pr-1">:</td>
+                <td className="align-bottom">
+                  <span className="relative inline-block align-bottom" style={{ height: '1.1em' }}>
+                    {data?.lembar || 'I/II/III/IV/V'}
+                  </span>
+                </td>
               </tr>
             </tbody>
           </table>
