@@ -23,6 +23,12 @@ const GUILLOCHE_SOFT = 'rgba(41,95,109,0.14)'
 // bukan menempel di pojok atas).
 const TOP_OFFSET_MM = 123
 
+// Lebar slip kwitansi (counterfoil + perforasi + badan utama). Diperlebar
+// dari 185mm -> 202mm (nyaris selebar kertas A4 210mm, sisa margin kiri-
+// kanan tipis) supaya baris "Rp <nominal>" punya cukup ruang dan tidak
+// pernah pecah ke baris baru walau nominalnya besar (mis. Rp 12.500.000).
+const SLIP_WIDTH_MM = 202
+
 // Latar motif guilloche: pola ubin (tile) berisi lingkaran-lingkaran
 // bersinggungan, menghasilkan efek jalinan garis khas kertas berharga.
 // (Beda dengan NotaPrintTemplate yang polos hitam-putih — kwitansi meniru
@@ -141,7 +147,7 @@ const KuitansiJasaPrintTemplate = forwardRef(function KuitansiJasaPrintTemplate(
       <div
         className="flex box-border h-fit"
         style={{
-          width: '185mm',
+          width: `${SLIP_WIDTH_MM}mm`,
           padding: '2mm',
           background: PAPER_DEEP,
           fontFamily: 'Georgia, "Times New Roman", serif',
@@ -231,7 +237,7 @@ const KuitansiJasaPrintTemplate = forwardRef(function KuitansiJasaPrintTemplate(
 
             <div className="flex items-end justify-between" style={{ marginTop: '2.5mm' }}>
               <div
-                className="font-bold"
+                className="font-bold whitespace-nowrap flex-shrink-0"
                 style={{
                   fontSize: '13px',
                   color: INK,
