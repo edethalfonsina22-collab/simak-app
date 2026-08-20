@@ -225,12 +225,13 @@ export default function Kuitansi() {
     const gagal = []
     for (const row of rows) {
       try {
-        const { data: nomorData, error: nomorErr } = await supabase.rpc('next_nomor_kuitansi', { p_jenis: 'kuitansi' })
-        if (nomorErr) throw nomorErr
+        if (!row.no_bukti || !String(row.no_bukti).trim()) {
+          throw new Error('Kolom no_bukti kosong (wajib diisi sebagai nomor kuitansi)')
+        }
 
         const payload = {
           jenis: 'kuitansi',
-          nomor: nomorData,
+          nomor: row.no_bukti,
           no_bukti: row.no_bukti,
           lembar: row.lembar,
           mata_anggaran: row.mata_anggaran,
