@@ -139,6 +139,7 @@ export default function KuitansiJasa() {
         uang_sejumlah: terbilangRupiah(cetakUlang.jumlah_total),
         untuk_pembayaran: cetakUlang.untuk_pembayaran,
         jumlah: cetakUlang.jumlah_total,
+        alamat: cetakUlang.alamat_penerima,
       }
     : null
 
