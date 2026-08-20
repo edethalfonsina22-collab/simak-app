@@ -34,7 +34,8 @@ import {
   UserCog,
   Award,
   Video,
-  PiggyBank,
+  Receipt,
+  ShoppingCart,
 } from 'lucide-react'
 import { useAuth } from '../lib/AuthContext'
 import { supabase } from '../lib/supabaseClient'
@@ -74,7 +75,9 @@ const groupsAdmin = [
     label: 'Keuangan & Aset',
     links: [
       { to: '/keuangan', label: 'Keuangan', icon: Wallet },
-      { to: '/anggaran-arkas', label: 'Anggaran ARKAS', icon: PiggyBank },
+      { to: '/kuitansi', label: 'Kuitansi', icon: Receipt },
+      { to: '/kuitansi-jasa', label: 'Kuitansi Jasa', icon: Receipt },
+      { to: '/nota', label: 'Nota Belanja', icon: ShoppingCart },
       { to: '/perpustakaan', label: 'Perpustakaan', icon: Library },
       { to: '/inventaris', label: 'Inventaris', icon: Boxes },
     ],
@@ -98,6 +101,8 @@ const groupsAdmin = [
 ]
 
 // Menu GURU: tetap ringkas, tidak perlu dikelompokkan
+// Kuitansi, Kuitansi Jasa & Nota Belanja SENGAJA TIDAK ada di sini — ketiga
+// fitur ini admin-only (lihat RLS policy nota_hanya_admin di Supabase).
 const linksGuru = [
   { to: '/', label: 'Dasbor', icon: LayoutDashboard, end: true },
   { to: '/profil-saya', label: 'Profil Saya', icon: UserCircle },
