@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { supabase } from '../lib/supabaseClient'
+import ArkasImportModal from '../components/ArkasImportModal'
 import Layout from '../components/Layout'
 import { eksporExcel, eksporPDF } from '../lib/exportUtils'
 import {
@@ -255,8 +256,11 @@ export default function Keuangan() {
       subtitle="Kas & SPP"
       actions={
         <>
+      actions={
+        <>
           <button className="btn-secondary" onClick={handleExportPDF}><FileDown size={16} /> PDF</button>
           <button className="btn-secondary" onClick={handleExportExcel}><FileSpreadsheet size={16} /> Excel</button>
+          <ArkasImportModal tahunAnggaran={String(tahun)} onSelesai={loadData} />
           <button className="btn-primary" onClick={openAdd}><Plus size={16} /> Tambah Transaksi</button>
         </>
       }
