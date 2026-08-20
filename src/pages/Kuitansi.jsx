@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabaseClient'
 import Layout from '../components/Layout'
 import KuitansiModal from '../components/KuitansiModal'
+import KuitansiJasaModal from '../components/KuitansiJasaModal'
 import KuitansiPrintTemplate from '../lib/KuitansiPrintTemplate'
 import BulkImportModal from '../components/BulkImportModal'
-import { Plus, Printer, Search, Loader2, Receipt, Trash2, FileSpreadsheet, FileText } from 'lucide-react'
+import { Plus, Printer, Search, Loader2, Receipt, Trash2, FileSpreadsheet, FileText, ArrowRightLeft } from 'lucide-react'
 
 function formatRupiah(angka) {
   return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(angka || 0)
@@ -90,6 +91,7 @@ function mapRowKuitansi(row) {
 }
 
 export default function Kuitansi() {
+  const navigate = useNavigate()
   const [data, setData] = useState([])
   const [loading, setLoading] = useState(true)
   const [pencarian, setPencarian] = useState('')
@@ -98,6 +100,11 @@ export default function Kuitansi() {
   const [sekolah, setSekolah] = useState(null)
   const [menghapus, setMenghapus] = useState(null) // id yang sedang dihapus
   const [menghapusSemua, setMenghapusSemua] = useState(false) // status hapus semua
+
+  // Baris kuitansi yang sedang "dijadikan" Kuitansi Jasa — datanya dipakai
+  // untuk pre-fill KuitansiJasaModal supaya tidak perlu diketik ulang.
+  const [salinKeJasa, setSalinKeJasa] = useState(null)
+  const [showJasaModal, setShowJasaModal] = useState(false)
 
   // Baris yang sedang dicetak ulang
   const [cetakUlang, setCetakUlang] = useState(null)
@@ -187,6 +194,39 @@ export default function Kuitansi() {
   function handleTutupBuat() {
     setShowBuat(false)
     loadData()
+  }
+
+  // "Jadikan Kuitansi Jasa" — buka KuitansiJasaModal langsung di halaman ini
+  // (tidak perlu pindah halaman) dengan Nama/Jumlah/Keterangan sudah terisi
+  // dari baris kuitansi yang dipilih. No. Bukti & Tanggal dikosongkan di
+  // dalam modal karena keduanya harus baru untuk tiap transaksi.
+  function handleJadikanKuitansiJasa(row) {
+    setSalinKeJasa(row)
+    setShowJasaModal(true)
+  }
+
+  function handleTutupJasaModal() {
+    setShowJasaModal(false)
+    setSalinKeJasa(null)
+  }
+
+  // "Jadikan Nota" — form Nota beda struktur (per-baris barang, bukan nominal
+  // tunggal), jadi tidak bisa dibuka sebagai modal sederhana di sini seperti
+  // Kuitansi Jasa. Sebagai gantinya, pindah ke halaman /nota sambil membawa
+  // data baris ini lewat router state; Nota.jsx yang membaca state tersebut
+  // lalu otomatis membuka form "Tambah Nota" dengan Tuan, Tanggal, dan satu
+  // baris barang (dari Keterangan + Jumlah) sudah terisi.
+  function handleJadikanNota(row) {
+    navigate('/nota', {
+      state: {
+        prefillDariKuitansi: {
+          tanggal: row.tanggal,
+          tuan: row.diterima_dari,
+          nama_barang: row.untuk_pembayaran,
+          harga: row.jumlah_total,
+        },
+      },
+    })
   }
 
   async function handleImportKuitansi(rows) {
@@ -332,6 +372,20 @@ export default function Kuitansi() {
                 <td>
                   <div className="flex items-center gap-1 justify-end">
                     <button
+                      className="icon-btn text-amber-600"
+                      title="Jadikan Nota Belanja (isi otomatis)"
+                      onClick={() => handleJadikanNota(d)}
+                    >
+                      <FileText size={15} />
+                    </button>
+                    <button
+                      className="icon-btn text-teal-600"
+                      title="Jadikan Kuitansi Jasa (isi otomatis)"
+                      onClick={() => handleJadikanKuitansiJasa(d)}
+                    >
+                      <ArrowRightLeft size={15} />
+                    </button>
+                    <button
                       className="icon-btn"
                       title="Cetak Ulang"
                       onClick={() => handleCetakUlang(d)}
@@ -359,6 +413,14 @@ export default function Kuitansi() {
           keuanganRow={null}
           sekolah={sekolah}
           onClose={handleTutupBuat}
+        />
+      )}
+
+      {showJasaModal && (
+        <KuitansiJasaModal
+          sekolah={sekolah}
+          initialData={salinKeJasa}
+          onClose={handleTutupJasaModal}
         />
       )}
 
