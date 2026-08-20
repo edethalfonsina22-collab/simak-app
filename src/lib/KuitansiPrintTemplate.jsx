@@ -86,12 +86,11 @@ const KuitansiPrintTemplate = forwardRef(function KuitansiPrintTemplate({ sekola
   return (
     <div
       ref={ref}
-      className="print-only relative bg-red-50 text-black py-10 px-4 text-sm overflow-hidden"
+      className="print-only relative bg-white text-black py-10 px-4 text-sm overflow-hidden"
       style={{
         width: '210mm',
         minHeight: '148mm',
         boxSizing: 'border-box',
-        border: '4px solid red',
         WebkitPrintColorAdjust: 'exact',
         printColorAdjust: 'exact',
         colorAdjust: 'exact',
