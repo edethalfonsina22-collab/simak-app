@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import * as XLSX from 'xlsx'
 import { supabase } from '../lib/supabaseClient' // sesuaikan path kalau berbeda di project kamu
 import NotaPrintTemplate from '../components/NotaPrintTemplate'
@@ -45,6 +46,8 @@ function mapUntukCetak(nota) {
 }
 
 export default function Nota({ sekolah }) {
+  const location = useLocation()
+  const navigate = useNavigate()
   const [daftar, setDaftar] = useState([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
@@ -72,6 +75,35 @@ export default function Nota({ sekolah }) {
   useEffect(() => {
     muatDaftar()
   }, [])
+
+  // Datang dari tombol "Jadikan Nota" di halaman Kuitansi — buka form
+  // "Tambah Nota" otomatis dengan Tuan, Tanggal, dan satu baris barang
+  // (dari Keterangan + Jumlah kuitansi) sudah terisi, supaya tidak perlu
+  // diketik ulang. No. Nota & Toko sengaja dikosongkan karena keduanya
+  // spesifik untuk dokumen nota (belum ada padanannya di kuitansi).
+  // State langsung dibersihkan dari history supaya tidak terpicu lagi kalau
+  // halaman ini di-refresh atau dibuka lewat tombol "back" browser.
+  useEffect(() => {
+    const prefill = location.state?.prefillDariKuitansi
+    if (!prefill) return
+    setEditingId(null)
+    setForm({
+      no_nota: '',
+      tanggal: prefill.tanggal || new Date().toISOString().slice(0, 10),
+      tuan: prefill.tuan || '',
+      toko: '',
+      alamat_lanjutan: '',
+      items: [{
+        banyaknya: 1,
+        satuan: '',
+        nama_barang: prefill.nama_barang || '',
+        harga: prefill.harga || '',
+      }],
+    })
+    setShowForm(true)
+    navigate(location.pathname, { replace: true, state: {} })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.state])
 
   // ------------------------- Form manual -------------------------
   function bukaTambah() {
