@@ -164,8 +164,23 @@ export default function Nota({ sekolah }) {
   async function simpanForm(e) {
     e.preventDefault()
     const items = form.items.filter((it) => it.nama_barang?.trim())
+
+    // Kalau No. Nota dikosongkan, tarik nomor otomatis dari deret gabungan
+    // yang sama dengan Kuitansi Utama & Kuitansi Jasa (fungsi database
+    // `next_nomor_kuitansi`, format "0001/BNU/2026"). Nomor yang sudah ada
+    // (saat edit) tidak diubah.
+    let noNotaFinal = form.no_nota.trim()
+    if (!noNotaFinal) {
+      const { data: nomorData, error: nomorErr } = await supabase.rpc('next_nomor_kuitansi', { p_jenis: 'nota' })
+      if (nomorErr) {
+        alert('Gagal membuat nomor otomatis: ' + nomorErr.message)
+        return
+      }
+      noNotaFinal = nomorData
+    }
+
     const payload = {
-      no_nota: form.no_nota,
+      no_nota: noNotaFinal,
       tanggal: form.tanggal,
       tuan: form.tuan,
       toko: form.toko,
@@ -460,12 +475,12 @@ export default function Nota({ sekolah }) {
 
               <div className="grid grid-cols-2 gap-3 mb-3">
                 <div>
-                  <label className="block text-xs mb-1">No. Nota</label>
+                  <label className="block text-xs mb-1">No. Nota (kosongkan agar otomatis)</label>
                   <input
                     className="border rounded w-full p-2 text-sm"
+                    placeholder="Contoh: 0001/BNU/2026"
                     value={form.no_nota}
                     onChange={(e) => setForm((f) => ({ ...f, no_nota: e.target.value }))}
-                    required
                   />
                 </div>
                 <div>
