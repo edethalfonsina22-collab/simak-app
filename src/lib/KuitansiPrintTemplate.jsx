@@ -80,11 +80,10 @@ const KuitansiPrintTemplate = forwardRef(function KuitansiPrintTemplate({ sekola
   return (
     <div
       ref={ref}
-      className="print-only relative bg-white text-black p-12 text-base leading-relaxed overflow-hidden border border-black"
+      className="print-only relative bg-white text-black p-10 text-sm overflow-hidden"
       style={{
-        width: '190mm',
+        width: '210mm',
         minHeight: '148mm',
-        margin: '0 auto',
         WebkitPrintColorAdjust: 'exact',
         printColorAdjust: 'exact',
         colorAdjust: 'exact',
@@ -103,18 +102,14 @@ const KuitansiPrintTemplate = forwardRef(function KuitansiPrintTemplate({ sekola
           <table>
             <tbody>
               <tr>
-                <td className="text-left whitespace-nowrap align-bottom pr-1 font-semibold" style={{ width: 90 }}>No. Bukti</td>
-                <td className="align-bottom pr-1 font-semibold">:</td>
-                <td className="align-bottom"><Blank value={data?.no_bukti} width={220} /></td>
+                <td className="text-left whitespace-nowrap pr-1">No. Bukti</td>
+                <td className="pr-1">:</td>
+                <td><Blank value={data?.no_bukti} width={170} /></td>
               </tr>
               <tr>
-                <td className="text-left whitespace-nowrap align-bottom pr-1 font-semibold" style={{ width: 90 }}>Lembar</td>
-                <td className="align-bottom pr-1 font-semibold">:</td>
-                <td className="align-bottom">
-                  <span className="relative inline-block align-bottom font-semibold" style={{ height: '1.1em' }}>
-                    {data?.lembar || 'I/II/III/IV/V'}
-                  </span>
-                </td>
+                <td className="text-left whitespace-nowrap pr-1">Lembar</td>
+                <td className="pr-1">:</td>
+                <td>{data?.lembar || 'I/II/III/IV/V'}</td>
               </tr>
             </tbody>
           </table>
@@ -125,71 +120,71 @@ const KuitansiPrintTemplate = forwardRef(function KuitansiPrintTemplate({ sekola
           <table className="ml-auto">
             <tbody>
               <tr>
-                <td className="text-left whitespace-nowrap pr-1 font-semibold">Mata Anggaran</td>
-                <td className="pr-1 font-semibold">:</td>
-                <td><Blank value={data?.mata_anggaran} width={190} /></td>
+                <td className="text-left whitespace-nowrap pr-1">Mata Anggaran</td>
+                <td className="pr-1">:</td>
+                <td><Blank value={data?.mata_anggaran} width={150} /></td>
               </tr>
               <tr>
-                <td className="text-left whitespace-nowrap pr-1 font-semibold">Tahun</td>
-                <td className="pr-1 font-semibold">:</td>
-                <td><Blank value={data?.tahun_anggaran} width={120} /></td>
+                <td className="text-left whitespace-nowrap pr-1">Tahun</td>
+                <td className="pr-1">:</td>
+                <td><Blank value={data?.tahun_anggaran} width={90} /></td>
               </tr>
             </tbody>
           </table>
         </div>
 
-        <h1 className="font-display text-center text-3xl font-bold underline tracking-wide mb-6">KWITANSI</h1>
+        <h1 className="text-center text-xl font-bold underline tracking-wide mb-4">KWITANSI</h1>
 
-        <table className="w-full mb-8 text-base">
+        <table className="w-full mb-6">
           <tbody>
             <tr>
-              <td className="w-52 py-1.5 align-top font-semibold">Sudah Terima Dari</td>
-              <td className="w-4 align-top font-semibold">:</td>
-              <td className="py-1.5 align-top">{data?.diterima_dari || '-'}</td>
+              <td className="w-40 py-1 align-top">Sudah Terima Dari</td>
+              <td className="w-4 align-top">:</td>
+              <td className="py-1 align-top">{data?.diterima_dari || '-'}</td>
             </tr>
             <tr>
-              <td className="py-1.5 align-top font-semibold">Uang Sejumlah</td>
-              <td className="align-top font-semibold">:</td>
-              <td className="py-1.5 align-top italic uppercase">{terbilangRupiah(total)}</td>
+              <td className="py-1 align-top">Uang Sejumlah</td>
+              <td className="align-top">:</td>
+              <td className="py-1 align-top italic uppercase">{terbilangRupiah(total)}</td>
             </tr>
             <tr>
-              <td className="py-1.5 align-top font-semibold">Untuk Pembayaran</td>
-              <td className="align-top font-semibold">:</td>
-              <td className="py-1.5 align-top whitespace-pre-line">{data?.untuk_pembayaran || '-'}</td>
+              <td className="py-1 align-top">Untuk Pembayaran</td>
+              <td className="align-top">:</td>
+              <td className="py-1 align-top whitespace-pre-line">{data?.untuk_pembayaran || '-'}</td>
             </tr>
             {/* TERBILANG sekarang jadi baris tabel juga (bukan <div> terpisah lagi)
                 supaya label & garis bawah nominalnya sejajar rata kiri dengan
                 "Sudah Terima Dari / Uang Sejumlah / Untuk Pembayaran" di atasnya. */}
             <tr>
-              <td className="py-1.5 align-top font-semibold" colSpan={2}>TERBILANG : Rp.</td>
-              <td className="py-1.5 align-top font-semibold">
-                <span className="border-b-2 border-black px-4 text-lg">{formatRupiah(total)}</span>
+              <td className="py-1 align-top font-semibold" colSpan={2}>TERBILANG : Rp.</td>
+              <td className="py-1 align-top font-semibold">
+                <span className="border-b-2 border-black px-3">{formatRupiah(total)}</span>
               </td>
             </tr>
           </tbody>
         </table>
 
-        <div className="grid grid-cols-3 gap-6 mb-10 text-base">
+        <div className="grid grid-cols-3 gap-4 mb-8">
           {/* Lunas dibayar */}
           <div className="text-center">
-            <p className="font-semibold">Lunas dibayar</p>
-            <p className="font-semibold">Pemegang Kas,</p>
-            <div className="h-20" />
+            <p>Lunas dibayar</p>
+            <p>Pemegang Kas,</p>
+            <div className="h-16" />
             <div className="border-b border-black pb-1">
               <p>{data?.dibayar_oleh || '.......................'}</p>
-              <p className="text-sm">NIP. {data?.nip_dibayar || '.......................'}</p>
+              <p className="text-xs">NIP. {data?.nip_dibayar || '.......................'}</p>
             </div>
-            <p className="text-sm mt-2 text-left">Tgl. Dibayarkan : {formatTanggal(data?.tanggal)}</p>
+            <p className="text-xs mt-2 text-left">Tgl. Dibayarkan : {formatTanggal(data?.tanggal)}</p>
           </div>
 
           {/* Setuju dibayar */}
           <div className="text-center">
-            <p className="font-semibold">Setuju dibayar :</p>
-            <p className="font-semibold">{data?.jabatan_disetujui || 'Atasan Langsung'},</p>
-            <div className="h-20" />
+            <p>Setuju dibayar :</p>
+            <p>{data?.jabatan_disetujui || 'Atasan Langsung'},</p>
+            <div className="h-16" />
             <div className="border-b border-black pb-1">
               <p>{data?.disetujui_oleh || '.......................'}</p>
-              <p className="text-sm">NIP. {data?.nip_disetujui || '.......................'}</p>
+              <p className="text-xs">NIP. {data?.nip_disetujui || '.......................'}</p>
             </div>
           </div>
 
@@ -198,17 +193,17 @@ const KuitansiPrintTemplate = forwardRef(function KuitansiPrintTemplate({ sekola
               sama seperti pola tanggal+kota yang lazim di surat, dan konsisten
               dengan alamat yang sudah tampil di bawah nama penerima. */}
           <div className="text-center">
-            <p className="font-semibold">{data?.alamat_penerima ? `${data.alamat_penerima}, ` : ''}{formatTanggal(data?.tanggal)}</p>
-            <p className="font-semibold">Yang Menerima,</p>
-            <div className="h-20" />
+            <p>{data?.alamat_penerima ? `${data.alamat_penerima}, ` : ''}{formatTanggal(data?.tanggal)}</p>
+            <p>Yang Menerima,</p>
+            <div className="h-16" />
             <div className="border-b border-black pb-1">
               <p>{data?.nama_penerima || '.......................'}</p>
-              <p className="text-sm">Alamat : {data?.alamat_penerima || '-'}</p>
+              <p className="text-xs">Alamat : {data?.alamat_penerima || '-'}</p>
             </div>
           </div>
         </div>
 
-        {data?.catatan && <p className="text-sm italic">Catatan: {data.catatan}</p>}
+        {data?.catatan && <p className="text-xs italic">Catatan: {data.catatan}</p>}
       </div>
     </div>
   )
