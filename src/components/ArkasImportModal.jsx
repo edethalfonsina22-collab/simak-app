@@ -12,6 +12,11 @@ import { Upload, X, Loader2, CheckCircle2, AlertCircle } from 'lucide-react'
  * afirmasi_kinerja_operasi, afirmasi_kinerja_modal, silpa_operasi, silpa_modal,
  * bosp_lainnya_operasi, bosp_lainnya_modal, is_item
  *
+ * PENTING (diperbaiki): sebelum insert data baru, modal ini akan MENGHAPUS
+ * dulu semua baris ARKAS untuk tahun_anggaran (& npsn) yang sama. Jadi
+ * upload = "ganti total" data tahun itu, bukan "tambah terus" — supaya
+ * tidak dobel walau file yang sama di-upload berkali-kali.
+ *
  * Penggunaan di Keuangan.jsx:
  *   import ArkasImportModal from '../components/ArkasImportModal'
  *   ...
@@ -98,12 +103,26 @@ export default function ArkasImportModal({ tahunAnggaran, npsn, onSelesai }) {
 
   async function handleImport() {
     if (rows.length === 0) return
+
+    const konfirmasi = confirm(
+      `Data ARKAS tahun ${tahunAnggaran} yang sudah ada akan DIHAPUS dan diganti dengan ${rows.length} baris dari file ini. Lanjutkan?`
+    )
+    if (!konfirmasi) return
+
     setLoading(true)
     setError('')
-    const BATCH_SIZE = 200
-    let insertedTotal = 0
 
     try {
+      // 1) Hapus dulu data ARKAS tahun ini (& npsn ini kalau ada) supaya
+      //    upload ulang tidak menumpuk jadi dobel.
+      let hapusQuery = supabase.from('arkas_anggaran').delete().eq('tahun_anggaran', tahunAnggaran)
+      if (npsn) hapusQuery = hapusQuery.eq('npsn', npsn)
+      const { error: hapusError } = await hapusQuery
+      if (hapusError) throw hapusError
+
+      // 2) Insert data baru per batch
+      const BATCH_SIZE = 200
+      let insertedTotal = 0
       for (let i = 0; i < rows.length; i += BATCH_SIZE) {
         const batch = rows.slice(i, i + BATCH_SIZE)
         const { error: insertError, data } = await supabase
@@ -141,6 +160,7 @@ export default function ArkasImportModal({ tahunAnggaran, npsn, onSelesai }) {
             <p className="text-sm text-ink-700/60 mb-3">
               Upload file CSV atau Excel hasil konversi Kertas Kerja ARKAS
               (pakai skrip <code>pdf_ke_csv_arkas.py</code> kalau sumbernya PDF).
+              <strong> Upload baru akan menggantikan seluruh data ARKAS tahun {tahunAnggaran} yang lama</strong>, bukan menambah.
             </p>
 
             <input
@@ -191,7 +211,7 @@ export default function ArkasImportModal({ tahunAnggaran, npsn, onSelesai }) {
 
             {done && (
               <div className="flex items-center gap-2 text-sm text-sage-600 mb-3">
-                <CheckCircle2 size={16} /> Berhasil! {done.inserted} dari {done.total} baris tersimpan.
+                <CheckCircle2 size={16} /> Berhasil! {done.inserted} dari {done.total} baris tersimpan (data lama tahun {tahunAnggaran} sudah diganti).
               </div>
             )}
 
