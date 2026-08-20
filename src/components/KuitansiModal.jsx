@@ -2,66 +2,68 @@ import { useEffect, useRef, useState } from 'react'
 import { supabase } from '../lib/supabaseClient'
 import { X, Loader2, Printer } from 'lucide-react'
 import KuitansiPrintTemplate from '../lib/KuitansiPrintTemplate'
-import { useSaranFormKuitansi } from '../lib/useSaranFormKuitansi'
 
-// initialData (opsional): baris kuitansi lain yang datanya mau disalin ke
-// form ini. No. Bukti & Tanggal SENGAJA tidak ikut disalin karena keduanya
-// harus baru untuk tiap transaksi.
-const emptyForm = (initialData) => ({
+const emptyForm = (keuanganRow) => ({
   no_bukti: '',
-  lembar: initialData?.lembar || 'I/II/III/IV/V',
-  mata_anggaran: initialData?.mata_anggaran || '',
-  tahun_anggaran: initialData?.tahun_anggaran || String(new Date().getFullYear()),
-  tanggal: new Date().toISOString().slice(0, 10),
-  diterima_dari: initialData?.diterima_dari || '',
-  jumlah: initialData?.jumlah_total ?? initialData?.jumlah ?? '',
-  untuk_pembayaran: initialData?.untuk_pembayaran || '',
-  disetujui_oleh: initialData?.disetujui_oleh || '',
-  jabatan_disetujui: initialData?.jabatan_disetujui || 'Atasan Langsung',
-  nip_disetujui: initialData?.nip_disetujui || '',
-  dibayar_oleh: initialData?.dibayar_oleh || '',
-  nip_dibayar: initialData?.nip_dibayar || '',
-  nama_penerima: initialData?.nama_penerima || '',
-  alamat_penerima: initialData?.alamat_penerima || '',
-  catatan: initialData?.catatan || '',
+  lembar: 'I/II/III/IV/V',
+  mata_anggaran: '',
+  tahun_anggaran: String(new Date().getFullYear()),
+  tanggal: keuanganRow?.tanggal || new Date().toISOString().slice(0, 10),
+  diterima_dari: '',
+  jumlah: keuanganRow?.jumlah || '',
+  untuk_pembayaran: keuanganRow?.catatan || keuanganRow?.kategori || '',
+  catatan: '',
+  disetujui_oleh: '',
+  jabatan_disetujui: 'Atasan Langsung',
+  nip_disetujui: '',
+  dibayar_oleh: '',
+  jabatan_dibayar: 'Pemegang Kas',
+  nip_dibayar: '',
+  nama_penerima: '',
+  alamat_penerima: '',
 })
 
-export default function KuitansiModal({ sekolah, initialData, onClose }) {
-  const [form, setForm] = useState(emptyForm(initialData))
+/**
+ * Form untuk membuat Kuitansi (khusus Kwitansi — bagian Nota belum didukung di sini).
+ * Nominal diisi langsung lewat field "Uang Sejumlah" (tidak lagi dihitung dari
+ * rincian barang, karena rincian barang/item hanya relevan untuk Nota).
+ *
+ * Catatan revisi: nomor kuitansi TIDAK lagi digenerate otomatis lewat RPC
+ * next_nomor_kuitansi. Nomor sekarang diisi manual lewat field "No. Bukti"
+ * (kolom no_bukti), dan nilai yang sama dipakai juga untuk kolom "nomor" —
+ * supaya cocok dipakai untuk skenario impor massal / nomor urut lama.
+ *
+ * Dipanggil dari Keuangan.jsx atau Kuitansi.jsx:
+ *   <KuitansiModal
+ *     keuanganRow={row}          // baris transaksi keuangan yang mau dibuatkan kuitansi (boleh null)
+ *     sekolah={{ nama, alamat, kota }}
+ *     onClose={() => setKuitansiFor(null)}
+ *   />
+ */
+export default function KuitansiModal({ keuanganRow, sekolah, onClose }) {
+  const [form, setForm] = useState(emptyForm(keuanganRow))
   const [saving, setSaving] = useState(false)
-  const [savedData, setSavedData] = useState(null)
+  const [savedData, setSavedData] = useState(null) // { ...kuitansi row } setelah tersimpan, siap dicetak
   const printRef = useRef(null)
-  const { saran, namaKeNip } = useSaranFormKuitansi()
 
   function ubah(field, value) {
     setForm((prev) => ({ ...prev, [field]: value }))
   }
 
-  // Kalau nama yang diketik cocok dengan nama guru/pegawai yang pernah
-  // dipakai (dari useSaranFormKuitansi), NIP-nya otomatis ikut terisi.
-  function ubahNamaDenganAutoNip(namaField, nipField, value) {
-    setForm((prev) => {
-      const next = { ...prev, [namaField]: value }
-      const nipTerkait = namaKeNip[value.trim()]
-      if (nipTerkait) next[nipField] = nipTerkait
-      return next
-    })
-  }
-
   async function handleSimpan(e) {
     e.preventDefault()
+
+    if (!form.no_bukti.trim()) {
+      alert('No. Bukti / Nomor Kuitansi wajib diisi.')
+      return
+    }
+
     setSaving(true)
     try {
-      let nomorFinal = form.no_bukti.trim()
-      if (!nomorFinal) {
-        const { data: nomorData, error: nomorErr } = await supabase.rpc('next_nomor_kuitansi', { p_jenis: 'kuitansi' })
-        if (nomorErr) throw nomorErr
-        nomorFinal = nomorData
-      }
-
       const payload = {
+        keuangan_id: keuanganRow?.id || null,
         jenis: 'kuitansi',
-        nomor: nomorFinal,
+        nomor: form.no_bukti,
         no_bukti: form.no_bukti,
         lembar: form.lembar,
         mata_anggaran: form.mata_anggaran,
@@ -74,6 +76,7 @@ export default function KuitansiModal({ sekolah, initialData, onClose }) {
         jabatan_disetujui: form.jabatan_disetujui,
         nip_disetujui: form.nip_disetujui,
         dibayar_oleh: form.dibayar_oleh,
+        jabatan_dibayar: form.jabatan_dibayar,
         nip_dibayar: form.nip_dibayar,
         nama_penerima: form.nama_penerima,
         alamat_penerima: form.alamat_penerima,
@@ -93,6 +96,7 @@ export default function KuitansiModal({ sekolah, initialData, onClose }) {
 
   useEffect(() => {
     if (savedData) {
+      // beri waktu render sebelum memanggil print dialog
       const t = setTimeout(() => window.print(), 150)
       return () => clearTimeout(t)
     }
@@ -103,19 +107,21 @@ export default function KuitansiModal({ sekolah, initialData, onClose }) {
       <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4 no-print">
         <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl p-6 max-h-[90vh] overflow-y-auto">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="font-display text-lg font-semibold">Buat Kuitansi Baru</h2>
+            <h2 className="font-display text-lg font-semibold">Buat Kuitansi</h2>
             <button className="icon-btn" onClick={onClose}><X size={18} /></button>
           </div>
 
           <form onSubmit={handleSimpan} className="space-y-4">
+            {/* ==== Header dokumen ==== */}
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="label-field">No. Bukti (opsional)</label>
+                <label className="label-field">No. Bukti / Nomor Kuitansi</label>
                 <input
                   className="input-field"
-                  placeholder="Contoh: BNU-12"
+                  placeholder="Contoh: 0001/BNU/2026"
                   value={form.no_bukti}
                   onChange={(e) => ubah('no_bukti', e.target.value)}
+                  required
                 />
               </div>
               <div>
@@ -127,17 +133,16 @@ export default function KuitansiModal({ sekolah, initialData, onClose }) {
                   onChange={(e) => ubah('tanggal', e.target.value)}
                 />
               </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="label-field">Lembar</label>
                 <input
                   className="input-field"
-                  list="saran-lembar"
                   value={form.lembar}
                   onChange={(e) => ubah('lembar', e.target.value)}
                 />
-                <datalist id="saran-lembar">
-                  {saran.lembar?.map((v) => <option key={v} value={v} />)}
-                </datalist>
               </div>
               <div>
                 <label className="label-field">Tahun Anggaran</label>
@@ -153,154 +158,99 @@ export default function KuitansiModal({ sekolah, initialData, onClose }) {
               <label className="label-field">Mata Anggaran</label>
               <input
                 className="input-field"
-                list="saran-mata-anggaran"
-                placeholder="Contoh: 5.1.02.01.01.00.12"
+                placeholder="Contoh: 5.1.02.01.01.0055"
                 value={form.mata_anggaran}
                 onChange={(e) => ubah('mata_anggaran', e.target.value)}
               />
-              <datalist id="saran-mata-anggaran">
-                {saran.mata_anggaran?.map((v) => <option key={v} value={v} />)}
-              </datalist>
             </div>
 
             <div>
               <label className="label-field">Sudah Terima Dari</label>
               <input
                 className="input-field"
-                list="saran-diterima-dari"
-                placeholder="Nama orang / pihak pembayar"
+                placeholder="Nama orang tua / pihak pembayar"
                 value={form.diterima_dari}
                 onChange={(e) => ubah('diterima_dari', e.target.value)}
               />
-              <datalist id="saran-diterima-dari">
-                {saran.diterima_dari?.map((v) => <option key={v} value={v} />)}
-              </datalist>
             </div>
 
             <div>
-              <label className="label-field">Jumlah (Rp)</label>
+              <label className="label-field">Uang Sejumlah (Rp)</label>
               <input
                 type="number"
                 min="0"
                 className="input-field"
-                placeholder="Contoh: 1000000"
+                placeholder="Contoh: 1250000"
                 value={form.jumlah}
                 onChange={(e) => ubah('jumlah', e.target.value)}
               />
             </div>
 
             <div>
-              <label className="label-field">Untuk Pembayaran</label>
-              <textarea
+              <label className="label-field">Untuk Pembayaran / Keterangan</label>
+              <input
                 className="input-field"
-                rows={2}
-                placeholder="Contoh: Transportasi dalam rangka penyusunan soal UAS"
                 value={form.untuk_pembayaran}
                 onChange={(e) => ubah('untuk_pembayaran', e.target.value)}
               />
             </div>
 
-            <div className="border-t pt-4">
-              <p className="text-sm font-semibold mb-3">Pemegang Kas (yang membayar)</p>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="label-field">Nama</label>
-                  <input
-                    className="input-field"
-                    list="saran-dibayar-oleh"
-                    value={form.dibayar_oleh}
-                    onChange={(e) => ubahNamaDenganAutoNip('dibayar_oleh', 'nip_dibayar', e.target.value)}
-                  />
-                  <datalist id="saran-dibayar-oleh">
-                    {saran.dibayar_oleh?.map((v) => <option key={v} value={v} />)}
-                  </datalist>
-                </div>
-                <div>
-                  <label className="label-field">NIP</label>
-                  <input
-                    className="input-field"
-                    value={form.nip_dibayar}
-                    onChange={(e) => ubah('nip_dibayar', e.target.value)}
-                  />
-                </div>
+            {/* ==== Tanda tangan ==== */}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="label-field">Setuju Dibayar (nama)</label>
+                <input
+                  className="input-field"
+                  value={form.disetujui_oleh}
+                  onChange={(e) => ubah('disetujui_oleh', e.target.value)}
+                />
+              </div>
+              <div>
+                <label className="label-field">NIP Penyetuju</label>
+                <input
+                  className="input-field"
+                  value={form.nip_disetujui}
+                  onChange={(e) => ubah('nip_disetujui', e.target.value)}
+                />
               </div>
             </div>
 
-            <div className="border-t pt-4">
-              <p className="text-sm font-semibold mb-3">Disetujui Oleh (atasan langsung)</p>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="label-field">Nama</label>
-                  <input
-                    className="input-field"
-                    list="saran-disetujui-oleh"
-                    value={form.disetujui_oleh}
-                    onChange={(e) => ubahNamaDenganAutoNip('disetujui_oleh', 'nip_disetujui', e.target.value)}
-                  />
-                  <datalist id="saran-disetujui-oleh">
-                    {saran.disetujui_oleh?.map((v) => <option key={v} value={v} />)}
-                  </datalist>
-                </div>
-                <div>
-                  <label className="label-field">NIP</label>
-                  <input
-                    className="input-field"
-                    value={form.nip_disetujui}
-                    onChange={(e) => ubah('nip_disetujui', e.target.value)}
-                  />
-                </div>
-                <div className="col-span-2">
-                  <label className="label-field">Jabatan</label>
-                  <input
-                    className="input-field"
-                    list="saran-jabatan-disetujui"
-                    value={form.jabatan_disetujui}
-                    onChange={(e) => ubah('jabatan_disetujui', e.target.value)}
-                  />
-                  <datalist id="saran-jabatan-disetujui">
-                    {saran.jabatan_disetujui?.map((v) => <option key={v} value={v} />)}
-                  </datalist>
-                </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="label-field">Lunas Dibayar (nama)</label>
+                <input
+                  className="input-field"
+                  value={form.dibayar_oleh}
+                  onChange={(e) => ubah('dibayar_oleh', e.target.value)}
+                />
+              </div>
+              <div>
+                <label className="label-field">NIP Pembayar</label>
+                <input
+                  className="input-field"
+                  value={form.nip_dibayar}
+                  onChange={(e) => ubah('nip_dibayar', e.target.value)}
+                />
               </div>
             </div>
 
-            <div className="border-t pt-4">
-              <p className="text-sm font-semibold mb-3">Yang Menerima</p>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="label-field">Nama</label>
-                  <input
-                    className="input-field"
-                    list="saran-nama-penerima"
-                    value={form.nama_penerima}
-                    onChange={(e) => ubah('nama_penerima', e.target.value)}
-                  />
-                  <datalist id="saran-nama-penerima">
-                    {saran.nama_penerima?.map((v) => <option key={v} value={v} />)}
-                  </datalist>
-                </div>
-                <div>
-                  <label className="label-field">Alamat</label>
-                  <input
-                    className="input-field"
-                    list="saran-alamat-penerima"
-                    value={form.alamat_penerima}
-                    onChange={(e) => ubah('alamat_penerima', e.target.value)}
-                  />
-                  <datalist id="saran-alamat-penerima">
-                    {saran.alamat_penerima?.map((v) => <option key={v} value={v} />)}
-                  </datalist>
-                </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="label-field">Yang Menerima (nama)</label>
+                <input
+                  className="input-field"
+                  value={form.nama_penerima}
+                  onChange={(e) => ubah('nama_penerima', e.target.value)}
+                />
               </div>
-            </div>
-
-            <div>
-              <label className="label-field">Catatan (opsional)</label>
-              <input
-                className="input-field"
-                value={form.catatan}
-                onChange={(e) => ubah('catatan', e.target.value)}
-              />
+              <div>
+                <label className="label-field">Alamat Penerima</label>
+                <input
+                  className="input-field"
+                  value={form.alamat_penerima}
+                  onChange={(e) => ubah('alamat_penerima', e.target.value)}
+                />
+              </div>
             </div>
 
             <div className="flex justify-end gap-3 pt-2">
@@ -314,6 +264,9 @@ export default function KuitansiModal({ sekolah, initialData, onClose }) {
         </div>
       </div>
 
+      {/* Sengaja di luar div "no-print" di atas — kalau ada di dalamnya, lembar ini
+          ikut disembunyikan saat print (display:none pada induk menang atas
+          visibility:visible di sini), akibatnya hasil cetak jadi halaman kosong. */}
       {savedData && (
         <KuitansiPrintTemplate
           ref={printRef}
