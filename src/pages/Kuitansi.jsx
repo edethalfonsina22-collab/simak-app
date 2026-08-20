@@ -217,16 +217,7 @@ export default function Kuitansi() {
   // lalu otomatis membuka form "Tambah Nota" dengan Tuan, Tanggal, dan satu
   // baris barang (dari Keterangan + Jumlah) sudah terisi.
   function handleJadikanNota(row) {
-    navigate('/nota', {
-      state: {
-        prefillDariKuitansi: {
-          tanggal: row.tanggal,
-          tuan: row.diterima_dari,
-          nama_barang: row.untuk_pembayaran,
-          harga: row.jumlah_total,
-        },
-      },
-    })
+    navigate('/nota', { state: { prefillDariKuitansi: row } })
   }
 
   async function handleImportKuitansi(rows) {
