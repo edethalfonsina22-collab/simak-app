@@ -94,7 +94,7 @@ const KuitansiPrintTemplate = forwardRef(function KuitansiPrintTemplate({ sekola
       className="print-only relative bg-white text-black py-10 px-4 text-base overflow-hidden"
       style={{
         width: '280mm',
-        minHeight: '158mm',
+        minHeight: '148mm',
         WebkitPrintColorAdjust: 'exact',
         printColorAdjust: 'exact',
         colorAdjust: 'exact',
