@@ -11,7 +11,7 @@ import { Upload, X, Loader2, CheckCircle2, AlertCircle, AlertTriangle, Download 
  *
  * Kolom yang dibaca dari file:
  *   tanggal, no_bukti, uraian, penerimaan, pengeluaran,
- *   kode_kegiatan, kode_rekening, saldo_dokumen
+ *   kode_kegiatan, kode_rekening, jumlah_barang, saldo_dokumen
  * (saldo_dokumen dipakai HANYA untuk validasi silang, tidak disimpan
  * ke database — saldo berjalan selalu dihitung ulang dari penerimaan
  * dan pengeluaran tiap kali halaman Keuangan dibuka.)
@@ -31,13 +31,13 @@ import { Upload, X, Loader2, CheckCircle2, AlertCircle, AlertTriangle, Download 
 
 const TEMPLATE_HEADERS = [
   'tanggal', 'no_bukti', 'uraian', 'penerimaan', 'pengeluaran',
-  'kode_kegiatan', 'kode_rekening', 'saldo_dokumen',
+  'kode_kegiatan', 'kode_rekening', 'jumlah_barang', 'saldo_dokumen',
 ]
 
 // Baris contoh, sekadar menunjukkan format yang benar (boleh dihapus user).
 const TEMPLATE_CONTOH = [
-  ['2025-01-21', 'BBU01', 'Terima Dana BOSP Tahap 1 2025', '46050000', '0', '', '', ''],
-  ['2025-09-01', 'BNU01', 'KELAS II (BUKU SISWA) Tema 5 Pengalamanku', '0', '170000', '05.02.03.', '5.1.02.03.05.00.01', ''],
+  ['2025-01-21', 'BBU01', 'Terima Dana BOSP Tahap 1 2025', '46050000', '0', '', '', '', ''],
+  ['2025-09-01', 'BNU01', 'KELAS II (BUKU SISWA) Tema 5 Pengalamanku', '0', '170000', '05.02.03.', '5.1.02.03.05.00.01', '30', ''],
 ]
 
 function unduhTemplateBku() {
@@ -71,6 +71,9 @@ function normalizeRow(row) {
     pengeluaran: toNumber(row.pengeluaran),
     kode_kegiatan: (row.kode_kegiatan || '').trim() || null,
     kode_rekening: (row.kode_rekening || '').trim() || null,
+    jumlah_barang: row.jumlah_barang !== undefined && row.jumlah_barang !== ''
+      ? toNumber(row.jumlah_barang)
+      : null,
     saldo_dokumen: row.saldo_dokumen !== undefined && row.saldo_dokumen !== ''
       ? toNumber(row.saldo_dokumen)
       : null,
@@ -202,6 +205,7 @@ export default function BkuImportModal({ tahun, bulan, npsn, onSelesai }) {
           uraian: r.uraian,
           kode_kegiatan: r.kode_kegiatan,
           kode_rekening: r.kode_rekening,
+          jumlah_barang: r.jumlah_barang,
           penerimaan: r.penerimaan,
           pengeluaran: r.pengeluaran,
         }
@@ -295,6 +299,7 @@ export default function BkuImportModal({ tahun, bulan, npsn, onSelesai }) {
                     <tr>
                       <th className="text-left p-1">Tanggal</th>
                       <th className="text-left p-1">Uraian</th>
+                      <th className="text-right p-1">Jml Barang</th>
                       <th className="text-right p-1">Penerimaan</th>
                       <th className="text-right p-1">Pengeluaran</th>
                     </tr>
@@ -304,6 +309,7 @@ export default function BkuImportModal({ tahun, bulan, npsn, onSelesai }) {
                       <tr key={idx} className="border-t">
                         <td className="p-1">{r.tanggal}</td>
                         <td className="p-1">{r.uraian}</td>
+                        <td className="p-1 text-right">{r.jumlah_barang ?? '-'}</td>
                         <td className="p-1 text-right">{r.penerimaan ? r.penerimaan.toLocaleString('id-ID') : '-'}</td>
                         <td className="p-1 text-right">{r.pengeluaran ? r.pengeluaran.toLocaleString('id-ID') : '-'}</td>
                       </tr>
