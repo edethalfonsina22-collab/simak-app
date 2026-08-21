@@ -71,12 +71,23 @@ function formDariKuitansi(row) {
 
 // Memetakan banyak baris pengeluaran BKU (tabel `bku_kas`) jadi form Nota —
 // dipakai dari tombol "Tarik dari BKU" lewat PilihBkuUntukNotaModal. Setiap
-// baris BKU terpilih jadi satu baris barang (banyaknya default 1, satuan
-// dikosongkan karena BKU tidak punya field itu). Tanggal nota ikut baris
-// pertama yang dipilih. Kalau semua baris terpilih berbagi No. Bukti yang
-// sama, No. Nota otomatis diisi dari situ (khas: satu nota belanja = satu
-// No. Bukti dengan banyak barang); kalau campuran, dikosongkan supaya
-// nomor otomatis yang generate saat simpan.
+// baris BKU terpilih jadi satu baris barang.
+//
+// `banyaknya` diambil dari bku_kas.jumlah_barang (kolom numeric, nullable —
+// ditambahkan lewat ALTER TABLE terpisah, jadi baris lama sebelum kolom ini
+// ada bisa saja null/0). Kalau kosong/0, fallback ke 1 supaya tidak error
+// dan tetap konsisten dengan perilaku lama untuk baris tanpa data ini.
+//
+// `harga` di form Nota adalah HARGA SATUAN (dikalikan banyaknya di
+// hitungJumlahBaris), sedangkan r.pengeluaran dari BKU adalah TOTAL
+// pengeluaran baris itu. Makanya di sini dihitung balik:
+// harga satuan = pengeluaran / jumlah_barang — supaya subtotal tiap baris
+// (banyaknya × harga) tetap sama persis dengan r.pengeluaran asli dari BKU.
+//
+// Tanggal nota ikut baris pertama yang dipilih. Kalau semua baris terpilih
+// berbagi No. Bukti yang sama, No. Nota otomatis diisi dari situ (khas:
+// satu nota belanja = satu No. Bukti dengan banyak barang); kalau campuran,
+// dikosongkan supaya nomor otomatis yang generate saat simpan.
 function formDariBku(rows) {
   const noBuktiPertama = rows[0]?.no_bukti || ''
   const semuaNoBuktiSama = noBuktiPertama && rows.every((r) => r.no_bukti === noBuktiPertama)
@@ -87,12 +98,16 @@ function formDariBku(rows) {
     tuan: '',
     toko: '',
     alamat_lanjutan: '',
-    items: rows.map((r) => ({
-      banyaknya: 1,
-      satuan: '',
-      nama_barang: r.uraian || '',
-      harga: r.pengeluaran || '',
-    })),
+    items: rows.map((r) => {
+      const qty = Number(r.jumlah_barang) > 0 ? Number(r.jumlah_barang) : 1
+      const totalBaris = Number(r.pengeluaran) || 0
+      return {
+        banyaknya: qty,
+        satuan: '',
+        nama_barang: r.uraian || '',
+        harga: qty > 0 ? totalBaris / qty : totalBaris,
+      }
+    }),
   }
 }
 
