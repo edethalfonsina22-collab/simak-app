@@ -172,7 +172,11 @@ export default function Kuitansi() {
   // KuitansiModal tidak perlu tahu soal struktur tabel bku_kas sama sekali.
   function handlePilihBku(row) {
     setBkuTerpilih({
-      id: row.id,
+      // SENGAJA tidak menyertakan `id` di sini. keuanganRow.id dipakai
+      // KuitansiModal untuk mengisi kolom keuangan_id, yang foreign key-nya
+      // menunjuk ke tabel `keuangan` — bukan ke bku_kas. Kalau id baris BKU
+      // ikut dioper, insert kuitansi akan gagal (atau salah nyambung ke baris
+      // keuangan yang tidak berhubungan). keuangan_id akan otomatis null.
       tanggal: row.tanggal,
       jumlah: row.pengeluaran,
       catatan: row.uraian,
