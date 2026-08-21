@@ -2,12 +2,15 @@ import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
 import SuratKeteranganForm from "../components/SuratKeteranganForm";
 import Layout from "../components/Layout";
+import { Trash2 } from "lucide-react";
 
 export default function SuratKeterangan() {
   const [showForm, setShowForm] = useState(false);
   const [list, setList] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
+  const [deletingId, setDeletingId] = useState(null);
+
   async function loadList() {
     setLoading(true);
     setLoadError("");
@@ -27,9 +30,26 @@ export default function SuratKeterangan() {
     setList(data || []);
     setLoading(false);
   }
+
   useEffect(() => {
     loadList();
   }, []);
+
+  async function handleDelete(id, judul) {
+    if (!confirm(`Hapus surat "${judul || "ini"}"? Tindakan ini tidak bisa dibatalkan.`)) return;
+
+    setDeletingId(id);
+    const { error } = await supabase.from("surat_keterangan").delete().eq("id", id);
+    setDeletingId(null);
+
+    if (error) {
+      alert("Gagal menghapus surat: " + error.message);
+      return;
+    }
+
+    setList((prev) => prev.filter((s) => s.id !== id));
+  }
+
   return (
     <Layout
       title="Surat Keterangan"
@@ -68,12 +88,13 @@ export default function SuratKeterangan() {
               <th className="p-2 border">Siswa</th>
               <th className="p-2 border">Guru</th>
               <th className="p-2 border">Tanggal</th>
+              <th className="p-2 border">Aksi</th>
             </tr>
           </thead>
           <tbody>
             {list.length === 0 && (
               <tr>
-                <td colSpan={5} className="p-3 text-center text-gray-500">
+                <td colSpan={6} className="p-3 text-center text-gray-500">
                   Belum ada surat keterangan.
                 </td>
               </tr>
@@ -86,6 +107,17 @@ export default function SuratKeterangan() {
                 <td className="p-2 border">{s.guru?.nama_lengkap || "-"}</td>
                 <td className="p-2 border">
                   {new Date(s.tanggal_surat).toLocaleDateString("id-ID")}
+                </td>
+                <td className="p-2 border">
+                  <button
+                    onClick={() => handleDelete(s.id, s.judul)}
+                    disabled={deletingId === s.id}
+                    className="text-red-600 hover:text-red-800 inline-flex items-center gap-1 text-sm disabled:opacity-50"
+                    title="Hapus surat"
+                  >
+                    <Trash2 size={14} />
+                    {deletingId === s.id ? "Menghapus..." : "Hapus"}
+                  </button>
                 </td>
               </tr>
             ))}
