@@ -145,6 +145,19 @@ export default function Keuangan() {
     else alert('Gagal menghapus: ' + error.message)
   }
 
+  async function handleHapusSemuaArkas() {
+    if (arkasData.length === 0) return
+    const konfirmasi = confirm(
+      `Semua data ARKAS tahun ${tahun} (${arkasData.length} baris) akan DIHAPUS PERMANEN. Tindakan ini tidak bisa dibatalkan. Lanjutkan?`
+    )
+    if (!konfirmasi) return
+    setLoadingArkas(true)
+    const { error } = await supabase.from('arkas_anggaran').delete().eq('tahun_anggaran', String(tahun))
+    setLoadingArkas(false)
+    if (!error) loadArkasData()
+    else alert('Gagal menghapus: ' + error.message)
+  }
+
   const totalMasuk = data.filter((d) => d.jenis === 'masuk').reduce((a, b) => a + Number(b.jumlah), 0)
   const totalKeluar = data.filter((d) => d.jenis === 'keluar').reduce((a, b) => a + Number(b.jumlah), 0)
   const saldo = totalMasuk - totalKeluar
@@ -212,7 +225,16 @@ export default function Keuangan() {
             <button className="btn-primary" onClick={openAdd}><Plus size={16} /> Tambah Transaksi</button>
           </>
         ) : menu === 'arkas' ? (
-          <ArkasImportModal tahunAnggaran={String(tahun)} onSelesai={loadArkasData} />
+          <>
+            <button
+              className="btn-secondary text-red-600"
+              onClick={handleHapusSemuaArkas}
+              disabled={arkasData.length === 0 || loadingArkas}
+            >
+              <Trash2 size={16} /> Hapus Semua
+            </button>
+            <ArkasImportModal tahunAnggaran={String(tahun)} onSelesai={loadArkasData} />
+          </>
         ) : (
           <>
             <button className="btn-secondary" onClick={handleExportBkuPDF}><FileDown size={16} /> Ekspor PDF</button>
