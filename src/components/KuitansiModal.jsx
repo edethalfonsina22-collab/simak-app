@@ -3,28 +3,32 @@ import { supabase } from '../lib/supabaseClient'
 import { X, Loader2, Printer } from 'lucide-react'
 import KuitansiPrintTemplate from '../lib/KuitansiPrintTemplate'
 
-// Kunci localStorage untuk mengingat isian tanda tangan terakhir (Setuju
-// Dibayar/NIP Penyetuju/Lunas Dibayar/NIP Pembayar) — orangnya biasanya
-// itu-itu saja (kepala sekolah & bendahara yang sama) tiap kuitansi dibuat,
-// jadi tidak perlu ketik ulang tiap kali. Tetap bisa diedit manual di form.
-const TTD_STORAGE_KEY = 'kuitansi_ttd_default'
+// Kunci localStorage untuk mengingat isian terakhir yang biasanya sama tiap
+// kuitansi dibuat: tanda tangan (Setuju Dibayar/NIP Penyetuju/Lunas
+// Dibayar/NIP Pembayar) DAN pihak yang terlibat (Sudah Terima Dari/Yang
+// Menerima/Alamat Penerima). Tidak perlu ketik ulang tiap kali, tapi tetap
+// bisa diedit manual di form kalau memang beda dari biasanya.
+const ISIAN_STORAGE_KEY = 'kuitansi_ttd_default'
 
-function ambilTtdTersimpan() {
+function ambilIsianTersimpan() {
   try {
-    const raw = localStorage.getItem(TTD_STORAGE_KEY)
+    const raw = localStorage.getItem(ISIAN_STORAGE_KEY)
     return raw ? JSON.parse(raw) : {}
   } catch {
     return {}
   }
 }
 
-function simpanTtdDefault(form) {
+function simpanIsianDefault(form) {
   try {
-    localStorage.setItem(TTD_STORAGE_KEY, JSON.stringify({
+    localStorage.setItem(ISIAN_STORAGE_KEY, JSON.stringify({
+      diterima_dari: form.diterima_dari,
       disetujui_oleh: form.disetujui_oleh,
       nip_disetujui: form.nip_disetujui,
       dibayar_oleh: form.dibayar_oleh,
       nip_dibayar: form.nip_dibayar,
+      nama_penerima: form.nama_penerima,
+      alamat_penerima: form.alamat_penerima,
     }))
   } catch {
     // localStorage tidak tersedia (mis. mode privat) — abaikan saja, form tetap
@@ -33,25 +37,25 @@ function simpanTtdDefault(form) {
 }
 
 const emptyForm = (keuanganRow) => {
-  const ttdDefault = ambilTtdTersimpan()
+  const isianDefault = ambilIsianTersimpan()
   return {
     no_bukti: keuanganRow?.no_bukti || '',
     lembar: 'I/II/III/IV/V',
     mata_anggaran: keuanganRow?.mata_anggaran || '',
     tahun_anggaran: String(new Date().getFullYear()),
     tanggal: keuanganRow?.tanggal || new Date().toISOString().slice(0, 10),
-    diterima_dari: '',
+    diterima_dari: isianDefault.diterima_dari || '',
     jumlah: keuanganRow?.jumlah || '',
     untuk_pembayaran: keuanganRow?.catatan || keuanganRow?.kategori || '',
     catatan: '',
-    disetujui_oleh: ttdDefault.disetujui_oleh || '',
+    disetujui_oleh: isianDefault.disetujui_oleh || '',
     jabatan_disetujui: 'Atasan Langsung',
-    nip_disetujui: ttdDefault.nip_disetujui || '',
-    dibayar_oleh: ttdDefault.dibayar_oleh || '',
+    nip_disetujui: isianDefault.nip_disetujui || '',
+    dibayar_oleh: isianDefault.dibayar_oleh || '',
     jabatan_dibayar: 'Pemegang Kas',
-    nip_dibayar: ttdDefault.nip_dibayar || '',
-    nama_penerima: '',
-    alamat_penerima: '',
+    nip_dibayar: isianDefault.nip_dibayar || '',
+    nama_penerima: isianDefault.nama_penerima || '',
+    alamat_penerima: isianDefault.alamat_penerima || '',
   }
 }
 
@@ -73,9 +77,11 @@ const emptyForm = (keuanganRow) => {
  * field id — lihat catatan di handleSimpan soal keuangan_id) sebelum dioper
  * ke sini, supaya komponen ini tidak perlu tahu soal BKU.
  *
- * Field tanda tangan (disetujui_oleh/nip_disetujui/dibayar_oleh/nip_dibayar)
- * diingat otomatis lewat localStorage (lihat TTD_STORAGE_KEY di atas) supaya
- * tidak perlu diketik ulang tiap kali — orangnya biasanya sama terus.
+ * Field "Sudah Terima Dari", tanda tangan (disetujui_oleh/nip_disetujui/
+ * dibayar_oleh/nip_dibayar), dan "Yang Menerima"/"Alamat Penerima" diingat
+ * otomatis lewat localStorage (lihat ISIAN_STORAGE_KEY di atas) supaya tidak
+ * perlu diketik ulang tiap kali — kalau suatu saat beda, tinggal edit manual
+ * di form, dan isian barunya otomatis jadi default berikutnya.
  */
 export default function KuitansiModal({ keuanganRow, sekolah, onClose }) {
   const [form, setForm] = useState(emptyForm(keuanganRow))
@@ -125,8 +131,8 @@ export default function KuitansiModal({ keuanganRow, sekolah, onClose }) {
       const { data: inserted, error: insertErr } = await supabase.from('kuitansi').insert(payload).select().single()
       if (insertErr) throw insertErr
 
-      // Simpan 4 field tanda tangan sebagai default untuk kuitansi berikutnya.
-      simpanTtdDefault(form)
+      // Simpan isian yang biasanya konstan sebagai default untuk kuitansi berikutnya.
+      simpanIsianDefault(form)
 
       setSavedData(inserted)
     } catch (err) {
@@ -237,8 +243,10 @@ export default function KuitansiModal({ keuanganRow, sekolah, onClose }) {
             </div>
 
             {/* ==== Tanda tangan ====
-                4 field ini otomatis terisi dari isian terakhir (localStorage)
-                lewat emptyForm() di atas — tetap bisa diedit kalau orangnya beda. */}
+                Semua field di bawah ini (termasuk Sudah Terima Dari di atas, dan
+                Yang Menerima/Alamat Penerima di bawah) otomatis terisi dari isian
+                terakhir (localStorage) lewat emptyForm() di atas — tetap bisa
+                diedit kalau memang beda dari biasanya. */}
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="label-field">Setuju Dibayar (nama)</label>
