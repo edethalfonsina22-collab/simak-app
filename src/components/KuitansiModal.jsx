@@ -4,9 +4,9 @@ import { X, Loader2, Printer } from 'lucide-react'
 import KuitansiPrintTemplate from '../lib/KuitansiPrintTemplate'
 
 const emptyForm = (keuanganRow) => ({
-  no_bukti: '',
+  no_bukti: keuanganRow?.no_bukti || '',
   lembar: 'I/II/III/IV/V',
-  mata_anggaran: '',
+  mata_anggaran: keuanganRow?.mata_anggaran || '',
   tahun_anggaran: String(new Date().getFullYear()),
   tanggal: keuanganRow?.tanggal || new Date().toISOString().slice(0, 10),
   diterima_dari: '',
@@ -28,17 +28,17 @@ const emptyForm = (keuanganRow) => ({
  * Nominal diisi langsung lewat field "Uang Sejumlah" (tidak lagi dihitung dari
  * rincian barang, karena rincian barang/item hanya relevan untuk Nota).
  *
- * Catatan revisi: nomor kuitansi TIDAK lagi digenerate otomatis lewat RPC
- * next_nomor_kuitansi. Nomor sekarang diisi manual lewat field "No. Bukti"
- * (kolom no_bukti), dan nilai yang sama dipakai juga untuk kolom "nomor" —
- * supaya cocok dipakai untuk skenario impor massal / nomor urut lama.
- *
  * Dipanggil dari Keuangan.jsx atau Kuitansi.jsx:
  *   <KuitansiModal
  *     keuanganRow={row}          // baris transaksi keuangan yang mau dibuatkan kuitansi (boleh null)
  *     sekolah={{ nama, alamat, kota }}
  *     onClose={() => setKuitansiFor(null)}
  *   />
+ *
+ * keuanganRow juga dipakai untuk prefill dari alur "Tarik Data dari BKU" di
+ * Kuitansi.jsx — baris bku_kas dipetakan ke bentuk yang sama di sana
+ * ({ id, tanggal, jumlah, catatan, kategori, no_bukti, mata_anggaran })
+ * sebelum dioper ke sini, supaya komponen ini tidak perlu tahu soal BKU.
  */
 export default function KuitansiModal({ keuanganRow, sekolah, onClose }) {
   const [form, setForm] = useState(emptyForm(keuanganRow))
@@ -52,18 +52,15 @@ export default function KuitansiModal({ keuanganRow, sekolah, onClose }) {
 
   async function handleSimpan(e) {
     e.preventDefault()
-
-    if (!form.no_bukti.trim()) {
-      alert('No. Bukti / Nomor Kuitansi wajib diisi.')
-      return
-    }
-
     setSaving(true)
     try {
+      const { data: nomorData, error: nomorErr } = await supabase.rpc('next_nomor_kuitansi', { p_jenis: 'kuitansi' })
+      if (nomorErr) throw nomorErr
+
       const payload = {
         keuangan_id: keuanganRow?.id || null,
         jenis: 'kuitansi',
-        nomor: form.no_bukti,
+        nomor: nomorData,
         no_bukti: form.no_bukti,
         lembar: form.lembar,
         mata_anggaran: form.mata_anggaran,
@@ -111,19 +108,16 @@ export default function KuitansiModal({ keuanganRow, sekolah, onClose }) {
             <button className="icon-btn" onClick={onClose}><X size={18} /></button>
           </div>
 
-          <form onSubmit={handleSimpan} className="space-y-4" autoComplete="on">
+          <form onSubmit={handleSimpan} className="space-y-4">
             {/* ==== Header dokumen ==== */}
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="label-field">No. Bukti / Nomor Kuitansi</label>
+                <label className="label-field">No. Bukti</label>
                 <input
                   className="input-field"
-                  name="no_bukti"
-                  autoComplete="off"
-                  placeholder="Contoh: 0001/BNU/2026"
+                  placeholder="Contoh: BNU-12"
                   value={form.no_bukti}
                   onChange={(e) => ubah('no_bukti', e.target.value)}
-                  required
                 />
               </div>
               <div>
@@ -131,7 +125,6 @@ export default function KuitansiModal({ keuanganRow, sekolah, onClose }) {
                 <input
                   type="date"
                   className="input-field"
-                  name="tanggal"
                   value={form.tanggal}
                   onChange={(e) => ubah('tanggal', e.target.value)}
                 />
@@ -143,8 +136,6 @@ export default function KuitansiModal({ keuanganRow, sekolah, onClose }) {
                 <label className="label-field">Lembar</label>
                 <input
                   className="input-field"
-                  name="lembar"
-                  autoComplete="on"
                   value={form.lembar}
                   onChange={(e) => ubah('lembar', e.target.value)}
                 />
@@ -153,8 +144,6 @@ export default function KuitansiModal({ keuanganRow, sekolah, onClose }) {
                 <label className="label-field">Tahun Anggaran</label>
                 <input
                   className="input-field"
-                  name="tahun_anggaran"
-                  autoComplete="on"
                   value={form.tahun_anggaran}
                   onChange={(e) => ubah('tahun_anggaran', e.target.value)}
                 />
@@ -165,8 +154,6 @@ export default function KuitansiModal({ keuanganRow, sekolah, onClose }) {
               <label className="label-field">Mata Anggaran</label>
               <input
                 className="input-field"
-                name="mata_anggaran"
-                autoComplete="on"
                 placeholder="Contoh: 5.1.02.01.01.0055"
                 value={form.mata_anggaran}
                 onChange={(e) => ubah('mata_anggaran', e.target.value)}
@@ -177,8 +164,6 @@ export default function KuitansiModal({ keuanganRow, sekolah, onClose }) {
               <label className="label-field">Sudah Terima Dari</label>
               <input
                 className="input-field"
-                name="diterima_dari"
-                autoComplete="on"
                 placeholder="Nama orang tua / pihak pembayar"
                 value={form.diterima_dari}
                 onChange={(e) => ubah('diterima_dari', e.target.value)}
@@ -191,8 +176,6 @@ export default function KuitansiModal({ keuanganRow, sekolah, onClose }) {
                 type="number"
                 min="0"
                 className="input-field"
-                name="jumlah"
-                autoComplete="off"
                 placeholder="Contoh: 1250000"
                 value={form.jumlah}
                 onChange={(e) => ubah('jumlah', e.target.value)}
@@ -203,8 +186,6 @@ export default function KuitansiModal({ keuanganRow, sekolah, onClose }) {
               <label className="label-field">Untuk Pembayaran / Keterangan</label>
               <input
                 className="input-field"
-                name="untuk_pembayaran"
-                autoComplete="on"
                 value={form.untuk_pembayaran}
                 onChange={(e) => ubah('untuk_pembayaran', e.target.value)}
               />
@@ -216,8 +197,6 @@ export default function KuitansiModal({ keuanganRow, sekolah, onClose }) {
                 <label className="label-field">Setuju Dibayar (nama)</label>
                 <input
                   className="input-field"
-                  name="disetujui_oleh"
-                  autoComplete="on"
                   value={form.disetujui_oleh}
                   onChange={(e) => ubah('disetujui_oleh', e.target.value)}
                 />
@@ -226,8 +205,6 @@ export default function KuitansiModal({ keuanganRow, sekolah, onClose }) {
                 <label className="label-field">NIP Penyetuju</label>
                 <input
                   className="input-field"
-                  name="nip_disetujui"
-                  autoComplete="on"
                   value={form.nip_disetujui}
                   onChange={(e) => ubah('nip_disetujui', e.target.value)}
                 />
@@ -239,8 +216,6 @@ export default function KuitansiModal({ keuanganRow, sekolah, onClose }) {
                 <label className="label-field">Lunas Dibayar (nama)</label>
                 <input
                   className="input-field"
-                  name="dibayar_oleh"
-                  autoComplete="on"
                   value={form.dibayar_oleh}
                   onChange={(e) => ubah('dibayar_oleh', e.target.value)}
                 />
@@ -249,8 +224,6 @@ export default function KuitansiModal({ keuanganRow, sekolah, onClose }) {
                 <label className="label-field">NIP Pembayar</label>
                 <input
                   className="input-field"
-                  name="nip_dibayar"
-                  autoComplete="on"
                   value={form.nip_dibayar}
                   onChange={(e) => ubah('nip_dibayar', e.target.value)}
                 />
@@ -262,8 +235,6 @@ export default function KuitansiModal({ keuanganRow, sekolah, onClose }) {
                 <label className="label-field">Yang Menerima (nama)</label>
                 <input
                   className="input-field"
-                  name="nama_penerima"
-                  autoComplete="on"
                   value={form.nama_penerima}
                   onChange={(e) => ubah('nama_penerima', e.target.value)}
                 />
@@ -272,8 +243,6 @@ export default function KuitansiModal({ keuanganRow, sekolah, onClose }) {
                 <label className="label-field">Alamat Penerima</label>
                 <input
                   className="input-field"
-                  name="alamat_penerima"
-                  autoComplete="on"
                   value={form.alamat_penerima}
                   onChange={(e) => ubah('alamat_penerima', e.target.value)}
                 />
