@@ -4,33 +4,32 @@ import { X, Loader2, Printer } from 'lucide-react'
 import KuitansiJasaPrintTemplate from '../lib/KuitansiJasaPrintTemplate'
 import { terbilangRupiah } from '../lib/terbilang'
 
-// `initialData` (opsional) adalah baris kuitansi/kuitansi-jasa yang mau ditarik
-// datanya (dari tombol "Tarik dari Kuitansi" atau "Duplikat" di KuitansiJasa.jsx).
-// Semua field diisi otomatis dari initialData, termasuk No. Bukti dan Tanggal —
-// keduanya ikut ditarik sama persis dari kuitansi utama (bukan direset ke
-// kosong/hari ini lagi), sesuai konfirmasi user.
-//
-// `alamat` dipetakan ke kolom `alamat_penerima` di tabel `kuitansi` — kolom
-// yang sama dipakai Kuitansi Utama untuk baris "<kota>, <tanggal>" di
-// cetakan (mis. "Ambon, 27 November 2026"). Kwitansi Jasa sebelumnya malah
-// memakai field Kabupaten di Profil Sekolah untuk baris ini, yang isinya
-// nama instansi untuk kop surat (mis. "PEMERINTAH KABUPATEN KEPULAUAN ARU"),
-// bukan nama kota — makanya salah muncul di cetakan.
-const emptyForm = (initialData) => ({
-  no_bukti: initialData?.no_bukti || '',
-  tanggal: initialData?.tanggal || new Date().toISOString().slice(0, 10),
-  diterima_dari: initialData?.diterima_dari || '',
-  jumlah: initialData?.jumlah_total != null && initialData.jumlah_total !== ''
-    ? String(initialData.jumlah_total)
-    : '',
-  untuk_pembayaran: initialData?.untuk_pembayaran || '',
-  alamat: initialData?.alamat_penerima || '',
+const emptyForm = () => ({
+  no_bukti: '',
+  tanggal: new Date().toISOString().slice(0, 10),
+  diterima_dari: '',
+  jumlah: '',
+  untuk_pembayaran: '',
+  nama_penerima: '',
 })
 
-export default function KuitansiJasaModal({ sekolah, initialData, onClose }) {
-  const [form, setForm] = useState(() => emptyForm(initialData))
+/**
+ * Form untuk membuat Kuitansi Jasa (transport, honor kegiatan, dsb).
+ * Berbeda dari KuitansiModal (kuitansi barang): field lebih ringkas dan
+ * "Uang Sejumlah" pada hasil cetak digenerate OTOMATIS dari nominal
+ * (terbilangRupiah), bukan diisi manual.
+ *
+ * Disimpan ke tabel yang sama dengan kuitansi biasa (`kuitansi`), dibedakan
+ * lewat kolom jenis = 'kuitansi_jasa', supaya riwayat & penomoran tetap
+ * terpusat di satu tabel.
+ *
+ * Dipanggil dari KuitansiJasa.jsx:
+ *   <KuitansiJasaModal sekolah={{ nama, alamat, kota }} onClose={...} />
+ */
+export default function KuitansiJasaModal({ sekolah, onClose }) {
+  const [form, setForm] = useState(emptyForm())
   const [saving, setSaving] = useState(false)
-  const [savedData, setSavedData] = useState(null)
+  const [savedData, setSavedData] = useState(null) // { ...kuitansi row } setelah tersimpan, siap dicetak
   const printRef = useRef(null)
 
   function ubah(field, value) {
@@ -41,22 +40,18 @@ export default function KuitansiJasaModal({ sekolah, initialData, onClose }) {
     e.preventDefault()
     setSaving(true)
     try {
-      let nomorFinal = form.no_bukti.trim()
-      if (!nomorFinal) {
-        const { data: nomorData, error: nomorErr } = await supabase.rpc('next_nomor_kuitansi', { p_jenis: 'kuitansi_jasa' })
-        if (nomorErr) throw nomorErr
-        nomorFinal = nomorData
-      }
+      const { data: nomorData, error: nomorErr } = await supabase.rpc('next_nomor_kuitansi', { p_jenis: 'kuitansi_jasa' })
+      if (nomorErr) throw nomorErr
 
       const payload = {
         jenis: 'kuitansi_jasa',
-        nomor: nomorFinal,
+        nomor: nomorData,
         no_bukti: form.no_bukti,
         tanggal: form.tanggal,
         diterima_dari: form.diterima_dari,
         untuk_pembayaran: form.untuk_pembayaran,
         jumlah_total: Number(form.jumlah) || 0,
-        alamat_penerima: form.alamat,
+        nama_penerima: form.nama_penerima,
       }
 
       const { data: inserted, error: insertErr } = await supabase.from('kuitansi').insert(payload).select().single()
@@ -72,20 +67,24 @@ export default function KuitansiJasaModal({ sekolah, initialData, onClose }) {
 
   useEffect(() => {
     if (savedData) {
+      // beri waktu render sebelum memanggil print dialog
       const t = setTimeout(() => window.print(), 150)
       return () => clearTimeout(t)
     }
   }, [savedData])
 
+  // Data yang dioper ke template cetak — memetakan nama kolom tabel (nomor,
+  // diterima_dari, jumlah_total) ke nama prop yang dipakai KuitansiJasaPrintTemplate
+  // (no_kwitansi, dari, uang_sejumlah, jumlah).
   const dataCetak = savedData
     ? {
         no_kwitansi: savedData.nomor,
         tanggal: savedData.tanggal,
         dari: savedData.diterima_dari,
-        uang_sejumlah: terbilangRupiah(savedData.jumlah_total).toUpperCase(),
+        uang_sejumlah: terbilangRupiah(savedData.jumlah_total),
         untuk_pembayaran: savedData.untuk_pembayaran,
         jumlah: savedData.jumlah_total,
-        alamat: savedData.alamat_penerima,
+        nama_penerima: savedData.nama_penerima,
       }
     : null
 
@@ -142,7 +141,7 @@ export default function KuitansiJasaModal({ sekolah, initialData, onClose }) {
               />
               {form.jumlah > 0 && (
                 <p className="text-xs text-ink-700/50 mt-1 italic">
-                  Terbilang: {terbilangRupiah(form.jumlah).toUpperCase()}
+                  Terbilang: {terbilangRupiah(form.jumlah)}
                 </p>
               )}
             </div>
@@ -158,16 +157,13 @@ export default function KuitansiJasaModal({ sekolah, initialData, onClose }) {
             </div>
 
             <div>
-              <label className="label-field">Alamat (kota untuk tanggal di cetakan)</label>
+              <label className="label-field">Yang Menerima (nama)</label>
               <input
                 className="input-field"
-                placeholder="Contoh: Ambon"
-                value={form.alamat}
-                onChange={(e) => ubah('alamat', e.target.value)}
+                placeholder="Nama penerima uang"
+                value={form.nama_penerima}
+                onChange={(e) => ubah('nama_penerima', e.target.value)}
               />
-              <p className="text-xs text-ink-700/50 mt-1">
-                Akan muncul di cetakan sebagai &quot;{form.alamat || 'Ambon'}, {new Date(form.tanggal || Date.now()).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}&quot;
-              </p>
             </div>
 
             <div className="flex justify-end gap-3 pt-2">
@@ -181,6 +177,9 @@ export default function KuitansiJasaModal({ sekolah, initialData, onClose }) {
         </div>
       </div>
 
+      {/* Sengaja di luar div "no-print" di atas — kalau ada di dalamnya, lembar ini
+          ikut disembunyikan saat print (display:none pada induk menang atas
+          visibility:visible di sini), akibatnya hasil cetak jadi halaman kosong. */}
       {dataCetak && (
         <KuitansiJasaPrintTemplate
           ref={printRef}
