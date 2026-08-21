@@ -9,8 +9,11 @@ import { Upload, X, Loader2, CheckCircle2, AlertCircle, AlertTriangle, Download 
  * Menerima CSV/Excel hasil konversi PDF ARKAS (rencana anggaran sekolah).
  *
  * Kolom yang dibaca dari file:
- *   tahun_anggaran, no_urut, kode_rekening, kode_kegiatan, uraian,
+ *   tahun_anggaran, no_urut, level, kode_rekening, kode_kegiatan, uraian,
  *   jumlah, status, is_item
+ * (level wajib diisi di database — kalau kosong di file, diturunkan
+ * otomatis dari is_item: item/rincian = 3, kelompok/header = 1. Ini
+ * masih dugaan; sesuaikan lagi kalau makna "level" di tabel berbeda.)
  *
  * PENTING soal tahun anggaran:
  *   Sekolah sering mengerjakan laporan untuk tahun anggaran yang BUKAN
@@ -38,17 +41,18 @@ import { Upload, X, Loader2, CheckCircle2, AlertCircle, AlertTriangle, Download 
  */
 
 const TEMPLATE_HEADERS = [
-  'tahun_anggaran', 'no_urut', 'kode_rekening', 'kode_kegiatan', 'uraian',
+  'tahun_anggaran', 'no_urut', 'level', 'kode_rekening', 'kode_kegiatan', 'uraian',
   'jumlah', 'status', 'is_item',
 ]
 
 // Baris contoh — sengaja pakai dua tahun anggaran berbeda untuk
 // menunjukkan bahwa satu file boleh berisi lebih dari satu tahun.
+// Kolom "level": 1 = kelompok/kode rekening, 3 = rincian/item barang.
 const TEMPLATE_CONTOH = [
-  ['2024', '1', '5.1.02.01.01.00', '06.05.08.', 'Belanja ATK', '', 'header', 'FALSE'],
-  ['2024', '2', '5.1.02.01.01.00', '06.05.08.', 'Kertas HVS Folio', '420000', 'disetujui', 'TRUE'],
-  ['2025', '1', '5.1.02.03.05.00', '05.02.03.', 'Belanja Buku Siswa', '', 'header', 'FALSE'],
-  ['2025', '2', '5.1.02.03.05.00', '05.02.03.', 'KELAS II (BUKU SISWA) Tema 5 Pengalamanku', '170000', 'disetujui', 'TRUE'],
+  ['2024', '1', '1', '5.1.02.01.01.00', '06.05.08.', 'Belanja ATK', '', 'header', 'FALSE'],
+  ['2024', '2', '3', '5.1.02.01.01.00', '06.05.08.', 'Kertas HVS Folio', '420000', 'disetujui', 'TRUE'],
+  ['2025', '1', '1', '5.1.02.03.05.00', '05.02.03.', 'Belanja Buku Siswa', '', 'header', 'FALSE'],
+  ['2025', '2', '3', '5.1.02.03.05.00', '05.02.03.', 'KELAS II (BUKU SISWA) Tema 5 Pengalamanku', '170000', 'disetujui', 'TRUE'],
 ]
 
 function unduhTemplateArkas() {
@@ -80,15 +84,24 @@ function toBool(val) {
 }
 
 function normalizeRow(row, idx) {
+  const is_item = toBool(row.is_item)
+  // "level" wajib diisi (NOT NULL) di tabel arkas_anggaran. Kalau kolom
+  // level tidak ada di file, turunkan dari is_item: item/rincian = 3,
+  // kelompok/header = 1.
+  const level = row.level !== undefined && row.level !== ''
+    ? toNumber(row.level)
+    : (is_item ? 3 : 1)
+
   return {
     tahun_anggaran: (row.tahun_anggaran ?? '').toString().trim(),
     no_urut: row.no_urut !== undefined && row.no_urut !== '' ? toNumber(row.no_urut) : idx + 1,
+    level,
     kode_rekening: (row.kode_rekening || '').toString().trim() || null,
     kode_kegiatan: (row.kode_kegiatan || '').toString().trim() || null,
     uraian: (row.uraian || '').toString().trim(),
     jumlah: toNumber(row.jumlah),
     status: (row.status || '').toString().trim() || null,
-    is_item: toBool(row.is_item),
+    is_item,
   }
 }
 
@@ -185,6 +198,7 @@ export default function ArkasImportModal({ tahunAnggaran, npsn, onSelesai }) {
         npsn: npsn || null,
         tahun_anggaran: r.tahun_anggaran,
         no_urut: r.no_urut,
+        level: r.level,
         kode_rekening: r.kode_rekening,
         kode_kegiatan: r.kode_kegiatan,
         uraian: r.uraian,
