@@ -4,13 +4,13 @@ import { X, Loader2, Printer } from 'lucide-react'
 import KuitansiJasaPrintTemplate from '../lib/KuitansiJasaPrintTemplate'
 import { terbilangRupiah } from '../lib/terbilang'
 
-const emptyForm = () => ({
+const emptyForm = (dataAwal) => ({
   no_bukti: '',
-  tanggal: new Date().toISOString().slice(0, 10),
-  diterima_dari: '',
-  jumlah: '',
-  untuk_pembayaran: '',
-  nama_penerima: '',
+  tanggal: dataAwal?.tanggal || new Date().toISOString().slice(0, 10),
+  diterima_dari: dataAwal?.diterima_dari || '',
+  jumlah: dataAwal?.jumlah_total || '',
+  untuk_pembayaran: dataAwal?.untuk_pembayaran || '',
+  nama_penerima: dataAwal?.nama_penerima || '',
 })
 
 /**
@@ -23,11 +23,17 @@ const emptyForm = () => ({
  * lewat kolom jenis = 'kuitansi_jasa', supaya riwayat & penomoran tetap
  * terpusat di satu tabel.
  *
+ * dataAwal (opsional): baris kuitansi (jenis='kuitansi') hasil "Tarik dari
+ * Kuitansi" — dipakai untuk mengisi form otomatis. Field yang dipetakan:
+ * tanggal, diterima_dari, untuk_pembayaran, jumlah_total, nama_penerima.
+ * No. Bukti SENGAJA tidak ikut ditarik karena penomoran kuitansi jasa
+ * berdiri sendiri dari kuitansi asal.
+ *
  * Dipanggil dari KuitansiJasa.jsx:
- *   <KuitansiJasaModal sekolah={{ nama, alamat, kota }} onClose={...} />
+ *   <KuitansiJasaModal sekolah={{ nama, alamat, kota }} dataAwal={row} onClose={...} />
  */
-export default function KuitansiJasaModal({ sekolah, onClose }) {
-  const [form, setForm] = useState(emptyForm())
+export default function KuitansiJasaModal({ sekolah, dataAwal, onClose }) {
+  const [form, setForm] = useState(emptyForm(dataAwal))
   const [saving, setSaving] = useState(false)
   const [savedData, setSavedData] = useState(null) // { ...kuitansi row } setelah tersimpan, siap dicetak
   const printRef = useRef(null)
@@ -67,15 +73,11 @@ export default function KuitansiJasaModal({ sekolah, onClose }) {
 
   useEffect(() => {
     if (savedData) {
-      // beri waktu render sebelum memanggil print dialog
       const t = setTimeout(() => window.print(), 150)
       return () => clearTimeout(t)
     }
   }, [savedData])
 
-  // Data yang dioper ke template cetak — memetakan nama kolom tabel (nomor,
-  // diterima_dari, jumlah_total) ke nama prop yang dipakai KuitansiJasaPrintTemplate
-  // (no_kwitansi, dari, uang_sejumlah, jumlah).
   const dataCetak = savedData
     ? {
         no_kwitansi: savedData.nomor,
@@ -177,9 +179,6 @@ export default function KuitansiJasaModal({ sekolah, onClose }) {
         </div>
       </div>
 
-      {/* Sengaja di luar div "no-print" di atas — kalau ada di dalamnya, lembar ini
-          ikut disembunyikan saat print (display:none pada induk menang atas
-          visibility:visible di sini), akibatnya hasil cetak jadi halaman kosong. */}
       {dataCetak && (
         <KuitansiJasaPrintTemplate
           ref={printRef}
