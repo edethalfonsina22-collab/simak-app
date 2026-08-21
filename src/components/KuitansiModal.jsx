@@ -3,25 +3,57 @@ import { supabase } from '../lib/supabaseClient'
 import { X, Loader2, Printer } from 'lucide-react'
 import KuitansiPrintTemplate from '../lib/KuitansiPrintTemplate'
 
-const emptyForm = (keuanganRow) => ({
-  no_bukti: keuanganRow?.no_bukti || '',
-  lembar: 'I/II/III/IV/V',
-  mata_anggaran: keuanganRow?.mata_anggaran || '',
-  tahun_anggaran: String(new Date().getFullYear()),
-  tanggal: keuanganRow?.tanggal || new Date().toISOString().slice(0, 10),
-  diterima_dari: '',
-  jumlah: keuanganRow?.jumlah || '',
-  untuk_pembayaran: keuanganRow?.catatan || keuanganRow?.kategori || '',
-  catatan: '',
-  disetujui_oleh: '',
-  jabatan_disetujui: 'Atasan Langsung',
-  nip_disetujui: '',
-  dibayar_oleh: '',
-  jabatan_dibayar: 'Pemegang Kas',
-  nip_dibayar: '',
-  nama_penerima: '',
-  alamat_penerima: '',
-})
+// Kunci localStorage untuk mengingat isian tanda tangan terakhir (Setuju
+// Dibayar/NIP Penyetuju/Lunas Dibayar/NIP Pembayar) — orangnya biasanya
+// itu-itu saja (kepala sekolah & bendahara yang sama) tiap kuitansi dibuat,
+// jadi tidak perlu ketik ulang tiap kali. Tetap bisa diedit manual di form.
+const TTD_STORAGE_KEY = 'kuitansi_ttd_default'
+
+function ambilTtdTersimpan() {
+  try {
+    const raw = localStorage.getItem(TTD_STORAGE_KEY)
+    return raw ? JSON.parse(raw) : {}
+  } catch {
+    return {}
+  }
+}
+
+function simpanTtdDefault(form) {
+  try {
+    localStorage.setItem(TTD_STORAGE_KEY, JSON.stringify({
+      disetujui_oleh: form.disetujui_oleh,
+      nip_disetujui: form.nip_disetujui,
+      dibayar_oleh: form.dibayar_oleh,
+      nip_dibayar: form.nip_dibayar,
+    }))
+  } catch {
+    // localStorage tidak tersedia (mis. mode privat) — abaikan saja, form tetap
+    // berfungsi normal, hanya fitur "ingat isian" yang tidak aktif.
+  }
+}
+
+const emptyForm = (keuanganRow) => {
+  const ttdDefault = ambilTtdTersimpan()
+  return {
+    no_bukti: keuanganRow?.no_bukti || '',
+    lembar: 'I/II/III/IV/V',
+    mata_anggaran: keuanganRow?.mata_anggaran || '',
+    tahun_anggaran: String(new Date().getFullYear()),
+    tanggal: keuanganRow?.tanggal || new Date().toISOString().slice(0, 10),
+    diterima_dari: '',
+    jumlah: keuanganRow?.jumlah || '',
+    untuk_pembayaran: keuanganRow?.catatan || keuanganRow?.kategori || '',
+    catatan: '',
+    disetujui_oleh: ttdDefault.disetujui_oleh || '',
+    jabatan_disetujui: 'Atasan Langsung',
+    nip_disetujui: ttdDefault.nip_disetujui || '',
+    dibayar_oleh: ttdDefault.dibayar_oleh || '',
+    jabatan_dibayar: 'Pemegang Kas',
+    nip_dibayar: ttdDefault.nip_dibayar || '',
+    nama_penerima: '',
+    alamat_penerima: '',
+  }
+}
 
 /**
  * Form untuk membuat Kuitansi (khusus Kwitansi — bagian Nota belum didukung di sini).
@@ -37,8 +69,13 @@ const emptyForm = (keuanganRow) => ({
  *
  * keuanganRow juga dipakai untuk prefill dari alur "Tarik Data dari BKU" di
  * Kuitansi.jsx — baris bku_kas dipetakan ke bentuk yang sama di sana
- * ({ id, tanggal, jumlah, catatan, kategori, no_bukti, mata_anggaran })
- * sebelum dioper ke sini, supaya komponen ini tidak perlu tahu soal BKU.
+ * ({ tanggal, jumlah, catatan, kategori, no_bukti, mata_anggaran }, TANPA
+ * field id — lihat catatan di handleSimpan soal keuangan_id) sebelum dioper
+ * ke sini, supaya komponen ini tidak perlu tahu soal BKU.
+ *
+ * Field tanda tangan (disetujui_oleh/nip_disetujui/dibayar_oleh/nip_dibayar)
+ * diingat otomatis lewat localStorage (lihat TTD_STORAGE_KEY di atas) supaya
+ * tidak perlu diketik ulang tiap kali — orangnya biasanya sama terus.
  */
 export default function KuitansiModal({ keuanganRow, sekolah, onClose }) {
   const [form, setForm] = useState(emptyForm(keuanganRow))
@@ -58,6 +95,11 @@ export default function KuitansiModal({ keuanganRow, sekolah, onClose }) {
       if (nomorErr) throw nomorErr
 
       const payload = {
+        // PENTING: keuangan_id punya foreign key ke tabel `keuangan`. keuanganRow
+        // bisa juga datang dari alur "Tarik Data dari BKU" (baris tabel bku_kas,
+        // ID-nya BUKAN ID di tabel keuangan) — di situ Kuitansi.jsx sengaja TIDAK
+        // menyertakan field `id`, jadi keuanganRow?.id otomatis undefined -> null.
+        // Jangan pernah oper id baris bku_kas ke sini, nanti FK violation lagi.
         keuangan_id: keuanganRow?.id || null,
         jenis: 'kuitansi',
         nomor: nomorData,
@@ -82,6 +124,9 @@ export default function KuitansiModal({ keuanganRow, sekolah, onClose }) {
 
       const { data: inserted, error: insertErr } = await supabase.from('kuitansi').insert(payload).select().single()
       if (insertErr) throw insertErr
+
+      // Simpan 4 field tanda tangan sebagai default untuk kuitansi berikutnya.
+      simpanTtdDefault(form)
 
       setSavedData(inserted)
     } catch (err) {
@@ -191,7 +236,9 @@ export default function KuitansiModal({ keuanganRow, sekolah, onClose }) {
               />
             </div>
 
-            {/* ==== Tanda tangan ==== */}
+            {/* ==== Tanda tangan ====
+                4 field ini otomatis terisi dari isian terakhir (localStorage)
+                lewat emptyForm() di atas — tetap bisa diedit kalau orangnya beda. */}
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="label-field">Setuju Dibayar (nama)</label>
