@@ -5,7 +5,7 @@ import KuitansiJasaModal from '../components/KuitansiJasaModal'
 import PilihKuitansiModal from '../components/PilihKuitansiModal'
 import KuitansiJasaPrintTemplate from '../lib/KuitansiJasaPrintTemplate'
 import { terbilangRupiah } from '../lib/terbilang'
-import { Plus, Printer, Search, Loader2, Receipt, Trash2, Copy, ArrowDownToLine } from 'lucide-react'
+import { Plus, Printer, Search, Loader2, Receipt, Trash2, ArrowDownToLine } from 'lucide-react'
 
 function formatRupiah(angka) {
   return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(angka || 0)
@@ -21,15 +21,10 @@ export default function KuitansiJasa() {
   const [loading, setLoading] = useState(true)
   const [pencarian, setPencarian] = useState('')
   const [showBuat, setShowBuat] = useState(false)
+  const [showPilihKuitansi, setShowPilihKuitansi] = useState(false)
+  const [dataAwal, setDataAwal] = useState(null) // baris kuitansi hasil "Tarik dari Kuitansi", dioper ke KuitansiJasaModal
   const [sekolah, setSekolah] = useState(null)
   const [menghapus, setMenghapus] = useState(null) // id yang sedang dihapus
-
-  // Baris sumber saat user menekan tombol "Duplikat" — dipakai untuk pre-fill
-  // KuitansiJasaModal. null berarti form dibuka kosong seperti biasa.
-  const [duplikatDari, setDuplikatDari] = useState(null)
-
-  // Status modal "Tarik dari Kuitansi" (pilih data dari Kuitansi utama).
-  const [showPilih, setShowPilih] = useState(false)
 
   // Baris yang sedang dicetak ulang
   const [cetakUlang, setCetakUlang] = useState(null)
@@ -76,31 +71,6 @@ export default function KuitansiJasa() {
     setCetakUlang(row)
   }
 
-  // Membuka form "Buat Kuitansi Jasa" dengan Telah Terima Dari, Jumlah, dan
-  // Untuk Pembayaran/Keterangan sudah terisi dari baris yang dipilih — supaya
-  // transaksi berulang (transport kegiatan, honor, dsb.) tidak perlu diketik
-  // ulang dari nol. No. Bukti dan Tanggal tetap dikosongkan/direset di dalam
-  // modal karena keduanya harus baru untuk tiap transaksi.
-  function handleDuplikat(row) {
-    setDuplikatDari(row)
-    setShowBuat(true)
-  }
-
-  function handleBuatBaru() {
-    setDuplikatDari(null)
-    setShowBuat(true)
-  }
-
-  // Dipanggil dari PilihKuitansiModal saat user memilih satu kuitansi untuk
-  // ditarik datanya. KuitansiJasaModal sudah bisa membaca prop `initialData`
-  // (Nama, Jumlah, Keterangan langsung terisi; No. Bukti & Tanggal tetap
-  // dikosongkan karena harus baru).
-  function handleTarikData(row) {
-    setShowPilih(false)
-    setDuplikatDari(row)
-    setShowBuat(true)
-  }
-
   useEffect(() => {
     if (cetakUlang) {
       const t = setTimeout(() => {
@@ -125,8 +95,17 @@ export default function KuitansiJasa() {
 
   function handleTutupBuat() {
     setShowBuat(false)
-    setDuplikatDari(null)
+    setDataAwal(null)
     loadData()
+  }
+
+  // Dipanggil saat user memilih satu baris di modal "Tarik dari Kuitansi".
+  // Baris kuitansi (jenis='kuitansi') dipakai sebagai data awal untuk
+  // mengisi form Kuitansi Jasa secara otomatis.
+  function handlePilihKuitansi(row) {
+    setDataAwal(row)
+    setShowPilihKuitansi(false)
+    setShowBuat(true)
   }
 
   // Memetakan nama kolom tabel ke nama prop yang dipakai KuitansiJasaPrintTemplate,
@@ -139,7 +118,7 @@ export default function KuitansiJasa() {
         uang_sejumlah: terbilangRupiah(cetakUlang.jumlah_total),
         untuk_pembayaran: cetakUlang.untuk_pembayaran,
         jumlah: cetakUlang.jumlah_total,
-        alamat: cetakUlang.alamat_penerima,
+        nama_penerima: cetakUlang.nama_penerima,
       }
     : null
 
@@ -149,10 +128,10 @@ export default function KuitansiJasa() {
       subtitle="Riwayat kuitansi jasa (transport, honor kegiatan, dsb.)"
       actions={
         <>
-          <button className="btn-secondary" onClick={() => setShowPilih(true)}>
+          <button className="btn-secondary" onClick={() => setShowPilihKuitansi(true)}>
             <ArrowDownToLine size={16} /> Tarik dari Kuitansi
           </button>
-          <button className="btn-primary" onClick={handleBuatBaru}>
+          <button className="btn-primary" onClick={() => { setDataAwal(null); setShowBuat(true) }}>
             <Plus size={16} /> Buat Kuitansi Jasa
           </button>
         </>
@@ -210,13 +189,6 @@ export default function KuitansiJasa() {
                   <div className="flex items-center gap-1 justify-end">
                     <button
                       className="icon-btn"
-                      title="Duplikat (isi ulang dari transaksi ini)"
-                      onClick={() => handleDuplikat(d)}
-                    >
-                      <Copy size={15} />
-                    </button>
-                    <button
-                      className="icon-btn"
                       title="Cetak Ulang"
                       onClick={() => handleCetakUlang(d)}
                     >
@@ -238,18 +210,18 @@ export default function KuitansiJasa() {
         </table>
       </div>
 
-      {showBuat && (
-        <KuitansiJasaModal
-          sekolah={sekolah}
-          initialData={duplikatDari}
-          onClose={handleTutupBuat}
+      {showPilihKuitansi && (
+        <PilihKuitansiModal
+          onPilih={handlePilihKuitansi}
+          onClose={() => setShowPilihKuitansi(false)}
         />
       )}
 
-      {showPilih && (
-        <PilihKuitansiModal
-          onPilih={handleTarikData}
-          onClose={() => setShowPilih(false)}
+      {showBuat && (
+        <KuitansiJasaModal
+          sekolah={sekolah}
+          dataAwal={dataAwal}
+          onClose={handleTutupBuat}
         />
       )}
 
