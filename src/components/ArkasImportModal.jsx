@@ -10,12 +10,27 @@ import { Upload, X, Loader2, CheckCircle2, AlertCircle } from 'lucide-react'
  * no_urut, level, kode_kegiatan, kode_rekening, item_no, uraian, jumlah,
  * bosp_reguler_operasi, bosp_reguler_modal, bosp_daerah_operasi, bosp_daerah_modal,
  * afirmasi_kinerja_operasi, afirmasi_kinerja_modal, silpa_operasi, silpa_modal,
- * bosp_lainnya_operasi, bosp_lainnya_modal, is_item
+ * bosp_lainnya_operasi, bosp_lainnya_modal, is_item, tanggal (opsional)
  *
- * PENTING (diperbaiki): sebelum insert data baru, modal ini akan MENGHAPUS
- * dulu semua baris ARKAS untuk tahun_anggaran (& npsn) yang sama. Jadi
- * upload = "ganti total" data tahun itu, bukan "tambah terus" — supaya
- * tidak dobel walau file yang sama di-upload berkali-kali.
+ * Kolom "tanggal" (opsional, per baris) dipakai sebagai tanggal transaksi saat
+ * baris item disalin ke tabel `keuangan` — karena ARKAS bisa dibuat untuk
+ * tahun anggaran yang berbeda dari tahun berjalan saat file di-upload.
+ * Format yang didukung: YYYY-MM-DD, YYYY/MM/DD, DD-MM-YYYY, DD/MM/YYYY,
+ * atau tanggal Excel (cell bertipe Date). Kalau kolom ini kosong/tidak
+ * terbaca, dipakai fallback 1 Januari tahun_anggaran.
+ *
+ * PENTING: sebelum insert data baru, modal ini akan MENGHAPUS dulu:
+ *  1) semua baris ARKAS untuk tahun_anggaran (& npsn) yang sama di tabel
+ *     `arkas_anggaran` (detail lengkap, semua level/hirarki)
+ *  2) semua baris hasil impor ARKAS tahun ini di tabel `keuangan` (ditandai
+ *     lewat prefix "[ARKAS-<tahun>]" di kolom catatan)
+ * lalu insert ulang keduanya. Jadi upload = "ganti total" data tahun itu,
+ * bukan "tambah terus" — supaya tidak dobel walau file yang sama di-upload
+ * berkali-kali.
+ *
+ * Data yang masuk ke tabel `keuangan` hanya baris item (is_item = true)
+ * dengan jumlah > 0, supaya baris header/grup ARKAS tidak ikut terhitung
+ * dobel di ringkasan Pemasukan/Pengeluaran halaman Keuangan.
  *
  * Penggunaan di Keuangan.jsx:
  *   import ArkasImportModal from '../components/ArkasImportModal'
@@ -32,6 +47,8 @@ const NUMERIC_FIELDS = [
   'bosp_lainnya_operasi', 'bosp_lainnya_modal',
 ]
 
+const ARKAS_TAG_PREFIX = '[ARKAS-'
+
 function toNumber(val) {
   if (val === null || val === undefined || val === '') return 0
   if (typeof val === 'number') return val
@@ -40,8 +57,68 @@ function toNumber(val) {
   return Number.isFinite(n) ? n : 0
 }
 
+// Ambil nilai kolom dari raw row tanpa peduli besar/kecil huruf nama kolom
+// (mis. "Tanggal", "tanggal", "TANGGAL" dianggap sama).
+function getField(row, names) {
+  const keys = Object.keys(row)
+  for (const name of names) {
+    const found = keys.find((k) => k.trim().toLowerCase() === name.toLowerCase())
+    if (found !== undefined && row[found] !== '') return row[found]
+  }
+  return undefined
+}
+
+function pad2(n) {
+  return String(n).padStart(2, '0')
+}
+
+function formatDateISO(d) {
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`
+}
+
+// Excel menyimpan tanggal sebagai serial number (hari sejak 1899-12-30).
+function excelSerialToDate(serial) {
+  const utcDays = Math.floor(serial - 25569)
+  const utcValue = utcDays * 86400
+  return new Date(utcValue * 1000)
+}
+
+// Parse nilai kolom "tanggal" dari file impor. Mendukung:
+// - Date object (Excel dengan cellDates)
+// - Serial number Excel
+// - String "YYYY-MM-DD" / "YYYY/MM/DD"
+// - String "DD-MM-YYYY" / "DD/MM/YYYY"
+// Kalau gagal / kosong, fallback ke 1 Januari tahunFallback.
+function parseTanggal(val, tahunFallback) {
+  const fallback = `${tahunFallback}-01-01`
+  if (val === null || val === undefined || val === '') return fallback
+
+  if (val instanceof Date && !isNaN(val)) return formatDateISO(val)
+
+  if (typeof val === 'number') {
+    const d = excelSerialToDate(val)
+    return isNaN(d) ? fallback : formatDateISO(d)
+  }
+
+  const str = String(val).trim()
+
+  let m = str.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})$/)
+  if (m) {
+    const [, y, mo, d] = m
+    return `${y}-${pad2(mo)}-${pad2(d)}`
+  }
+
+  m = str.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})$/)
+  if (m) {
+    const [, d, mo, y] = m
+    return `${y}-${pad2(mo)}-${pad2(d)}`
+  }
+
+  return fallback
+}
+
 function normalizeRow(row, tahunAnggaran, npsn) {
-  const out = {
+  const arkas = {
     tahun_anggaran: tahunAnggaran,
     npsn: npsn || null,
     no_urut: row.no_urut ? parseInt(row.no_urut, 10) : null,
@@ -53,13 +130,34 @@ function normalizeRow(row, tahunAnggaran, npsn) {
     is_item: String(row.is_item).trim().toLowerCase() === 'true' || row.is_item === true,
     status: 'draft',
   }
-  for (const f of NUMERIC_FIELDS) out[f] = toNumber(row[f])
-  return out
+  for (const f of NUMERIC_FIELDS) arkas[f] = toNumber(row[f])
+
+  // tanggal HANYA dipakai untuk mapping ke tabel keuangan, tidak dikirim ke
+  // tabel arkas_anggaran (supaya tidak error kalau kolom itu tidak ada di sana).
+  const tanggalMentah = getField(row, ['tanggal', 'tanggal_transaksi'])
+  const tanggal = parseTanggal(tanggalMentah, tahunAnggaran)
+
+  return { arkas, tanggal }
+}
+
+// Mapping baris ARKAS -> baris ringkas untuk tabel keuangan.
+// Hanya dipakai untuk baris item (is_item true) dengan jumlah > 0.
+function toKeuanganRow({ arkas, tanggal }) {
+  const tag = `${ARKAS_TAG_PREFIX}${arkas.tahun_anggaran}]`
+  const kodeRek = arkas.kode_rekening ? ` (${arkas.kode_rekening})` : ''
+  return {
+    jenis: 'keluar',
+    kategori: 'Lainnya',
+    siswa_id: null,
+    jumlah: arkas.jumlah,
+    tanggal,
+    catatan: `${tag} ${arkas.uraian}${kodeRek}`.trim(),
+  }
 }
 
 export default function ArkasImportModal({ tahunAnggaran, npsn, onSelesai }) {
   const [open, setOpen] = useState(false)
-  const [rows, setRows] = useState([])
+  const [rows, setRows] = useState([]) // array of { arkas, tanggal }
   const [fileName, setFileName] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -89,7 +187,7 @@ export default function ArkasImportModal({ tahunAnggaran, npsn, onSelesai }) {
       const reader = new FileReader()
       reader.onload = (evt) => {
         try {
-          const wb = XLSX.read(evt.target.result, { type: 'binary' })
+          const wb = XLSX.read(evt.target.result, { type: 'binary', cellDates: true })
           const sheet = wb.Sheets[wb.SheetNames[0]]
           const json = XLSX.utils.sheet_to_json(sheet, { defval: '' })
           setRows(json.map((r) => normalizeRow(r, tahunAnggaran, npsn)))
@@ -105,7 +203,7 @@ export default function ArkasImportModal({ tahunAnggaran, npsn, onSelesai }) {
     if (rows.length === 0) return
 
     const konfirmasi = confirm(
-      `Data ARKAS tahun ${tahunAnggaran} yang sudah ada akan DIHAPUS dan diganti dengan ${rows.length} baris dari file ini. Lanjutkan?`
+      `Data ARKAS tahun ${tahunAnggaran} yang sudah ada (di tabel arkas_anggaran maupun di daftar Transaksi Keuangan) akan DIHAPUS dan diganti dengan ${rows.length} baris dari file ini. Lanjutkan?`
     )
     if (!konfirmasi) return
 
@@ -113,18 +211,27 @@ export default function ArkasImportModal({ tahunAnggaran, npsn, onSelesai }) {
     setError('')
 
     try {
-      // 1) Hapus dulu data ARKAS tahun ini (& npsn ini kalau ada) supaya
-      //    upload ulang tidak menumpuk jadi dobel.
-      let hapusQuery = supabase.from('arkas_anggaran').delete().eq('tahun_anggaran', tahunAnggaran)
-      if (npsn) hapusQuery = hapusQuery.eq('npsn', npsn)
-      const { error: hapusError } = await hapusQuery
-      if (hapusError) throw hapusError
+      // 1) Hapus dulu data ARKAS tahun ini (& npsn ini kalau ada) di tabel detail
+      //    arkas_anggaran, supaya upload ulang tidak menumpuk jadi dobel.
+      let hapusArkasQuery = supabase.from('arkas_anggaran').delete().eq('tahun_anggaran', tahunAnggaran)
+      if (npsn) hapusArkasQuery = hapusArkasQuery.eq('npsn', npsn)
+      const { error: hapusArkasError } = await hapusArkasQuery
+      if (hapusArkasError) throw hapusArkasError
 
-      // 2) Insert data baru per batch
+      // 2) Hapus juga baris hasil impor ARKAS tahun ini di tabel keuangan
+      //    (ditandai lewat prefix "[ARKAS-<tahun>]" pada kolom catatan).
+      const tagTahun = `${ARKAS_TAG_PREFIX}${tahunAnggaran}]%`
+      const { error: hapusKeuanganError } = await supabase
+        .from('keuangan')
+        .delete()
+        .ilike('catatan', tagTahun)
+      if (hapusKeuanganError) throw hapusKeuanganError
+
+      // 3) Insert data detail baru ke arkas_anggaran per batch
       const BATCH_SIZE = 200
       let insertedTotal = 0
       for (let i = 0; i < rows.length; i += BATCH_SIZE) {
-        const batch = rows.slice(i, i + BATCH_SIZE)
+        const batch = rows.slice(i, i + BATCH_SIZE).map((r) => r.arkas)
         const { error: insertError, data } = await supabase
           .from('arkas_anggaran')
           .insert(batch)
@@ -132,7 +239,26 @@ export default function ArkasImportModal({ tahunAnggaran, npsn, onSelesai }) {
         if (insertError) throw insertError
         insertedTotal += data?.length || 0
       }
-      setDone({ inserted: insertedTotal, total: rows.length })
+
+      // 4) Insert versi ringkas ke tabel keuangan supaya muncul di halaman
+      //    Keuangan/Transaksi. Hanya baris item (is_item true) dengan jumlah > 0,
+      //    tanggalnya mengikuti kolom "tanggal" pada file impor.
+      const keuanganRows = rows
+        .filter((r) => r.arkas.is_item && r.arkas.jumlah > 0)
+        .map(toKeuanganRow)
+
+      let keuanganInsertedTotal = 0
+      for (let i = 0; i < keuanganRows.length; i += BATCH_SIZE) {
+        const batch = keuanganRows.slice(i, i + BATCH_SIZE)
+        const { error: insertKeuanganError, data } = await supabase
+          .from('keuangan')
+          .insert(batch)
+          .select('id')
+        if (insertKeuanganError) throw insertKeuanganError
+        keuanganInsertedTotal += data?.length || 0
+      }
+
+      setDone({ inserted: insertedTotal, total: rows.length, keuangan: keuanganInsertedTotal })
       onSelesai?.()
     } catch (err) {
       setError('Gagal menyimpan ke database: ' + err.message)
@@ -160,7 +286,11 @@ export default function ArkasImportModal({ tahunAnggaran, npsn, onSelesai }) {
             <p className="text-sm text-ink-700/60 mb-3">
               Upload file CSV atau Excel hasil konversi Kertas Kerja ARKAS
               (pakai skrip <code>pdf_ke_csv_arkas.py</code> kalau sumbernya PDF).
-              <strong> Upload baru akan menggantikan seluruh data ARKAS tahun {tahunAnggaran} yang lama</strong>, bukan menambah.
+              Kalau file punya kolom <strong>tanggal</strong>, nilai itu dipakai sebagai
+              tanggal transaksi di Transaksi Keuangan (kalau kosong, dipakai 1 Januari
+              tahun anggaran).
+              <strong> Upload baru akan menggantikan seluruh data ARKAS tahun {tahunAnggaran} yang lama</strong>, baik
+              detail anggaran maupun ringkasannya di daftar Transaksi Keuangan.
             </p>
 
             <input
@@ -173,7 +303,7 @@ export default function ArkasImportModal({ tahunAnggaran, npsn, onSelesai }) {
             {fileName && (
               <div className="text-sm text-ink-700/70 mb-3">
                 File: <strong>{fileName}</strong> — {rows.length} baris terbaca
-                {' '}({rows.filter((r) => r.is_item).length} baris item)
+                {' '}({rows.filter((r) => r.arkas.is_item).length} baris item)
               </div>
             )}
 
@@ -183,6 +313,7 @@ export default function ArkasImportModal({ tahunAnggaran, npsn, onSelesai }) {
                   <thead className="bg-sage-50 sticky top-0">
                     <tr>
                       <th className="text-left p-1">Uraian</th>
+                      <th className="text-left p-1">Tanggal</th>
                       <th className="text-right p-1">Jumlah</th>
                       <th className="text-center p-1">Item?</th>
                     </tr>
@@ -190,9 +321,10 @@ export default function ArkasImportModal({ tahunAnggaran, npsn, onSelesai }) {
                   <tbody>
                     {rows.slice(0, 20).map((r, idx) => (
                       <tr key={idx} className="border-t">
-                        <td className="p-1">{r.uraian}</td>
-                        <td className="p-1 text-right">{r.jumlah.toLocaleString('id-ID')}</td>
-                        <td className="p-1 text-center">{r.is_item ? '✓' : ''}</td>
+                        <td className="p-1">{r.arkas.uraian}</td>
+                        <td className="p-1">{r.tanggal}</td>
+                        <td className="p-1 text-right">{r.arkas.jumlah.toLocaleString('id-ID')}</td>
+                        <td className="p-1 text-center">{r.arkas.is_item ? '✓' : ''}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -211,7 +343,8 @@ export default function ArkasImportModal({ tahunAnggaran, npsn, onSelesai }) {
 
             {done && (
               <div className="flex items-center gap-2 text-sm text-sage-600 mb-3">
-                <CheckCircle2 size={16} /> Berhasil! {done.inserted} dari {done.total} baris tersimpan (data lama tahun {tahunAnggaran} sudah diganti).
+                <CheckCircle2 size={16} /> Berhasil! {done.inserted} dari {done.total} baris tersimpan ke arkas_anggaran,
+                {' '}{done.keuangan} baris item masuk ke Transaksi Keuangan (data lama tahun {tahunAnggaran} sudah diganti).
               </div>
             )}
 
