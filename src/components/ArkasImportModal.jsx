@@ -1,32 +1,41 @@
 import { useState } from 'react'
 import Papa from 'papaparse'
-import * as XLSX from 'xlsx'
+import { parseArkasPdf } from '../lib/parseArkasPdf'
 import { supabase } from '../lib/supabaseClient'
 import { Upload, X, Loader2, CheckCircle2, AlertCircle } from 'lucide-react'
 
 /**
  * Tombol + Modal "Input Data Massal ARKAS"
- * Menerima file CSV (hasil pdf_ke_csv_arkas.py) atau Excel dengan kolom:
+ * Menerima file PDF Kertas Kerja RKAS/ARKAS asli (dibaca langsung di
+ * browser lewat parseArkasPdf, tidak perlu konversi manual lagi) atau file
+ * CSV dengan kolom:
  * no_urut, level, kode_kegiatan, kode_rekening, item_no, uraian, jumlah,
  * bosp_reguler_operasi, bosp_reguler_modal, bosp_daerah_operasi, bosp_daerah_modal,
  * afirmasi_kinerja_operasi, afirmasi_kinerja_modal, silpa_operasi, silpa_modal,
  * bosp_lainnya_operasi, bosp_lainnya_modal, is_item, tanggal (opsional)
  *
- * Kolom "tanggal" (opsional, per baris) dipakai sebagai tanggal transaksi saat
- * baris item disalin ke tabel `keuangan` — karena ARKAS bisa dibuat untuk
- * tahun anggaran yang berbeda dari tahun berjalan saat file di-upload.
- * Format yang didukung: YYYY-MM-DD, YYYY/MM/DD, DD-MM-YYYY, DD/MM/YYYY,
- * atau tanggal Excel (cell bertipe Date). Kalau kolom ini kosong/tidak
- * terbaca, dipakai fallback 1 Januari tahun_anggaran.
+ * TAHUN ANGGARAN & TANGGAL:
+ * - Untuk file PDF: tahun anggaran diambil otomatis dari teks
+ *   "TAHUN ANGGARAN : ####" di dalam PDF itu sendiri (BUKAN dari tahun
+ *   berjalan aplikasi/komputer, dan bukan dari dropdown Tahun Anggaran di
+ *   halaman Keuangan) — supaya tetap benar walau yang sedang dikerjakan
+ *   adalah ARKAS untuk tahun sebelumnya. Semua baris otomatis dapat
+ *   tanggal 1 Januari tahun tersebut, karena PDF tidak punya kolom tanggal
+ *   per baris.
+ * - Untuk file CSV: kolom "tanggal" (opsional, per baris) tetap dipakai
+ *   kalau ada; kalau kosong dipakai fallback 1 Januari dari prop
+ *   tahunAnggaran (nilai dropdown Tahun Anggaran di halaman Keuangan).
+ *   Format yang didukung: YYYY-MM-DD, YYYY/MM/DD, DD-MM-YYYY, DD/MM/YYYY.
  *
  * PENTING: sebelum insert data baru, modal ini akan MENGHAPUS dulu:
- *  1) semua baris ARKAS untuk tahun_anggaran (& npsn) yang sama di tabel
+ *  1) semua baris ARKAS untuk tahun anggaran (& npsn) yang sama di tabel
  *     `arkas_anggaran` (detail lengkap, semua level/hirarki)
  *  2) semua baris hasil impor ARKAS tahun ini di tabel `keuangan` (ditandai
  *     lewat prefix "[ARKAS-<tahun>]" di kolom catatan)
  * lalu insert ulang keduanya. Jadi upload = "ganti total" data tahun itu,
  * bukan "tambah terus" — supaya tidak dobel walau file yang sama di-upload
- * berkali-kali.
+ * berkali-kali. "Tahun" yang dipakai di sini adalah tahun anggaran efektif
+ * (hasil deteksi PDF kalau filenya PDF, atau prop tahunAnggaran kalau CSV).
  *
  * Data yang masuk ke tabel `keuangan` hanya baris item (is_item = true)
  * dengan jumlah > 0, supaya baris header/grup ARKAS tidak ikut terhitung
@@ -76,16 +85,16 @@ function formatDateISO(d) {
   return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`
 }
 
-// Excel menyimpan tanggal sebagai serial number (hari sejak 1899-12-30).
+// CSV kadang menyimpan tanggal sebagai serial number (hari sejak 1899-12-30).
 function excelSerialToDate(serial) {
   const utcDays = Math.floor(serial - 25569)
   const utcValue = utcDays * 86400
   return new Date(utcValue * 1000)
 }
 
-// Parse nilai kolom "tanggal" dari file impor. Mendukung:
-// - Date object (Excel dengan cellDates)
-// - Serial number Excel
+// Parse nilai kolom "tanggal" dari file CSV. Mendukung:
+// - Date object
+// - Serial number ala Excel
 // - String "YYYY-MM-DD" / "YYYY/MM/DD"
 // - String "DD-MM-YYYY" / "DD/MM/YYYY"
 // Kalau gagal / kosong, fallback ke 1 Januari tahunFallback.
@@ -117,7 +126,7 @@ function parseTanggal(val, tahunFallback) {
   return fallback
 }
 
-function normalizeRow(row, tahunAnggaran, npsn) {
+function normalizeCsvRow(row, tahunAnggaran, npsn) {
   const arkas = {
     tahun_anggaran: tahunAnggaran,
     npsn: npsn || null,
@@ -162,12 +171,19 @@ export default function ArkasImportModal({ tahunAnggaran, npsn, onSelesai }) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [done, setDone] = useState(null)
+  const [pdfMeta, setPdfMeta] = useState(null) // { tahunAnggaran, npsn } kalau sumbernya PDF
+
+  // Tahun anggaran yang benar-benar dipakai untuk hapus+insert: kalau file
+  // PDF, pakai tahun yang terdeteksi dari isi PDF (bukan dropdown halaman
+  // Keuangan) supaya tetap benar walau sedang mengerjakan ARKAS tahun lalu.
+  const tahunEfektif = pdfMeta?.tahunAnggaran || tahunAnggaran
 
   function resetState() {
     setRows([])
     setFileName('')
     setError('')
     setDone(null)
+    setPdfMeta(null)
   }
 
   function handleFile(e) {
@@ -176,26 +192,26 @@ export default function ArkasImportModal({ tahunAnggaran, npsn, onSelesai }) {
     resetState()
     setFileName(file.name)
 
-    if (file.name.toLowerCase().endsWith('.csv')) {
+    const lower = file.name.toLowerCase()
+
+    if (lower.endsWith('.csv')) {
       Papa.parse(file, {
         header: true,
         skipEmptyLines: true,
-        complete: (result) => setRows(result.data.map((r) => normalizeRow(r, tahunAnggaran, npsn))),
+        complete: (result) => setRows(result.data.map((r) => normalizeCsvRow(r, tahunAnggaran, npsn))),
         error: (err) => setError('Gagal membaca CSV: ' + err.message),
       })
+    } else if (lower.endsWith('.pdf')) {
+      setLoading(true)
+      parseArkasPdf(file, tahunAnggaran, npsn)
+        .then(({ rows: parsedRows, tahunAnggaran: tahunTerdeteksi, npsn: npsnTerdeteksi }) => {
+          setRows(parsedRows)
+          setPdfMeta({ tahunAnggaran: tahunTerdeteksi, npsn: npsnTerdeteksi })
+        })
+        .catch((err) => setError('Gagal membaca PDF: ' + err.message))
+        .finally(() => setLoading(false))
     } else {
-      const reader = new FileReader()
-      reader.onload = (evt) => {
-        try {
-          const wb = XLSX.read(evt.target.result, { type: 'binary', cellDates: true })
-          const sheet = wb.Sheets[wb.SheetNames[0]]
-          const json = XLSX.utils.sheet_to_json(sheet, { defval: '' })
-          setRows(json.map((r) => normalizeRow(r, tahunAnggaran, npsn)))
-        } catch (err) {
-          setError('Gagal membaca Excel: ' + err.message)
-        }
-      }
-      reader.readAsBinaryString(file)
+      setError('Format file tidak didukung. Upload file .pdf (Kertas Kerja ARKAS asli) atau .csv.')
     }
   }
 
@@ -203,7 +219,7 @@ export default function ArkasImportModal({ tahunAnggaran, npsn, onSelesai }) {
     if (rows.length === 0) return
 
     const konfirmasi = confirm(
-      `Data ARKAS tahun ${tahunAnggaran} yang sudah ada (di tabel arkas_anggaran maupun di daftar Transaksi Keuangan) akan DIHAPUS dan diganti dengan ${rows.length} baris dari file ini. Lanjutkan?`
+      `Data ARKAS tahun ${tahunEfektif} yang sudah ada (di tabel arkas_anggaran maupun di daftar Transaksi Keuangan) akan DIHAPUS dan diganti dengan ${rows.length} baris dari file ini. Lanjutkan?`
     )
     if (!konfirmasi) return
 
@@ -213,14 +229,14 @@ export default function ArkasImportModal({ tahunAnggaran, npsn, onSelesai }) {
     try {
       // 1) Hapus dulu data ARKAS tahun ini (& npsn ini kalau ada) di tabel detail
       //    arkas_anggaran, supaya upload ulang tidak menumpuk jadi dobel.
-      let hapusArkasQuery = supabase.from('arkas_anggaran').delete().eq('tahun_anggaran', tahunAnggaran)
+      let hapusArkasQuery = supabase.from('arkas_anggaran').delete().eq('tahun_anggaran', tahunEfektif)
       if (npsn) hapusArkasQuery = hapusArkasQuery.eq('npsn', npsn)
       const { error: hapusArkasError } = await hapusArkasQuery
       if (hapusArkasError) throw hapusArkasError
 
       // 2) Hapus juga baris hasil impor ARKAS tahun ini di tabel keuangan
       //    (ditandai lewat prefix "[ARKAS-<tahun>]" pada kolom catatan).
-      const tagTahun = `${ARKAS_TAG_PREFIX}${tahunAnggaran}]%`
+      const tagTahun = `${ARKAS_TAG_PREFIX}${tahunEfektif}]%`
       const { error: hapusKeuanganError } = await supabase
         .from('keuangan')
         .delete()
@@ -284,23 +300,39 @@ export default function ArkasImportModal({ tahunAnggaran, npsn, onSelesai }) {
             </div>
 
             <p className="text-sm text-ink-700/60 mb-3">
-              Upload file CSV atau Excel hasil konversi Kertas Kerja ARKAS
-              (pakai skrip <code>pdf_ke_csv_arkas.py</code> kalau sumbernya PDF).
-              Kalau file punya kolom <strong>tanggal</strong>, nilai itu dipakai sebagai
-              tanggal transaksi di Transaksi Keuangan (kalau kosong, dipakai 1 Januari
-              tahun anggaran).
-              <strong> Upload baru akan menggantikan seluruh data ARKAS tahun {tahunAnggaran} yang lama</strong>, baik
+              Upload file <strong>PDF Kertas Kerja RKAS/ARKAS</strong> asli (langsung dibaca
+              di sini, tidak perlu konversi manual), atau file <strong>CSV</strong> hasil
+              ekspor manual. Tahun anggaran & tanggal transaksi untuk file PDF diambil otomatis
+              dari isi PDF itu sendiri, bukan dari tahun berjalan aplikasi — jadi tetap benar
+              walau yang sedang diimpor adalah ARKAS untuk tahun sebelumnya.
+              <strong> Upload baru akan menggantikan seluruh data ARKAS tahun itu yang lama</strong>, baik
               detail anggaran maupun ringkasannya di daftar Transaksi Keuangan.
             </p>
 
             <input
               type="file"
-              accept=".csv,.xlsx,.xls"
+              accept=".pdf,.csv"
               onChange={handleFile}
               className="input-field mb-3"
             />
 
-            {fileName && (
+            {pdfMeta && (
+              <div className="text-sm mb-3 p-2 rounded-lg bg-sage-50 text-ink-700/80">
+                Terdeteksi dari PDF: <strong>Tahun Anggaran {pdfMeta.tahunAnggaran}</strong>
+                {pdfMeta.npsn ? <> · NPSN {pdfMeta.npsn}</> : null}
+                {String(tahunAnggaran) !== String(pdfMeta.tahunAnggaran) && (
+                  <div className="flex items-center gap-2 text-amber-600 mt-1">
+                    <AlertCircle size={14} />
+                    Tahun ini beda dengan filter Tahun Anggaran ({tahunAnggaran}) yang lagi
+                    dipilih di halaman Keuangan. Data akan disimpan sebagai tahun{' '}
+                    <strong>{pdfMeta.tahunAnggaran}</strong> mengikuti isi PDF — pastikan itu
+                    memang tahun yang dimaksud.
+                  </div>
+                )}
+              </div>
+            )}
+
+            {fileName && !loading && (
               <div className="text-sm text-ink-700/70 mb-3">
                 File: <strong>{fileName}</strong> — {rows.length} baris terbaca
                 {' '}({rows.filter((r) => r.arkas.is_item).length} baris item)
@@ -344,7 +376,7 @@ export default function ArkasImportModal({ tahunAnggaran, npsn, onSelesai }) {
             {done && (
               <div className="flex items-center gap-2 text-sm text-sage-600 mb-3">
                 <CheckCircle2 size={16} /> Berhasil! {done.inserted} dari {done.total} baris tersimpan ke arkas_anggaran,
-                {' '}{done.keuangan} baris item masuk ke Transaksi Keuangan (data lama tahun {tahunAnggaran} sudah diganti).
+                {' '}{done.keuangan} baris item masuk ke Transaksi Keuangan (data lama tahun {tahunEfektif} sudah diganti).
               </div>
             )}
 
