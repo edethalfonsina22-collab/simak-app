@@ -71,9 +71,10 @@ function normalizeRow(row) {
     pengeluaran: toNumber(row.pengeluaran),
     kode_kegiatan: (row.kode_kegiatan || '').trim() || null,
     kode_rekening: (row.kode_rekening || '').trim() || null,
-    jumlah_barang: row.jumlah_barang !== undefined && row.jumlah_barang !== ''
-      ? toNumber(row.jumlah_barang)
-      : null,
+    jumlah_barang: (() => {
+      const v = row.jumlah_barang ?? row.JumlahBarang ?? row['Jumlah Barang'] ?? row['Jumlah_Barang']
+      return v !== undefined && v !== '' ? toNumber(v) : null
+    })(),
     saldo_dokumen: row.saldo_dokumen !== undefined && row.saldo_dokumen !== ''
       ? toNumber(row.saldo_dokumen)
       : null,
