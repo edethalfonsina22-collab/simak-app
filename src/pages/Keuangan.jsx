@@ -145,6 +145,18 @@ export default function Keuangan() {
     else alert('Gagal menghapus: ' + error.message)
   }
 
+  // Hapus satu baris ARKAS
+  async function handleHapusArkas(id) {
+    if (!confirm('Hapus baris ARKAS ini?')) return
+    const { error } = await supabase.from('arkas_anggaran').delete().eq('id', id)
+    if (!error) {
+      loadArkasData()
+    } else {
+      alert('Gagal menghapus: ' + error.message)
+    }
+  }
+
+  // Hapus semua baris ARKAS untuk tahun yang sedang dipilih
   async function handleHapusSemuaArkas() {
     if (arkasData.length === 0) return
     const konfirmasi = confirm(
@@ -172,6 +184,49 @@ export default function Keuangan() {
       )
     } else {
       alert(`Berhasil menghapus ${jumlahTerhapus} baris ARKAS tahun ${tahun}.`)
+    }
+  }
+
+  // Hapus satu baris BKU
+  async function handleHapusBku(id) {
+    if (!confirm('Hapus baris BKU ini?')) return
+    const { error } = await supabase.from('bku_kas').delete().eq('id', id)
+    if (!error) {
+      loadBkuData()
+    } else {
+      alert('Gagal menghapus: ' + error.message)
+    }
+  }
+
+  // Hapus semua baris BKU untuk bulan & tahun yang sedang dipilih
+  async function handleHapusSemuaBku() {
+    if (bkuData.length === 0) return
+    const konfirmasi = confirm(
+      `Semua data BKU bulan ${NAMA_BULAN[bulan - 1]} ${tahun} (${bkuData.length} baris) akan DIHAPUS PERMANEN. Tindakan ini tidak bisa dibatalkan. Lanjutkan?`
+    )
+    if (!konfirmasi) return
+    setLoadingBku(true)
+    const { error, data: rowsHapus } = await supabase
+      .from('bku_kas')
+      .delete()
+      .eq('tahun', tahun)
+      .eq('bulan', bulan)
+      .select('id')
+    setLoadingBku(false)
+    if (error) {
+      alert('Gagal menghapus: ' + error.message)
+      return
+    }
+    const jumlahTerhapus = rowsHapus?.length || 0
+    loadBkuData()
+    if (jumlahTerhapus === 0) {
+      alert(
+        'Tidak ada baris yang terhapus. Kemungkinan izin akses (RLS di Supabase) memblokir, ' +
+        'atau data bulan/tahun di database tidak cocok. ' +
+        'Coba hapus langsung lewat SQL Editor Supabase kalau ini terus terjadi.'
+      )
+    } else {
+      alert(`Berhasil menghapus ${jumlahTerhapus} baris BKU bulan ${NAMA_BULAN[bulan - 1]} ${tahun}.`)
     }
   }
 
@@ -254,6 +309,13 @@ export default function Keuangan() {
           </>
         ) : (
           <>
+            <button
+              className="btn-secondary text-red-600"
+              onClick={handleHapusSemuaBku}
+              disabled={bkuData.length === 0 || loadingBku}
+            >
+              <Trash2 size={16} /> Hapus Semua
+            </button>
             <button className="btn-secondary" onClick={handleExportBkuPDF}><FileDown size={16} /> Ekspor PDF</button>
             <BkuImportModal bulan={bulan} tahun={tahun} onSelesai={loadBkuData} />
           </>
@@ -379,12 +441,13 @@ export default function Keuangan() {
                 <th>Uraian</th>
                 <th>Jumlah</th>
                 <th>Status</th>
+                <th></th>
               </tr>
             </thead>
             <tbody>
-              {loadingArkas && <tr><td colSpan={5} className="text-center py-8 text-ink-700/50">Memuat data...</td></tr>}
+              {loadingArkas && <tr><td colSpan={6} className="text-center py-8 text-ink-700/50">Memuat data...</td></tr>}
               {!loadingArkas && arkasData.length === 0 && (
-                <tr><td colSpan={5} className="text-center py-8 text-ink-700/50">
+                <tr><td colSpan={6} className="text-center py-8 text-ink-700/50">
                   Belum ada data ARKAS tahun {tahun}. Klik "Input Data Massal ARKAS" untuk mengunggah CSV/Excel hasil konversi PDF.
                 </td></tr>
               )}
@@ -395,6 +458,13 @@ export default function Keuangan() {
                   <td className={r.is_item ? '' : 'font-medium'}>{r.uraian}</td>
                   <td className="font-medium">{formatRupiah(r.jumlah)}</td>
                   <td>{r.status}</td>
+                  <td>
+                    <div className="flex items-center justify-end">
+                      <button className="icon-btn text-red-600" onClick={() => handleHapusArkas(r.id)}>
+                        <Trash2 size={15} />
+                      </button>
+                    </div>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -446,12 +516,13 @@ export default function Keuangan() {
                   <th>Penerimaan</th>
                   <th>Pengeluaran</th>
                   <th>Saldo</th>
+                  <th></th>
                 </tr>
               </thead>
               <tbody>
-                {loadingBku && <tr><td colSpan={7} className="text-center py-8 text-ink-700/50">Memuat data...</td></tr>}
+                {loadingBku && <tr><td colSpan={8} className="text-center py-8 text-ink-700/50">Memuat data...</td></tr>}
                 {!loadingBku && bkuData.length === 0 && (
-                  <tr><td colSpan={7} className="text-center py-8 text-ink-700/50">
+                  <tr><td colSpan={8} className="text-center py-8 text-ink-700/50">
                     Belum ada data BKU bulan {NAMA_BULAN[bulan - 1]} {tahun}. Klik "Input Data Massal BKU" untuk mengunggah CSV/Excel hasil konversi PDF.
                   </td></tr>
                 )}
@@ -468,6 +539,13 @@ export default function Keuangan() {
                         <td>{r.penerimaan ? formatRupiah(r.penerimaan) : '-'}</td>
                         <td>{r.pengeluaran ? formatRupiah(r.pengeluaran) : '-'}</td>
                         <td className="font-medium">{formatRupiah(saldoBerjalan)}</td>
+                        <td>
+                          <div className="flex items-center justify-end">
+                            <button className="icon-btn text-red-600" onClick={() => handleHapusBku(r.id)}>
+                              <Trash2 size={15} />
+                            </button>
+                          </div>
+                        </td>
                       </tr>
                     )
                   })
