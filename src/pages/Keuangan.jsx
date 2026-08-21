@@ -442,15 +442,16 @@ export default function Keuangan() {
                   <th>Tanggal</th>
                   <th>No. Bukti</th>
                   <th>Uraian</th>
+                  <th>Jumlah Barang</th>
                   <th>Penerimaan</th>
                   <th>Pengeluaran</th>
                   <th>Saldo</th>
                 </tr>
               </thead>
               <tbody>
-                {loadingBku && <tr><td colSpan={6} className="text-center py-8 text-ink-700/50">Memuat data...</td></tr>}
+                {loadingBku && <tr><td colSpan={7} className="text-center py-8 text-ink-700/50">Memuat data...</td></tr>}
                 {!loadingBku && bkuData.length === 0 && (
-                  <tr><td colSpan={6} className="text-center py-8 text-ink-700/50">
+                  <tr><td colSpan={7} className="text-center py-8 text-ink-700/50">
                     Belum ada data BKU bulan {NAMA_BULAN[bulan - 1]} {tahun}. Klik "Input Data Massal BKU" untuk mengunggah CSV/Excel hasil konversi PDF.
                   </td></tr>
                 )}
@@ -463,6 +464,7 @@ export default function Keuangan() {
                         <td>{r.tanggal}</td>
                         <td>{r.no_bukti || '-'}</td>
                         <td>{r.uraian || '-'}</td>
+                        <td>{r.jumlah_barang ?? '-'}</td>
                         <td>{r.penerimaan ? formatRupiah(r.penerimaan) : '-'}</td>
                         <td>{r.pengeluaran ? formatRupiah(r.pengeluaran) : '-'}</td>
                         <td className="font-medium">{formatRupiah(saldoBerjalan)}</td>
