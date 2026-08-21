@@ -152,10 +152,27 @@ export default function Keuangan() {
     )
     if (!konfirmasi) return
     setLoadingArkas(true)
-    const { error } = await supabase.from('arkas_anggaran').delete().eq('tahun_anggaran', String(tahun))
+    const { error, data: rowsHapus } = await supabase
+      .from('arkas_anggaran')
+      .delete()
+      .eq('tahun_anggaran', String(tahun))
+      .select('id')
     setLoadingArkas(false)
-    if (!error) loadArkasData()
-    else alert('Gagal menghapus: ' + error.message)
+    if (error) {
+      alert('Gagal menghapus: ' + error.message)
+      return
+    }
+    const jumlahTerhapus = rowsHapus?.length || 0
+    loadArkasData()
+    if (jumlahTerhapus === 0) {
+      alert(
+        'Tidak ada baris yang terhapus. Kemungkinan izin akses (RLS di Supabase) memblokir, ' +
+        'atau data tahun_anggaran di database tidak persis "' + tahun + '". ' +
+        'Coba hapus langsung lewat SQL Editor Supabase kalau ini terus terjadi.'
+      )
+    } else {
+      alert(`Berhasil menghapus ${jumlahTerhapus} baris ARKAS tahun ${tahun}.`)
+    }
   }
 
   const totalMasuk = data.filter((d) => d.jenis === 'masuk').reduce((a, b) => a + Number(b.jumlah), 0)
