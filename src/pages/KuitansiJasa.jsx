@@ -101,7 +101,7 @@ export default function KuitansiJasa() {
 
   // Dipanggil saat user memilih satu baris di modal "Tarik dari Kuitansi".
   // Baris kuitansi (jenis='kuitansi') dipakai sebagai data awal untuk
-  // mengisi form Kuitansi Jasa secara otomatis.
+  // mengisi form Kuitansi Jasa secara otomatis, termasuk No. Bukti.
   function handlePilihKuitansi(row) {
     setDataAwal(row)
     setShowPilihKuitansi(false)
