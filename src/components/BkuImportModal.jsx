@@ -2,7 +2,7 @@ import { useState } from 'react'
 import Papa from 'papaparse'
 import * as XLSX from 'xlsx'
 import { supabase } from '../lib/supabaseClient'
-import { Upload, X, Loader2, CheckCircle2, AlertCircle, AlertTriangle } from 'lucide-react'
+import { Upload, X, Loader2, CheckCircle2, AlertCircle, AlertTriangle, Download } from 'lucide-react'
 
 /**
  * Tombol + Modal "Input Data Massal BKU"
@@ -28,6 +28,31 @@ import { Upload, X, Loader2, CheckCircle2, AlertCircle, AlertTriangle } from 'lu
  *   ...
  *   <BkuImportModal bulan={bulan} tahun={tahun} onSelesai={loadBkuData} />
  */
+
+const TEMPLATE_HEADERS = [
+  'tanggal', 'no_bukti', 'uraian', 'penerimaan', 'pengeluaran',
+  'kode_kegiatan', 'kode_rekening', 'saldo_dokumen',
+]
+
+// Baris contoh, sekadar menunjukkan format yang benar (boleh dihapus user).
+const TEMPLATE_CONTOH = [
+  ['2025-01-21', 'BBU01', 'Terima Dana BOSP Tahap 1 2025', '46050000', '0', '', '', ''],
+  ['2025-09-01', 'BNU01', 'KELAS II (BUKU SISWA) Tema 5 Pengalamanku', '0', '170000', '05.02.03.', '5.1.02.03.05.00.01', ''],
+]
+
+function unduhTemplateBku() {
+  const baris = [TEMPLATE_HEADERS, ...TEMPLATE_CONTOH]
+  const csv = baris.map((r) => r.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\r\n')
+  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = 'template-bku.csv'
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  URL.revokeObjectURL(url)
+}
 
 function toNumber(val) {
   if (val === null || val === undefined || val === '') return 0
@@ -223,6 +248,14 @@ export default function BkuImportModal({ tahun, bulan, npsn, onSelesai }) {
               root repo). <strong>Upload baru akan menggantikan data BKU pada bulan-bulan yang ada di file ini</strong>,
               bukan menambah.
             </p>
+
+            <button
+              type="button"
+              className="btn-secondary w-full mb-3 justify-center"
+              onClick={unduhTemplateBku}
+            >
+              <Download size={16} /> Unduh Template CSV
+            </button>
 
             <input
               type="file"
