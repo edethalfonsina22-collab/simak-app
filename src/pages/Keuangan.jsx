@@ -3,13 +3,22 @@ import { supabase } from '../lib/supabaseClient'
 import Layout from '../components/Layout'
 import { eksporExcel, eksporPDF } from '../lib/exportUtils'
 import ArkasImportModal from '../components/ArkasImportModal'
+import BkuImportModal from '../components/BkuImportModal'
 import {
   Plus, Pencil, Trash2, X, Loader2, TrendingUp, TrendingDown, Wallet,
-  FileDown, FileSpreadsheet,
+  FileDown, FileSpreadsheet, BookOpen, ClipboardList,
 } from 'lucide-react'
 
 const KATEGORI_MASUK = ['SPP', 'Donasi', 'Dana BOS', 'Sumbangan', 'Lainnya']
 const KATEGORI_KELUAR = ['Gaji/Honor', 'ATK', 'Listrik & Air', 'Perawatan Gedung', 'Kegiatan Siswa', 'Lainnya']
+
+const MENU_TABS = [
+  { key: 'transaksi', label: 'Transaksi', icon: Wallet },
+  { key: 'arkas', label: 'ARKAS', icon: ClipboardList },
+  { key: 'bku', label: 'BKU', icon: BookOpen },
+]
+
+const NAMA_BULAN = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember']
 
 const emptyForm = {
   jenis: 'masuk',
@@ -26,8 +35,11 @@ function formatRupiah(angka) {
 
 export default function Keuangan() {
   const now = new Date()
+  const [menu, setMenu] = useState('transaksi') // 'transaksi' | 'arkas' | 'bku'
   const [bulan, setBulan] = useState(now.getMonth() + 1)
   const [tahun, setTahun] = useState(now.getFullYear())
+
+  // Tab Transaksi
   const [data, setData] = useState([])
   const [siswaList, setSiswaList] = useState([])
   const [loading, setLoading] = useState(true)
@@ -35,6 +47,14 @@ export default function Keuangan() {
   const [editingId, setEditingId] = useState(null)
   const [form, setForm] = useState(emptyForm)
   const [saving, setSaving] = useState(false)
+
+  // Tab ARKAS
+  const [arkasData, setArkasData] = useState([])
+  const [loadingArkas, setLoadingArkas] = useState(false)
+
+  // Tab BKU
+  const [bkuData, setBkuData] = useState([])
+  const [loadingBku, setLoadingBku] = useState(false)
 
   async function loadData() {
     setLoading(true)
@@ -51,10 +71,35 @@ export default function Keuangan() {
     setLoading(false)
   }
 
+  async function loadArkasData() {
+    setLoadingArkas(true)
+    const { data: rows } = await supabase
+      .from('arkas_anggaran')
+      .select('*')
+      .eq('tahun_anggaran', String(tahun))
+      .order('no_urut', { ascending: true })
+    setArkasData(rows || [])
+    setLoadingArkas(false)
+  }
+
+  async function loadBkuData() {
+    setLoadingBku(true)
+    const { data: rows } = await supabase
+      .from('bku_kas')
+      .select('*')
+      .eq('tahun', tahun)
+      .eq('bulan', bulan)
+      .order('tanggal', { ascending: true })
+    setBkuData(rows || [])
+    setLoadingBku(false)
+  }
+
   useEffect(() => {
-    loadData()
+    if (menu === 'transaksi') loadData()
+    if (menu === 'arkas') loadArkasData()
+    if (menu === 'bku') loadBkuData()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [bulan, tahun])
+  }, [menu, bulan, tahun])
 
   useEffect(() => {
     supabase.from('siswa').select('id, nama_lengkap').order('nama_lengkap').then(({ data }) => setSiswaList(data || []))
@@ -104,6 +149,9 @@ export default function Keuangan() {
   const totalKeluar = data.filter((d) => d.jenis === 'keluar').reduce((a, b) => a + Number(b.jumlah), 0)
   const saldo = totalMasuk - totalKeluar
 
+  const totalPenerimaanBku = bkuData.reduce((a, b) => a + Number(b.penerimaan || 0), 0)
+  const totalPengeluaranBku = bkuData.reduce((a, b) => a + Number(b.pengeluaran || 0), 0)
+
   function handleExportPDF() {
     const kolom = ['Tanggal', 'Jenis', 'Kategori', 'Keterangan', 'Jumlah']
     const baris = data.map((d) => [
@@ -134,25 +182,68 @@ export default function Keuangan() {
     )
   }
 
+  function handleExportBkuPDF() {
+    const kolom = ['Tanggal', 'No. Bukti', 'Uraian', 'Penerimaan', 'Pengeluaran', 'Saldo']
+    let saldoBerjalan = 0
+    const baris = bkuData.map((d) => {
+      saldoBerjalan += Number(d.penerimaan || 0) - Number(d.pengeluaran || 0)
+      return [
+        d.tanggal,
+        d.no_bukti || '-',
+        d.uraian || '-',
+        d.penerimaan ? formatRupiah(d.penerimaan) : '-',
+        d.pengeluaran ? formatRupiah(d.pengeluaran) : '-',
+        formatRupiah(saldoBerjalan),
+      ]
+    })
+    baris.push(['', '', 'Total', formatRupiah(totalPenerimaanBku), formatRupiah(totalPengeluaranBku), formatRupiah(saldoBerjalan)])
+    eksporPDF(`Buku Kas Umum — ${NAMA_BULAN[bulan - 1]} ${tahun}`, kolom, baris, `bku-${tahun}-${bulan}`)
+  }
+
   return (
     <Layout
       title="Keuangan Sekolah"
       subtitle="Kas & SPP"
       actions={
-        <>
-          <button className="btn-secondary" onClick={handleExportPDF}><FileDown size={16} /> PDF</button>
-          <button className="btn-secondary" onClick={handleExportExcel}><FileSpreadsheet size={16} /> Excel</button>
-          <ArkasImportModal tahunAnggaran={String(tahun)} />
-          <button className="btn-primary" onClick={openAdd}><Plus size={16} /> Tambah Transaksi</button>
-        </>
+        menu === 'transaksi' ? (
+          <>
+            <button className="btn-secondary" onClick={handleExportPDF}><FileDown size={16} /> PDF</button>
+            <button className="btn-secondary" onClick={handleExportExcel}><FileSpreadsheet size={16} /> Excel</button>
+            <button className="btn-primary" onClick={openAdd}><Plus size={16} /> Tambah Transaksi</button>
+          </>
+        ) : menu === 'arkas' ? (
+          <ArkasImportModal tahunAnggaran={String(tahun)} onSelesai={loadArkasData} />
+        ) : (
+          <>
+            <button className="btn-secondary" onClick={handleExportBkuPDF}><FileDown size={16} /> Ekspor PDF</button>
+            <BkuImportModal bulan={bulan} tahun={tahun} onSelesai={loadBkuData} />
+          </>
+        )
       }
     >
+      {/* Menu tab */}
+      <div className="flex gap-1 mb-4 border-b border-ink-950/10">
+        {MENU_TABS.map(({ key, label, icon: Icon }) => (
+          <button
+            key={key}
+            onClick={() => setMenu(key)}
+            className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors ${
+              menu === key
+                ? 'border-brass-500 text-brass-600'
+                : 'border-transparent text-ink-700/60 hover:text-ink-950'
+            }`}
+          >
+            <Icon size={16} />
+            {label}
+          </button>
+        ))}
+      </div>
+
       <div className="card p-4 mb-4 flex flex-wrap gap-3 items-end">
         <div>
           <label className="label-field">Bulan</label>
           <select className="input-field" value={bulan} onChange={(e) => setBulan(Number(e.target.value))}>
-            {['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember']
-              .map((n, i) => <option key={n} value={i + 1}>{n}</option>)}
+            {NAMA_BULAN.map((n, i) => <option key={n} value={i + 1}>{n}</option>)}
           </select>
         </div>
         <div>
@@ -161,78 +252,192 @@ export default function Keuangan() {
         </div>
       </div>
 
-      <div className="grid sm:grid-cols-3 gap-4 mb-5">
-        <div className="card p-5 flex items-center gap-4">
-          <div className="w-11 h-11 rounded-lg bg-sage-500/10 flex items-center justify-center text-sage-500">
-            <TrendingUp size={20} />
+      {/* ===== TAB: TRANSAKSI ===== */}
+      {menu === 'transaksi' && (
+        <>
+          <div className="grid sm:grid-cols-3 gap-4 mb-5">
+            <div className="card p-5 flex items-center gap-4">
+              <div className="w-11 h-11 rounded-lg bg-sage-500/10 flex items-center justify-center text-sage-500">
+                <TrendingUp size={20} />
+              </div>
+              <div>
+                <p className="text-xs text-ink-700/50">Total Pemasukan</p>
+                <p className="font-display text-lg font-semibold text-ink-950">{formatRupiah(totalMasuk)}</p>
+              </div>
+            </div>
+            <div className="card p-5 flex items-center gap-4">
+              <div className="w-11 h-11 rounded-lg bg-red-50 flex items-center justify-center text-red-600">
+                <TrendingDown size={20} />
+              </div>
+              <div>
+                <p className="text-xs text-ink-700/50">Total Pengeluaran</p>
+                <p className="font-display text-lg font-semibold text-ink-950">{formatRupiah(totalKeluar)}</p>
+              </div>
+            </div>
+            <div className="card p-5 flex items-center gap-4">
+              <div className="w-11 h-11 rounded-lg bg-brass-400/20 flex items-center justify-center text-brass-600">
+                <Wallet size={20} />
+              </div>
+              <div>
+                <p className="text-xs text-ink-700/50">Saldo Bulan Ini</p>
+                <p className="font-display text-lg font-semibold text-ink-950">{formatRupiah(saldo)}</p>
+              </div>
+            </div>
           </div>
-          <div>
-            <p className="text-xs text-ink-700/50">Total Pemasukan</p>
-            <p className="font-display text-lg font-semibold text-ink-950">{formatRupiah(totalMasuk)}</p>
-          </div>
-        </div>
-        <div className="card p-5 flex items-center gap-4">
-          <div className="w-11 h-11 rounded-lg bg-red-50 flex items-center justify-center text-red-600">
-            <TrendingDown size={20} />
-          </div>
-          <div>
-            <p className="text-xs text-ink-700/50">Total Pengeluaran</p>
-            <p className="font-display text-lg font-semibold text-ink-950">{formatRupiah(totalKeluar)}</p>
-          </div>
-        </div>
-        <div className="card p-5 flex items-center gap-4">
-          <div className="w-11 h-11 rounded-lg bg-brass-400/20 flex items-center justify-center text-brass-600">
-            <Wallet size={20} />
-          </div>
-          <div>
-            <p className="text-xs text-ink-700/50">Saldo Bulan Ini</p>
-            <p className="font-display text-lg font-semibold text-ink-950">{formatRupiah(saldo)}</p>
-          </div>
-        </div>
-      </div>
 
-      <div className="card overflow-x-auto">
-        <table className="table-shell">
-          <thead>
-            <tr>
-              <th>Tanggal</th>
-              <th>Jenis</th>
-              <th>Kategori</th>
-              <th>Keterangan</th>
-              <th>Jumlah</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading && <tr><td colSpan={6} className="text-center py-8 text-ink-700/50">Memuat data...</td></tr>}
-            {!loading && data.length === 0 && (
-              <tr><td colSpan={6} className="text-center py-8 text-ink-700/50">Belum ada transaksi bulan ini.</td></tr>
-            )}
-            {data.map((d) => (
-              <tr key={d.id}>
-                <td>{d.tanggal}</td>
-                <td>
-                  <span className={`text-xs px-2 py-1 rounded-full font-medium ${
-                    d.jenis === 'masuk' ? 'bg-sage-500/10 text-sage-500' : 'bg-red-50 text-red-700'
-                  }`}>
-                    {d.jenis === 'masuk' ? 'Masuk' : 'Keluar'}
-                  </span>
-                </td>
-                <td>{d.kategori}</td>
-                <td>{d.siswa?.nama_lengkap || d.catatan || '-'}</td>
-                <td className="font-medium">{formatRupiah(d.jumlah)}</td>
-                <td>
-                  <div className="flex items-center gap-1 justify-end">
-                    <button className="icon-btn" onClick={() => openEdit(d)}><Pencil size={15} /></button>
-                    <button className="icon-btn text-red-600" onClick={() => handleDelete(d.id)}><Trash2 size={15} /></button>
-                  </div>
-                </td>
+          <div className="card overflow-x-auto">
+            <table className="table-shell">
+              <thead>
+                <tr>
+                  <th>Tanggal</th>
+                  <th>Jenis</th>
+                  <th>Kategori</th>
+                  <th>Keterangan</th>
+                  <th>Jumlah</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {loading && <tr><td colSpan={6} className="text-center py-8 text-ink-700/50">Memuat data...</td></tr>}
+                {!loading && data.length === 0 && (
+                  <tr><td colSpan={6} className="text-center py-8 text-ink-700/50">Belum ada transaksi bulan ini.</td></tr>
+                )}
+                {data.map((d) => (
+                  <tr key={d.id}>
+                    <td>{d.tanggal}</td>
+                    <td>
+                      <span className={`text-xs px-2 py-1 rounded-full font-medium ${
+                        d.jenis === 'masuk' ? 'bg-sage-500/10 text-sage-500' : 'bg-red-50 text-red-700'
+                      }`}>
+                        {d.jenis === 'masuk' ? 'Masuk' : 'Keluar'}
+                      </span>
+                    </td>
+                    <td>{d.kategori}</td>
+                    <td>{d.siswa?.nama_lengkap || d.catatan || '-'}</td>
+                    <td className="font-medium">{formatRupiah(d.jumlah)}</td>
+                    <td>
+                      <div className="flex items-center gap-1 justify-end">
+                        <button className="icon-btn" onClick={() => openEdit(d)}><Pencil size={15} /></button>
+                        <button className="icon-btn text-red-600" onClick={() => handleDelete(d.id)}><Trash2 size={15} /></button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+
+      {/* ===== TAB: ARKAS ===== */}
+      {menu === 'arkas' && (
+        <div className="card overflow-x-auto">
+          <table className="table-shell">
+            <thead>
+              <tr>
+                <th>Kode Rekening</th>
+                <th>Kode Kegiatan</th>
+                <th>Uraian</th>
+                <th>Jumlah</th>
+                <th>Status</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+            </thead>
+            <tbody>
+              {loadingArkas && <tr><td colSpan={5} className="text-center py-8 text-ink-700/50">Memuat data...</td></tr>}
+              {!loadingArkas && arkasData.length === 0 && (
+                <tr><td colSpan={5} className="text-center py-8 text-ink-700/50">
+                  Belum ada data ARKAS tahun {tahun}. Klik "Input Data Massal ARKAS" untuk mengunggah CSV/Excel hasil konversi PDF.
+                </td></tr>
+              )}
+              {arkasData.map((r) => (
+                <tr key={r.id}>
+                  <td>{r.kode_rekening || '-'}</td>
+                  <td>{r.kode_kegiatan || '-'}</td>
+                  <td className={r.is_item ? '' : 'font-medium'}>{r.uraian}</td>
+                  <td className="font-medium">{formatRupiah(r.jumlah)}</td>
+                  <td>{r.status}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
 
+      {/* ===== TAB: BKU ===== */}
+      {menu === 'bku' && (
+        <>
+          <div className="grid sm:grid-cols-3 gap-4 mb-5">
+            <div className="card p-5 flex items-center gap-4">
+              <div className="w-11 h-11 rounded-lg bg-sage-500/10 flex items-center justify-center text-sage-500">
+                <TrendingUp size={20} />
+              </div>
+              <div>
+                <p className="text-xs text-ink-700/50">Total Penerimaan</p>
+                <p className="font-display text-lg font-semibold text-ink-950">{formatRupiah(totalPenerimaanBku)}</p>
+              </div>
+            </div>
+            <div className="card p-5 flex items-center gap-4">
+              <div className="w-11 h-11 rounded-lg bg-red-50 flex items-center justify-center text-red-600">
+                <TrendingDown size={20} />
+              </div>
+              <div>
+                <p className="text-xs text-ink-700/50">Total Pengeluaran</p>
+                <p className="font-display text-lg font-semibold text-ink-950">{formatRupiah(totalPengeluaranBku)}</p>
+              </div>
+            </div>
+            <div className="card p-5 flex items-center gap-4">
+              <div className="w-11 h-11 rounded-lg bg-brass-400/20 flex items-center justify-center text-brass-600">
+                <Wallet size={20} />
+              </div>
+              <div>
+                <p className="text-xs text-ink-700/50">Saldo Akhir Bulan</p>
+                <p className="font-display text-lg font-semibold text-ink-950">{formatRupiah(totalPenerimaanBku - totalPengeluaranBku)}</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="card overflow-x-auto">
+            <table className="table-shell">
+              <thead>
+                <tr>
+                  <th>Tanggal</th>
+                  <th>No. Bukti</th>
+                  <th>Uraian</th>
+                  <th>Penerimaan</th>
+                  <th>Pengeluaran</th>
+                  <th>Saldo</th>
+                </tr>
+              </thead>
+              <tbody>
+                {loadingBku && <tr><td colSpan={6} className="text-center py-8 text-ink-700/50">Memuat data...</td></tr>}
+                {!loadingBku && bkuData.length === 0 && (
+                  <tr><td colSpan={6} className="text-center py-8 text-ink-700/50">
+                    Belum ada data BKU bulan {NAMA_BULAN[bulan - 1]} {tahun}. Klik "Input Data Massal BKU" untuk mengunggah CSV/Excel hasil konversi PDF.
+                  </td></tr>
+                )}
+                {(() => {
+                  let saldoBerjalan = 0
+                  return bkuData.map((r) => {
+                    saldoBerjalan += Number(r.penerimaan || 0) - Number(r.pengeluaran || 0)
+                    return (
+                      <tr key={r.id}>
+                        <td>{r.tanggal}</td>
+                        <td>{r.no_bukti || '-'}</td>
+                        <td>{r.uraian || '-'}</td>
+                        <td>{r.penerimaan ? formatRupiah(r.penerimaan) : '-'}</td>
+                        <td>{r.pengeluaran ? formatRupiah(r.pengeluaran) : '-'}</td>
+                        <td className="font-medium">{formatRupiah(saldoBerjalan)}</td>
+                      </tr>
+                    )
+                  })
+                })()}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+
+      {/* Modal tambah/ubah transaksi (tab Transaksi) */}
       {showForm && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-xl w-full max-w-lg p-6">
