@@ -5,7 +5,7 @@ import KuitansiJasaPrintTemplate from '../lib/KuitansiJasaPrintTemplate'
 import { terbilangRupiah } from '../lib/terbilang'
 
 const emptyForm = (dataAwal) => ({
-  no_bukti: '',
+  no_bukti: dataAwal?.no_bukti || '',
   tanggal: dataAwal?.tanggal || new Date().toISOString().slice(0, 10),
   diterima_dari: dataAwal?.diterima_dari || '',
   jumlah: dataAwal?.jumlah_total || '',
@@ -25,9 +25,8 @@ const emptyForm = (dataAwal) => ({
  *
  * dataAwal (opsional): baris kuitansi (jenis='kuitansi') hasil "Tarik dari
  * Kuitansi" — dipakai untuk mengisi form otomatis. Field yang dipetakan:
- * tanggal, diterima_dari, untuk_pembayaran, jumlah_total, nama_penerima.
- * No. Bukti SENGAJA tidak ikut ditarik karena penomoran kuitansi jasa
- * berdiri sendiri dari kuitansi asal.
+ * no_bukti, tanggal, diterima_dari, untuk_pembayaran, jumlah_total,
+ * nama_penerima.
  *
  * Dipanggil dari KuitansiJasa.jsx:
  *   <KuitansiJasaModal sekolah={{ nama, alamat, kota }} dataAwal={row} onClose={...} />
@@ -73,11 +72,15 @@ export default function KuitansiJasaModal({ sekolah, dataAwal, onClose }) {
 
   useEffect(() => {
     if (savedData) {
+      // beri waktu render sebelum memanggil print dialog
       const t = setTimeout(() => window.print(), 150)
       return () => clearTimeout(t)
     }
   }, [savedData])
 
+  // Data yang dioper ke template cetak — memetakan nama kolom tabel (nomor,
+  // diterima_dari, jumlah_total) ke nama prop yang dipakai KuitansiJasaPrintTemplate
+  // (no_kwitansi, dari, uang_sejumlah, jumlah).
   const dataCetak = savedData
     ? {
         no_kwitansi: savedData.nomor,
@@ -179,6 +182,9 @@ export default function KuitansiJasaModal({ sekolah, dataAwal, onClose }) {
         </div>
       </div>
 
+      {/* Sengaja di luar div "no-print" di atas — kalau ada di dalamnya, lembar ini
+          ikut disembunyikan saat print (display:none pada induk menang atas
+          visibility:visible di sini), akibatnya hasil cetak jadi halaman kosong. */}
       {dataCetak && (
         <KuitansiJasaPrintTemplate
           ref={printRef}
