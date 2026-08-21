@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabaseClient'
 import Layout from '../components/Layout'
-import { Save, Loader2, CheckCircle2, ImagePlus, PenTool } from 'lucide-react'
+import { Save, Loader2, CheckCircle2, ImagePlus, PenTool, Trash2 } from 'lucide-react'
 
 const emptyForm = {
   nama_sekolah: '',
@@ -128,6 +128,26 @@ export default function ProfilSekolah() {
     setUploadingTtd(false)
   }
 
+  // Hapus tanda tangan elektronik kepala sekolah — menghapus file dari
+  // storage (kalau ada) lalu mengosongkan state & field form terkait.
+  async function handleTtdDelete() {
+    if (!confirm('Hapus tanda tangan kepala sekolah?')) return
+
+    if (form.ttd_kepala_sekolah_path) {
+      const { error } = await supabase.storage
+        .from('profil-sekolah')
+        .remove([form.ttd_kepala_sekolah_path])
+
+      if (error) {
+        alert('Gagal menghapus tanda tangan: ' + error.message)
+        return
+      }
+    }
+
+    setTtdUrl('')
+    setForm((f) => ({ ...f, ttd_kepala_sekolah_path: '' }))
+  }
+
   function ubah(field, value) {
     setForm({ ...form, [field]: value })
   }
@@ -178,11 +198,24 @@ export default function ProfilSekolah() {
               )}
             </div>
             <div>
-              <label className="btn-secondary cursor-pointer inline-flex">
-                {uploadingTtd ? <Loader2 size={16} className="animate-spin" /> : <PenTool size={16} />}
-                {uploadingTtd ? 'Mengunggah...' : 'Upload Tanda Tangan'}
-                <input type="file" accept="image/*" className="hidden" onChange={handleTtdChange} disabled={uploadingTtd} />
-              </label>
+              <div className="flex items-center gap-2">
+                <label className="btn-secondary cursor-pointer inline-flex">
+                  {uploadingTtd ? <Loader2 size={16} className="animate-spin" /> : <PenTool size={16} />}
+                  {uploadingTtd ? 'Mengunggah...' : 'Upload Tanda Tangan'}
+                  <input type="file" accept="image/*" className="hidden" onChange={handleTtdChange} disabled={uploadingTtd} />
+                </label>
+
+                {ttdUrl && (
+                  <button
+                    type="button"
+                    onClick={handleTtdDelete}
+                    className="btn-secondary inline-flex items-center gap-1.5 text-red-600"
+                  >
+                    <Trash2 size={16} />
+                    Hapus
+                  </button>
+                )}
+              </div>
               <p className="text-xs text-ink-700/50 mt-1.5">
                 Gunakan PNG dengan latar transparan agar rapi. Sekali diunggah, tanda tangan ini otomatis
                 terpasang di setiap Surat Keterangan Izin/Cuti yang dicetak untuk pengajuan yang sudah disetujui.
