@@ -2,27 +2,28 @@ import { useState } from 'react'
 import Papa from 'papaparse'
 import * as XLSX from 'xlsx'
 import { supabase } from '../lib/supabaseClient'
-import { Upload, X, Loader2, CheckCircle2, AlertCircle } from 'lucide-react'
+import { Upload, X, Loader2, CheckCircle2, AlertCircle, AlertTriangle } from 'lucide-react'
 
 /**
- * Tombol + Modal "Input Data Massal BKU (Buku Kas Umum)"
- * Menerima file CSV (hasil pdf_ke_csv_bku.py) atau Excel dengan kolom:
- * tanggal, no_bukti, uraian, penerimaan, pengeluaran
+ * Tombol + Modal "Input Data Massal BKU"
+ * Menerima CSV/Excel hasil konversi PDF BKU Pembantu Bank lewat
+ * pdf_ke_csv_bku.py (lihat file itu di root repo untuk cara pakai).
  *
- * Catatan format sumber:
- *  - tanggal harus berformat YYYY-MM-DD (kalau file sumber pakai format
- *    lain, ubah dulu di skrip konversi atau di file sebelum diupload)
- *  - penerimaan / pengeluaran boleh kosong untuk salah satu (baris
- *    penerimaan mengisi kolom penerimaan saja, baris pengeluaran mengisi
- *    kolom pengeluaran saja), nilai kosong dianggap 0
+ * Kolom yang dibaca dari file:
+ *   tanggal, no_bukti, uraian, penerimaan, pengeluaran,
+ *   kode_kegiatan, kode_rekening, saldo_dokumen
+ * (saldo_dokumen dipakai HANYA untuk validasi silang, tidak disimpan
+ * ke database — saldo berjalan selalu dihitung ulang dari penerimaan
+ * dan pengeluaran tiap kali halaman Keuangan dibuka.)
  *
- * PENTING (mengikuti pola ArkasImportModal): sebelum insert data baru,
- * modal ini akan MENGHAPUS dulu semua baris BKU untuk bulan & tahun yang
- * sama (& npsn kalau ada). Jadi upload = "ganti total" data bulan itu,
- * bukan "tambah terus" — supaya tidak dobel walau file yang sama
- * di-upload berkali-kali.
+ * Upload akan MENGHAPUS dulu data bku_kas pada tahun+bulan yang sama
+ * dengan baris-baris di file, baru insert ulang — supaya upload
+ * berkali-kali tidak menumpuk jadi dobel. Satu file boleh berisi lebih
+ * dari satu bulan (mis. rekap satu tahun penuh); tiap baris dikelompokkan
+ * ke bulan sesuai tanggalnya sendiri, bukan filter Bulan yang aktif di
+ * halaman.
  *
- * Penggunaan di Keuangan.jsx:
+ * Penggunaan di Keuangan.jsx (sudah ada di file itu):
  *   import BkuImportModal from '../components/BkuImportModal'
  *   ...
  *   <BkuImportModal bulan={bulan} tahun={tahun} onSelesai={loadBkuData} />
@@ -36,43 +37,32 @@ function toNumber(val) {
   return Number.isFinite(n) ? n : 0
 }
 
-function normalizeTanggal(val) {
-  if (!val) return null
-  const s = String(val).trim()
-  // Sudah format YYYY-MM-DD
-  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s
-  // Format DD/MM/YYYY atau DD-MM-YYYY
-  const m = s.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/)
-  if (m) {
-    const [, d, mo, y] = m
-    return `${y}-${mo.padStart(2, '0')}-${d.padStart(2, '0')}`
-  }
-  return s
-}
-
-function normalizeRow(row, bulan, tahun, npsn) {
+function normalizeRow(row) {
   return {
-    tahun: Number(tahun),
-    bulan: Number(bulan),
-    npsn: npsn || null,
-    tanggal: normalizeTanggal(row.tanggal),
-    no_bukti: (row.no_bukti || '').toString().trim() || null,
-    uraian: (row.uraian || '').toString().trim(),
+    tanggal: (row.tanggal || '').trim(),
+    no_bukti: (row.no_bukti || '').trim() || null,
+    uraian: (row.uraian || '').trim(),
     penerimaan: toNumber(row.penerimaan),
     pengeluaran: toNumber(row.pengeluaran),
-    // Kolom tambahan opsional — hanya terisi kalau sumbernya CSV hasil
-    // pdf_ke_csv_bku.py (yang menyertakan kode_kegiatan/kode_rekening
-    // dari PDF BKU Pembantu Bank). Kalau file CSV/Excel tidak punya
-    // kolom ini, nilainya otomatis kosong dan tidak masalah.
-    kode_kegiatan: (row.kode_kegiatan || '').toString().trim() || null,
-    kode_rekening: (row.kode_rekening || '').toString().trim() || null,
-    status: 'draft',
+    kode_kegiatan: (row.kode_kegiatan || '').trim() || null,
+    kode_rekening: (row.kode_rekening || '').trim() || null,
+    saldo_dokumen: row.saldo_dokumen !== undefined && row.saldo_dokumen !== ''
+      ? toNumber(row.saldo_dokumen)
+      : null,
   }
 }
 
-export default function BkuImportModal({ bulan, tahun, npsn, onSelesai }) {
+function tahunBulanDari(tanggal) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(tanggal)
+  if (!m) return null
+  return { tahun: parseInt(m[1], 10), bulan: parseInt(m[2], 10) }
+}
+
+export default function BkuImportModal({ tahun, bulan, npsn, onSelesai }) {
   const [open, setOpen] = useState(false)
   const [rows, setRows] = useState([])
+  const [invalidCount, setInvalidCount] = useState(0)
+  const [mismatchCount, setMismatchCount] = useState(0)
   const [fileName, setFileName] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -80,47 +70,84 @@ export default function BkuImportModal({ bulan, tahun, npsn, onSelesai }) {
 
   function resetState() {
     setRows([])
+    setInvalidCount(0)
+    setMismatchCount(0)
     setFileName('')
     setError('')
     setDone(null)
   }
 
-  function handleFile(e) {
+  function processRows(rawRows) {
+    const normalized = rawRows.map(normalizeRow)
+    const valid = normalized.filter((r) => tahunBulanDari(r.tanggal) && r.uraian)
+    setInvalidCount(normalized.length - valid.length)
+
+    // Validasi silang: hitung ulang saldo berjalan per bulan lalu
+    // bandingkan dengan saldo_dokumen dari PDF, supaya salah parse
+    // ketahuan sebelum data disimpan ke database.
+    const saldoBerjalan = new Map()
+    let mismatches = 0
+    valid.forEach((r) => {
+      const { tahun: ty, bulan: bm } = tahunBulanDari(r.tanggal)
+      const key = `${ty}-${bm}`
+      const prev = saldoBerjalan.get(key) || 0
+      const next = prev + r.penerimaan - r.pengeluaran
+      saldoBerjalan.set(key, next)
+      if (r.saldo_dokumen !== null && Math.round(next) !== Math.round(r.saldo_dokumen)) {
+        mismatches += 1
+      }
+    })
+    setMismatchCount(mismatches)
+    setRows(valid)
+  }
+
+  async function handleFile(e) {
     const file = e.target.files?.[0]
     if (!file) return
     resetState()
     setFileName(file.name)
 
-    if (file.name.toLowerCase().endsWith('.csv')) {
+    const lower = file.name.toLowerCase()
+
+    if (lower.endsWith('.csv')) {
       Papa.parse(file, {
         header: true,
         skipEmptyLines: true,
-        complete: (result) => setRows(result.data.map((r) => normalizeRow(r, bulan, tahun, npsn))),
+        complete: (result) => processRows(result.data),
         error: (err) => setError('Gagal membaca CSV: ' + err.message),
       })
-    } else {
+      return
+    }
+
+    if (lower.endsWith('.xlsx') || lower.endsWith('.xls')) {
       const reader = new FileReader()
       reader.onload = (evt) => {
         try {
           const wb = XLSX.read(evt.target.result, { type: 'binary' })
           const sheet = wb.Sheets[wb.SheetNames[0]]
           const json = XLSX.utils.sheet_to_json(sheet, { defval: '' })
-          setRows(json.map((r) => normalizeRow(r, bulan, tahun, npsn)))
+          processRows(json)
         } catch (err) {
           setError('Gagal membaca Excel: ' + err.message)
         }
       }
       reader.readAsBinaryString(file)
+      return
     }
+
+    setError('Format file tidak dikenali. Gunakan file .csv atau .xlsx hasil konversi pdf_ke_csv_bku.py.')
   }
+
+  const kelompok = [...new Set(rows.map((r) => {
+    const { tahun: ty, bulan: bm } = tahunBulanDari(r.tanggal)
+    return `${ty}-${String(bm).padStart(2, '0')}`
+  }))].sort()
 
   async function handleImport() {
     if (rows.length === 0) return
 
-    const namaBulan = ['', 'Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'][bulan]
-
     const konfirmasi = confirm(
-      `Data BKU bulan ${namaBulan} ${tahun} yang sudah ada akan DIHAPUS dan diganti dengan ${rows.length} baris dari file ini. Lanjutkan?`
+      `Data BKU pada ${kelompok.length} bulan (${kelompok.join(', ')}) yang sudah ada akan DIHAPUS dan diganti dengan ${rows.length} baris dari file ini. Lanjutkan?`
     )
     if (!konfirmasi) return
 
@@ -128,18 +155,37 @@ export default function BkuImportModal({ bulan, tahun, npsn, onSelesai }) {
     setError('')
 
     try {
-      // 1) Hapus dulu data BKU bulan & tahun ini (& npsn ini kalau ada)
+      // 1) Hapus dulu data pada bulan-bulan yang tersentuh file ini,
       //    supaya upload ulang tidak menumpuk jadi dobel.
-      let hapusQuery = supabase.from('bku_kas').delete().eq('tahun', Number(tahun)).eq('bulan', Number(bulan))
-      if (npsn) hapusQuery = hapusQuery.eq('npsn', npsn)
-      const { error: hapusError } = await hapusQuery
-      if (hapusError) throw hapusError
+      for (const key of kelompok) {
+        const [ty, bm] = key.split('-').map(Number)
+        let hapusQuery = supabase.from('bku_kas').delete().eq('tahun', ty).eq('bulan', bm)
+        if (npsn) hapusQuery = hapusQuery.eq('npsn', npsn)
+        const { error: hapusError } = await hapusQuery
+        if (hapusError) throw hapusError
+      }
 
       // 2) Insert data baru per batch
+      const payload = rows.map((r) => {
+        const { tahun: ty, bulan: bm } = tahunBulanDari(r.tanggal)
+        return {
+          npsn: npsn || null,
+          tahun: ty,
+          bulan: bm,
+          tanggal: r.tanggal,
+          no_bukti: r.no_bukti,
+          uraian: r.uraian,
+          kode_kegiatan: r.kode_kegiatan,
+          kode_rekening: r.kode_rekening,
+          penerimaan: r.penerimaan,
+          pengeluaran: r.pengeluaran,
+        }
+      })
+
       const BATCH_SIZE = 200
       let insertedTotal = 0
-      for (let i = 0; i < rows.length; i += BATCH_SIZE) {
-        const batch = rows.slice(i, i + BATCH_SIZE)
+      for (let i = 0; i < payload.length; i += BATCH_SIZE) {
+        const batch = payload.slice(i, i + BATCH_SIZE)
         const { error: insertError, data } = await supabase
           .from('bku_kas')
           .insert(batch)
@@ -147,7 +193,7 @@ export default function BkuImportModal({ bulan, tahun, npsn, onSelesai }) {
         if (insertError) throw insertError
         insertedTotal += data?.length || 0
       }
-      setDone({ inserted: insertedTotal, total: rows.length })
+      setDone({ inserted: insertedTotal, total: payload.length })
       onSelesai?.()
     } catch (err) {
       setError('Gagal menyimpan ke database: ' + err.message)
@@ -158,7 +204,7 @@ export default function BkuImportModal({ bulan, tahun, npsn, onSelesai }) {
 
   return (
     <>
-      <button className="btn-primary" onClick={() => setOpen(true)}>
+      <button className="btn-secondary" onClick={() => setOpen(true)}>
         <Upload size={16} /> Input Data Massal BKU
       </button>
 
@@ -173,11 +219,9 @@ export default function BkuImportModal({ bulan, tahun, npsn, onSelesai }) {
             </div>
 
             <p className="text-sm text-ink-700/60 mb-3">
-              Upload file CSV atau Excel hasil konversi Buku Kas Umum
-              (pakai skrip <code>pdf_ke_csv_bku.py</code> kalau sumbernya PDF).
-              Kolom wajib: <code>tanggal, no_bukti, uraian, penerimaan, pengeluaran</code>.
-              Kolom <code>kode_kegiatan</code> dan <code>kode_rekening</code> ikut tersimpan kalau ada.
-              <strong> Upload baru akan menggantikan seluruh data BKU bulan ini yang lama</strong>, bukan menambah.
+              Upload file CSV/Excel hasil konversi PDF BKU Pembantu Bank (lihat <code>pdf_ke_csv_bku.py</code> di
+              root repo). <strong>Upload baru akan menggantikan data BKU pada bulan-bulan yang ada di file ini</strong>,
+              bukan menambah.
             </p>
 
             <input
@@ -189,7 +233,25 @@ export default function BkuImportModal({ bulan, tahun, npsn, onSelesai }) {
 
             {fileName && (
               <div className="text-sm text-ink-700/70 mb-3">
-                File: <strong>{fileName}</strong> — {rows.length} baris terbaca
+                File: <strong>{fileName}</strong> — {rows.length} baris siap diimpor
+                {kelompok.length > 0 && <> ({kelompok.length} bulan: {kelompok.join(', ')})</>}
+              </div>
+            )}
+
+            {invalidCount > 0 && (
+              <div className="flex items-start gap-2 text-sm text-amber-700 bg-amber-50 rounded-lg p-2 mb-3">
+                <AlertTriangle size={16} className="mt-0.5 shrink-0" />
+                <span>{invalidCount} baris dilewati karena tanggal atau uraian kosong/tidak valid.</span>
+              </div>
+            )}
+
+            {mismatchCount > 0 && (
+              <div className="flex items-start gap-2 text-sm text-amber-700 bg-amber-50 rounded-lg p-2 mb-3">
+                <AlertTriangle size={16} className="mt-0.5 shrink-0" />
+                <span>
+                  {mismatchCount} baris punya saldo berjalan hasil hitung yang beda dari saldo di PDF asli.
+                  Kemungkinan ada baris yang salah terbaca — sebaiknya dicek dulu sebelum disimpan.
+                </span>
               </div>
             )}
 
@@ -207,10 +269,10 @@ export default function BkuImportModal({ bulan, tahun, npsn, onSelesai }) {
                   <tbody>
                     {rows.slice(0, 20).map((r, idx) => (
                       <tr key={idx} className="border-t">
-                        <td className="p-1">{r.tanggal || '-'}</td>
+                        <td className="p-1">{r.tanggal}</td>
                         <td className="p-1">{r.uraian}</td>
-                        <td className="p-1 text-right">{r.penerimaan ? r.penerimaan.toLocaleString('id-ID') : ''}</td>
-                        <td className="p-1 text-right">{r.pengeluaran ? r.pengeluaran.toLocaleString('id-ID') : ''}</td>
+                        <td className="p-1 text-right">{r.penerimaan ? r.penerimaan.toLocaleString('id-ID') : '-'}</td>
+                        <td className="p-1 text-right">{r.pengeluaran ? r.pengeluaran.toLocaleString('id-ID') : '-'}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -229,7 +291,7 @@ export default function BkuImportModal({ bulan, tahun, npsn, onSelesai }) {
 
             {done && (
               <div className="flex items-center gap-2 text-sm text-sage-600 mb-3">
-                <CheckCircle2 size={16} /> Berhasil! {done.inserted} dari {done.total} baris tersimpan (data lama bulan ini sudah diganti).
+                <CheckCircle2 size={16} /> Berhasil! {done.inserted} dari {done.total} baris tersimpan.
               </div>
             )}
 
