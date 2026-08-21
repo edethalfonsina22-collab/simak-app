@@ -142,7 +142,7 @@ export default function Keuangan() {
         <>
           <button className="btn-secondary" onClick={handleExportPDF}><FileDown size={16} /> PDF</button>
           <button className="btn-secondary" onClick={handleExportExcel}><FileSpreadsheet size={16} /> Excel</button>
-          <ArkasImportModal tahunAnggaran={String(tahun)} onSelesai={loadData} />
+          <ArkasImportModal tahunAnggaran={String(tahun)} />
           <button className="btn-primary" onClick={openAdd}><Plus size={16} /> Tambah Transaksi</button>
         </>
       }
