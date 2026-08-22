@@ -43,6 +43,8 @@ import PengajuanEditSiswa from './pages/PengajuanEditSiswa'
 import HariLibur from './pages/HariLibur'
 import Rapat from './pages/Rapat'
 import RapatVideo from './pages/RapatVideo'
+import Ijazah from './pages/Ijazah'
+import SuratKeteranganLulus from './pages/SuratKeteranganLulus'
 import Loader from './components/Loader'
 
 function ProtectedRoute({ children, adminOnly }) {
@@ -110,6 +112,8 @@ export default function App() {
       <Route path="/nilai" element={<ProtectedRoute><Nilai /></ProtectedRoute>} />
       <Route path="/rapor" element={<ProtectedRoute><Rapor /></ProtectedRoute>} />
       <Route path="/rapor/cetak" element={<ProtectedRoute><RaporCetak /></ProtectedRoute>} />
+      <Route path="/ijazah" element={<ProtectedRoute><Ijazah /></ProtectedRoute>} />
+      <Route path="/skl" element={<ProtectedRoute><SuratKeteranganLulus /></ProtectedRoute>} />
       <Route path="/inventaris" element={<ProtectedRoute adminOnly><Inventaris /></ProtectedRoute>} />
       <Route path="/agenda" element={<ProtectedRoute><Agenda /></ProtectedRoute>} />
       <Route path="/surat" element={<ProtectedRoute adminOnly><Surat /></ProtectedRoute>} />
