@@ -37,6 +37,12 @@ const IjazahPrintTemplate = React.forwardRef(function IjazahPrintTemplate(
       ref={ref}
       className="print-only"
       style={{
+        // display:block ditambahkan secara eksplisit di sini (inline style)
+        // supaya menang atas aturan `@media screen { .print-only { display: none } }`
+        // di index.css — aturan itu untuk menyembunyikan lembar cetak saat
+        // browsing biasa, tapi elemen ini juga dipakai sebagai kotak
+        // "Pratinjau" di halaman Ijazah/SKL, jadi harus tetap terlihat di layar.
+        display: "block",
         width: "210mm",
         minHeight: "297mm",
         padding: "20mm 18mm",
