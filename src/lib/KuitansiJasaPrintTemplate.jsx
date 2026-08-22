@@ -127,8 +127,8 @@ const doubleFrame = {
 // BUKAN `sekolah.kota`, karena field itu berisi nama instansi untuk kop
 // surat (mis. "PEMERINTAH KABUPATEN KEPULAUAN ARU"), bukan nama kota.
 //
-// `data.nama_penerima` dicetak di bawah caption "Yang menerima" (dalam
-// tanda kurung), sebagai nama jelas penanda tangan.
+// `data.nama_penerima` dicetak tepat di atas garis tanda tangan (di atas
+// caption "Yang menerima"), sebagai nama jelas penanda tangan.
 const KuitansiJasaPrintTemplate = forwardRef(function KuitansiJasaPrintTemplate(
   { sekolah, data },
   ref
@@ -258,15 +258,15 @@ const KuitansiJasaPrintTemplate = forwardRef(function KuitansiJasaPrintTemplate(
               </div>
               <div className="text-center" style={{ fontSize: '9px', color: INK }}>
                 <div>{data?.alamat}{data?.alamat ? ', ' : ''}{tanggal}</div>
-                <div style={{ height: '9mm' }} />
+                <div style={{ height: '6mm' }} />
+                {data?.nama_penerima && (
+                  <div style={{ fontSize: '9px', fontWeight: 'bold', marginBottom: '0.3mm' }}>
+                    {data.nama_penerima}
+                  </div>
+                )}
                 <div style={{ borderTop: `0.6px solid ${LINE}`, paddingTop: '0.5mm', minWidth: '28mm' }}>
                   Yang menerima
                 </div>
-                {data?.nama_penerima && (
-                  <div style={{ fontSize: '8px', marginTop: '0.5mm', fontWeight: 'bold' }}>
-                    ({data.nama_penerima})
-                  </div>
-                )}
               </div>
             </div>
           </div>
