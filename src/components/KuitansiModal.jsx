@@ -82,6 +82,14 @@ const emptyForm = (keuanganRow) => {
  * otomatis lewat localStorage (lihat ISIAN_STORAGE_KEY di atas) supaya tidak
  * perlu diketik ulang tiap kali — kalau suatu saat beda, tinggal edit manual
  * di form, dan isian barunya otomatis jadi default berikutnya.
+ *
+ * PENOMORAN: untuk kuitansi biasa (dibuat manual, keuanganRow?.id terisi
+ * atau kosong total), nomor kuitansi tetap otomatis lewat RPC
+ * next_nomor_kuitansi seperti semula. KHUSUS untuk kuitansi hasil "Tarik
+ * Data dari BKU" (keuanganRow tanpa id, tapi No. Bukti terisi dari baris
+ * BKU), nomor kuitansi LANGSUNG memakai No. Bukti BKU apa adanya (mis.
+ * "BNU02"), bukan format auto "0008/BNU/2026" — supaya nomor kuitansi
+ * selalu mengikuti nomor bukti aslinya di BKU. Lihat handleSimpan.
  */
 export default function KuitansiModal({ keuanganRow, sekolah, onClose }) {
   const [form, setForm] = useState(emptyForm(keuanganRow))
@@ -97,8 +105,22 @@ export default function KuitansiModal({ keuanganRow, sekolah, onClose }) {
     e.preventDefault()
     setSaving(true)
     try {
-      const { data: nomorData, error: nomorErr } = await supabase.rpc('next_nomor_kuitansi', { p_jenis: 'kuitansi' })
-      if (nomorErr) throw nomorErr
+      // Kuitansi yang ditarik dari BKU tidak punya keuangan_id (lihat catatan
+      // di payload di bawah), dan No. Bukti-nya sudah otomatis terisi dari
+      // baris BKU. Untuk kasus ini, nomor kuitansi langsung mengikuti No.
+      // Bukti BKU apa adanya — penomoran otomatis (next_nomor_kuitansi)
+      // dilewati supaya tidak "memakan" urutan nomor untuk kuitansi biasa,
+      // dan supaya nomor kuitansi selalu identik dengan nomor bukti BKU.
+      const dariBku = !keuanganRow?.id && !!form.no_bukti
+      let nomorFinal
+
+      if (dariBku) {
+        nomorFinal = form.no_bukti
+      } else {
+        const { data: nomorData, error: nomorErr } = await supabase.rpc('next_nomor_kuitansi', { p_jenis: 'kuitansi' })
+        if (nomorErr) throw nomorErr
+        nomorFinal = nomorData
+      }
 
       const payload = {
         // PENTING: keuangan_id punya foreign key ke tabel `keuangan`. keuanganRow
@@ -108,7 +130,7 @@ export default function KuitansiModal({ keuanganRow, sekolah, onClose }) {
         // Jangan pernah oper id baris bku_kas ke sini, nanti FK violation lagi.
         keuangan_id: keuanganRow?.id || null,
         jenis: 'kuitansi',
-        nomor: nomorData,
+        nomor: nomorFinal,
         no_bukti: form.no_bukti,
         lembar: form.lembar,
         mata_anggaran: form.mata_anggaran,
