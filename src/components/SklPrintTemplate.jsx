@@ -17,12 +17,6 @@ const SklPrintTemplate = React.forwardRef(function SklPrintTemplate(
       ref={ref}
       className="print-only"
       style={{
-        // display:block ditambahkan secara eksplisit di sini (inline style)
-        // supaya menang atas aturan `@media screen { .print-only { display: none } }`
-        // di index.css — aturan itu untuk menyembunyikan lembar cetak saat
-        // browsing biasa, tapi elemen ini juga dipakai sebagai kotak
-        // "Pratinjau" di halaman Ijazah/SKL, jadi harus tetap terlihat di layar.
-        display: "block",
         width: "210mm",
         minHeight: "297mm",
         padding: "20mm 18mm",
@@ -45,14 +39,12 @@ const SklPrintTemplate = React.forwardRef(function SklPrintTemplate(
         }}
       >
         {sekolah?.logo_url && (
-          <img src={sekolah.logo_url} alt="Logo" style={{ width: 64, height: 64, objectFit: "contain" }} />
+          <img src={sekolah.logo_url} alt="Logo" style={{ width: 64, height: 64, objectFit: "contain", flexShrink: 0 }} />
         )}
         <div style={{ flex: 1, textAlign: "center" }}>
-          {/* Urutan & isi disesuaikan dengan blangko resmi: Pemerintah Kabupaten,
-              Dinas Pendidikan, Nama Sekolah, Kecamatan, lalu Alamat. Tidak lagi
-              menambahkan prefiks "PEMERINTAH KABUPATEN"/"Kecamatan" di depan
-              nilai field — karena field kabupaten/kecamatan di Profil Sekolah
-              sudah berisi teks lengkap, prefiks tambahan bikin dobel. */}
+          {/* Urutan & isi disamakan dengan IjazahPrintTemplate: field kabupaten/kecamatan
+              di Profil Sekolah sudah berisi teks lengkap, jadi tidak ditambah prefiks lagi
+              di sini supaya tidak dobel (mis. "Kabupaten PEMERINTAH KABUPATEN ..."). */}
           {sekolah?.kabupaten && <p style={{ fontWeight: "bold", margin: 0 }}>{sekolah.kabupaten}</p>}
           {sekolah?.dinas_pendidikan && <p style={{ fontWeight: "bold", margin: 0 }}>{sekolah.dinas_pendidikan}</p>}
           <p style={{ fontWeight: "bold", margin: 0, fontSize: "14pt" }}>{sekolah?.nama_sekolah || "NAMA SEKOLAH"}</p>
@@ -61,6 +53,8 @@ const SklPrintTemplate = React.forwardRef(function SklPrintTemplate(
           )}
           {sekolah?.alamat && <p style={{ fontStyle: "italic", fontSize: "10pt", margin: 0 }}>{sekolah.alamat}</p>}
         </div>
+        {/* Spacer kosong seukuran logo supaya blok teks kop tetap tersentral meski logo hanya di kiri */}
+        {sekolah?.logo_url && <div style={{ width: 64, flexShrink: 0 }} />}
       </div>
 
       <p style={{ textAlign: "center", fontWeight: "bold", textDecoration: "underline", margin: "0 0 2px 0" }}>
@@ -70,8 +64,8 @@ const SklPrintTemplate = React.forwardRef(function SklPrintTemplate(
 
       <p style={{ textAlign: "justify" }}>
         Yang bertanda tangan di bawah ini Kepala {sekolah?.nama_sekolah}
-        {sekolah?.kecamatan ? `, Kecamatan ${sekolah.kecamatan}` : ""}
-        {sekolah?.kabupaten ? `, Kabupaten ${sekolah.kabupaten}` : ""}
+        {sekolah?.kecamatan ? `, ${sekolah.kecamatan}` : ""}
+        {sekolah?.kabupaten ? `, ${sekolah.kabupaten}` : ""}
         {sekolah?.provinsi ? `, Provinsi ${sekolah.provinsi}` : ""}, menerangkan bahwa:
       </p>
 
@@ -152,7 +146,7 @@ const SklPrintTemplate = React.forwardRef(function SklPrintTemplate(
 function Baris({ label, nilai }) {
   return (
     <tr>
-      <td style={{ padding: "1px 0", width: 190 }}>{label}</td>
+      <td style={{ padding: "1px 8px 1px 0", width: 190 }}>{label}</td>
       <td style={{ padding: "1px 6px", width: 10 }}>:</td>
       <td style={{ padding: "1px 0" }}>{nilai || "-"}</td>
     </tr>
@@ -168,8 +162,8 @@ function formatTanggal(iso) {
   }
 }
 
-const th = { border: "1px solid #000", padding: "5px 7px", background: "#f0f0f0", fontWeight: "bold" };
-const td = { border: "1px solid #000", padding: "4px 7px", textAlign: "center" };
+const th = { border: "1px solid #000", padding: "5px 7px", background: "#f0f0f0", fontWeight: "bold", letterSpacing: "0.2px" };
+const td = { border: "1px solid #000", padding: "4px 7px", textAlign: "center", verticalAlign: "middle" };
 const tdGroup = { border: "1px solid #000", padding: "4px 7px", fontWeight: "bold", background: "#fafafa" };
 
 export default SklPrintTemplate;
