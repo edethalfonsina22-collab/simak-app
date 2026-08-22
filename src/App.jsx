@@ -139,7 +139,11 @@ export default function App() {
       <Route path="/profil-saya" element={<ProtectedRoute><ProfilSaya /></ProtectedRoute>} />
       <Route path="/sertifikat" element={<ProtectedRoute><SertifikatPenghargaan /></ProtectedRoute>} />
       <Route path="/rapat" element={<ProtectedRoute><Rapat /></ProtectedRoute>} />
-      <Route path="/rapat/:roomId" element={<ProtectedRoute><RapatVideo /></ProtectedRoute>} />
+      {/* Sengaja TIDAK dibungkus ProtectedRoute — link rapat dibagikan ke
+          peserta yang mungkin belum/tidak punya akun (mis. orang tua, tamu),
+          jadi mereka bisa langsung gabung cukup dengan mengisi nama.
+          RapatVideo sendiri yang menangani kasus sudah login vs tamu. */}
+      <Route path="/rapat/:roomId" element={<RapatVideo />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )
