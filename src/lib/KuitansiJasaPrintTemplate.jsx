@@ -120,12 +120,15 @@ const doubleFrame = {
 //
 // Props:
 //   sekolah: { nama, alamat, kota }
-//   data: { no_kwitansi, tanggal, dari, uang_sejumlah, untuk_pembayaran, jumlah, alamat }
+//   data: { no_kwitansi, tanggal, dari, uang_sejumlah, untuk_pembayaran, jumlah, alamat, nama_penerima }
 //
-// `data.alamat` (diisi lewat kotak "Alamat" di KuitansiJasaModal, kolom
-// `alamat_penerima` di tabel) dipakai untuk baris "<kota>, <tanggal>" —
+// `data.alamat` (diisi lewat kotak "Alamat Penerima" di KuitansiJasaModal,
+// kolom `alamat_penerima` di tabel) dipakai untuk baris "<kota>, <tanggal>" —
 // BUKAN `sekolah.kota`, karena field itu berisi nama instansi untuk kop
 // surat (mis. "PEMERINTAH KABUPATEN KEPULAUAN ARU"), bukan nama kota.
+//
+// `data.nama_penerima` dicetak di bawah caption "Yang menerima" (dalam
+// tanda kurung), sebagai nama jelas penanda tangan.
 const KuitansiJasaPrintTemplate = forwardRef(function KuitansiJasaPrintTemplate(
   { sekolah, data },
   ref
@@ -259,6 +262,11 @@ const KuitansiJasaPrintTemplate = forwardRef(function KuitansiJasaPrintTemplate(
                 <div style={{ borderTop: `0.6px solid ${LINE}`, paddingTop: '0.5mm', minWidth: '28mm' }}>
                   Yang menerima
                 </div>
+                {data?.nama_penerima && (
+                  <div style={{ fontSize: '8px', marginTop: '0.5mm', fontWeight: 'bold' }}>
+                    ({data.nama_penerima})
+                  </div>
+                )}
               </div>
             </div>
           </div>
