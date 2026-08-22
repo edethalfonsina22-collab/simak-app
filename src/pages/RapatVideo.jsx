@@ -17,6 +17,12 @@ export default function RapatVideo() {
   // halaman berkedip lalu balik ke dashboard.
   const [connError, setConnError] = useState(null)
 
+  // BARU: dukungan peserta tamu (belum/tidak login) — mereka klik link rapat
+  // langsung dan cukup isi nama, tanpa perlu login dulu. Kalau session ada
+  // (user login), nama diambil otomatis dari akun seperti sebelumnya.
+  const [namaTamu, setNamaTamu] = useState('')
+  const [namaTamuTerkirim, setNamaTamuTerkirim] = useState(null)
+
   // State untuk live streaming
   const [showStreamForm, setShowStreamForm] = useState(false)
   const [rtmpUrl, setRtmpUrl] = useState('')
@@ -25,19 +31,29 @@ export default function RapatVideo() {
   const [streamError, setStreamError] = useState(null)
   const [streamLoading, setStreamLoading] = useState(false)
 
+  // Nama peserta: kalau sudah login pakai nama/email akunnya (otomatis),
+  // kalau tamu pakai nama yang mereka isi lewat form di bawah.
+  const namaPeserta = session?.user
+    ? session.user.user_metadata?.full_name || session.user.email || session.user.id
+    : namaTamuTerkirim
+
   useEffect(() => {
+    // session === undefined artinya AuthContext masih mengecek status login,
+    // tunggu dulu supaya tidak salah kira "belum login" padahal masih loading.
+    if (session === undefined) return
+
+    // Tamu (tidak login) yang belum isi nama: tampilkan form dulu, jangan
+    // ambil token dulu.
+    if (!session?.user && !namaTamuTerkirim) return
+
     const fetchToken = async () => {
-      if (!session?.user) {
-        setError('Anda harus login dulu')
-        return
-      }
       try {
         const res = await fetch('/api/livekit-token', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             roomName: roomId,
-            participantName: session.user.email || session.user.id,
+            participantName: namaPeserta,
           }),
         })
         if (!res.ok) {
@@ -50,7 +66,13 @@ export default function RapatVideo() {
       }
     }
     fetchToken()
-  }, [roomId, session])
+  }, [roomId, session, namaTamuTerkirim])
+
+  function gabungSebagaiTamu(e) {
+    e.preventDefault()
+    if (!namaTamu.trim()) return
+    setNamaTamuTerkirim(namaTamu.trim())
+  }
 
   async function mulaiStreaming(e) {
     e.preventDefault()
@@ -128,6 +150,48 @@ export default function RapatVideo() {
         >
           Kembali ke Dashboard
         </button>
+      </div>
+    )
+  }
+
+  // Masih mengecek status login — tunggu sebentar sebelum putuskan tamu/login.
+  if (session === undefined) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-paper">
+        <p>Memuat...</p>
+      </div>
+    )
+  }
+
+  // Tamu (tidak login) dan belum isi nama: minta nama dulu sebelum join.
+  if (!session?.user && !namaTamuTerkirim) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-paper px-4">
+        <form
+          onSubmit={gabungSebagaiTamu}
+          className="bg-white rounded-lg shadow-xl p-6 w-full max-w-sm flex flex-col gap-3"
+        >
+          <h1 className="text-lg font-semibold text-center">Gabung ke Rapat</h1>
+          <p className="text-sm text-gray-500 text-center">
+            Masukkan nama Anda untuk masuk ke rapat.
+          </p>
+          <input
+            type="text"
+            value={namaTamu}
+            onChange={(e) => setNamaTamu(e.target.value)}
+            placeholder="Nama Anda"
+            className="px-3 py-2 rounded border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            autoFocus
+            required
+          />
+          <button
+            type="submit"
+            disabled={!namaTamu.trim()}
+            className="px-4 py-2 rounded-lg bg-blue-600 text-white font-medium hover:bg-blue-700 disabled:opacity-50"
+          >
+            Gabung Sekarang
+          </button>
+        </form>
       </div>
     )
   }
