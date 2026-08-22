@@ -28,48 +28,70 @@ const SklPrintTemplate = React.forwardRef(function SklPrintTemplate(
         boxSizing: "border-box",
       }}
     >
+      {/* KOP SURAT */}
       <div
         style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 12,
+          position: "relative",
           borderBottom: "3px double #000",
-          paddingBottom: 8,
-          marginBottom: 20,
+          paddingBottom: 10,
+          marginBottom: 22,
+          minHeight: 72,
         }}
       >
         {sekolah?.logo_url && (
-          <img src={sekolah.logo_url} alt="Logo" style={{ width: 64, height: 64, objectFit: "contain", flexShrink: 0 }} />
+          <img
+            src={sekolah.logo_url}
+            alt="Logo"
+            style={{
+              position: "absolute",
+              left: 0,
+              top: "50%",
+              transform: "translateY(-50%)",
+              width: 70,
+              height: 70,
+              objectFit: "contain",
+            }}
+          />
         )}
-        <div style={{ flex: 1, textAlign: "center" }}>
+        <div style={{ textAlign: "center", padding: "0 78px" }}>
           {/* Urutan & isi disamakan dengan IjazahPrintTemplate: field kabupaten/kecamatan
               di Profil Sekolah sudah berisi teks lengkap, jadi tidak ditambah prefiks lagi
               di sini supaya tidak dobel (mis. "Kabupaten PEMERINTAH KABUPATEN ..."). */}
-          {sekolah?.kabupaten && <p style={{ fontWeight: "bold", margin: 0 }}>{sekolah.kabupaten}</p>}
-          {sekolah?.dinas_pendidikan && <p style={{ fontWeight: "bold", margin: 0 }}>{sekolah.dinas_pendidikan}</p>}
-          <p style={{ fontWeight: "bold", margin: 0, fontSize: "14pt" }}>{sekolah?.nama_sekolah || "NAMA SEKOLAH"}</p>
-          {sekolah?.kecamatan && (
-            <p style={{ fontWeight: "bold", margin: 0, fontSize: "10pt" }}>{sekolah.kecamatan}</p>
+          {sekolah?.kabupaten && (
+            <p style={{ fontWeight: "bold", margin: 0, fontSize: "12pt", letterSpacing: "0.3px" }}>
+              {sekolah.kabupaten}
+            </p>
           )}
-          {sekolah?.alamat && <p style={{ fontStyle: "italic", fontSize: "10pt", margin: 0 }}>{sekolah.alamat}</p>}
+          {sekolah?.dinas_pendidikan && (
+            <p style={{ fontWeight: "bold", margin: 0, fontSize: "12pt", letterSpacing: "0.3px" }}>
+              {sekolah.dinas_pendidikan}
+            </p>
+          )}
+          <p style={{ fontWeight: "bold", margin: "2px 0 0 0", fontSize: "15pt", letterSpacing: "0.5px" }}>
+            {sekolah?.nama_sekolah || "NAMA SEKOLAH"}
+          </p>
+          {sekolah?.kecamatan && (
+            <p style={{ fontWeight: "bold", margin: "1px 0 0 0", fontSize: "10pt" }}>{sekolah.kecamatan}</p>
+          )}
+          {sekolah?.alamat && (
+            <p style={{ fontStyle: "italic", fontSize: "10pt", margin: "2px 0 0 0" }}>{sekolah.alamat}</p>
+          )}
         </div>
-        {/* Spacer kosong seukuran logo supaya blok teks kop tetap tersentral meski logo hanya di kiri */}
-        {sekolah?.logo_url && <div style={{ width: 64, flexShrink: 0 }} />}
       </div>
 
-      <p style={{ textAlign: "center", fontWeight: "bold", textDecoration: "underline", margin: "0 0 2px 0" }}>
+      <p style={{ textAlign: "center", fontWeight: "bold", textDecoration: "underline", margin: "0 0 2px 0", letterSpacing: "0.5px" }}>
         SURAT KETERANGAN LULUS
       </p>
-      <p style={{ textAlign: "center", margin: "0 0 18px 0" }}>Nomor: {skl?.nomor_skl || "-"}</p>
+      <p style={{ textAlign: "center", margin: "0 0 20px 0" }}>Nomor: {skl?.nomor_skl || "-"}</p>
 
-      <p style={{ textAlign: "justify" }}>
+      <p style={{ textAlign: "justify", margin: "0 0 10px 0" }}>
         Yang bertanda tangan di bawah ini Kepala {sekolah?.nama_sekolah}
         {sekolah?.kecamatan ? `, ${sekolah.kecamatan}` : ""}
         {sekolah?.kabupaten ? `, ${sekolah.kabupaten}` : ""}
         {sekolah?.provinsi ? `, Provinsi ${sekolah.provinsi}` : ""}, menerangkan bahwa:
       </p>
 
-      <table style={{ borderCollapse: "collapse", margin: "10px 0 14px 0" }}>
+      <table style={{ borderCollapse: "collapse", margin: "0 0 16px 0" }}>
         <tbody>
           <Baris label="Nama" nilai={siswa?.nama_lengkap} />
           <Baris label="Tempat, Tanggal Lahir" nilai={`${siswa?.tempat_lahir || ""}, ${formatTanggal(siswa?.tanggal_lahir)}`} />
@@ -79,13 +101,13 @@ const SklPrintTemplate = React.forwardRef(function SklPrintTemplate(
         </tbody>
       </table>
 
-      <p style={{ textAlign: "justify" }}>
+      <p style={{ textAlign: "justify", margin: "0 0 10px 0" }}>
         Bahwa siswa/siswi tersebut di atas benar-benar murid Kelas VI {sekolah?.nama_sekolah} dan telah mengikuti
         Asesmen Sekolah Tahun Pelajaran {tahunPelajaran} dan dinyatakan <strong>BERHASIL</strong> dengan nilai
         sebagai berikut:
       </p>
 
-      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "12pt", margin: "10px 0 16px 0" }}>
+      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "12pt", margin: "0 0 18px 0" }}>
         <thead>
           <tr>
             <th style={th}>No</th>
@@ -121,12 +143,12 @@ const SklPrintTemplate = React.forwardRef(function SklPrintTemplate(
         </tbody>
       </table>
 
-      <p style={{ textAlign: "justify" }}>
+      <p style={{ textAlign: "justify", margin: 0 }}>
         Demikian Surat Keterangan Lulus ini dibuat untuk digunakan seperlunya, sambil menantikan tibanya ijazah
         yang bersangkutan.
       </p>
 
-      <div style={{ textAlign: "right", marginTop: 30 }}>
+      <div style={{ textAlign: "right", marginTop: 34 }}>
         <p style={{ margin: 0 }}>
           {sekolah?.tempat_ttd || sekolah?.kecamatan || ""}, {tanggalTerbit}
         </p>
