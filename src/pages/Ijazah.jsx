@@ -231,7 +231,7 @@ export default function Ijazah() {
               </button>
             </div>
 
-            <div className="border border-ink-900/10 rounded-lg overflow-hidden" style={{ transform: "scale(0.72)", transformOrigin: "top center", marginBottom: "-28%" }}>
+            <div className="border border-ink-900/10 rounded-lg overflow-auto" style={{ maxHeight: "70vh" }}>
               <IjazahPrintTemplate
                 siswa={siswaTerpilih}
                 nilai={nilaiMap[selectedId] || {}}
