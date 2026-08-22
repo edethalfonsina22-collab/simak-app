@@ -29,6 +29,13 @@ const emptyForm = (dataAwal) => ({
  * no_bukti, tanggal, diterima_dari, untuk_pembayaran, jumlah_total,
  * nama_penerima, alamat_penerima.
  *
+ * PENOMORAN: kuitansi jasa yang dibuat manual (dataAwal kosong) tetap pakai
+ * nomor otomatis lewat RPC next_nomor_kuitansi seperti semula. KHUSUS
+ * kuitansi jasa hasil "Tarik dari Kuitansi" (dataAwal terisi), nomor
+ * LANGSUNG memakai No. Bukti dari kuitansi sumbernya apa adanya (mis.
+ * "BNU02"), bukan format auto "0007/BNU/2026" — supaya nomornya selalu
+ * konsisten dengan bukti aslinya. Lihat handleSimpan.
+ *
  * Dipanggil dari KuitansiJasa.jsx:
  *   <KuitansiJasaModal sekolah={{ nama, alamat, kota }} dataAwal={row} onClose={...} />
  */
@@ -46,12 +53,24 @@ export default function KuitansiJasaModal({ sekolah, dataAwal, onClose }) {
     e.preventDefault()
     setSaving(true)
     try {
-      const { data: nomorData, error: nomorErr } = await supabase.rpc('next_nomor_kuitansi', { p_jenis: 'kuitansi_jasa' })
-      if (nomorErr) throw nomorErr
+      // Kuitansi jasa hasil "Tarik dari Kuitansi" (dataAwal terisi) langsung
+      // memakai No. Bukti dari kuitansi sumbernya sebagai nomor — penomoran
+      // otomatis dilewati supaya nomor kuitansi jasa selalu ikut nomor bukti
+      // aslinya, bukan "memakan" urutan nomor auto tersendiri.
+      const dariTarik = !!dataAwal && !!form.no_bukti
+      let nomorFinal
+
+      if (dariTarik) {
+        nomorFinal = form.no_bukti
+      } else {
+        const { data: nomorData, error: nomorErr } = await supabase.rpc('next_nomor_kuitansi', { p_jenis: 'kuitansi_jasa' })
+        if (nomorErr) throw nomorErr
+        nomorFinal = nomorData
+      }
 
       const payload = {
         jenis: 'kuitansi_jasa',
-        nomor: nomorData,
+        nomor: nomorFinal,
         no_bukti: form.no_bukti,
         tanggal: form.tanggal,
         diterima_dari: form.diterima_dari,
