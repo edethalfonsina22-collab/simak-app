@@ -68,15 +68,18 @@ const IjazahPrintTemplate = React.forwardRef(function IjazahPrintTemplate(
           <img src={sekolah.logo_url} alt="Logo" style={{ width: 64, height: 64, objectFit: "contain" }} />
         )}
         <div style={{ flex: 1, textAlign: "center" }}>
+          {/* Urutan & isi disesuaikan dengan blangko resmi: Pemerintah Kabupaten,
+              Dinas Pendidikan, Nama Sekolah, Kecamatan, lalu Alamat. Tidak lagi
+              menambahkan prefiks "PEMERINTAH KABUPATEN"/"Kecamatan" di depan
+              nilai field — karena field kabupaten/kecamatan di Profil Sekolah
+              sudah berisi teks lengkap, prefiks tambahan bikin dobel. */}
+          {sekolah?.kabupaten && <p style={{ fontWeight: "bold", margin: 0 }}>{sekolah.kabupaten}</p>}
           {sekolah?.dinas_pendidikan && <p style={{ fontWeight: "bold", margin: 0 }}>{sekolah.dinas_pendidikan}</p>}
-          {sekolah?.kabupaten && (
-            <p style={{ fontWeight: "bold", margin: 0 }}>PEMERINTAH KABUPATEN {sekolah.kabupaten}</p>
-          )}
           <p style={{ fontWeight: "bold", margin: 0, fontSize: "14pt" }}>{sekolah?.nama_sekolah || "NAMA SEKOLAH"}</p>
-          <p style={{ fontStyle: "italic", fontSize: "10pt", margin: 0 }}>
-            {sekolah?.kecamatan ? `Kecamatan ${sekolah.kecamatan} — ` : ""}
-            {sekolah?.alamat}
-          </p>
+          {sekolah?.kecamatan && (
+            <p style={{ fontWeight: "bold", margin: 0, fontSize: "10pt" }}>{sekolah.kecamatan}</p>
+          )}
+          {sekolah?.alamat && <p style={{ fontStyle: "italic", fontSize: "10pt", margin: 0 }}>{sekolah.alamat}</p>}
         </div>
       </div>
 
