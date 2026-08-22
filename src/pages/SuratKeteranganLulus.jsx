@@ -13,6 +13,8 @@ function tahunPelajaranDefault() {
 
 export default function SuratKeteranganLulus() {
   const [tahunPelajaran, setTahunPelajaran] = useState(tahunPelajaranDefault());
+  const [kelasList, setKelasList] = useState([]);
+  const [kelasId, setKelasId] = useState(null);
   const [siswaList, setSiswaList] = useState([]);
   const [nilaiMap, setNilaiMap] = useState({});
   const [sklMap, setSklMap] = useState({});
@@ -22,15 +24,39 @@ export default function SuratKeteranganLulus() {
   const [generating, setGenerating] = useState(false);
   const [nomorPrefix, setNomorPrefix] = useState("421.2/");
 
+  // Ambil daftar kelas sekali di awal, lalu default-kan ke kelas yang mengandung "6"
   useEffect(() => {
-    loadAll();
+    loadKelas();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tahunPelajaran]);
+  }, []);
+
+  useEffect(() => {
+    if (kelasId !== null) {
+      loadAll();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tahunPelajaran, kelasId]);
+
+  async function loadKelas() {
+    const { data: kelas } = await supabase.from("kelas").select("*").order("nama_kelas");
+    setKelasList(kelas || []);
+    // Tingkat disimpan sebagai angka Romawi (VII, VI, dst), jadi cocokkan persis "VI"
+    // (bukan .includes, karena "VI" juga jadi substring dari "VII" dan "VIII")
+    const kelas6 = (kelas || []).find((k) => String(k.tingkat).trim().toUpperCase() === "VI");
+    setKelasId(kelas6 ? kelas6.id : kelas?.[0]?.id ?? "");
+  }
 
   async function loadAll() {
     setLoading(true);
+    let siswaQuery = supabase
+      .from("siswa")
+      .select("*, kelas(tingkat)")
+      .eq("status", "aktif")
+      .order("nama_lengkap");
+    if (kelasId) siswaQuery = siswaQuery.eq("kelas_id", kelasId);
+
     const [{ data: siswa }, { data: nilai }, { data: sklRows }, { data: profil }] = await Promise.all([
-      supabase.from("siswa").select("*").eq("status", "aktif").order("nama_lengkap"),
+      siswaQuery,
       supabase.from("nilai_ijazah").select("*").eq("tahun_pelajaran", tahunPelajaran),
       supabase.from("skl").select("*").eq("tahun_pelajaran", tahunPelajaran),
       supabase.from("profil_sekolah").select("*").eq("id", 1).maybeSingle(),
@@ -43,7 +69,12 @@ export default function SuratKeteranganLulus() {
     (sklRows || []).forEach((r) => (sMap[r.siswa_id] = r));
     setSklMap(sMap);
     setSekolah(profil || null);
-    if (siswa?.length && !selectedId) setSelectedId(siswa[0].id);
+    // Pilih siswa pertama di kelas terpilih (reset kalau siswa lama tidak ada di kelas ini)
+    if (siswa?.length && !siswa.some((s) => s.id === selectedId)) {
+      setSelectedId(siswa[0].id);
+    } else if (!siswa?.length) {
+      setSelectedId(null);
+    }
     setLoading(false);
   }
 
@@ -111,6 +142,20 @@ export default function SuratKeteranganLulus() {
           />
         </div>
         <div>
+          <label className="block text-xs font-semibold text-ink-700/60 mb-1">Kelas</label>
+          <select
+            className="input-field w-48"
+            value={kelasId || ""}
+            onChange={(e) => setKelasId(e.target.value)}
+          >
+            {kelasList.map((k) => (
+              <option key={k.id} value={k.id}>
+                {k.nama_kelas} (Tingkat {k.tingkat})
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
           <label className="block text-xs font-semibold text-ink-700/60 mb-1">Awalan Nomor Surat</label>
           <input className="input-field w-40" value={nomorPrefix} onChange={(e) => setNomorPrefix(e.target.value)} />
         </div>
@@ -119,7 +164,7 @@ export default function SuratKeteranganLulus() {
       {loading ? (
         <p>Memuat...</p>
       ) : siswaList.length === 0 ? (
-        <div className="card p-6 text-center text-ink-700/60">Belum ada siswa aktif.</div>
+        <div className="card p-6 text-center text-ink-700/60">Belum ada siswa aktif di kelas ini.</div>
       ) : (
         <>
           <div className="card overflow-x-auto mb-6">
