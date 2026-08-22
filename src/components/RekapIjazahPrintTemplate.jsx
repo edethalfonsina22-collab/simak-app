@@ -117,12 +117,14 @@ const RekapIjazahPrintTemplate = React.forwardRef(function RekapIjazahPrintTempl
       <table style={{ width: "100%", borderCollapse: "collapse", marginTop: 40, fontSize: "10.5pt" }}>
         <tbody>
           <tr>
-            <td style={{ width: "38%" }} />
+            <td style={{ width: "26%" }} />
             <td style={{ width: "24%", textAlign: "center" }}>
               Mengetahui
               <br />
               Pengawas
             </td>
+            {/* Kolom pemisah kosong supaya blok Pengawas dan Kepala Sekolah tidak berhimpitan */}
+            <td style={{ width: "12%" }} />
             <td style={{ width: "38%", textAlign: "center" }}>
               {sekolah?.tempat_ttd || sekolah?.kabupaten || ""}, {formatTanggal(new Date().toISOString())}
               <br />
@@ -136,21 +138,23 @@ const RekapIjazahPrintTemplate = React.forwardRef(function RekapIjazahPrintTempl
                 <img src={sekolah.ttd_pengawas_url} alt="TTD Pengawas" style={{ height: 44 }} />
               )}
             </td>
+            <td />
             <td style={{ height: 50, textAlign: "center", verticalAlign: "bottom" }}>
               {sekolah?.ttd_url && <img src={sekolah.ttd_url} alt="TTD Kepala Sekolah" style={{ height: 44 }} />}
             </td>
           </tr>
           <tr>
             <td />
-            <td style={{ textAlign: "center", fontWeight: "bold", textDecoration: "underline" }}>
-              {sekolah?.pengawas}
+            <td style={{ textAlign: "center", fontWeight: "bold" }}>
+              <span style={{ textDecoration: "underline" }}>{sekolah?.pengawas}</span>
               <br />
-              <span style={{ fontWeight: "normal", textDecoration: "none" }}>NIP. {sekolah?.nip_pengawas}</span>
+              <span style={{ fontWeight: "normal" }}>NIP. {sekolah?.nip_pengawas}</span>
             </td>
-            <td style={{ textAlign: "center", fontWeight: "bold", textDecoration: "underline" }}>
-              {sekolah?.kepala_sekolah}
+            <td />
+            <td style={{ textAlign: "center", fontWeight: "bold" }}>
+              <span style={{ textDecoration: "underline" }}>{sekolah?.kepala_sekolah}</span>
               <br />
-              <span style={{ fontWeight: "normal", textDecoration: "none" }}>NIP. {sekolah?.nip_kepala_sekolah}</span>
+              <span style={{ fontWeight: "normal" }}>NIP. {sekolah?.nip_kepala_sekolah}</span>
             </td>
           </tr>
         </tbody>
