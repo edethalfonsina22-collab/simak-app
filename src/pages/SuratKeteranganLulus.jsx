@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
 import Layout from "../components/Layout";
 import SklPrintTemplate from "../components/SklPrintTemplate";
@@ -23,6 +23,15 @@ export default function SuratKeteranganLulus() {
   const [selectedId, setSelectedId] = useState(null);
   const [generating, setGenerating] = useState(false);
   const [nomorPrefix, setNomorPrefix] = useState("421.2/");
+  const previewRef = useRef(null);
+
+  // Pilih siswa dari tabel lalu gulir otomatis ke kartu pratinjau di bawah,
+  // supaya perubahannya kelihatan jelas (sebelumnya terasa "tidak merespon"
+  // karena kartu pratinjau ada jauh di bawah tabel).
+  function lihatSiswa(id) {
+    setSelectedId(id);
+    previewRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
 
   // Ambil daftar kelas sekali di awal, lalu default-kan ke kelas yang mengandung "6"
   useEffect(() => {
@@ -194,7 +203,7 @@ export default function SuratKeteranganLulus() {
                       </td>
                       <td>{skl ? new Date(skl.tanggal_terbit).toLocaleDateString("id-ID") : "-"}</td>
                       <td>
-                        <button className="btn-secondary !px-3 !py-1.5 text-xs" onClick={() => setSelectedId(s.id)}>
+                        <button className="btn-secondary !px-3 !py-1.5 text-xs" onClick={() => lihatSiswa(s.id)}>
                           Lihat
                         </button>
                       </td>
@@ -205,7 +214,7 @@ export default function SuratKeteranganLulus() {
             </table>
           </div>
 
-          <div className="card p-4">
+          <div className="card p-4" ref={previewRef}>
             <div className="flex items-center justify-between mb-4">
               <div>
                 <label className="block text-xs font-semibold text-ink-700/60 mb-1">Pratinjau Siswa</label>
@@ -232,10 +241,7 @@ export default function SuratKeteranganLulus() {
               </p>
             )}
 
-            <div
-              className="border border-ink-900/10 rounded-lg overflow-hidden"
-              style={{ transform: "scale(0.72)", transformOrigin: "top center", marginBottom: "-28%" }}
-            >
+            <div className="border border-ink-900/10 rounded-lg overflow-auto" style={{ maxHeight: "70vh" }}>
               <SklPrintTemplate
                 siswa={siswaTerpilih}
                 nilai={nilaiMap[selectedId] || {}}
