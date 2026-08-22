@@ -11,6 +11,10 @@ const emptyForm = {
   email: '',
   kepala_sekolah: '',
   nip_kepala_sekolah: '',
+  // TAMBAHAN: nama & NIP pengawas sekolah — dipakai di blok tanda tangan
+  // rekap ijazah kelulusan (kolom "Mengetahui, Pengawas").
+  pengawas: '',
+  nip_pengawas: '',
   logo_path: '',
   ttd_kepala_sekolah_path: '',
   tahun_berdiri: '',
@@ -291,6 +295,15 @@ export default function ProfilSekolah() {
             <div>
               <label className="label-field">NIP Kepala Sekolah</label>
               <input className="input-field" value={form.nip_kepala_sekolah} onChange={(e) => ubah('nip_kepala_sekolah', e.target.value)} />
+            </div>
+            {/* TAMBAHAN: dipakai di blok tanda tangan rekap ijazah kelulusan */}
+            <div>
+              <label className="label-field">Nama Pengawas</label>
+              <input className="input-field" value={form.pengawas} onChange={(e) => ubah('pengawas', e.target.value)} />
+            </div>
+            <div>
+              <label className="label-field">NIP Pengawas</label>
+              <input className="input-field" value={form.nip_pengawas} onChange={(e) => ubah('nip_pengawas', e.target.value)} />
             </div>
             <div>
               <label className="label-field">Tahun Berdiri</label>
