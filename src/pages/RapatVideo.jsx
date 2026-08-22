@@ -11,6 +11,11 @@ export default function RapatVideo() {
   const { session } = useAuth()
   const [token, setToken] = useState(null)
   const [error, setError] = useState(null)
+  // BARU: pesan error khusus kegagalan koneksi LiveKit (bukan gagal ambil
+  // token) — sebelumnya kegagalan ini "tertelan" oleh onDisconnected yang
+  // langsung navigate('/') tanpa pesan apapun, sehingga user cuma lihat
+  // halaman berkedip lalu balik ke dashboard.
+  const [connError, setConnError] = useState(null)
 
   // State untuk live streaming
   const [showStreamForm, setShowStreamForm] = useState(false)
@@ -110,6 +115,23 @@ export default function RapatVideo() {
     )
   }
 
+  // BARU: tampilkan pesan error koneksi LiveKit alih-alih auto-redirect diam-diam.
+  if (connError) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-paper gap-4">
+        <p className="text-red-500 text-center max-w-md px-4">
+          Gagal terhubung ke server rapat: {connError}
+        </p>
+        <button
+          onClick={() => navigate('/')}
+          className="px-4 py-2 rounded bg-gray-200 hover:bg-gray-300"
+        >
+          Kembali ke Dashboard
+        </button>
+      </div>
+    )
+  }
+
   if (!token) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-paper">
@@ -179,6 +201,14 @@ export default function RapatVideo() {
         data-lk-theme="default"
         style={{ height: '100vh' }}
         onDisconnected={() => navigate('/')}
+        onError={(err) => {
+          // BARU: kalau LiveKitRoom gagal connect (server URL salah, token
+          // tidak valid, dsb), sebelumnya ini langsung memicu onDisconnected
+          // dan navigate('/') tanpa pesan apapun. Sekarang errornya ditangkap
+          // dan ditampilkan lewat connError, supaya penyebab aslinya kelihatan.
+          console.error('LiveKit connection error:', err)
+          setConnError(err?.message || String(err))
+        }}
       >
         <VideoConference />
       </LiveKitRoom>
