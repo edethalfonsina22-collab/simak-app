@@ -11,6 +11,7 @@ const emptyForm = (dataAwal) => ({
   jumlah: dataAwal?.jumlah_total || '',
   untuk_pembayaran: dataAwal?.untuk_pembayaran || '',
   nama_penerima: dataAwal?.nama_penerima || '',
+  alamat_penerima: dataAwal?.alamat_penerima || '',
 })
 
 /**
@@ -26,7 +27,7 @@ const emptyForm = (dataAwal) => ({
  * dataAwal (opsional): baris kuitansi (jenis='kuitansi') hasil "Tarik dari
  * Kuitansi" — dipakai untuk mengisi form otomatis. Field yang dipetakan:
  * no_bukti, tanggal, diterima_dari, untuk_pembayaran, jumlah_total,
- * nama_penerima.
+ * nama_penerima, alamat_penerima.
  *
  * Dipanggil dari KuitansiJasa.jsx:
  *   <KuitansiJasaModal sekolah={{ nama, alamat, kota }} dataAwal={row} onClose={...} />
@@ -57,6 +58,7 @@ export default function KuitansiJasaModal({ sekolah, dataAwal, onClose }) {
         untuk_pembayaran: form.untuk_pembayaran,
         jumlah_total: Number(form.jumlah) || 0,
         nama_penerima: form.nama_penerima,
+        alamat_penerima: form.alamat_penerima,
       }
 
       const { data: inserted, error: insertErr } = await supabase.from('kuitansi').insert(payload).select().single()
@@ -79,8 +81,8 @@ export default function KuitansiJasaModal({ sekolah, dataAwal, onClose }) {
   }, [savedData])
 
   // Data yang dioper ke template cetak — memetakan nama kolom tabel (nomor,
-  // diterima_dari, jumlah_total) ke nama prop yang dipakai KuitansiJasaPrintTemplate
-  // (no_kwitansi, dari, uang_sejumlah, jumlah).
+  // diterima_dari, jumlah_total, alamat_penerima) ke nama prop yang dipakai
+  // KuitansiJasaPrintTemplate (no_kwitansi, dari, uang_sejumlah, jumlah, alamat).
   const dataCetak = savedData
     ? {
         no_kwitansi: savedData.nomor,
@@ -90,6 +92,7 @@ export default function KuitansiJasaModal({ sekolah, dataAwal, onClose }) {
         untuk_pembayaran: savedData.untuk_pembayaran,
         jumlah: savedData.jumlah_total,
         nama_penerima: savedData.nama_penerima,
+        alamat: savedData.alamat_penerima,
       }
     : null
 
@@ -168,6 +171,16 @@ export default function KuitansiJasaModal({ sekolah, dataAwal, onClose }) {
                 placeholder="Nama penerima uang"
                 value={form.nama_penerima}
                 onChange={(e) => ubah('nama_penerima', e.target.value)}
+              />
+            </div>
+
+            <div>
+              <label className="label-field">Alamat Penerima (opsional)</label>
+              <input
+                className="input-field"
+                placeholder="Contoh: Waria, Kec. Aru Utara"
+                value={form.alamat_penerima}
+                onChange={(e) => ubah('alamat_penerima', e.target.value)}
               />
             </div>
 
