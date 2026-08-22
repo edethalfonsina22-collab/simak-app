@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
 import Layout from "../components/Layout";
-import IjazahPrintTemplate, { MAPEL_IJAZAH, jumlahNilai, rataRataNilai } from "../components/IjazahPrintTemplate";
+import { MAPEL_IJAZAH, jumlahNilai, rataRataNilai } from "../components/IjazahPrintTemplate";
+import RekapIjazahPrintTemplate from "../components/RekapIjazahPrintTemplate";
 import { Loader2, Save, Printer } from "lucide-react";
 
 // Tahun pelajaran default: kalau sekarang Juli-Des, "thn/thn+1"; kalau Jan-Jun, "thn-1/thn".
@@ -103,7 +104,12 @@ export default function Ijazah() {
     loadAll();
   }
 
-  const siswaTerpilih = useMemo(() => siswaList.find((s) => s.id === selectedId), [siswaList, selectedId]);
+  // Gabungkan siswa + nilainya jadi satu objek per siswa untuk dikonsumsi
+  // RekapIjazahPrintTemplate (butuh siswa.nilai, bukan lookup terpisah).
+  const siswaUntukRekap = useMemo(
+    () => siswaList.map((s) => ({ ...s, nilai: nilaiMap[s.id] || {} })),
+    [siswaList, nilaiMap]
+  );
 
   const sekolahUntukCetak = sekolah
     ? {
@@ -117,13 +123,15 @@ export default function Ijazah() {
         tempat_ttd: sekolah.tempat_ttd,
         kepala_sekolah: sekolah.kepala_sekolah,
         nip_kepala_sekolah: sekolah.nip_kepala_sekolah,
+        pengawas: sekolah.pengawas,
+        nip_pengawas: sekolah.nip_pengawas,
       }
     : null;
 
   return (
     <Layout
       title="Ijazah"
-      subtitle="Pengisian nilai kelulusan (9 mapel) dan cetak data ijazah per siswa"
+      subtitle="Pengisian nilai kelulusan (9 mapel) dan cetak rekap data ijazah kelulusan"
       actions={
         <button className="btn-primary" onClick={simpanSemua} disabled={saving || loading}>
           {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
@@ -213,28 +221,19 @@ export default function Ijazah() {
           <div className="card p-4">
             <div className="flex items-center justify-between mb-4">
               <div>
-                <label className="block text-xs font-semibold text-ink-700/60 mb-1">Pratinjau Siswa</label>
-                <select
-                  className="input-field w-64"
-                  value={selectedId || ""}
-                  onChange={(e) => setSelectedId(e.target.value)}
-                >
-                  {siswaList.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.nama_lengkap}
-                    </option>
-                  ))}
-                </select>
+                <label className="block text-xs font-semibold text-ink-700/60 mb-1">Pratinjau Rekap</label>
+                <p className="text-sm text-ink-700/60">
+                  {siswaList.length} siswa · Tahun Pelajaran {tahunPelajaran}
+                </p>
               </div>
               <button className="btn-primary" onClick={() => window.print()}>
-                <Printer size={16} /> Cetak Ijazah
+                <Printer size={16} /> Cetak Rekap Ijazah
               </button>
             </div>
 
             <div className="border border-ink-900/10 rounded-lg overflow-auto" style={{ maxHeight: "70vh" }}>
-              <IjazahPrintTemplate
-                siswa={siswaTerpilih}
-                nilai={nilaiMap[selectedId] || {}}
+              <RekapIjazahPrintTemplate
+                siswaList={siswaUntukRekap}
                 sekolah={sekolahUntukCetak}
                 tahunPelajaran={tahunPelajaran}
               />
