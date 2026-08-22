@@ -126,6 +126,12 @@ export default function SuratKeteranganLulus() {
         tempat_ttd: sekolah.tempat_ttd,
         kepala_sekolah: sekolah.kepala_sekolah,
         nip_kepala_sekolah: sekolah.nip_kepala_sekolah,
+        // logo_url & ttd_url sebelumnya tidak disertakan di sini, padahal
+        // SklPrintTemplate butuh keduanya untuk menampilkan logo sekolah &
+        // tanda tangan elektronik kepala sekolah — itu sebabnya logo tidak
+        // pernah muncul di cetakan SKL.
+        logo_url: sekolah.logo_url,
+        ttd_url: sekolah.ttd_url,
       }
     : null;
 
