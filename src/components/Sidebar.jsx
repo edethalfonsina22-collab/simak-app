@@ -38,6 +38,7 @@ import {
   Video,
   Receipt,
   ShoppingCart,
+  PackagePlus,
 } from 'lucide-react'
 import { useAuth } from '../lib/AuthContext'
 import { supabase } from '../lib/supabaseClient'
@@ -91,6 +92,7 @@ const groupsAdmin = [
     links: [
       { to: '/pengajuan-surat-aktif', label: 'Pengajuan Surat Aktif', icon: FileCheck2 },
       { to: '/perbaikan-data-siswa', label: 'Perbaikan Data Siswa', icon: UserCog },
+      { to: '/pengajuan-kebutuhan-kelas', label: 'Kebutuhan Kelas', icon: PackagePlus },
       { to: '/agenda', label: 'Agenda Sekolah', icon: CalendarDays },
       { to: '/surat', label: 'Surat Masuk/Keluar', icon: Mail },
       { to: '/surat-keterangan', label: 'Surat Keterangan', icon: FileSignature },
@@ -124,6 +126,7 @@ const linksGuru = [
   { to: '/sertifikat', label: 'Sertifikat & Penghargaan', icon: Award },
   { to: '/pengajuan-surat-aktif', label: 'Pengajuan Surat Aktif', icon: FileCheck2 },
   { to: '/perbaikan-data-siswa', label: 'Perbaikan Data Siswa', icon: UserCog },
+  { to: '/pengajuan-kebutuhan-kelas', label: 'Kebutuhan Kelas', icon: PackagePlus },
   { to: '/buat-ujian', label: 'Buat Ujian', icon: FilePlus },
   { to: '/hasil-ujian', label: 'Hasil Ujian', icon: ClipboardList },
   { to: '/bank-soal', label: 'Bank Soal', icon: Database },
