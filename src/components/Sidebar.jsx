@@ -39,6 +39,7 @@ import {
   Receipt,
   ShoppingCart,
   PackagePlus,
+  FolderHeart,
 } from 'lucide-react'
 import { useAuth } from '../lib/AuthContext'
 import { supabase } from '../lib/supabaseClient'
@@ -68,6 +69,7 @@ const groupsAdmin = [
       { to: '/rapor', label: 'Rapor Siswa', icon: FileBadge },
       { to: '/ijazah', label: 'Ijazah', icon: ScrollText },
       { to: '/skl', label: 'Surat Keterangan Lulus', icon: Stamp },
+      { to: '/portofolio-siswa', label: 'Portofolio Siswa', icon: FolderHeart },
       { to: '/rpp', label: 'RPP', icon: NotebookPen },
       { to: '/arsip-rpp', label: 'Arsip RPP', icon: Archive },
       { to: '/sertifikat', label: 'Sertifikat & Penghargaan', icon: Award },
@@ -121,6 +123,7 @@ const linksGuru = [
   { to: '/rapor', label: 'Rapor Siswa', icon: FileBadge },
   { to: '/ijazah', label: 'Ijazah', icon: ScrollText },
   { to: '/skl', label: 'Surat Keterangan Lulus', icon: Stamp },
+  { to: '/portofolio-siswa', label: 'Portofolio Siswa', icon: FolderHeart },
   { to: '/rpp', label: 'RPP', icon: NotebookPen },
   { to: '/arsip-rpp', label: 'Arsip RPP', icon: Archive },
   { to: '/sertifikat', label: 'Sertifikat & Penghargaan', icon: Award },
