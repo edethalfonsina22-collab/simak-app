@@ -38,6 +38,7 @@ import BuatUjian from './pages/BuatUjian'
 import UjianOnline from './pages/UjianOnline'
 import ProfilSaya from './pages/ProfilSaya'
 import SertifikatPenghargaan from './pages/SertifikatPenghargaan'
+import PortofolioSiswa from './pages/PortofolioSiswa'
 import PengajuanSuratAktif from './pages/PengajuanSuratAktif'
 import PengajuanEditSiswa from './pages/PengajuanEditSiswa'
 import PengajuanKebutuhanKelas from './pages/PengajuanKebutuhanKelas'
@@ -144,6 +145,7 @@ export default function App() {
       <Route path="/buat-ujian" element={<ProtectedRoute><BuatUjian /></ProtectedRoute>} />
       <Route path="/profil-saya" element={<ProtectedRoute><ProfilSaya /></ProtectedRoute>} />
       <Route path="/sertifikat" element={<ProtectedRoute><SertifikatPenghargaan /></ProtectedRoute>} />
+      <Route path="/portofolio-siswa" element={<ProtectedRoute><PortofolioSiswa /></ProtectedRoute>} />
       <Route path="/rapat" element={<ProtectedRoute><Rapat /></ProtectedRoute>} />
       {/* Sengaja TIDAK dibungkus ProtectedRoute — link rapat dibagikan ke
           peserta yang mungkin belum/tidak punya akun (mis. orang tua, tamu),
