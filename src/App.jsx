@@ -24,6 +24,7 @@ import Rapor from './pages/Rapor'
 import RaporCetak from './pages/RaporCetak'
 import LaporanBulanan from './pages/LaporanBulanan'
 import Keuangan from './pages/Keuangan'
+import KeuanganKelas from './pages/KeuanganKelas'
 import Kuitansi from './pages/Kuitansi'
 import Nota from './pages/Nota'
 import KuitansiJasa from './pages/KuitansiJasa'
@@ -123,6 +124,9 @@ export default function App() {
       <Route path="/laporan" element={<ProtectedRoute adminOnly><LaporanBulanan /></ProtectedRoute>} />
       <Route path="/hari-libur" element={<ProtectedRoute adminOnly><HariLibur /></ProtectedRoute>} />
       <Route path="/keuangan" element={<ProtectedRoute adminOnly><Keuangan /></ProtectedRoute>} />
+      {/* Keuangan Kelas: BUKAN adminOnly — ini kas kelas yang dipegang wali kelas (guru),
+          admin tetap bisa membuka untuk memantau semua kelas. */}
+      <Route path="/keuangan-kelas" element={<ProtectedRoute><KeuanganKelas /></ProtectedRoute>} />
       <Route path="/kuitansi" element={<ProtectedRoute adminOnly><Kuitansi /></ProtectedRoute>} />
       {/* Sebelumnya belum terdaftar di sini meski halamannya sudah ada di src/pages —
           jadi /nota dan /kuitansi-jasa tidak bisa dibuka sama sekali. */}
