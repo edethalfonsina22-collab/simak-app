@@ -40,6 +40,7 @@ import ProfilSaya from './pages/ProfilSaya'
 import SertifikatPenghargaan from './pages/SertifikatPenghargaan'
 import PengajuanSuratAktif from './pages/PengajuanSuratAktif'
 import PengajuanEditSiswa from './pages/PengajuanEditSiswa'
+import PengajuanKebutuhanKelas from './pages/PengajuanKebutuhanKelas'
 import HariLibur from './pages/HariLibur'
 import Rapat from './pages/Rapat'
 import RapatVideo from './pages/RapatVideo'
@@ -137,6 +138,7 @@ export default function App() {
 <Route path="/arsip-rpp" element={<ProtectedRoute><ArsipRPP /></ProtectedRoute>} />
       <Route path="/pengajuan-surat-aktif" element={<ProtectedRoute><PengajuanSuratAktif /></ProtectedRoute>} />
       <Route path="/perbaikan-data-siswa" element={<ProtectedRoute><PengajuanEditSiswa /></ProtectedRoute>} />
+      <Route path="/pengajuan-kebutuhan-kelas" element={<ProtectedRoute><PengajuanKebutuhanKelas /></ProtectedRoute>} />
       <Route path="/bank-soal" element={<ProtectedRoute><BankSoal /></ProtectedRoute>} />
       <Route path="/kartu" element={<ProtectedRoute adminOnly><KartuSiswa /></ProtectedRoute>} />
       <Route path="/buat-ujian" element={<ProtectedRoute><BuatUjian /></ProtectedRoute>} />
