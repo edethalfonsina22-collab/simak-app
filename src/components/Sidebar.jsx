@@ -40,6 +40,7 @@ import {
   ShoppingCart,
   PackagePlus,
   FolderHeart,
+  PiggyBank,
 } from 'lucide-react'
 import { useAuth } from '../lib/AuthContext'
 import { supabase } from '../lib/supabaseClient'
@@ -82,6 +83,7 @@ const groupsAdmin = [
     label: 'Keuangan & Aset',
     links: [
       { to: '/keuangan', label: 'Keuangan', icon: Wallet },
+      { to: '/keuangan-kelas', label: 'Keuangan Kelas', icon: PiggyBank },
       { to: '/kuitansi', label: 'Kuitansi', icon: Receipt },
       { to: '/kuitansi-jasa', label: 'Kuitansi Jasa', icon: Receipt },
       { to: '/nota', label: 'Nota Belanja', icon: ShoppingCart },
@@ -117,6 +119,7 @@ const linksGuru = [
   { to: '/rapat', label: 'Rapat Video', icon: Video },
   { to: '/galeri', label: 'Galeri Kegiatan', icon: Images },
   { to: '/dokumen', label: 'Dokumen Penting', icon: HardDrive },
+  { to: '/keuangan-kelas', label: 'Keuangan Kelas', icon: PiggyBank },
   { to: '/siswa', label: 'Data Siswa', icon: Users },
   { to: '/presensi', label: 'Presensi', icon: ClipboardCheck },
   { to: '/nilai', label: 'Nilai Siswa', icon: BookOpenCheck },
