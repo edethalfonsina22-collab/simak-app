@@ -17,6 +17,26 @@ export default function Halaman8355() {
   const [search, setSearch] = useState('')
   const [kelasId, setKelasId] = useState('')
 
+  // TAMBAHAN: Tahun Ajaran bisa dipilih/diisi sendiri, tidak lagi hardcode.
+  // Default dihitung otomatis dari tanggal hari ini (asumsi tahun ajaran
+  // baru mulai bulan Juli): Jan-Jun -> tahun lalu/tahun ini, Jul-Des -> tahun ini/tahun depan.
+  const tahunAjaranDefault = useMemo(() => {
+    const now = new Date()
+    const y = now.getFullYear()
+    const bulan = now.getMonth() + 1 // 1-12
+    return bulan >= 7 ? `${y} / ${y + 1}` : `${y - 1} / ${y}`
+  }, [])
+  const opsiTahunAjaran = useMemo(() => {
+    const now = new Date()
+    const y = now.getFullYear()
+    const daftar = []
+    for (let i = -2; i <= 2; i++) {
+      daftar.push(`${y + i} / ${y + i + 1}`)
+    }
+    return daftar
+  }, [])
+  const [tahunAjaran, setTahunAjaran] = useState(tahunAjaranDefault)
+
   async function loadData() {
     setLoading(true)
     const [{ data: siswa }, { data: kelas }] = await Promise.all([
@@ -47,7 +67,7 @@ export default function Halaman8355() {
       bukaCetak8355({
         profil,
         siswaList: filtered,
-        tahunPelajaran: '2025 / 2026',
+        tahunPelajaran: tahunAjaran,
       })
     } finally {
       setMencetak(false)
@@ -105,6 +125,7 @@ export default function Halaman8355() {
         Transportasi: s.transportasi || '',
         'Jml Saudara': s.jumlah_saudara || '',
         'No SKHUN': s.no_skhun || '',
+        'Tahun Ajaran': tahunAjaran,
       }))
 
       const ws = XLSX.utils.json_to_sheet(rows)
@@ -115,7 +136,7 @@ export default function Halaman8355() {
       )
       const wb = XLSX.utils.book_new()
       XLSX.utils.book_append_sheet(wb, ws, 'Formulir 8355')
-      XLSX.writeFile(wb, `Formulir-8355-${new Date().toISOString().slice(0, 10)}.xlsx`)
+      XLSX.writeFile(wb, `Formulir-8355-${tahunAjaran.replace(/\s/g, '')}-${new Date().toISOString().slice(0, 10)}.xlsx`)
     } finally {
       setMengunduh(false)
     }
@@ -127,6 +148,20 @@ export default function Halaman8355() {
       subtitle="Daftar Calon Peserta Ujian — format resmi dengan kop surat sekolah"
       actions={
         <>
+          {/* TAMBAHAN: pilih Tahun Ajaran, dipakai di subjudul cetak PDF & nama file Excel */}
+          <select
+            className="input-field w-40"
+            value={tahunAjaran}
+            onChange={(e) => setTahunAjaran(e.target.value)}
+            title="Tahun Ajaran"
+          >
+            {!opsiTahunAjaran.includes(tahunAjaran) && (
+              <option value={tahunAjaran}>{tahunAjaran}</option>
+            )}
+            {opsiTahunAjaran.map((ta) => (
+              <option key={ta} value={ta}>{ta}</option>
+            ))}
+          </select>
           <button className="btn-secondary" onClick={handleExportExcel} disabled={mengunduh || loading}>
             {mengunduh ? <Loader2 size={16} className="animate-spin" /> : <FileSpreadsheet size={16} />}
             Unduh Excel (bisa diedit)
