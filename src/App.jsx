@@ -5,10 +5,10 @@ import Galeri from './pages/Galeri'
 import Dokumen from './pages/Dokumen'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { useAuth } from './lib/AuthContext'
-import { supabase } from './lib/supabaseClient'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
 import Siswa from './pages/Siswa'
+import Halaman8355 from './pages/8355'
 import HasilUjian from './pages/HasilUjian'
 import Guru from './pages/Guru'
 import Kelas from './pages/Kelas'
@@ -24,10 +24,7 @@ import Rapor from './pages/Rapor'
 import RaporCetak from './pages/RaporCetak'
 import LaporanBulanan from './pages/LaporanBulanan'
 import Keuangan from './pages/Keuangan'
-import KeuanganKelas from './pages/KeuanganKelas'
 import Kuitansi from './pages/Kuitansi'
-import Nota from './pages/Nota'
-import KuitansiJasa from './pages/KuitansiJasa'
 import Backup from './pages/Backup'
 import ProfilSekolah from './pages/ProfilSekolah'
 import PPDBPublik from './pages/PPDBPublik'
@@ -39,16 +36,11 @@ import BuatUjian from './pages/BuatUjian'
 import UjianOnline from './pages/UjianOnline'
 import ProfilSaya from './pages/ProfilSaya'
 import SertifikatPenghargaan from './pages/SertifikatPenghargaan'
-import PortofolioSiswa from './pages/PortofolioSiswa'
 import PengajuanSuratAktif from './pages/PengajuanSuratAktif'
 import PengajuanEditSiswa from './pages/PengajuanEditSiswa'
-import PengajuanKebutuhanKelas from './pages/PengajuanKebutuhanKelas'
 import HariLibur from './pages/HariLibur'
 import Rapat from './pages/Rapat'
 import RapatVideo from './pages/RapatVideo'
-import Ijazah from './pages/Ijazah'
-import NilaiAsesmen from './pages/NilaiAsesmen'
-import SuratKeteranganLulus from './pages/SuratKeteranganLulus'
 import Loader from './components/Loader'
 
 function ProtectedRoute({ children, adminOnly }) {
@@ -72,33 +64,6 @@ function ProtectedRoute({ children, adminOnly }) {
   return children
 }
 
-// Nota.jsx menerima `sekolah` lewat prop (beda dari Kuitansi.jsx/KuitansiJasa.jsx
-// yang mengambil sendiri profil sekolah secara internal) — wrapper kecil ini
-// mengambilkan profil sekolah dengan cara yang sama supaya kop surat di cetakan
-// nota tetap terisi.
-function NotaDenganSekolah() {
-  const [sekolah, setSekolah] = useState(null)
-
-  useEffect(() => {
-    supabase
-      .from('profil_sekolah')
-      .select('*')
-      .eq('id', 1)
-      .maybeSingle()
-      .then(({ data }) => {
-        if (data) {
-          setSekolah({
-            nama: data.nama_sekolah,
-            alamat: data.alamat,
-            kota: data.kabupaten,
-          })
-        }
-      })
-  }, [])
-
-  return <Nota sekolah={sekolah} />
-}
-
 export default function App() {
   return (
     <Routes>
@@ -108,6 +73,7 @@ export default function App() {
       <Route path="/login" element={<Login />} />
       <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
       <Route path="/siswa" element={<ProtectedRoute><Siswa /></ProtectedRoute>} />
+      <Route path="/8355" element={<ProtectedRoute><Halaman8355 /></ProtectedRoute>} />
       <Route path="/hasil-ujian" element={<ProtectedRoute><HasilUjian /></ProtectedRoute>} />
       <Route path="/guru" element={<ProtectedRoute adminOnly><Guru /></ProtectedRoute>} />
       <Route path="/kelas" element={<ProtectedRoute adminOnly><Kelas /></ProtectedRoute>} />
@@ -116,9 +82,6 @@ export default function App() {
       <Route path="/nilai" element={<ProtectedRoute><Nilai /></ProtectedRoute>} />
       <Route path="/rapor" element={<ProtectedRoute><Rapor /></ProtectedRoute>} />
       <Route path="/rapor/cetak" element={<ProtectedRoute><RaporCetak /></ProtectedRoute>} />
-      <Route path="/nilai-asesmen" element={<ProtectedRoute><NilaiAsesmen /></ProtectedRoute>} />
-      <Route path="/ijazah" element={<ProtectedRoute><Ijazah /></ProtectedRoute>} />
-      <Route path="/skl" element={<ProtectedRoute><SuratKeteranganLulus /></ProtectedRoute>} />
       <Route path="/inventaris" element={<ProtectedRoute adminOnly><Inventaris /></ProtectedRoute>} />
       <Route path="/agenda" element={<ProtectedRoute><Agenda /></ProtectedRoute>} />
       <Route path="/surat" element={<ProtectedRoute adminOnly><Surat /></ProtectedRoute>} />
@@ -126,14 +89,7 @@ export default function App() {
       <Route path="/laporan" element={<ProtectedRoute adminOnly><LaporanBulanan /></ProtectedRoute>} />
       <Route path="/hari-libur" element={<ProtectedRoute adminOnly><HariLibur /></ProtectedRoute>} />
       <Route path="/keuangan" element={<ProtectedRoute adminOnly><Keuangan /></ProtectedRoute>} />
-      {/* Keuangan Kelas: BUKAN adminOnly — ini kas kelas yang dipegang wali kelas (guru),
-          admin tetap bisa membuka untuk memantau semua kelas. */}
-      <Route path="/keuangan-kelas" element={<ProtectedRoute><KeuanganKelas /></ProtectedRoute>} />
       <Route path="/kuitansi" element={<ProtectedRoute adminOnly><Kuitansi /></ProtectedRoute>} />
-      {/* Sebelumnya belum terdaftar di sini meski halamannya sudah ada di src/pages —
-          jadi /nota dan /kuitansi-jasa tidak bisa dibuka sama sekali. */}
-      <Route path="/nota" element={<ProtectedRoute adminOnly><NotaDenganSekolah /></ProtectedRoute>} />
-      <Route path="/kuitansi-jasa" element={<ProtectedRoute adminOnly><KuitansiJasa /></ProtectedRoute>} />
       <Route path="/backup" element={<ProtectedRoute adminOnly><Backup /></ProtectedRoute>} />
       <Route path="/profil-sekolah" element={<ProtectedRoute adminOnly><ProfilSekolah /></ProtectedRoute>} />
       <Route path="/ppdb-admin" element={<ProtectedRoute adminOnly><PPDBAdmin /></ProtectedRoute>} />
@@ -145,19 +101,13 @@ export default function App() {
 <Route path="/arsip-rpp" element={<ProtectedRoute><ArsipRPP /></ProtectedRoute>} />
       <Route path="/pengajuan-surat-aktif" element={<ProtectedRoute><PengajuanSuratAktif /></ProtectedRoute>} />
       <Route path="/perbaikan-data-siswa" element={<ProtectedRoute><PengajuanEditSiswa /></ProtectedRoute>} />
-      <Route path="/pengajuan-kebutuhan-kelas" element={<ProtectedRoute><PengajuanKebutuhanKelas /></ProtectedRoute>} />
       <Route path="/bank-soal" element={<ProtectedRoute><BankSoal /></ProtectedRoute>} />
       <Route path="/kartu" element={<ProtectedRoute adminOnly><KartuSiswa /></ProtectedRoute>} />
       <Route path="/buat-ujian" element={<ProtectedRoute><BuatUjian /></ProtectedRoute>} />
       <Route path="/profil-saya" element={<ProtectedRoute><ProfilSaya /></ProtectedRoute>} />
       <Route path="/sertifikat" element={<ProtectedRoute><SertifikatPenghargaan /></ProtectedRoute>} />
-      <Route path="/portofolio-siswa" element={<ProtectedRoute><PortofolioSiswa /></ProtectedRoute>} />
       <Route path="/rapat" element={<ProtectedRoute><Rapat /></ProtectedRoute>} />
-      {/* Sengaja TIDAK dibungkus ProtectedRoute — link rapat dibagikan ke
-          peserta yang mungkin belum/tidak punya akun (mis. orang tua, tamu),
-          jadi mereka bisa langsung gabung cukup dengan mengisi nama.
-          RapatVideo sendiri yang menangani kasus sudah login vs tamu. */}
-      <Route path="/rapat/:roomId" element={<RapatVideo />} />
+      <Route path="/rapat/:roomId" element={<ProtectedRoute><RapatVideo /></ProtectedRoute>} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )
