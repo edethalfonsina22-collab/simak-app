@@ -4,7 +4,8 @@ import Layout from "../components/Layout";
 import { MAPEL_IJAZAH, jumlahNilai, rataRataNilai } from "../components/IjazahPrintTemplate";
 import RekapIjazahPrintTemplate from "../components/RekapIjazahPrintTemplate";
 import ImporNilaiAsesmenModal from "../components/ImporNilaiAsesmenModal";
-import { Loader2, Save, Printer } from "lucide-react";
+import DetailNilaiSiswaModal from "../components/DetailNilaiSiswaModal";
+import { Loader2, Save, Printer, FileEdit } from "lucide-react";
 
 // Tahun pelajaran default: kalau sekarang Juli-Des, "thn/thn+1"; kalau Jan-Jun, "thn-1/thn".
 function tahunPelajaranDefault() {
@@ -24,6 +25,7 @@ export default function Ijazah() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [selectedId, setSelectedId] = useState(null);
+  const [detailSiswa, setDetailSiswa] = useState(null); // siswa yang lagi dibuka di modal Detail & Cetak
 
   // Ambil daftar kelas sekali di awal, lalu default-kan ke kelas yang mengandung "6"
   useEffect(() => {
@@ -126,6 +128,7 @@ export default function Ijazah() {
         nip_kepala_sekolah: sekolah.nip_kepala_sekolah,
         pengawas: sekolah.pengawas,
         nip_pengawas: sekolah.nip_pengawas,
+        ttd_url: sekolah.ttd_url,
       }
     : null;
 
@@ -191,6 +194,7 @@ export default function Ijazah() {
                   ))}
                   <th className="text-right">Jumlah</th>
                   <th className="text-right">Rata²</th>
+                  <th></th>
                 </tr>
               </thead>
               <tbody>
@@ -219,12 +223,31 @@ export default function Ijazah() {
                       ))}
                       <td className="text-right font-semibold">{jumlahNilai(v).toFixed(2)}</td>
                       <td className="text-right font-semibold">{rataRataNilai(v).toFixed(2)}</td>
+                      <td className="text-right">
+                        <button
+                          className="btn-secondary !px-2.5 !py-1.5 text-xs whitespace-nowrap"
+                          onClick={() => setDetailSiswa(s)}
+                          title="Isi nilai per semester & cetak Daftar Nilai Kolektif"
+                        >
+                          <FileEdit size={14} /> Detail &amp; Cetak
+                        </button>
+                      </td>
                     </tr>
                   );
                 })}
               </tbody>
             </table>
           </div>
+
+          {detailSiswa && (
+            <DetailNilaiSiswaModal
+              siswa={detailSiswa}
+              sekolah={sekolahUntukCetak}
+              tahunPelajaran={tahunPelajaran}
+              onClose={() => setDetailSiswa(null)}
+              onSaved={loadAll}
+            />
+          )}
 
           <div className="card p-4">
             <div className="flex items-center justify-between mb-4">
