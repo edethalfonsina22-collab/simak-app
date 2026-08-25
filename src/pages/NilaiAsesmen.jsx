@@ -12,8 +12,9 @@ import { useEffect, useMemo, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
 import Layout from "../components/Layout";
 import ImporNilaiAsesmenModal from "../components/ImporNilaiAsesmenModal";
+import DetailNilaiSiswaModal from "../components/DetailNilaiSiswaModal";
 import { MAPEL_IJAZAH, jumlahNilai, rataRataNilai } from "../components/IjazahPrintTemplate";
-import { Loader2, Save, FileSpreadsheet } from "lucide-react";
+import { Loader2, Save, FileSpreadsheet, FileEdit } from "lucide-react";
 
 // Tahun pelajaran default: kalau sekarang Juli-Des, "thn/thn+1"; kalau Jan-Jun, "thn-1/thn".
 function tahunPelajaranDefault() {
@@ -29,9 +30,11 @@ export default function NilaiAsesmen() {
   const [kelasId, setKelasId] = useState(null);
   const [siswaList, setSiswaList] = useState([]);
   const [nilaiMap, setNilaiMap] = useState({}); // siswa_id -> {pend_agama: .., ...}
+  const [sekolah, setSekolah] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [detailSiswa, setDetailSiswa] = useState(null); // siswa yang lagi dibuka di modal Detail & Cetak
 
   useEffect(() => {
     loadKelas();
@@ -60,9 +63,10 @@ export default function NilaiAsesmen() {
       .order("nama_lengkap");
     if (kelasId) siswaQuery = siswaQuery.eq("kelas_id", kelasId);
 
-    const [{ data: siswa }, { data: nilai }] = await Promise.all([
+    const [{ data: siswa }, { data: nilai }, { data: profil }] = await Promise.all([
       siswaQuery,
       supabase.from("nilai_ijazah").select("*").eq("tahun_pelajaran", tahunPelajaran),
+      supabase.from("profil_sekolah").select("*").eq("id", 1).maybeSingle(),
     ]);
     setSiswaList(siswa || []);
     const map = {};
@@ -70,6 +74,7 @@ export default function NilaiAsesmen() {
       map[n.siswa_id] = n;
     });
     setNilaiMap(map);
+    setSekolah(profil || null);
     setLoading(false);
   }
 
@@ -104,6 +109,19 @@ export default function NilaiAsesmen() {
   }
 
   const kelasAktif = useMemo(() => kelasList.find((k) => k.id === kelasId), [kelasList, kelasId]);
+
+  const sekolahUntukCetak = sekolah
+    ? {
+        nama_sekolah: sekolah.nama_sekolah,
+        npsn: sekolah.npsn,
+        kabupaten: sekolah.kabupaten,
+        provinsi: sekolah.provinsi,
+        tempat_ttd: sekolah.tempat_ttd,
+        kepala_sekolah: sekolah.kepala_sekolah,
+        nip_kepala_sekolah: sekolah.nip_kepala_sekolah,
+        ttd_url: sekolah.ttd_url,
+      }
+    : null;
 
   return (
     <Layout
@@ -170,6 +188,7 @@ export default function NilaiAsesmen() {
                 ))}
                 <th className="text-right">Jumlah</th>
                 <th className="text-right">Rata²</th>
+                <th></th>
               </tr>
             </thead>
             <tbody>
@@ -196,12 +215,31 @@ export default function NilaiAsesmen() {
                     ))}
                     <td className="text-right font-semibold">{jumlahNilai(v).toFixed(2)}</td>
                     <td className="text-right font-semibold">{rataRataNilai(v).toFixed(2)}</td>
+                    <td className="text-right">
+                      <button
+                        className="btn-secondary !px-2.5 !py-1.5 text-xs whitespace-nowrap"
+                        onClick={() => setDetailSiswa(s)}
+                        title="Isi nilai per semester & cetak Daftar Nilai Kolektif"
+                      >
+                        <FileEdit size={14} /> Detail &amp; Cetak
+                      </button>
+                    </td>
                   </tr>
                 );
               })}
             </tbody>
           </table>
         </div>
+      )}
+
+      {detailSiswa && (
+        <DetailNilaiSiswaModal
+          siswa={detailSiswa}
+          sekolah={sekolahUntukCetak}
+          tahunPelajaran={tahunPelajaran}
+          onClose={() => setDetailSiswa(null)}
+          onSaved={loadAll}
+        />
       )}
 
       {siswaList.length > 0 && (
