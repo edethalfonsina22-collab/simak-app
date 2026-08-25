@@ -41,6 +41,7 @@ import {
   PackagePlus,
   FolderHeart,
   PiggyBank,
+  FileSpreadsheet,
 } from 'lucide-react'
 import { useAuth } from '../lib/AuthContext'
 import { supabase } from '../lib/supabaseClient'
@@ -67,6 +68,7 @@ const groupsAdmin = [
       { to: '/jadwal', label: 'Jadwal Pelajaran', icon: CalendarClock },
       { to: '/presensi', label: 'Presensi', icon: ClipboardCheck },
       { to: '/nilai', label: 'Nilai Siswa', icon: BookOpenCheck },
+      { to: '/nilai-asesmen', label: 'Nilai Asesmen', icon: FileSpreadsheet },
       { to: '/rapor', label: 'Rapor Siswa', icon: FileBadge },
       { to: '/ijazah', label: 'Ijazah', icon: ScrollText },
       { to: '/skl', label: 'Surat Keterangan Lulus', icon: Stamp },
@@ -123,6 +125,7 @@ const linksGuru = [
   { to: '/siswa', label: 'Data Siswa', icon: Users },
   { to: '/presensi', label: 'Presensi', icon: ClipboardCheck },
   { to: '/nilai', label: 'Nilai Siswa', icon: BookOpenCheck },
+  { to: '/nilai-asesmen', label: 'Nilai Asesmen', icon: FileSpreadsheet },
   { to: '/rapor', label: 'Rapor Siswa', icon: FileBadge },
   { to: '/ijazah', label: 'Ijazah', icon: ScrollText },
   { to: '/skl', label: 'Surat Keterangan Lulus', icon: Stamp },
