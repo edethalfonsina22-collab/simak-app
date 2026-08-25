@@ -1,6 +1,21 @@
 import React from "react";
 import { MAPEL_IJAZAH, jumlahNilai } from "./IjazahPrintTemplate";
 
+// Motif bingkai: ubin SVG kecil (diamond + bunga di tengah, warna biru) yang
+// diulang sepanjang tepi lewat CSS border-image — meniru gaya bingkai
+// ornamen biru pada sertifikat, tapi dibuat lebih tipis supaya tidak
+// memakan banyak ruang cetak dan tetap rapi di kertas A4.
+const FRAME_TILE = encodeURIComponent(
+  `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+    <rect width="64" height="64" fill="#2748a0"/>
+    <rect x="2" y="2" width="60" height="60" fill="none" stroke="#8fa6e0" stroke-width="1"/>
+    <path d="M32 10 L44 32 L32 54 L20 32 Z" fill="none" stroke="#c9d6f5" stroke-width="2"/>
+    <circle cx="32" cy="32" r="6" fill="#c9d6f5"/>
+    <circle cx="32" cy="32" r="2.4" fill="#2748a0"/>
+  </svg>`
+);
+const FRAME_URL = `url("data:image/svg+xml,${FRAME_TILE}")`;
+
 const SklPrintTemplate = React.forwardRef(function SklPrintTemplate(
   { siswa, nilai, sekolah, skl, tahunPelajaran },
   ref
@@ -33,22 +48,27 @@ const SklPrintTemplate = React.forwardRef(function SklPrintTemplate(
         boxSizing: "border-box",
       }}
     >
-      {/* BINGKAI GANDA — garis luar tebal + garis dalam tipis, gaya sertifikat
-          resmi. Konten surat ditaruh di dalam bingkai dalam supaya selalu
-          punya jarak aman dari tepi kertas A4 saat dicetak. */}
+      {/* BINGKAI ORNAMEN BIRU — motif diamond/bunga berulang lewat border-image,
+          dibuat lebih tipis daripada gaya sertifikat pada umumnya supaya konten
+          tetap lega. Garis tipis biru di dalamnya menggantikan garis hitam
+          sebelumnya, mengikuti nuansa warna yang sama dengan bingkai luar. */}
       <div
         style={{
-          border: "2.5pt solid #000",
-          padding: "2.5mm",
+          border: "7mm solid transparent",
+          borderImageSource: FRAME_URL,
+          borderImageSlice: 22,
+          borderImageWidth: "7mm",
+          borderImageRepeat: "round",
+          padding: "2mm",
           minHeight: "calc(297mm - 16mm)",
           boxSizing: "border-box",
         }}
       >
         <div
           style={{
-            border: "1pt solid #000",
+            border: "1pt solid #2748a0",
             padding: "10mm 12mm",
-            minHeight: "calc(297mm - 16mm - 5pt - 5mm)",
+            minHeight: "calc(297mm - 16mm - 14mm - 4mm - 5pt)",
             boxSizing: "border-box",
             display: "flex",
             flexDirection: "column",
@@ -62,7 +82,7 @@ const SklPrintTemplate = React.forwardRef(function SklPrintTemplate(
               display: "flex",
               alignItems: "center",
               gap: 14,
-              borderBottom: "3px double #000",
+              borderBottom: "3px double #2748a0",
               paddingBottom: 8,
               marginBottom: 20,
             }}
@@ -235,8 +255,8 @@ function formatTanggal(iso) {
   }
 }
 
-const th = { border: "1px solid #000", padding: "5px 7px", background: "#f0f0f0", fontWeight: "bold", letterSpacing: "0.2px" };
-const td = { border: "1px solid #000", padding: "4px 7px", textAlign: "center", verticalAlign: "middle" };
-const tdGroup = { border: "1px solid #000", padding: "4px 7px", fontWeight: "bold", background: "#fafafa" };
+const th = { border: "1px solid #2748a0", padding: "5px 7px", background: "#eef1fb", fontWeight: "bold", letterSpacing: "0.2px" };
+const td = { border: "1px solid #2748a0", padding: "4px 7px", textAlign: "center", verticalAlign: "middle" };
+const tdGroup = { border: "1px solid #2748a0", padding: "4px 7px", fontWeight: "bold", background: "#f5f7fc" };
 
 export default SklPrintTemplate;
