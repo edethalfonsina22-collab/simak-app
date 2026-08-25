@@ -224,11 +224,15 @@ export function bukaCetakTabel({
   jendela.document.close()
 }
 
+// Definisi kolom Formulir 8355, disusun per-blok sesuai 3 lembar di file Word
+// aslinya. Kolom No/NISN/Nama diulang di awal blok 2 & 3 supaya tiap lembar
+// tetap bisa dicocokkan barisnya meski dipisah kertas.
 const KOL_NO = ['No', (s, i) => i + 1]
 const KOL_NISN = ['NISN', (s) => s.nisn]
 const KOL_NAMA = ['Nama Peserta', (s) => s.nama_lengkap]
 
 const BLOK_8355 = [
+  // Lembar 1 — setara kolom 1–14 di file Word
   [
     KOL_NO,
     ['Kode Prov.', (s) => s.kode_provinsi],
@@ -245,6 +249,7 @@ const BLOK_8355 = [
     ['Tempat Lahir', (s) => s.tempat_lahir],
     ['Tgl Lahir', (s) => formatTglSingkat(s.tanggal_lahir)],
   ],
+  // Lembar 2 — setara kolom 15–25 di file Word
   [
     KOL_NO,
     KOL_NISN,
@@ -260,6 +265,7 @@ const BLOK_8355 = [
     ['Agama', (s) => s.agama],
     ['Pekerjaan Ayah', (s) => s.pekerjaan_ayah],
   ],
+  // Lembar 3 — setara kolom 26–38 di file Word
   [
     KOL_NO,
     KOL_NISN,
@@ -279,12 +285,26 @@ const BLOK_8355 = [
   ],
 ]
 
+// Versi datar (flat) dipakai untuk tabel di layar (halaman 8355.jsx) —
+// gabungan semua kolom unik dari 3 blok di atas, tanpa duplikasi No/NISN/Nama.
 export const KOLOM_8355 = [
   ...BLOK_8355[0],
   ...BLOK_8355[1].filter(([label]) => !['No', 'NISN', 'Nama Peserta'].includes(label)),
   ...BLOK_8355[2].filter(([label]) => !['No', 'NISN', 'Nama Peserta'].includes(label)),
 ]
 
+/**
+ * Cetak Formulir 8355 — Daftar Calon Peserta Ujian, dipisah jadi 3 lembar
+ * terpisah (blok kolom 1–14, 15–25, 26–38) persis susunan file Word aslinya.
+ * Setiap lembar punya kop surat sendiri; tanda tangan kepala sekolah hanya
+ * muncul di lembar terakhir. Dicetak dalam orientasi LANDSCAPE karena jumlah
+ * kolom per lembar cukup banyak (14 kolom di lembar 1).
+ *
+ * @param {object}      opsi
+ * @param {object|null} opsi.profil        - hasil ambilProfilUntukCetak()
+ * @param {Array}       opsi.siswaList     - daftar siswa (baris data lengkap dari Supabase)
+ * @param {string}      [opsi.tahunPelajaran] - mis. "2025 / 2026"
+ */
 export function bukaCetak8355({ profil, siswaList, tahunPelajaran }) {
   const subJudul = tahunPelajaran ? `Tahun Pelajaran ${tahunPelajaran}` : ''
 
@@ -329,7 +349,7 @@ export function bukaCetak8355({ profil, siswaList, tahunPelajaran }) {
       <title>Formulir 8355</title>
       <style>
         ${CSS_DASAR}
-        @media print { @page { size: A4 portrait; margin: 0; } }
+        @media print { @page { size: A4 landscape; margin: 0; } }
       </style>
     </head>
     <body>
