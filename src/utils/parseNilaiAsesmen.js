@@ -103,14 +103,20 @@ function cariTahunPelajaran(rows) {
   return ''
 }
 
-// Cari baris header tabel nilai ("NO", "MATA PELAJARAN", "NILAI", dst.)
-// lalu kumpulkan baris-baris mapel di bawahnya (dikenali dari kolom "NO"
-// yang berisi angka urut 1..9), ambil nilai akhir dari kolom "NILAI".
-function cariBarisMapel(rows) {
+// Cari baris header tabel nilai ("NO", "MATA PELAJARAN", "JUMLAH",
+// "RATA-RATA", "NILAI ASESMEN", "NILAI", "KETERANGAN") lalu kumpulkan
+// baris-baris mapel di bawahnya (dikenali dari kolom "NO" yang berisi
+// angka urut 1..9). Kolom nilai per semester (IV-I, IV-II, V-I, V-II,
+// VI-I, VI-II) diambil dari SEMUA kolom di antara "MATA PELAJARAN" dan
+// "JUMLAH" — jadi tidak bergantung pada nomor kolom tetap, cuma pada
+// urutan header-nya (sama seperti format resmi "Daftar Nilai Kolektif").
+function cariBarisMapelDetail(rows) {
   let headerIdx = -1
   let noCol = -1
   let mapelCol = -1
-  let nilaiCol = -1
+  let jumlahCol = -1
+  let asesmenCol = -1
+  let keteranganCol = -1
 
   for (let r = 0; r < rows.length; r++) {
     const row = rows[r]
@@ -119,14 +125,25 @@ function cariBarisMapel(rows) {
       const label = normalisasi(row[c])
       if (label === 'no') noCol = c
       if (label === 'mata pelajaran') { mapelCol = c; foundMapelHeader = true }
-      // "NILAI" harus persis "nilai" — bukan "nilai asesmen" — supaya tidak
-      // salah ambil kolom Nilai Asesmen sebagai kolom Nilai (akhir).
-      if (label === 'nilai') nilaiCol = c
+      if (label === 'jumlah') jumlahCol = c
+      if (label.includes('asesmen')) asesmenCol = c
+      if (label.includes('keterangan')) keteranganCol = c
     }
     if (foundMapelHeader) { headerIdx = r; break }
   }
 
-  if (headerIdx === -1 || mapelCol === -1 || nilaiCol === -1) return []
+  if (headerIdx === -1 || mapelCol === -1 || jumlahCol === -1 || jumlahCol <= mapelCol) return []
+
+  // Kolom-kolom nilai per semester = semua kolom di antara "MATA PELAJARAN"
+  // dan "JUMLAH" (biasanya 6: IV-I, IV-II, V-I, V-II, VI-I, VI-II).
+  const semesterCols = []
+  for (let c = mapelCol + 1; c < jumlahCol; c++) semesterCols.push(c)
+
+  const angka = (v) => {
+    if (v === null || v === undefined || v === '') return null
+    const n = typeof v === 'number' ? v : Number(v)
+    return Number.isFinite(n) ? n : null
+  }
 
   const hasil = []
   for (let r = headerIdx + 1; r < rows.length; r++) {
@@ -140,20 +157,38 @@ function cariBarisMapel(rows) {
       continue
     }
     const namaMapel = bersihkanSel(row[mapelCol])
-    const nilaiRaw = row[nilaiCol]
     if (!namaMapel) continue
-    // Sel kosong (termasuk hasil rumus IFERROR(...,"") saat inputnya belum diisi)
-    // harus dianggap "belum ada nilai", BUKAN 0 — Number("") di JS = 0, jadi
-    // harus dicek eksplisit di sini supaya tidak salah tersimpan sebagai nilai 0.
-    const kosong = nilaiRaw === null || nilaiRaw === undefined || nilaiRaw === ''
-    const nilaiAkhir = kosong ? NaN : (typeof nilaiRaw === 'number' ? nilaiRaw : Number(nilaiRaw))
+
     hasil.push({
       namaMapel,
       key: cocokkanMapel(namaMapel),
-      nilai: nilaiAkhir,
+      semester: semesterCols.map((c) => angka(row[c])),
+      nilaiAsesmen: asesmenCol !== -1 ? angka(row[asesmenCol]) : null,
+      keterangan: keteranganCol !== -1 ? bersihkanSel(row[keteranganCol]) : '',
     })
   }
   return hasil
+}
+
+// Jumlah nilai rapor 6 semester (sel kosong dihitung 0, sama seperti rumus
+// SUM() di Excel).
+export function jumlahSemester(semester) {
+  return (semester || []).reduce((sum, v) => sum + (Number.isFinite(v) ? v : 0), 0)
+}
+
+// Rata-rata rapor = jumlah 6 semester dibagi 6 (bukan dibagi jumlah sel
+// terisi) — persis mengikuti rumus resmi format "Daftar Nilai Kolektif".
+export function rataRataSemester(semester) {
+  return jumlahSemester(semester) / 6
+}
+
+// Nilai akhir per mapel = (rata-rata rapor 6 semester + nilai asesmen) / 2.
+// Dicocokkan & diverifikasi langsung terhadap file daftar_nilai_asesmen_2026.xlsx
+// (mis. Pend. Agama: rata-rata 77.83 + asesmen 87 -> (77.83+87)/2 = 82.42,
+// sama persis dengan kolom "NILAI" di file itu).
+export function hitungNilaiAkhir(semester, nilaiAsesmen) {
+  if (!Number.isFinite(nilaiAsesmen)) return null
+  return (rataRataSemester(semester) + nilaiAsesmen) / 2
 }
 
 /**
@@ -164,6 +199,7 @@ function cariBarisMapel(rows) {
  * @returns {{
  *   namaPeserta: string, nis: string, nisn: string, noPeserta: string,
  *   tahunPelajaran: string, nilai: Record<string, number>,
+ *   detail: Record<string, {semester: (number|null)[], nilaiAsesmen: number|null, keterangan: string}>,
  *   mapelTidakDikenali: string[]
  * }}
  */
@@ -173,20 +209,28 @@ export function parseSheetNilaiAsesmen(rows) {
   const nisn = cariIdentitas(rows, { exact: 'NISN' })
   const noPeserta = cariIdentitas(rows, { exact: '', startsWith: 'NO PESERTA' })
   const tahunPelajaran = cariTahunPelajaran(rows)
-  const barisMapel = cariBarisMapel(rows)
+  const barisMapel = cariBarisMapelDetail(rows)
 
   const nilai = {}
+  const detail = {}
   const mapelTidakDikenali = []
   for (const b of barisMapel) {
-    if (!Number.isFinite(b.nilai)) continue
-    if (b.key) {
-      nilai[b.key] = Math.round(b.nilai * 100) / 100
-    } else {
+    if (!b.key) {
       mapelTidakDikenali.push(b.namaMapel)
+      continue
+    }
+    detail[b.key] = {
+      semester: b.semester,
+      nilaiAsesmen: b.nilaiAsesmen,
+      keterangan: b.keterangan,
+    }
+    const nilaiAkhir = hitungNilaiAkhir(b.semester, b.nilaiAsesmen)
+    if (nilaiAkhir !== null) {
+      nilai[b.key] = Math.round(nilaiAkhir * 100) / 100
     }
   }
 
-  return { namaPeserta, nis, nisn, noPeserta, tahunPelajaran, nilai, mapelTidakDikenali }
+  return { namaPeserta, nis, nisn, noPeserta, tahunPelajaran, nilai, detail, mapelTidakDikenali }
 }
 
 /**
