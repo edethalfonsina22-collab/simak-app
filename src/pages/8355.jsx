@@ -17,7 +17,7 @@ export default function Halaman8355() {
   const [search, setSearch] = useState('')
   const [kelasId, setKelasId] = useState('')
 
-  // TAMBAHAN: Tahun Ajaran bisa dipilih/diisi sendiri, tidak lagi hardcode.
+  // Tahun Ajaran bisa dipilih/diisi sendiri, tidak lagi hardcode.
   // Default dihitung otomatis dari tanggal hari ini (asumsi tahun ajaran
   // baru mulai bulan Juli): Jan-Jun -> tahun lalu/tahun ini, Jul-Des -> tahun ini/tahun depan.
   const tahunAjaranDefault = useMemo(() => {
@@ -87,6 +87,9 @@ export default function Halaman8355() {
   // Kolom yang belum bisa diisi otomatis (kode ujian dari Dapodik: Kode Prov,
   // Kode Rayon, dst) sengaja dibiarkan kosong supaya admin bisa mengisinya
   // langsung di Excel sebagai catatan/arsip, terpisah dari data siswa di sistem.
+  // Nama kolom di bawah ini sudah disamakan dengan definisi BLOK_8355 di
+  // src/lib/printTemplate.js (cita_cita_anak, jarak_rumah_sekolah, hobi_anak,
+  // alamat_1/alamat_2) supaya data di Excel dan di hasil cetak PDF konsisten.
   function handleExportExcel() {
     setMengunduh(true)
     try {
@@ -107,8 +110,8 @@ export default function Halaman8355() {
         'Tgl Lahir': formatTanggalLahirExcel(s.tanggal_lahir),
         'L/P': s.jenis_kelamin || '',
         'Nama Ayah': s.nama_ayah || '',
-        'Alamat 1': s.alamat || '',
-        'Alamat 2': s.alamat_tinggal || '',
+        'Alamat 1': s.alamat_1 || '',
+        'Alamat 2': s.alamat_2 || '',
         'Kode Pos': s.kode_pos || '',
         'Ket. Mengulang': s.ket_mengulang || '',
         'No Pst. Mengulang': s.no_peserta_mengulang || '',
@@ -116,12 +119,12 @@ export default function Halaman8355() {
         'Pekerjaan Ayah': s.pekerjaan_ayah || '',
         'Nama Ibu': s.nama_ibu || '',
         'Pekerjaan Ibu': s.pekerjaan_ibu || '',
-        'Anak Ke-': s.anak_ke || '',
-        'Cita-cita': s.cita_cita || '',
+        'Hobi Anak': s.hobi_anak || '',
+        'Cita-cita': s.cita_cita_anak || '',
         'Pend. Ayah': s.pendidikan_ayah || '',
         'Pend. Ibu': s.pendidikan_ibu || '',
         'Gaji Ortu': s.gaji_ortu || '',
-        'Jarak ke Sekolah': s.jarak_ke_sekolah || '',
+        'Jarak ke Sekolah': s.jarak_rumah_sekolah || '',
         Transportasi: s.transportasi || '',
         'Jml Saudara': s.jumlah_saudara || '',
         'No SKHUN': s.no_skhun || '',
@@ -148,7 +151,7 @@ export default function Halaman8355() {
       subtitle="Daftar Calon Peserta Ujian — format resmi dengan kop surat sekolah"
       actions={
         <>
-          {/* TAMBAHAN: pilih Tahun Ajaran, dipakai di subjudul cetak PDF & nama file Excel */}
+          {/* Pilih Tahun Ajaran, dipakai di subjudul cetak PDF & nama file Excel */}
           <select
             className="input-field w-40"
             value={tahunAjaran}
