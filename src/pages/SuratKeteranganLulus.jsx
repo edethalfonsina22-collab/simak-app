@@ -77,7 +77,27 @@ export default function SuratKeteranganLulus() {
     const sMap = {};
     (sklRows || []).forEach((r) => (sMap[r.siswa_id] = r));
     setSklMap(sMap);
-    setSekolah(profil || null);
+
+    // profil_sekolah hanya menyimpan logo_path & ttd_kepala_sekolah_path
+    // (path di Supabase Storage), bukan URL langsung — makanya harus diubah
+    // dulu jadi URL publik di sini, sama seperti di ProfilSekolah.jsx.
+    // Sebelumnya logo tidak pernah muncul di cetakan SKL karena kolom
+    // logo_url/ttd_url ini memang tidak ada di tabel.
+    let logoUrl = "";
+    let ttdUrl = "";
+    if (profil?.logo_path) {
+      const { data: pub } = supabase.storage.from("profil-sekolah").getPublicUrl(profil.logo_path);
+      logoUrl = pub?.publicUrl || "";
+    }
+    if (profil?.ttd_kepala_sekolah_path) {
+      const { data: pub } = supabase.storage
+        .from("profil-sekolah")
+        .getPublicUrl(profil.ttd_kepala_sekolah_path);
+      ttdUrl = pub?.publicUrl || "";
+    }
+
+    setSekolah(profil ? { ...profil, logo_url: logoUrl, ttd_url: ttdUrl } : null);
+
     // Pilih siswa pertama di kelas terpilih (reset kalau siswa lama tidak ada di kelas ini)
     if (siswa?.length && !siswa.some((s) => s.id === selectedId)) {
       setSelectedId(siswa[0].id);
@@ -126,10 +146,8 @@ export default function SuratKeteranganLulus() {
         tempat_ttd: sekolah.tempat_ttd,
         kepala_sekolah: sekolah.kepala_sekolah,
         nip_kepala_sekolah: sekolah.nip_kepala_sekolah,
-        // logo_url & ttd_url sebelumnya tidak disertakan di sini, padahal
-        // SklPrintTemplate butuh keduanya untuk menampilkan logo sekolah &
-        // tanda tangan elektronik kepala sekolah — itu sebabnya logo tidak
-        // pernah muncul di cetakan SKL.
+        // logo_url & ttd_url sudah berupa URL publik hasil getPublicUrl()
+        // di loadAll(), diambil dari logo_path & ttd_kepala_sekolah_path.
         logo_url: sekolah.logo_url,
         ttd_url: sekolah.ttd_url,
       }
