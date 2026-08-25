@@ -3,6 +3,7 @@ import { supabase } from "../lib/supabaseClient";
 import Layout from "../components/Layout";
 import { MAPEL_IJAZAH, jumlahNilai, rataRataNilai } from "../components/IjazahPrintTemplate";
 import RekapIjazahPrintTemplate from "../components/RekapIjazahPrintTemplate";
+import ImporNilaiAsesmenModal from "../components/ImporNilaiAsesmenModal";
 import { Loader2, Save, Printer } from "lucide-react";
 
 // Tahun pelajaran default: kalau sekarang Juli-Des, "thn/thn+1"; kalau Jan-Jun, "thn-1/thn".
@@ -133,10 +134,17 @@ export default function Ijazah() {
       title="Ijazah"
       subtitle="Pengisian nilai kelulusan (9 mapel) dan cetak rekap data ijazah kelulusan"
       actions={
-        <button className="btn-primary" onClick={simpanSemua} disabled={saving || loading}>
-          {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
-          Simpan Nilai
-        </button>
+        <div className="flex gap-2">
+          <ImporNilaiAsesmenModal
+            siswaList={siswaList}
+            tahunPelajaranDefault={tahunPelajaran}
+            onSelesai={loadAll}
+          />
+          <button className="btn-primary" onClick={simpanSemua} disabled={saving || loading}>
+            {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+            Simpan Nilai
+          </button>
+        </div>
       }
     >
       <div className="card p-4 mb-6 flex flex-wrap items-end gap-4">
