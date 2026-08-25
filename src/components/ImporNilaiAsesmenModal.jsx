@@ -84,6 +84,7 @@ export default function ImporNilaiAsesmenModal({ siswaList, tahunPelajaranDefaul
     setSaving(true)
     setError('')
     try {
+      // 1) Nilai akhir 9 mapel -> nilai_ijazah (dipakai halaman Ijazah, tidak berubah).
       const rows = barisCocok.map((b) => ({
         siswa_id: b.siswaId,
         tahun_pelajaran: b.tahunPelajaran || tahunPelajaranDefault,
@@ -96,6 +97,36 @@ export default function ImporNilaiAsesmenModal({ siswaList, tahunPelajaranDefaul
         .from('nilai_ijazah')
         .upsert(rows, { onConflict: 'siswa_id,tahun_pelajaran' })
       if (upsertError) throw upsertError
+
+      // 2) Detail nilai per semester (IV-I s/d VI-II) + nilai asesmen ->
+      //    nilai_rapor_semester, supaya bisa dicetak sebagai "Daftar Nilai
+      //    Kolektif" persis format Excel-nya dan diedit lagi nanti.
+      const rowsDetail = []
+      barisCocok.forEach((b) => {
+        MAPEL_ALIASES.forEach((m) => {
+          const d = b.detail?.[m.key]
+          if (!d) return
+          rowsDetail.push({
+            siswa_id: b.siswaId,
+            tahun_pelajaran: b.tahunPelajaran || tahunPelajaranDefault,
+            mapel_key: m.key,
+            iv_1: d.semester?.[0] ?? null,
+            iv_2: d.semester?.[1] ?? null,
+            v_1: d.semester?.[2] ?? null,
+            v_2: d.semester?.[3] ?? null,
+            vi_1: d.semester?.[4] ?? null,
+            vi_2: d.semester?.[5] ?? null,
+            nilai_asesmen: d.nilaiAsesmen ?? null,
+          })
+        })
+      })
+      if (rowsDetail.length > 0) {
+        const { error: detailError } = await supabase
+          .from('nilai_rapor_semester')
+          .upsert(rowsDetail, { onConflict: 'siswa_id,tahun_pelajaran,mapel_key' })
+        if (detailError) throw detailError
+      }
+
       setDone({ tersimpan: rows.length, dilewati: barisTidakCocok.length })
       onSelesai?.()
     } catch (err) {
