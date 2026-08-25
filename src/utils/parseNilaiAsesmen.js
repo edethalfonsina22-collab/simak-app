@@ -47,12 +47,25 @@ function cocokkanMapel(namaMapel) {
   return null
 }
 
+// Label-label lain yang mungkin muncul di baris yang sama (mis. blok identitas
+// kiri & kanan sejajar: "NAMA PESERTA ... PROVINSI ..."). Kalau pencarian nilai
+// menabrak salah satu label ini duluan, berarti sel isiannya memang kosong —
+// JANGAN ambil label itu sebagai nilai.
+const LABEL_IDENTITAS = ['NAMA PESERTA', 'NIS', 'NISN', 'NO PESERTA', 'PROVINSI', 'KABUPATEN', 'SEKOLAH', 'NPSN']
+
 // Ambil nilai (angka/teks) pertama yang tidak kosong setelah kolom `labelIdx`
 // pada baris yang sama, sambil membuang prefix ":" (mis. ": 776768768" -> "776768768").
-function ambilNilaiSetelahLabel(row, labelIdx) {
-  for (let j = labelIdx + 1; j < row.length; j++) {
+// Dibatasi jarak beberapa kolom & berhenti kalau menabrak label lain, supaya
+// tidak "nyasar" mengambil isian dari blok identitas sebelah (mis. kolom
+// PROVINSI) ketika sel isian yang dituju sebenarnya masih kosong.
+function ambilNilaiSetelahLabel(row, labelIdx, maxJarakKolom = 8) {
+  for (let j = labelIdx + 1; j <= labelIdx + maxJarakKolom && j < row.length; j++) {
     const v = row[j]
     if (v === null || v === undefined || v === '') continue
+    if (typeof v === 'string') {
+      const upper = bersihkanSel(v).toUpperCase()
+      if (LABEL_IDENTITAS.some((lbl) => upper.startsWith(lbl))) return ''
+    }
     let s = bersihkanSel(v)
     if (s.startsWith(':')) s = s.slice(1).trim()
     if (s === '') continue
@@ -127,12 +140,17 @@ function cariBarisMapel(rows) {
       continue
     }
     const namaMapel = bersihkanSel(row[mapelCol])
-    const nilaiAkhir = row[nilaiCol]
+    const nilaiRaw = row[nilaiCol]
     if (!namaMapel) continue
+    // Sel kosong (termasuk hasil rumus IFERROR(...,"") saat inputnya belum diisi)
+    // harus dianggap "belum ada nilai", BUKAN 0 — Number("") di JS = 0, jadi
+    // harus dicek eksplisit di sini supaya tidak salah tersimpan sebagai nilai 0.
+    const kosong = nilaiRaw === null || nilaiRaw === undefined || nilaiRaw === ''
+    const nilaiAkhir = kosong ? NaN : (typeof nilaiRaw === 'number' ? nilaiRaw : Number(nilaiRaw))
     hasil.push({
       namaMapel,
       key: cocokkanMapel(namaMapel),
-      nilai: typeof nilaiAkhir === 'number' ? nilaiAkhir : Number(nilaiAkhir),
+      nilai: nilaiAkhir,
     })
   }
   return hasil
