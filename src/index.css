@@ -51,15 +51,6 @@ body {
     size: A4;
     margin: 0;
   }
-  /* @page bernama khusus untuk lembar yang harus dicetak lanskap (mis.
-     Daftar Nilai Ijazah). @page di atas (tanpa nama) tetap jadi default
-     potret untuk Kuitansi/Nota/Kwitansi Jasa — @page ini hanya berlaku
-     pada elemen yang diberi class .print-landscape lewat properti `page`
-     di bawah, jadi tidak mempengaruhi lembar cetak lain. */
-  @page ijazah-landscape {
-    size: A4 landscape;
-    margin: 0;
-  }
   body * {
     visibility: hidden;
   }
@@ -94,13 +85,6 @@ body {
   .print-anchor-bottom {
     top: auto;
     bottom: 0;
-  }
-  /* Khusus Daftar Nilai Ijazah: pakai @page bernama "ijazah-landscape" di
-     atas supaya kertas fisiknya lanskap, bukan cuma kontennya dilebarkan.
-     Tambahkan class ini (bersama .print-only) di root elemen
-     IjazahPrintTemplate.jsx. */
-  .print-landscape {
-    page: ijazah-landscape;
   }
   .no-print {
     display: none !important;
