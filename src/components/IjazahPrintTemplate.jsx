@@ -24,19 +24,6 @@ export function rataRataNilai(nilai) {
 // forwardRef supaya elemen ini bisa dicetak lewat window.print() (kelas
 // .print-only) atau di-capture html2canvas untuk export PDF, sama seperti
 // SuratKeteranganPrintTemplate.
-//
-// CATATAN ORIENTASI CETAK (lanskap):
-// Wrapper di bawah dicetak lanskap lewat DUA hal sekaligus:
-// 1. Ukuran elemen di sini sudah A4 lanskap (297mm x 210mm).
-// 2. className "print-landscape" mengaktifkan @page bernama
-//    "ijazah-landscape" yang didefinisikan di index.css — bagian INI yang
-//    membuat kertas fisiknya benar-benar lanskap saat window.print(),
-//    bukan cuma kontennya dilebarkan (kalau cuma andalkan ukuran elemen,
-//    kebanyakan browser tetap cetak ke kertas default potret lalu
-//    mengecilkan/memotong konten).
-// Dokumen cetak lain (Kuitansi, Nota, Kwitansi Jasa, Surat Keterangan)
-// TIDAK memakai class ini, jadi tetap ikut @page default (potret) di
-// index.css — perubahan ini tidak mempengaruhi lembar lain.
 const IjazahPrintTemplate = React.forwardRef(function IjazahPrintTemplate(
   { siswa, nilai, sekolah, tahunPelajaran },
   ref
@@ -48,7 +35,7 @@ const IjazahPrintTemplate = React.forwardRef(function IjazahPrintTemplate(
   return (
     <div
       ref={ref}
-      className="print-only print-landscape"
+      className="print-only"
       style={{
         // display:block ditambahkan secara eksplisit di sini (inline style)
         // supaya menang atas aturan `@media screen { .print-only { display: none } }`
@@ -56,9 +43,9 @@ const IjazahPrintTemplate = React.forwardRef(function IjazahPrintTemplate(
         // browsing biasa, tapi elemen ini juga dipakai sebagai kotak
         // "Pratinjau" di halaman Ijazah/SKL, jadi harus tetap terlihat di layar.
         display: "block",
-        width: "297mm",
-        minHeight: "210mm",
-        padding: "15mm 18mm",
+        width: "210mm",
+        minHeight: "297mm",
+        padding: "20mm 18mm",
         background: "#fff",
         fontFamily: "'Times New Roman', serif",
         fontSize: "12.5pt",
