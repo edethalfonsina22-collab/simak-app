@@ -1,164 +1,296 @@
-import { useState, useEffect } from 'react'
-import BankSoal from './pages/BankSoal'
-import KartuSiswa from './pages/KartuSiswa'
-import Galeri from './pages/Galeri'
-import Dokumen from './pages/Dokumen'
-import { Routes, Route, Navigate } from 'react-router-dom'
-import { useAuth } from './lib/AuthContext'
-import { supabase } from './lib/supabaseClient'
-import Login from './pages/Login'
-import Dashboard from './pages/Dashboard'
-import Siswa from './pages/Siswa'
-import HasilUjian from './pages/HasilUjian'
-import Guru from './pages/Guru'
-import Kelas from './pages/Kelas'
-import Jadwal from './pages/Jadwal'
-import Presensi from './pages/Presensi'
-import Nilai from './pages/Nilai'
-import Pengumuman from './pages/Pengumuman'
-import Inventaris from './pages/Inventaris'
-import Agenda from './pages/Agenda'
-import Surat from './pages/Surat'
-import SuratKeterangan from './pages/SuratKeterangan'
-import Rapor from './pages/Rapor'
-import RaporCetak from './pages/RaporCetak'
-import LaporanBulanan from './pages/LaporanBulanan'
-import Keuangan from './pages/Keuangan'
-import KeuanganKelas from './pages/KeuanganKelas'
-import Kuitansi from './pages/Kuitansi'
-import Nota from './pages/Nota'
-import KuitansiJasa from './pages/KuitansiJasa'
-import Backup from './pages/Backup'
-import ProfilSekolah from './pages/ProfilSekolah'
-import PPDBPublik from './pages/PPDBPublik'
-import PPDBAdmin from './pages/PPDBAdmin'
-import Perpustakaan from './pages/Perpustakaan'
-import RPP from './pages/RPP'
-import ArsipRPP from './pages/ArsipRPP'
-import BuatUjian from './pages/BuatUjian'
-import UjianOnline from './pages/UjianOnline'
-import ProfilSaya from './pages/ProfilSaya'
-import SertifikatPenghargaan from './pages/SertifikatPenghargaan'
-import PortofolioSiswa from './pages/PortofolioSiswa'
-import PengajuanSuratAktif from './pages/PengajuanSuratAktif'
-import PengajuanEditSiswa from './pages/PengajuanEditSiswa'
-import PengajuanKebutuhanKelas from './pages/PengajuanKebutuhanKelas'
-import HariLibur from './pages/HariLibur'
-import Rapat from './pages/Rapat'
-import RapatVideo from './pages/RapatVideo'
-import Ijazah from './pages/Ijazah'
-import NilaiAsesmen from './pages/NilaiAsesmen'
-import SuratKeteranganLulus from './pages/SuratKeteranganLulus'
-import Loader from './components/Loader'
+import { NavLink } from 'react-router-dom'
+import {
+  LayoutDashboard,
+  Users,
+  GraduationCap,
+  DoorOpen,
+  CalendarClock,
+  ClipboardCheck,
+  BookOpenCheck,
+  Megaphone,
+  Power,
+  Boxes,
+  CalendarDays,
+  Mail,
+  FileBadge,
+  ScrollText,
+  Stamp,
+  FileText,
+  FileSignature,
+  Wallet,
+  DatabaseBackup,
+  UserPlus,
+  Landmark,
+  Library,
+  NotebookPen,
+  Archive,
+  UserCircle,
+  Images,
+  HardDrive,
+  ClipboardList,
+  Database,
+  IdCard,
+  FilePlus,
+  CalendarOff,
+  FileCheck2,
+  UserCog,
+  Award,
+  Video,
+  Receipt,
+  ShoppingCart,
+  PackagePlus,
+  FolderHeart,
+  PiggyBank,
+  FileSpreadsheet,
+  FileDigit,
+} from 'lucide-react'
+import { useAuth } from '../lib/AuthContext'
+import { supabase } from '../lib/supabaseClient'
 
-function ProtectedRoute({ children, adminOnly }) {
-  const { session, loading, isAdmin } = useAuth()
-  const [minTimeElapsed, setMinTimeElapsed] = useState(false)
+// Menu ADMIN dikelompokkan per kategori supaya tidak jadi satu daftar panjang
+const groupsAdmin = [
+  {
+    label: null, // tanpa judul grup — selalu di atas
+    links: [
+      { to: '/', label: 'Dasbor', icon: LayoutDashboard, end: true },
+      { to: '/profil-saya', label: 'Profil Saya', icon: UserCircle },
+      { to: '/rapat', label: 'Rapat Video', icon: Video },
+      { to: '/galeri', label: 'Galeri Kegiatan', icon: Images },
+      { to: '/dokumen', label: 'Dokumen Penting', icon: HardDrive },
+      { to: '/pengumuman', label: 'Pengumuman', icon: Megaphone },
+    ],
+  },
+  {
+    label: 'Akademik',
+    links: [
+      { to: '/siswa', label: 'Data Siswa', icon: Users },
+      { to: '/guru', label: 'Data Guru', icon: GraduationCap },
+      { to: '/kelas', label: 'Kelas', icon: DoorOpen },
+      { to: '/jadwal', label: 'Jadwal Pelajaran', icon: CalendarClock },
+      { to: '/presensi', label: 'Presensi', icon: ClipboardCheck },
+      { to: '/nilai', label: 'Nilai Siswa', icon: BookOpenCheck },
+      { to: '/nilai-asesmen', label: 'Nilai Asesmen', icon: FileSpreadsheet },
+      { to: '/rapor', label: 'Rapor Siswa', icon: FileBadge },
+      { to: '/ijazah', label: 'Ijazah', icon: ScrollText },
+      { to: '/skl', label: 'Surat Keterangan Lulus', icon: Stamp },
+      // Formulir 8355 (Daftar Calon Peserta Ujian) — khusus Admin, sengaja TIDAK
+      // dimasukkan ke linksGuru di bawah (sama seperti Kuitansi/Nota Belanja).
+      { to: '/8355', label: 'Formulir 8355', icon: FileDigit },
+      { to: '/portofolio-siswa', label: 'Portofolio Siswa', icon: FolderHeart },
+      { to: '/rpp', label: 'RPP', icon: NotebookPen },
+      { to: '/arsip-rpp', label: 'Arsip RPP', icon: Archive },
+      { to: '/sertifikat', label: 'Sertifikat & Penghargaan', icon: Award },
+      { to: '/buat-ujian', label: 'Buat Ujian', icon: FilePlus },
+      { to: '/hasil-ujian', label: 'Hasil Ujian', icon: ClipboardList },
+      { to: '/bank-soal', label: 'Bank Soal', icon: Database },
+    ],
+  },
+  {
+    label: 'Keuangan & Aset',
+    links: [
+      { to: '/keuangan', label: 'Keuangan', icon: Wallet },
+      { to: '/keuangan-kelas', label: 'Keuangan Kelas', icon: PiggyBank },
+      { to: '/kuitansi', label: 'Kuitansi', icon: Receipt },
+      { to: '/kuitansi-jasa', label: 'Kuitansi Jasa', icon: Receipt },
+      { to: '/nota', label: 'Nota Belanja', icon: ShoppingCart },
+      { to: '/perpustakaan', label: 'Perpustakaan', icon: Library },
+      { to: '/inventaris', label: 'Inventaris', icon: Boxes },
+    ],
+  },
+  {
+    label: 'Administrasi',
+    links: [
+      { to: '/pengajuan-surat-aktif', label: 'Pengajuan Surat Aktif', icon: FileCheck2 },
+      { to: '/perbaikan-data-siswa', label: 'Perbaikan Data Siswa', icon: UserCog },
+      { to: '/pengajuan-kebutuhan-kelas', label: 'Kebutuhan Kelas', icon: PackagePlus },
+      { to: '/agenda', label: 'Agenda Sekolah', icon: CalendarDays },
+      { to: '/surat', label: 'Surat Masuk/Keluar', icon: Mail },
+      { to: '/surat-keterangan', label: 'Surat Keterangan', icon: FileSignature },
+      { to: '/ppdb-admin', label: 'PPDB Siswa Baru', icon: UserPlus },
+      { to: '/laporan', label: 'Laporan Bulanan', icon: FileText },
+      { to: '/hari-libur', label: 'Hari Libur', icon: CalendarOff },
+      { to: '/backup', label: 'Backup Data', icon: DatabaseBackup },
+      { to: '/profil-sekolah', label: 'Profil Sekolah', icon: Landmark },
+      { to: '/kartu', label: 'Cetak Kartu', icon: IdCard },
+    ],
+  },
+]
 
-  useEffect(() => {
-    const timer = setTimeout(() => setMinTimeElapsed(true), 900)
-    return () => clearTimeout(timer)
-  }, [])
+// Menu GURU: tetap ringkas, tidak perlu dikelompokkan
+// Kuitansi, Kuitansi Jasa, Nota Belanja & Formulir 8355 SENGAJA TIDAK ada di
+// sini — keempat fitur ini admin-only (lihat ProtectedRoute adminOnly di
+// App.jsx dan RLS policy nota_hanya_admin di Supabase).
+const linksGuru = [
+  { to: '/', label: 'Dasbor', icon: LayoutDashboard, end: true },
+  { to: '/profil-saya', label: 'Profil Saya', icon: UserCircle },
+  { to: '/rapat', label: 'Rapat Video', icon: Video },
+  { to: '/galeri', label: 'Galeri Kegiatan', icon: Images },
+  { to: '/dokumen', label: 'Dokumen Penting', icon: HardDrive },
+  { to: '/keuangan-kelas', label: 'Keuangan Kelas', icon: PiggyBank },
+  { to: '/siswa', label: 'Data Siswa', icon: Users },
+  { to: '/presensi', label: 'Presensi', icon: ClipboardCheck },
+  { to: '/nilai', label: 'Nilai Siswa', icon: BookOpenCheck },
+  { to: '/nilai-asesmen', label: 'Nilai Asesmen', icon: FileSpreadsheet },
+  { to: '/rapor', label: 'Rapor Siswa', icon: FileBadge },
+  { to: '/ijazah', label: 'Ijazah', icon: ScrollText },
+  { to: '/skl', label: 'Surat Keterangan Lulus', icon: Stamp },
+  { to: '/portofolio-siswa', label: 'Portofolio Siswa', icon: FolderHeart },
+  { to: '/rpp', label: 'RPP', icon: NotebookPen },
+  { to: '/arsip-rpp', label: 'Arsip RPP', icon: Archive },
+  { to: '/sertifikat', label: 'Sertifikat & Penghargaan', icon: Award },
+  { to: '/pengajuan-surat-aktif', label: 'Pengajuan Surat Aktif', icon: FileCheck2 },
+  { to: '/perbaikan-data-siswa', label: 'Perbaikan Data Siswa', icon: UserCog },
+  { to: '/pengajuan-kebutuhan-kelas', label: 'Kebutuhan Kelas', icon: PackagePlus },
+  { to: '/buat-ujian', label: 'Buat Ujian', icon: FilePlus },
+  { to: '/hasil-ujian', label: 'Hasil Ujian', icon: ClipboardList },
+  { to: '/bank-soal', label: 'Bank Soal', icon: Database },
+  { to: '/perpustakaan', label: 'Perpustakaan', icon: Library },
+  { to: '/jadwal', label: 'Jadwal Pelajaran', icon: CalendarClock },
+  { to: '/agenda', label: 'Agenda Sekolah', icon: CalendarDays },
+  { to: '/pengumuman', label: 'Pengumuman', icon: Megaphone },
+]
 
-  if (loading || !minTimeElapsed) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-paper">
-        <Loader />
-      </div>
-    )
-  }
-  if (!session) return <Navigate to="/login" replace />
-  if (adminOnly && !isAdmin) return <Navigate to="/" replace />
-  return children
-}
-
-// Nota.jsx menerima `sekolah` lewat prop (beda dari Kuitansi.jsx/KuitansiJasa.jsx
-// yang mengambil sendiri profil sekolah secara internal) — wrapper kecil ini
-// mengambilkan profil sekolah dengan cara yang sama supaya kop surat di cetakan
-// nota tetap terisi.
-function NotaDenganSekolah() {
-  const [sekolah, setSekolah] = useState(null)
-
-  useEffect(() => {
-    supabase
-      .from('profil_sekolah')
-      .select('*')
-      .eq('id', 1)
-      .maybeSingle()
-      .then(({ data }) => {
-        if (data) {
-          setSekolah({
-            nama: data.nama_sekolah,
-            alamat: data.alamat,
-            kota: data.kabupaten,
-          })
-        }
-      })
-  }, [])
-
-  return <Nota sekolah={sekolah} />
-}
-
-export default function App() {
+function NavItem({ to, label, icon: Icon, end }) {
   return (
-    <Routes>
-      {/* Halaman publik — TIDAK perlu login, dibagikan ke orang tua calon siswa */}
-      <Route path="/ppdb" element={<PPDBPublik />} />
-      <Route path="/ujian-online" element={<UjianOnline />} />
-      <Route path="/login" element={<Login />} />
-      <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-      <Route path="/siswa" element={<ProtectedRoute><Siswa /></ProtectedRoute>} />
-      <Route path="/hasil-ujian" element={<ProtectedRoute><HasilUjian /></ProtectedRoute>} />
-      <Route path="/guru" element={<ProtectedRoute adminOnly><Guru /></ProtectedRoute>} />
-      <Route path="/kelas" element={<ProtectedRoute adminOnly><Kelas /></ProtectedRoute>} />
-      <Route path="/jadwal" element={<ProtectedRoute><Jadwal /></ProtectedRoute>} />
-      <Route path="/presensi" element={<ProtectedRoute><Presensi /></ProtectedRoute>} />
-      <Route path="/nilai" element={<ProtectedRoute><Nilai /></ProtectedRoute>} />
-      <Route path="/rapor" element={<ProtectedRoute><Rapor /></ProtectedRoute>} />
-      <Route path="/rapor/cetak" element={<ProtectedRoute><RaporCetak /></ProtectedRoute>} />
-      <Route path="/nilai-asesmen" element={<ProtectedRoute><NilaiAsesmen /></ProtectedRoute>} />
-      <Route path="/ijazah" element={<ProtectedRoute><Ijazah /></ProtectedRoute>} />
-      <Route path="/skl" element={<ProtectedRoute><SuratKeteranganLulus /></ProtectedRoute>} />
-      <Route path="/inventaris" element={<ProtectedRoute adminOnly><Inventaris /></ProtectedRoute>} />
-      <Route path="/agenda" element={<ProtectedRoute><Agenda /></ProtectedRoute>} />
-      <Route path="/surat" element={<ProtectedRoute adminOnly><Surat /></ProtectedRoute>} />
-      <Route path="/surat-keterangan" element={<ProtectedRoute adminOnly><SuratKeterangan /></ProtectedRoute>} />
-      <Route path="/laporan" element={<ProtectedRoute adminOnly><LaporanBulanan /></ProtectedRoute>} />
-      <Route path="/hari-libur" element={<ProtectedRoute adminOnly><HariLibur /></ProtectedRoute>} />
-      <Route path="/keuangan" element={<ProtectedRoute adminOnly><Keuangan /></ProtectedRoute>} />
-      {/* Keuangan Kelas: BUKAN adminOnly — ini kas kelas yang dipegang wali kelas (guru),
-          admin tetap bisa membuka untuk memantau semua kelas. */}
-      <Route path="/keuangan-kelas" element={<ProtectedRoute><KeuanganKelas /></ProtectedRoute>} />
-      <Route path="/kuitansi" element={<ProtectedRoute adminOnly><Kuitansi /></ProtectedRoute>} />
-      {/* Sebelumnya belum terdaftar di sini meski halamannya sudah ada di src/pages —
-          jadi /nota dan /kuitansi-jasa tidak bisa dibuka sama sekali. */}
-      <Route path="/nota" element={<ProtectedRoute adminOnly><NotaDenganSekolah /></ProtectedRoute>} />
-      <Route path="/kuitansi-jasa" element={<ProtectedRoute adminOnly><KuitansiJasa /></ProtectedRoute>} />
-      <Route path="/backup" element={<ProtectedRoute adminOnly><Backup /></ProtectedRoute>} />
-      <Route path="/profil-sekolah" element={<ProtectedRoute adminOnly><ProfilSekolah /></ProtectedRoute>} />
-      <Route path="/ppdb-admin" element={<ProtectedRoute adminOnly><PPDBAdmin /></ProtectedRoute>} />
-      <Route path="/perpustakaan" element={<ProtectedRoute><Perpustakaan /></ProtectedRoute>} />
-      <Route path="/pengumuman" element={<ProtectedRoute><Pengumuman /></ProtectedRoute>} />
-      <Route path="/galeri" element={<ProtectedRoute><Galeri /></ProtectedRoute>} />
-      <Route path="/dokumen" element={<ProtectedRoute><Dokumen /></ProtectedRoute>} />
-     <Route path="/rpp" element={<ProtectedRoute><RPP /></ProtectedRoute>} />
-<Route path="/arsip-rpp" element={<ProtectedRoute><ArsipRPP /></ProtectedRoute>} />
-      <Route path="/pengajuan-surat-aktif" element={<ProtectedRoute><PengajuanSuratAktif /></ProtectedRoute>} />
-      <Route path="/perbaikan-data-siswa" element={<ProtectedRoute><PengajuanEditSiswa /></ProtectedRoute>} />
-      <Route path="/pengajuan-kebutuhan-kelas" element={<ProtectedRoute><PengajuanKebutuhanKelas /></ProtectedRoute>} />
-      <Route path="/bank-soal" element={<ProtectedRoute><BankSoal /></ProtectedRoute>} />
-      <Route path="/kartu" element={<ProtectedRoute adminOnly><KartuSiswa /></ProtectedRoute>} />
-      <Route path="/buat-ujian" element={<ProtectedRoute><BuatUjian /></ProtectedRoute>} />
-      <Route path="/profil-saya" element={<ProtectedRoute><ProfilSaya /></ProtectedRoute>} />
-      <Route path="/sertifikat" element={<ProtectedRoute><SertifikatPenghargaan /></ProtectedRoute>} />
-      <Route path="/portofolio-siswa" element={<ProtectedRoute><PortofolioSiswa /></ProtectedRoute>} />
-      <Route path="/rapat" element={<ProtectedRoute><Rapat /></ProtectedRoute>} />
-      {/* Sengaja TIDAK dibungkus ProtectedRoute — link rapat dibagikan ke
-          peserta yang mungkin belum/tidak punya akun (mis. orang tua, tamu),
-          jadi mereka bisa langsung gabung cukup dengan mengisi nama.
-          RapatVideo sendiri yang menangani kasus sudah login vs tamu. */}
-      <Route path="/rapat/:roomId" element={<RapatVideo />} />
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+    <NavLink
+      to={to}
+      end={end}
+      className={({ isActive }) =>
+        `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
+          isActive
+            ? 'bg-gradient-to-r from-blue-500 to-indigo-400 text-white shadow-sm shadow-black/20'
+            : 'text-white/70 hover:bg-white/[0.08] hover:text-white'
+        }`
+      }
+    >
+      {({ isActive }) => (
+        <>
+          <Icon
+            size={17}
+            strokeWidth={1.8}
+            fill={isActive ? 'rgba(255,255,255,0.25)' : 'currentColor'}
+            fillOpacity={isActive ? 1 : 0.15}
+          />
+          {label}
+        </>
+      )}
+    </NavLink>
+  )
+}
+
+// Ambil URL foto guru dari kolom foto_profil_path (isinya path storage,
+// bukan URL lengkap) di bucket "foto-profil".
+function getFotoUrl(fotoProfilPath) {
+  if (!fotoProfilPath) return null
+  if (fotoProfilPath.startsWith('http')) return fotoProfilPath
+  const { data } = supabase.storage.from('foto-profil').getPublicUrl(fotoProfilPath)
+  return data?.publicUrl || null
+}
+
+function getInisial(nama) {
+  if (!nama) return '?'
+  const kata = nama.trim().split(/\s+/)
+  const inisial = kata.length > 1 ? kata[0][0] + kata[1][0] : kata[0].slice(0, 2)
+  return inisial.toUpperCase()
+}
+
+export default function Sidebar() {
+  const { signOut, session, profil, isAdmin } = useAuth()
+  const fotoUrl = getFotoUrl(profil?.foto_profil_path)
+  const namaTampil = profil?.nama_lengkap || session?.user?.email || 'Pengguna'
+
+  return (
+    <aside className="w-64 shrink-0 bg-blue-950 text-white flex flex-col h-screen sticky top-0 border-r border-blue-900/50">
+      <div className="relative overflow-hidden px-4 py-5 border-b border-white/10 bg-gradient-to-br from-blue-950 via-blue-900 to-indigo-900">
+        {/* Motif batik dekoratif (senada dengan banner dashboard) */}
+        <svg
+          className="absolute inset-0 w-full h-full opacity-[0.35] pointer-events-none"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <defs>
+            <pattern id="batikSidebar" width="46" height="46" patternUnits="userSpaceOnUse">
+              <circle cx="23" cy="23" r="12" fill="none" stroke="#fbbf24" strokeWidth="1.4" />
+              <circle cx="23" cy="23" r="4" fill="none" stroke="#fbbf24" strokeWidth="1.4" />
+              <path d="M23 5 v8 M23 33 v8 M5 23 h8 M33 23 h8" stroke="#fbbf24" strokeWidth="1.4" />
+              <path d="M10 10 l4 4 M32 10 l-4 4 M10 36 l4 -4 M32 36 l-4 -4" stroke="#fbbf24" strokeWidth="1" />
+            </pattern>
+          </defs>
+          <rect width="100%" height="100%" fill="url(#batikSidebar)" />
+        </svg>
+
+        <div className="relative flex items-center gap-3">
+          {fotoUrl ? (
+            <img
+              src={fotoUrl}
+              alt={namaTampil}
+              className="w-11 h-11 rounded-full object-cover shrink-0 border-2 border-white/20"
+            />
+          ) : (
+            <div className="w-11 h-11 rounded-full bg-gradient-to-br from-blue-500 to-indigo-400 flex items-center justify-center font-display font-bold text-white text-sm shrink-0 border-2 border-white/20">
+              {getInisial(namaTampil)}
+            </div>
+          )}
+          <div className="min-w-0 flex-1">
+            <p className="font-display font-semibold text-[13px] leading-tight truncate text-white">{namaTampil}</p>
+            <p className="text-[11px] text-white/50 mt-0.5">{isAdmin ? 'Admin' : 'Guru'}</p>
+          </div>
+          <button
+            onClick={signOut}
+            title="Keluar"
+            className="w-10 h-10 rounded-lg flex items-center justify-center text-red-400 hover:bg-red-500/15 hover:text-red-300 transition-colors shrink-0"
+          >
+            <Power size={20} strokeWidth={2.2} />
+          </button>
+        </div>
+      </div>
+
+      <nav className="relative flex-1 overflow-y-auto py-4 px-3 bg-gradient-to-b from-blue-950 via-blue-900 to-indigo-950">
+        {/* Motif batik area menu — gaya berbeda dari header (kawung/diamond, bukan lingkaran) */}
+        <svg
+          className="absolute inset-0 w-full h-full opacity-[0.22] pointer-events-none"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <defs>
+            <pattern
+              id="batikMenu"
+              width="36"
+              height="36"
+              patternUnits="userSpaceOnUse"
+              patternTransform="rotate(45)"
+            >
+              <rect x="12" y="0" width="12" height="12" fill="none" stroke="#fbbf24" strokeWidth="1.2" />
+              <circle cx="18" cy="6" r="2.6" fill="#fbbf24" />
+              <path d="M0 18 L18 0 M18 36 L36 18" stroke="#fbbf24" strokeWidth="1" />
+            </pattern>
+          </defs>
+          <rect width="100%" height="100%" fill="url(#batikMenu)" />
+        </svg>
+
+        <div className="relative">
+        {isAdmin ? (
+          groupsAdmin.map((group, i) => (
+            <div key={group.label ?? `top-${i}`} className={i > 0 ? 'mt-5' : ''}>
+              {group.label && (
+                <p className="px-3 mb-1.5 text-[10px] font-semibold tracking-wider uppercase text-white/35">
+                  {group.label}
+                </p>
+              )}
+              <div className="space-y-1">
+                {group.links.map((link) => (
+                  <NavItem key={link.to} {...link} />
+                ))}
+              </div>
+            </div>
+          ))
+        ) : (
+          <div className="space-y-1">
+            {linksGuru.map((link) => (
+              <NavItem key={link.to} {...link} />
+            ))}
+          </div>
+        )}
+        </div>
+      </nav>
+    </aside>
   )
 }
