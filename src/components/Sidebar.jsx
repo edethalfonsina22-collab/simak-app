@@ -42,7 +42,6 @@ import {
   FolderHeart,
   PiggyBank,
   FileSpreadsheet,
-  FileDigit,
 } from 'lucide-react'
 import { useAuth } from '../lib/AuthContext'
 import { supabase } from '../lib/supabaseClient'
@@ -73,9 +72,6 @@ const groupsAdmin = [
       { to: '/rapor', label: 'Rapor Siswa', icon: FileBadge },
       { to: '/ijazah', label: 'Ijazah', icon: ScrollText },
       { to: '/skl', label: 'Surat Keterangan Lulus', icon: Stamp },
-      // Formulir 8355 (Daftar Calon Peserta Ujian) — khusus Admin, sengaja TIDAK
-      // dimasukkan ke linksGuru di bawah (sama seperti Kuitansi/Nota Belanja).
-      { to: '/8355', label: 'Formulir 8355', icon: FileDigit },
       { to: '/portofolio-siswa', label: 'Portofolio Siswa', icon: FolderHeart },
       { to: '/rpp', label: 'RPP', icon: NotebookPen },
       { to: '/arsip-rpp', label: 'Arsip RPP', icon: Archive },
@@ -117,9 +113,8 @@ const groupsAdmin = [
 ]
 
 // Menu GURU: tetap ringkas, tidak perlu dikelompokkan
-// Kuitansi, Kuitansi Jasa, Nota Belanja & Formulir 8355 SENGAJA TIDAK ada di
-// sini — keempat fitur ini admin-only (lihat ProtectedRoute adminOnly di
-// App.jsx dan RLS policy nota_hanya_admin di Supabase).
+// Kuitansi, Kuitansi Jasa & Nota Belanja SENGAJA TIDAK ada di sini — ketiga
+// fitur ini admin-only (lihat RLS policy nota_hanya_admin di Supabase).
 const linksGuru = [
   { to: '/', label: 'Dasbor', icon: LayoutDashboard, end: true },
   { to: '/profil-saya', label: 'Profil Saya', icon: UserCircle },
