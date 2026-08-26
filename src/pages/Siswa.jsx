@@ -8,8 +8,6 @@ import TeleponLink from '../components/TeleponLink'
 import { Plus, UploadCloud, Pencil, Trash2, Search, X, Loader2, Download, FileSpreadsheet, Printer, ChevronDown, Camera, IdCard } from 'lucide-react'
 
 const AGAMA_OPTIONS = ['Islam', 'Kristen', 'Katolik', 'Hindu', 'Buddha', 'Khonghucu', 'Lainnya']
-const KET_MENGULANG_OPTIONS = ['Tidak', 'Ya']
-const TRANSPORTASI_OPTIONS = ['Jalan Kaki', 'Sepeda', 'Sepeda Motor', 'Mobil/Diantar', 'Angkutan Umum', 'Angkutan Sekolah', 'Lainnya']
 
 const emptyForm = {
   nis: '',
@@ -41,17 +39,6 @@ const emptyForm = {
   nama_wali: '',
   pekerjaan_wali: '',
   alamat_wali: '',
-  // TAMBAHAN: dipakai di Formulir 8355 (Daftar Calon Peserta Ujian)
-  kode_pos: '',
-  ket_mengulang: 'Tidak',
-  no_peserta_mengulang: '',
-  anak_ke: '',
-  cita_cita: '',
-  gaji_ortu: '',
-  jarak_ke_sekolah: '',
-  transportasi: '',
-  jumlah_saudara: '',
-  no_skhun: '',
 }
 
 // Header ini HARUS sama persis dengan templateHeaders di BulkImportModal (Impor Massal)
@@ -374,6 +361,11 @@ export default function Siswa() {
             ${rowsHtml}
           </tbody>
         </table>
+        <script>
+          window.onload = function () {
+            window.print();
+          };
+        </script>
       </body>
       </html>
     `
@@ -712,56 +704,6 @@ export default function Siswa() {
               <Field label="Alamat Wali" full>
                 <textarea className="input-field" rows={2} value={form.alamat_wali}
                   onChange={(e) => setForm({ ...form, alamat_wali: e.target.value })} />
-              </Field>
-
-              {/* TAMBAHAN: dipakai di Formulir 8355 (Daftar Calon Peserta Ujian) */}
-              <div className="col-span-2 pt-2 mt-1 border-t border-ink-900/[0.08]">
-                <p className="eyebrow mb-2">Data untuk Formulir 8355</p>
-              </div>
-              <Field label="Kode Pos">
-                <input className="input-field" value={form.kode_pos}
-                  onChange={(e) => setForm({ ...form, kode_pos: e.target.value })} />
-              </Field>
-              <Field label="Ket. Mengulang">
-                <select className="input-field" value={form.ket_mengulang}
-                  onChange={(e) => setForm({ ...form, ket_mengulang: e.target.value })}>
-                  {KET_MENGULANG_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
-                </select>
-              </Field>
-              <Field label="No Peserta Mengulang">
-                <input className="input-field" value={form.no_peserta_mengulang}
-                  onChange={(e) => setForm({ ...form, no_peserta_mengulang: e.target.value })} />
-              </Field>
-              <Field label="Anak ke-">
-                <input type="number" min="1" className="input-field" value={form.anak_ke}
-                  onChange={(e) => setForm({ ...form, anak_ke: e.target.value })} />
-              </Field>
-              <Field label="Jumlah Saudara">
-                <input type="number" min="0" className="input-field" value={form.jumlah_saudara}
-                  onChange={(e) => setForm({ ...form, jumlah_saudara: e.target.value })} />
-              </Field>
-              <Field label="Cita-cita">
-                <input className="input-field" value={form.cita_cita}
-                  onChange={(e) => setForm({ ...form, cita_cita: e.target.value })} />
-              </Field>
-              <Field label="Gaji/Penghasilan Orang Tua">
-                <input className="input-field" value={form.gaji_ortu}
-                  onChange={(e) => setForm({ ...form, gaji_ortu: e.target.value })} />
-              </Field>
-              <Field label="Jarak ke Sekolah">
-                <input className="input-field" placeholder="Contoh: 2 km" value={form.jarak_ke_sekolah}
-                  onChange={(e) => setForm({ ...form, jarak_ke_sekolah: e.target.value })} />
-              </Field>
-              <Field label="Transportasi">
-                <select className="input-field" value={form.transportasi}
-                  onChange={(e) => setForm({ ...form, transportasi: e.target.value })}>
-                  <option value="">— Pilih Transportasi —</option>
-                  {TRANSPORTASI_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
-                </select>
-              </Field>
-              <Field label="No SKHUN">
-                <input className="input-field" value={form.no_skhun}
-                  onChange={(e) => setForm({ ...form, no_skhun: e.target.value })} />
               </Field>
             </div>
 
