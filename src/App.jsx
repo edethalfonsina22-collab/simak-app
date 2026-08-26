@@ -44,8 +44,8 @@ import {
   FileSpreadsheet,
   FileDigit,
 } from 'lucide-react'
-import { useAuth } from '../lib/AuthContext'
-import { supabase } from '../lib/supabaseClient'
+import { useAuth } from './lib/AuthContext'
+import { supabase } from './lib/supabaseClient'
 
 // Menu ADMIN dikelompokkan per kategori supaya tidak jadi satu daftar panjang
 const groupsAdmin = [
