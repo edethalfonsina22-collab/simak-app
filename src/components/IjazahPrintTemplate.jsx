@@ -24,6 +24,32 @@ export function rataRataNilai(nilai) {
 // forwardRef supaya elemen ini bisa dicetak lewat window.print() (kelas
 // .print-only) atau di-capture html2canvas untuk export PDF, sama seperti
 // SuratKeteranganPrintTemplate.
+//
+// CATATAN ORIENTASI CETAK (lanskap):
+// Wrapper di bawah sudah diubah dari ukuran A4 potret (210mm x 297mm) ke
+// A4 lanskap (297mm x 210mm). Tapi ukuran elemen saja TIDAK cukup untuk
+// membuat browser mencetak ke kertas lanskap — kebanyakan browser tetap
+// memakai orientasi kertas default (potret) lalu mengecilkan/memotong
+// konten. Tambahkan juga aturan berikut di CSS global (mis. index.css):
+//
+//   @media print {
+//     @page {
+//       size: A4 landscape;
+//       margin: 0;
+//     }
+//   }
+//
+// Kalau ada dokumen cetak lain (mis. Surat Keterangan) yang harus tetap
+// potret, jangan pakai @page global tanpa nama di atas (itu akan membuat
+// SEMUA dokumen ikut lanskap). Sebagai gantinya pakai @page bernama:
+//
+//   @page landscape-page {
+//     size: A4 landscape;
+//     margin: 0;
+//   }
+//
+// lalu tambahkan `page: "landscape-page"` ke inline style wrapper di bawah
+// (didukung baik di Chrome/Edge, target umum window.print()/html2canvas).
 const IjazahPrintTemplate = React.forwardRef(function IjazahPrintTemplate(
   { siswa, nilai, sekolah, tahunPelajaran },
   ref
@@ -43,9 +69,9 @@ const IjazahPrintTemplate = React.forwardRef(function IjazahPrintTemplate(
         // browsing biasa, tapi elemen ini juga dipakai sebagai kotak
         // "Pratinjau" di halaman Ijazah/SKL, jadi harus tetap terlihat di layar.
         display: "block",
-        width: "210mm",
-        minHeight: "297mm",
-        padding: "20mm 18mm",
+        width: "297mm",
+        minHeight: "210mm",
+        padding: "15mm 18mm",
         background: "#fff",
         fontFamily: "'Times New Roman', serif",
         fontSize: "12.5pt",
