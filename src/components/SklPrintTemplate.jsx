@@ -39,36 +39,36 @@ const SklPrintTemplate = React.forwardRef(function SklPrintTemplate(
         display: "block",
         width: "210mm",
         minHeight: "297mm",
-        padding: "8mm",
+        maxHeight: "297mm",
+        overflow: "hidden",
+        padding: "6mm",
         background: "#fff",
         fontFamily: "'Times New Roman', serif",
-        fontSize: "12.5pt",
-        lineHeight: 1.5,
+        fontSize: "11.5pt",
+        lineHeight: 1.4,
         color: "#000",
         boxSizing: "border-box",
       }}
     >
       {/* BINGKAI ORNAMEN BIRU — motif diamond/bunga berulang lewat border-image,
-          dibuat lebih tipis daripada gaya sertifikat pada umumnya supaya konten
-          tetap lega. Garis tipis biru di dalamnya menggantikan garis hitam
-          sebelumnya, mengikuti nuansa warna yang sama dengan bingkai luar. */}
+          dibuat tipis supaya konten tetap muat dalam 1 halaman A4. Tinggi
+          mengikuti konten (tidak dipaksa minHeight) karena pembatas 1 halaman
+          sudah ditangani oleh wrapper terluar (maxHeight + overflow:hidden). */}
       <div
         style={{
-          border: "7mm solid transparent",
+          border: "5mm solid transparent",
           borderImageSource: FRAME_URL,
           borderImageSlice: 22,
-          borderImageWidth: "7mm",
+          borderImageWidth: "5mm",
           borderImageRepeat: "round",
-          padding: "2mm",
-          minHeight: "calc(297mm - 16mm)",
+          padding: "1.5mm",
           boxSizing: "border-box",
         }}
       >
         <div
           style={{
             border: "1pt solid #2748a0",
-            padding: "10mm 12mm",
-            minHeight: "calc(297mm - 16mm - 14mm - 4mm - 5pt)",
+            padding: "6mm 10mm",
             boxSizing: "border-box",
             display: "flex",
             flexDirection: "column",
@@ -83,15 +83,15 @@ const SklPrintTemplate = React.forwardRef(function SklPrintTemplate(
               alignItems: "center",
               gap: 14,
               borderBottom: "3px double #2748a0",
-              paddingBottom: 8,
-              marginBottom: 20,
+              paddingBottom: 6,
+              marginBottom: 12,
             }}
           >
             {sekolah?.logo_url && (
               <img
                 src={sekolah.logo_url}
                 alt="Logo"
-                style={{ width: 64, height: 64, objectFit: "contain", flexShrink: 0 }}
+                style={{ width: 58, height: 58, objectFit: "contain", flexShrink: 0 }}
               />
             )}
             <div style={{ flex: 1, textAlign: "center" }}>
@@ -99,28 +99,28 @@ const SklPrintTemplate = React.forwardRef(function SklPrintTemplate(
                   di Profil Sekolah sudah berisi teks lengkap, jadi tidak ditambah prefiks lagi
                   di sini supaya tidak dobel (mis. "Kabupaten PEMERINTAH KABUPATEN ..."). */}
               {sekolah?.kabupaten && (
-                <p style={{ fontWeight: "bold", margin: 0, fontSize: "12pt", letterSpacing: "0.3px" }}>
+                <p style={{ fontWeight: "bold", margin: 0, fontSize: "11.5pt", letterSpacing: "0.3px" }}>
                   {sekolah.kabupaten}
                 </p>
               )}
               {sekolah?.dinas_pendidikan && (
-                <p style={{ fontWeight: "bold", margin: 0, fontSize: "12pt", letterSpacing: "0.3px" }}>
+                <p style={{ fontWeight: "bold", margin: 0, fontSize: "11.5pt", letterSpacing: "0.3px" }}>
                   {sekolah.dinas_pendidikan}
                 </p>
               )}
-              <p style={{ fontWeight: "bold", margin: "2px 0 0 0", fontSize: "15pt", letterSpacing: "0.5px" }}>
+              <p style={{ fontWeight: "bold", margin: "2px 0 0 0", fontSize: "14pt", letterSpacing: "0.5px" }}>
                 {sekolah?.nama_sekolah || "NAMA SEKOLAH"}
               </p>
               {sekolah?.kecamatan && (
-                <p style={{ fontWeight: "bold", margin: "1px 0 0 0", fontSize: "10pt" }}>{sekolah.kecamatan}</p>
+                <p style={{ fontWeight: "bold", margin: "1px 0 0 0", fontSize: "9.5pt" }}>{sekolah.kecamatan}</p>
               )}
               {sekolah?.alamat && (
-                <p style={{ fontStyle: "italic", fontSize: "10pt", margin: "2px 0 0 0" }}>{sekolah.alamat}</p>
+                <p style={{ fontStyle: "italic", fontSize: "9.5pt", margin: "2px 0 0 0" }}>{sekolah.alamat}</p>
               )}
             </div>
             {/* Spacer di kanan seukuran logo, supaya blok teks tetap presisi di
                 tengah kop surat saat logo ada di kiri (bukan miring ke kanan). */}
-            {sekolah?.logo_url && <div style={{ width: 64, flexShrink: 0 }} />}
+            {sekolah?.logo_url && <div style={{ width: 58, flexShrink: 0 }} />}
           </div>
 
           <p
@@ -134,16 +134,16 @@ const SklPrintTemplate = React.forwardRef(function SklPrintTemplate(
           >
             SURAT KETERANGAN LULUS
           </p>
-          <p style={{ textAlign: "center", margin: "0 0 20px 0" }}>Nomor: {skl?.nomor_skl || "-"}</p>
+          <p style={{ textAlign: "center", margin: "0 0 12px 0" }}>Nomor: {skl?.nomor_skl || "-"}</p>
 
-          <p style={{ textAlign: "justify", margin: "0 0 10px 0" }}>
+          <p style={{ textAlign: "justify", margin: "0 0 6px 0" }}>
             Yang bertanda tangan di bawah ini Kepala {sekolah?.nama_sekolah}
             {sekolah?.kecamatan ? `, ${sekolah.kecamatan}` : ""}
             {sekolah?.kabupaten ? `, ${sekolah.kabupaten}` : ""}
             {sekolah?.provinsi ? `, Provinsi ${sekolah.provinsi}` : ""}, menerangkan bahwa:
           </p>
 
-          <table style={{ borderCollapse: "collapse", margin: "0 0 16px 0" }}>
+          <table style={{ borderCollapse: "collapse", margin: "0 0 10px 0" }}>
             <tbody>
               <Baris label="Nama" nilai={siswa?.nama_lengkap} />
               <Baris
@@ -156,7 +156,7 @@ const SklPrintTemplate = React.forwardRef(function SklPrintTemplate(
             </tbody>
           </table>
 
-          <p style={{ textAlign: "justify", margin: "0 0 10px 0" }}>
+          <p style={{ textAlign: "justify", margin: "0 0 6px 0" }}>
             Bahwa siswa/siswi tersebut di atas benar-benar murid Kelas VI {sekolah?.nama_sekolah} dan telah mengikuti
             Asesmen Sekolah Tahun Pelajaran {tahunPelajaran} dan dinyatakan <strong>BERHASIL</strong> dengan nilai
             sebagai berikut:
@@ -166,8 +166,8 @@ const SklPrintTemplate = React.forwardRef(function SklPrintTemplate(
             style={{
               width: "100%",
               borderCollapse: "collapse",
-              fontSize: "12pt",
-              margin: "0 0 18px 0",
+              fontSize: "11pt",
+              margin: "0 0 10px 0",
               pageBreakInside: "avoid",
             }}
           >
@@ -217,15 +217,15 @@ const SklPrintTemplate = React.forwardRef(function SklPrintTemplate(
             yang bersangkutan.
           </p>
 
-          <div style={{ textAlign: "right", marginTop: 34, pageBreakInside: "avoid" }}>
+          <div style={{ textAlign: "right", marginTop: 18, pageBreakInside: "avoid" }}>
             <p style={{ margin: 0 }}>
               {sekolah?.tempat_ttd || sekolah?.kecamatan || ""}, {tanggalTerbit}
             </p>
             <p style={{ margin: 0 }}>Kepala Sekolah</p>
             {sekolah?.ttd_url ? (
-              <img src={sekolah.ttd_url} alt="TTD" style={{ height: 60, margin: "6px 0" }} />
+              <img src={sekolah.ttd_url} alt="TTD" style={{ height: 50, margin: "4px 0" }} />
             ) : (
-              <div style={{ height: 60 }} />
+              <div style={{ height: 50 }} />
             )}
             <p style={{ margin: 0, fontWeight: "bold", textDecoration: "underline" }}>{sekolah?.kepala_sekolah}</p>
             <p style={{ margin: 0 }}>NIP. {sekolah?.nip_kepala_sekolah}</p>
@@ -255,8 +255,8 @@ function formatTanggal(iso) {
   }
 }
 
-const th = { border: "1px solid #2748a0", padding: "5px 7px", background: "#eef1fb", fontWeight: "bold", letterSpacing: "0.2px" };
-const td = { border: "1px solid #2748a0", padding: "4px 7px", textAlign: "center", verticalAlign: "middle" };
-const tdGroup = { border: "1px solid #2748a0", padding: "4px 7px", fontWeight: "bold", background: "#f5f7fc" };
+const th = { border: "1px solid #2748a0", padding: "3px 6px", background: "#eef1fb", fontWeight: "bold", letterSpacing: "0.2px" };
+const td = { border: "1px solid #2748a0", padding: "3px 6px", textAlign: "center", verticalAlign: "middle" };
+const tdGroup = { border: "1px solid #2748a0", padding: "3px 6px", fontWeight: "bold", background: "#f5f7fc" };
 
 export default SklPrintTemplate;
