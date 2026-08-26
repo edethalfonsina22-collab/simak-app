@@ -13,6 +13,8 @@ import {
   CalendarDays,
   Mail,
   FileBadge,
+  ScrollText,
+  Stamp,
   FileText,
   FileSignature,
   Wallet,
@@ -34,7 +36,12 @@ import {
   UserCog,
   Award,
   Video,
-  Printer,
+  Receipt,
+  ShoppingCart,
+  PackagePlus,
+  FolderHeart,
+  PiggyBank,
+  FileSpreadsheet,
 } from 'lucide-react'
 import { useAuth } from '../lib/AuthContext'
 import { supabase } from '../lib/supabaseClient'
@@ -56,13 +63,16 @@ const groupsAdmin = [
     label: 'Akademik',
     links: [
       { to: '/siswa', label: 'Data Siswa', icon: Users },
-      { to: '/8355', label: 'Cetak Data Siswa', icon: Printer },
       { to: '/guru', label: 'Data Guru', icon: GraduationCap },
       { to: '/kelas', label: 'Kelas', icon: DoorOpen },
       { to: '/jadwal', label: 'Jadwal Pelajaran', icon: CalendarClock },
       { to: '/presensi', label: 'Presensi', icon: ClipboardCheck },
       { to: '/nilai', label: 'Nilai Siswa', icon: BookOpenCheck },
+      { to: '/nilai-asesmen', label: 'Nilai Asesmen', icon: FileSpreadsheet },
       { to: '/rapor', label: 'Rapor Siswa', icon: FileBadge },
+      { to: '/ijazah', label: 'Ijazah', icon: ScrollText },
+      { to: '/skl', label: 'Surat Keterangan Lulus', icon: Stamp },
+      { to: '/portofolio-siswa', label: 'Portofolio Siswa', icon: FolderHeart },
       { to: '/rpp', label: 'RPP', icon: NotebookPen },
       { to: '/arsip-rpp', label: 'Arsip RPP', icon: Archive },
       { to: '/sertifikat', label: 'Sertifikat & Penghargaan', icon: Award },
@@ -75,6 +85,10 @@ const groupsAdmin = [
     label: 'Keuangan & Aset',
     links: [
       { to: '/keuangan', label: 'Keuangan', icon: Wallet },
+      { to: '/keuangan-kelas', label: 'Keuangan Kelas', icon: PiggyBank },
+      { to: '/kuitansi', label: 'Kuitansi', icon: Receipt },
+      { to: '/kuitansi-jasa', label: 'Kuitansi Jasa', icon: Receipt },
+      { to: '/nota', label: 'Nota Belanja', icon: ShoppingCart },
       { to: '/perpustakaan', label: 'Perpustakaan', icon: Library },
       { to: '/inventaris', label: 'Inventaris', icon: Boxes },
     ],
@@ -84,6 +98,7 @@ const groupsAdmin = [
     links: [
       { to: '/pengajuan-surat-aktif', label: 'Pengajuan Surat Aktif', icon: FileCheck2 },
       { to: '/perbaikan-data-siswa', label: 'Perbaikan Data Siswa', icon: UserCog },
+      { to: '/pengajuan-kebutuhan-kelas', label: 'Kebutuhan Kelas', icon: PackagePlus },
       { to: '/agenda', label: 'Agenda Sekolah', icon: CalendarDays },
       { to: '/surat', label: 'Surat Masuk/Keluar', icon: Mail },
       { to: '/surat-keterangan', label: 'Surat Keterangan', icon: FileSignature },
@@ -98,22 +113,29 @@ const groupsAdmin = [
 ]
 
 // Menu GURU: tetap ringkas, tidak perlu dikelompokkan
+// Kuitansi, Kuitansi Jasa & Nota Belanja SENGAJA TIDAK ada di sini — ketiga
+// fitur ini admin-only (lihat RLS policy nota_hanya_admin di Supabase).
 const linksGuru = [
   { to: '/', label: 'Dasbor', icon: LayoutDashboard, end: true },
   { to: '/profil-saya', label: 'Profil Saya', icon: UserCircle },
   { to: '/rapat', label: 'Rapat Video', icon: Video },
   { to: '/galeri', label: 'Galeri Kegiatan', icon: Images },
   { to: '/dokumen', label: 'Dokumen Penting', icon: HardDrive },
+  { to: '/keuangan-kelas', label: 'Keuangan Kelas', icon: PiggyBank },
   { to: '/siswa', label: 'Data Siswa', icon: Users },
-  { to: '/8355', label: 'Cetak Data Siswa', icon: Printer },
   { to: '/presensi', label: 'Presensi', icon: ClipboardCheck },
   { to: '/nilai', label: 'Nilai Siswa', icon: BookOpenCheck },
+  { to: '/nilai-asesmen', label: 'Nilai Asesmen', icon: FileSpreadsheet },
   { to: '/rapor', label: 'Rapor Siswa', icon: FileBadge },
+  { to: '/ijazah', label: 'Ijazah', icon: ScrollText },
+  { to: '/skl', label: 'Surat Keterangan Lulus', icon: Stamp },
+  { to: '/portofolio-siswa', label: 'Portofolio Siswa', icon: FolderHeart },
   { to: '/rpp', label: 'RPP', icon: NotebookPen },
   { to: '/arsip-rpp', label: 'Arsip RPP', icon: Archive },
   { to: '/sertifikat', label: 'Sertifikat & Penghargaan', icon: Award },
   { to: '/pengajuan-surat-aktif', label: 'Pengajuan Surat Aktif', icon: FileCheck2 },
   { to: '/perbaikan-data-siswa', label: 'Perbaikan Data Siswa', icon: UserCog },
+  { to: '/pengajuan-kebutuhan-kelas', label: 'Kebutuhan Kelas', icon: PackagePlus },
   { to: '/buat-ujian', label: 'Buat Ujian', icon: FilePlus },
   { to: '/hasil-ujian', label: 'Hasil Ujian', icon: ClipboardList },
   { to: '/bank-soal', label: 'Bank Soal', icon: Database },
