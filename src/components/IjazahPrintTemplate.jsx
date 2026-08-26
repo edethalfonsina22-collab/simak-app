@@ -42,24 +42,9 @@ const IjazahPrintTemplate = React.forwardRef(function IjazahPrintTemplate(
         // di index.css — aturan itu untuk menyembunyikan lembar cetak saat
         // browsing biasa, tapi elemen ini juga dipakai sebagai kotak
         // "Pratinjau" di halaman Ijazah/SKL, jadi harus tetap terlihat di layar.
-        //
-        // CATATAN PERBAIKAN CETAK:
-        // Sebelumnya elemen ini pakai `minHeight: "297mm"` DITAMBAH padding
-        // vertikal 20mm atas + 20mm bawah (total 40mm). Di layar itu aman
-        // karena minHeight cuma jadi batas bawah, tapi saat window.print()
-        // beberapa browser menghitung tinggi konten + minHeight + margin
-        // halaman browser sendiri, sehingga total tingginya sedikit
-        // melebihi 297mm. Kelebihan sekecil apa pun otomatis dilempar ke
-        // halaman ke-2 oleh browser — dan karena blok tanda tangan ada di
-        // paling bawah, itulah yang paling sering "terdorong".
-        //
-        // Perbaikan: jangan paksa minHeight 297mm saat print. Biarkan
-        // tinggi kertas dikunci lewat @page (lihat index.css) dan elemen
-        // ini cukup punya width tetap; height mengikuti konten. Untuk
-        // layar (mode "Pratinjau"), width tetap dipakai supaya proporsi
-        // A4 tetap kelihatan.
         display: "block",
         width: "210mm",
+        minHeight: "297mm",
         padding: "20mm 18mm",
         background: "#fff",
         fontFamily: "'Times New Roman', serif",
@@ -154,18 +139,7 @@ const IjazahPrintTemplate = React.forwardRef(function IjazahPrintTemplate(
         </tbody>
       </table>
 
-      {/* pageBreakInside/breakInside "avoid" mencegah blok ini dipotong
-          atau dipindah sendirian ke halaman berikutnya oleh browser saat
-          window.print() — ini yang langsung menahan tanda tangan supaya
-          tidak "lompat" ke halaman 2. */}
-      <div
-        style={{
-          textAlign: "right",
-          marginTop: 40,
-          pageBreakInside: "avoid",
-          breakInside: "avoid",
-        }}
-      >
+      <div style={{ textAlign: "right", marginTop: 40 }}>
         <p style={{ margin: 0 }}>
           {sekolah?.tempat_ttd || sekolah?.kecamatan || ""}, {formatTanggal(new Date().toISOString())}
         </p>
