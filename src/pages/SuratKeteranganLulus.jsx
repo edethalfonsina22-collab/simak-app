@@ -225,7 +225,7 @@ export default function SuratKeteranganLulus() {
             )}
 
             <div
-              className="border border-ink-900/10 rounded-lg overflow-hidden"
+              className="print-preview-scale border border-ink-900/10 rounded-lg overflow-hidden"
               style={{ transform: "scale(0.72)", transformOrigin: "top center", marginBottom: "-28%" }}
             >
               <SklPrintTemplate
