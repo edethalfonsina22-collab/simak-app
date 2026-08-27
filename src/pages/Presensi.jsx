@@ -268,7 +268,365 @@ function CameraFotoGuru({ guru, tanggal, onSaved, onClose }) {
   )
 }
 
-export default function Presensi() {
+// ============================================================
+// Panel Presensi Pribadi — ditampilkan untuk akun dengan role
+// 'guru' (bukan admin). Menampilkan:
+// 1) Presensi diri sendiri hari ini (status + foto bukti)
+// 2) Kalau guru adalah wali kelas, presensi siswa DI KELASNYA
+//    SAJA (tidak bisa lihat/edit kelas lain).
+// ============================================================
+function PresensiPribadi({ profil }) {
+  const hariIni = new Date().toISOString().slice(0, 10)
+  const tanggalLabel = new Date(hariIni).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })
+  const guruId = profil?.guru_id
+
+  // --- Presensi pribadi (guru itu sendiri) ---
+  const [dataSaya, setDataSaya] = useState({ status: 'hadir', foto_bukti_path: null, jam_absen: null })
+  const [loadingSaya, setLoadingSaya] = useState(true)
+  const [savingSaya, setSavingSaya] = useState(false)
+  const [savedSaya, setSavedSaya] = useState(false)
+  const [savedOfflineSaya, setSavedOfflineSaya] = useState(false)
+  const [showCamera, setShowCamera] = useState(false)
+
+  // --- Kelas yang diampu (wali kelas) & presensi siswanya ---
+  const [kelasWali, setKelasWali] = useState(undefined) // undefined = belum dicek, null = bukan wali kelas
+  const [siswaList, setSiswaList] = useState([])
+  const [statusSiswaMap, setStatusSiswaMap] = useState({})
+  const [loadingSiswa, setLoadingSiswa] = useState(false)
+  const [savingSiswa, setSavingSiswa] = useState(false)
+  const [savedSiswa, setSavedSiswa] = useState(false)
+  const [savedOfflineSiswa, setSavedOfflineSiswa] = useState(false)
+
+  const [isOffline, setIsOffline] = useState(!navigator.onLine)
+  const [queueCount, setQueueCount] = useState(0)
+
+  useEffect(() => {
+    if (guruId) {
+      loadPresensiSaya()
+      loadKelasWali()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [guruId])
+
+  useEffect(() => {
+    if (kelasWali) loadPresensiSiswa()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [kelasWali])
+
+  useEffect(() => {
+    ambilAntrian().then((items) => setQueueCount(items.length))
+    function handleOnline() { setIsOffline(false) }
+    function handleOffline() { setIsOffline(true) }
+    window.addEventListener('online', handleOnline)
+    window.addEventListener('offline', handleOffline)
+    return () => {
+      window.removeEventListener('online', handleOnline)
+      window.removeEventListener('offline', handleOffline)
+    }
+  }, [])
+
+  async function loadPresensiSaya() {
+    setLoadingSaya(true)
+    const { data: existing } = await supabase
+      .from('presensi_guru')
+      .select('status, foto_bukti_path, jam_absen')
+      .eq('guru_id', guruId)
+      .eq('tanggal', hariIni)
+      .maybeSingle()
+    setDataSaya(existing || { status: 'hadir', foto_bukti_path: null, jam_absen: null })
+    setLoadingSaya(false)
+  }
+
+  // Cari kelas di mana guru ini menjadi wali_kelas_id — kalau tidak ada,
+  // guru tersebut bukan wali kelas dan bagian presensi siswa disembunyikan.
+  async function loadKelasWali() {
+    const { data } = await supabase
+      .from('kelas')
+      .select('id, nama_kelas')
+      .eq('wali_kelas_id', guruId)
+      .maybeSingle()
+    setKelasWali(data || null)
+  }
+
+  async function loadPresensiSiswa() {
+    if (!kelasWali) return
+    setLoadingSiswa(true)
+    setSavedSiswa(false)
+    setSavedOfflineSiswa(false)
+    const { data: siswa } = await supabase
+      .from('siswa')
+      .select('id, nama_lengkap')
+      .eq('kelas_id', kelasWali.id)
+      .eq('status', 'aktif')
+      .order('nama_lengkap')
+    const { data: existing } = await supabase
+      .from('presensi_siswa')
+      .select('siswa_id, status')
+      .eq('tanggal', hariIni)
+      .in('siswa_id', (siswa || []).map((s) => s.id))
+    const map = {}
+    ;(existing || []).forEach((e) => { map[e.siswa_id] = e.status })
+    ;(siswa || []).forEach((s) => { if (!map[s.id]) map[s.id] = 'hadir' })
+    setSiswaList(siswa || [])
+    setStatusSiswaMap(map)
+    setLoadingSiswa(false)
+  }
+
+  async function simpanBaris(table, conflictCol, row) {
+    if (!navigator.onLine) {
+      await tambahAntrian({ table, conflictCol, rows: [row] })
+      const sisa = await ambilAntrian()
+      setQueueCount(sisa.length)
+      return { offline: true }
+    }
+    const { error } = await supabase.from(table).upsert([row], { onConflict: conflictCol })
+    if (error) {
+      await tambahAntrian({ table, conflictCol, rows: [row] })
+      const sisa = await ambilAntrian()
+      setQueueCount(sisa.length)
+      return { offline: true }
+    }
+    return { offline: false }
+  }
+
+  async function handleFotoTersimpan({ fotoPath, jamAbsen }) {
+    const next = { ...dataSaya, status: 'hadir', foto_bukti_path: fotoPath, jam_absen: jamAbsen }
+    setDataSaya(next)
+    await simpanBaris('presensi_guru', 'guru_id,tanggal', {
+      guru_id: guruId, tanggal: hariIni, status: 'hadir', foto_bukti_path: fotoPath, jam_absen: jamAbsen,
+    })
+  }
+
+  async function handleSimpanStatusSaya() {
+    setSavingSaya(true)
+    setSavedSaya(false)
+    setSavedOfflineSaya(false)
+    const hasil = await simpanBaris('presensi_guru', 'guru_id,tanggal', {
+      guru_id: guruId,
+      tanggal: hariIni,
+      status: dataSaya.status,
+      foto_bukti_path: dataSaya.foto_bukti_path ?? null,
+      jam_absen: dataSaya.jam_absen ?? null,
+    })
+    setSavingSaya(false)
+    if (hasil.offline) setSavedOfflineSaya(true)
+    else setSavedSaya(true)
+  }
+
+  async function handleSimpanPresensiSiswa() {
+    if (!kelasWali) return
+    setSavingSiswa(true)
+    setSavedSiswa(false)
+    setSavedOfflineSiswa(false)
+    const rows = siswaList.map((s) => ({
+      siswa_id: s.id,
+      tanggal: hariIni,
+      status: statusSiswaMap[s.id] || 'hadir',
+      diisi_oleh: guruId,
+    }))
+
+    if (!navigator.onLine) {
+      await tambahAntrian({ table: 'presensi_siswa', conflictCol: 'siswa_id,tanggal', rows })
+      const sisa = await ambilAntrian()
+      setQueueCount(sisa.length)
+      setSavingSiswa(false)
+      setSavedOfflineSiswa(true)
+      return
+    }
+
+    const { error } = await supabase.from('presensi_siswa').upsert(rows, { onConflict: 'siswa_id,tanggal' })
+    if (!error) {
+      setSavedSiswa(true)
+    } else {
+      await tambahAntrian({ table: 'presensi_siswa', conflictCol: 'siswa_id,tanggal', rows })
+      const sisa = await ambilAntrian()
+      setQueueCount(sisa.length)
+      setSavedOfflineSiswa(true)
+    }
+    setSavingSiswa(false)
+  }
+
+  return (
+    <Layout title="Presensi" subtitle="Kehadiran Anda hari ini">
+      <div className="relative overflow-hidden rounded-xl p-6 mb-6 bg-gradient-to-br from-blue-900 to-blue-950">
+        <div className="absolute -top-10 -right-10 w-40 h-40 rounded-full bg-white/5 pointer-events-none" />
+        <div className="absolute -bottom-14 -left-6 w-32 h-32 rounded-full bg-white/5 pointer-events-none" />
+        <BatikOverlay patternId="batikPresensiSayaBanner" strokeColor="#d4af37" />
+
+        <div className="relative flex items-center gap-4">
+          <div className="w-11 h-11 rounded-full bg-white/10 ring-2 ring-white/20 flex items-center justify-center shrink-0 overflow-hidden">
+            {fotoGuruUrl(profil?.foto_profil_path) ? (
+              <img src={fotoGuruUrl(profil.foto_profil_path)} alt={profil?.nama_lengkap} className="w-full h-full object-cover" />
+            ) : (
+              <ClipboardCheck size={20} className="text-white" />
+            )}
+          </div>
+          <div>
+            <p className="font-display font-semibold text-lg text-white">{profil?.nama_lengkap || 'Presensi Saya'}</p>
+            <p className="text-sm text-blue-200/70 mt-0.5">
+              {kelasWali ? `Wali Kelas ${kelasWali.nama_kelas} · ` : ''}
+              {tanggalLabel}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {(isOffline || queueCount > 0) && (
+        <div className="flex items-center gap-2 mb-4 px-3 py-2 rounded-lg bg-brass-400/15 text-brass-600 text-sm w-fit">
+          <WifiOff size={15} />
+          {isOffline
+            ? 'Sedang offline — presensi akan tersimpan sementara di perangkat ini.'
+            : `Menyinkronkan ${queueCount} data presensi yang tertunda...`}
+          {!isOffline && queueCount > 0 && <span className="font-medium">({queueCount} tersisa)</span>}
+        </div>
+      )}
+
+      {!guruId ? (
+        <div className="card p-6 text-center text-ink-700/60">
+          Akun Anda belum terhubung ke data guru. Hubungi admin untuk menautkan akun.
+        </div>
+      ) : (
+        <>
+          {/* ===== Presensi Pribadi ===== */}
+          <div className="mb-3">
+            <h2 className="font-display text-base font-semibold text-ink-900">Presensi Saya</h2>
+          </div>
+          {loadingSaya ? (
+            <div className="card p-6 text-center text-ink-700/50 mb-6">Memuat...</div>
+          ) : (
+            <div className="card relative overflow-hidden p-5 mb-6">
+              <span className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-900 to-brass-400" />
+
+              <div className="mb-5">
+                <label className="block text-xs font-semibold text-ink-700/60 mb-2">Status Kehadiran</label>
+                <div className="flex gap-1.5 flex-wrap">
+                  {STATUS_OPTS.map((opt) => (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => setDataSaya((d) => ({ ...d, status: opt.value }))}
+                      className={`badge cursor-pointer border ${dataSaya.status === opt.value ? opt.color + ' border-transparent' : 'border-ink-900/10 text-ink-700/40'}`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="mb-5">
+                <label className="block text-xs font-semibold text-ink-700/60 mb-2">Foto Bukti Kehadiran</label>
+                {dataSaya.foto_bukti_path ? (
+                  <button type="button" onClick={() => setShowCamera(true)} className="flex items-center gap-3 group" title="Ambil ulang foto">
+                    <img
+                      src={fotoBuktiUrl(dataSaya.foto_bukti_path)}
+                      alt="Bukti presensi"
+                      className="w-14 h-14 rounded-lg object-cover ring-1 ring-ink-900/10 group-hover:ring-blue-900/40"
+                    />
+                    <span className="text-xs text-ink-700/50">
+                      Diambil pukul {jamLabel(dataSaya.jam_absen) || '—'} · klik untuk ambil ulang
+                    </span>
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setShowCamera(true)}
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-blue-900/10 text-blue-900 text-sm font-medium hover:bg-blue-900/15"
+                  >
+                    <Camera size={15} /> Ambil Foto
+                  </button>
+                )}
+              </div>
+
+              <div className="flex items-center gap-3">
+                <button onClick={handleSimpanStatusSaya} disabled={savingSaya} className="btn-primary">
+                  {savingSaya ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+                  Simpan Presensi
+                </button>
+                {savedSaya && <span className="text-sm text-sage-500">Tersimpan.</span>}
+                {savedOfflineSaya && <span className="text-sm text-brass-600">Tersimpan lokal — akan dikirim otomatis saat online.</span>}
+              </div>
+            </div>
+          )}
+
+          {/* ===== Presensi Siswa — hanya untuk wali kelas, hanya kelasnya sendiri ===== */}
+          {kelasWali && (
+            <>
+              <div className="mb-3">
+                <h2 className="font-display text-base font-semibold text-ink-900">
+                  Presensi Siswa Kelas {kelasWali.nama_kelas}
+                </h2>
+              </div>
+              <div className="card relative overflow-hidden overflow-x-auto">
+                <span className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-900 to-brass-400" />
+                <table className="table-shell">
+                  <thead>
+                    <tr>
+                      <th>Nama Siswa</th>
+                      <th>Status Kehadiran</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {loadingSiswa && (
+                      <tr><td colSpan={2} className="text-center py-8 text-ink-700/50">Memuat...</td></tr>
+                    )}
+                    {!loadingSiswa && siswaList.length === 0 && (
+                      <tr><td colSpan={2} className="text-center py-8 text-ink-700/50">Belum ada siswa aktif di kelas ini.</td></tr>
+                    )}
+                    {siswaList.map((s) => (
+                      <tr key={s.id}>
+                        <td className="font-medium">{s.nama_lengkap}</td>
+                        <td>
+                          <div className="flex gap-1.5">
+                            {STATUS_OPTS.map((opt) => (
+                              <button
+                                key={opt.value}
+                                type="button"
+                                onClick={() => setStatusSiswaMap({ ...statusSiswaMap, [s.id]: opt.value })}
+                                className={`badge cursor-pointer border ${statusSiswaMap[s.id] === opt.value ? opt.color + ' border-transparent' : 'border-ink-900/10 text-ink-700/40'}`}
+                              >
+                                {opt.label}
+                              </button>
+                            ))}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {siswaList.length > 0 && (
+                <div className="mt-4 flex items-center gap-3">
+                  <button onClick={handleSimpanPresensiSiswa} disabled={savingSiswa} className="btn-primary">
+                    {savingSiswa ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+                    Simpan Presensi Siswa
+                  </button>
+                  {savedSiswa && <span className="text-sm text-sage-500">Tersimpan.</span>}
+                  {savedOfflineSiswa && <span className="text-sm text-brass-600">Tersimpan lokal — akan dikirim otomatis saat online.</span>}
+                </div>
+              )}
+            </>
+          )}
+        </>
+      )}
+
+      {showCamera && guruId && (
+        <CameraFotoGuru
+          guru={{ id: guruId, nama_lengkap: profil?.nama_lengkap }}
+          tanggal={hariIni}
+          onSaved={handleFotoTersimpan}
+          onClose={() => setShowCamera(false)}
+        />
+      )}
+    </Layout>
+  )
+}
+
+// ============================================================
+// Halaman Presensi umum (admin): kelola presensi siswa per kelas
+// dan presensi guru untuk semua guru. Tidak berubah dari sebelumnya.
+// ============================================================
+function PresensiAdmin() {
   const { profil } = useAuth()
   const [tab, setTab] = useState('siswa')
   const [tanggal, setTanggal] = useState(() => new Date().toISOString().slice(0, 10))
@@ -587,4 +945,24 @@ export default function Presensi() {
       )}
     </Layout>
   )
+}
+
+// ============================================================
+// Entry point: pilih tampilan berdasarkan peran yang login.
+// admin -> tampilan umum (semua siswa/guru, bisa pilih tanggal & kelas)
+// guru  -> tampilan pribadi (presensi diri sendiri + presensi siswa
+//          kelas yang diampu sebagai wali kelas, kalau ada)
+// ============================================================
+export default function Presensi() {
+  const { profil, isAdmin, loading } = useAuth()
+
+  if (loading) {
+    return (
+      <Layout title="Presensi" subtitle="Catat kehadiran siswa dan guru harian">
+        <div className="card p-6 text-center text-ink-700/50">Memuat...</div>
+      </Layout>
+    )
+  }
+
+  return isAdmin ? <PresensiAdmin /> : <PresensiPribadi profil={profil} />
 }
