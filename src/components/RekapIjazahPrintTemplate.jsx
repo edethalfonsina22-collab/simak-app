@@ -166,13 +166,31 @@ const RekapIjazahPrintTemplate = React.forwardRef(function RekapIjazahPrintTempl
             <td />
             <td style={{ height: isLandscape ? 50 : 36, textAlign: "center", verticalAlign: "bottom" }}>
               {sekolah?.ttd_pengawas_url && (
-                <img src={sekolah.ttd_pengawas_url} alt="TTD Pengawas" style={{ height: isLandscape ? 44 : 32 }} />
+                <img
+                  src={sekolah.ttd_pengawas_url}
+                  alt="TTD Pengawas"
+                  style={{ height: isLandscape ? 44 : 32 }}
+                  onError={(e) => {
+                    // Kalau gambar TTD gagal dimuat (URL tidak valid/rusak),
+                    // sembunyikan elemen img sepenuhnya supaya tidak muncul
+                    // kotak "broken image" bawaan browser yang mempersempit
+                    // ruang tanda tangan manual.
+                    e.currentTarget.style.display = "none";
+                  }}
+                />
               )}
             </td>
             <td />
             <td style={{ height: isLandscape ? 50 : 36, textAlign: "center", verticalAlign: "bottom" }}>
               {sekolah?.ttd_url && (
-                <img src={sekolah.ttd_url} alt="TTD Kepala Sekolah" style={{ height: isLandscape ? 44 : 32 }} />
+                <img
+                  src={sekolah.ttd_url}
+                  alt="TTD Kepala Sekolah"
+                  style={{ height: isLandscape ? 44 : 32 }}
+                  onError={(e) => {
+                    e.currentTarget.style.display = "none";
+                  }}
+                />
               )}
             </td>
           </tr>
