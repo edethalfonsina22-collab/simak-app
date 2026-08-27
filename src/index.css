@@ -111,20 +111,23 @@ body {
      Beri elemen ini @page tersendiri via `page: rekap-landscape;` supaya
      ukuran kertas cetak PERSIS sama dengan lebar kontennya (330mm) —
      otomatis landscape, tidak tergantung user memilih orientasi manual.
-     Override `position: static` + `width: 330mm` di sini karena default
-     .print-only di atas memakai `position: fixed` (dibuat untuk Kuitansi
-     yang isinya kecil dan perlu ditengahkan) — untuk tabel selebar ini,
-     fixed positioning bisa bikin lebar tidak mengikuti kertas dengan baik. */
+     PAKAI `position: fixed` (bukan static) supaya elemen ini benar-benar
+     lepas dari lebar parent-nya (card/layout aplikasi yang lebih sempit
+     dari 330mm) — dengan position:static, "containing block" untuk
+     margin:auto tetap lebar parent yang sempit itu, jadi tidak ada ruang
+     kosong untuk ditengahkan (makanya kontennya nempel kiri). Dengan
+     position:fixed, containing block-nya jadi kertas itu sendiri, sehingga
+     left:0; right:0; margin:auto benar-benar menengahkan relatif ke
+     kertas 330mm penuh, sama seperti default .print-only untuk Kuitansi. */
   .print-rekap {
     page: rekap-landscape;
-    position: static !important;
-    width: 330mm !important;
-    /* margin auto supaya tetap tertengah secara horizontal di kertas —
-       tanpa ini kontennya nempel rata kiri, karena position:static di atas
-       menghilangkan efek centering `position:fixed; left:0; right:0;` yang
-       dipakai .print-only untuk Kuitansi. */
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
     margin-left: auto !important;
     margin-right: auto !important;
+    width: 330mm !important;
   }
   @page rekap-landscape {
     size: 330mm 210mm; /* F4/Folio landscape, sesuai lebar RekapIjazahPrintTemplate.jsx */
