@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
 import Layout from "../components/Layout";
 import SklPrintTemplate from "../components/SklPrintTemplate";
@@ -13,8 +13,6 @@ function tahunPelajaranDefault() {
 
 export default function SuratKeteranganLulus() {
   const [tahunPelajaran, setTahunPelajaran] = useState(tahunPelajaranDefault());
-  const [kelasList, setKelasList] = useState([]);
-  const [kelasId, setKelasId] = useState(null);
   const [siswaList, setSiswaList] = useState([]);
   const [nilaiMap, setNilaiMap] = useState({});
   const [sklMap, setSklMap] = useState({});
@@ -22,50 +20,21 @@ export default function SuratKeteranganLulus() {
   const [loading, setLoading] = useState(true);
   const [selectedId, setSelectedId] = useState(null);
   const [generating, setGenerating] = useState(false);
-  const [nomorPrefix, setNomorPrefix] = useState("421.2/");
-  const previewRef = useRef(null);
-
-  // Pilih siswa dari tabel lalu gulir otomatis ke kartu pratinjau di bawah,
-  // supaya perubahannya kelihatan jelas (sebelumnya terasa "tidak merespon"
-  // karena kartu pratinjau ada jauh di bawah tabel).
-  function lihatSiswa(id) {
-    setSelectedId(id);
-    previewRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-  }
-
-  // Ambil daftar kelas sekali di awal, lalu default-kan ke kelas yang mengandung "6"
-  useEffect(() => {
-    loadKelas();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  // Diubah dari "Awalan Nomor Surat" (prefix + nomor urut otomatis per
+  // siswa) menjadi SATU nomor surat utuh yang sama untuk seluruh siswa —
+  // sesuai kebutuhan: SKL diterbitkan kolektif dengan satu nomor surat,
+  // bukan bernomor urut per anak.
+  const [nomorSkl, setNomorSkl] = useState("421.2/001/2026");
 
   useEffect(() => {
-    if (kelasId !== null) {
-      loadAll();
-    }
+    loadAll();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tahunPelajaran, kelasId]);
-
-  async function loadKelas() {
-    const { data: kelas } = await supabase.from("kelas").select("*").order("nama_kelas");
-    setKelasList(kelas || []);
-    // Tingkat disimpan sebagai angka Romawi (VII, VI, dst), jadi cocokkan persis "VI"
-    // (bukan .includes, karena "VI" juga jadi substring dari "VII" dan "VIII")
-    const kelas6 = (kelas || []).find((k) => String(k.tingkat).trim().toUpperCase() === "VI");
-    setKelasId(kelas6 ? kelas6.id : kelas?.[0]?.id ?? "");
-  }
+  }, [tahunPelajaran]);
 
   async function loadAll() {
     setLoading(true);
-    let siswaQuery = supabase
-      .from("siswa")
-      .select("*, kelas(tingkat)")
-      .eq("status", "aktif")
-      .order("nama_lengkap");
-    if (kelasId) siswaQuery = siswaQuery.eq("kelas_id", kelasId);
-
     const [{ data: siswa }, { data: nilai }, { data: sklRows }, { data: profil }] = await Promise.all([
-      siswaQuery,
+      supabase.from("siswa").select("*").eq("status", "aktif").order("nama_lengkap"),
       supabase.from("nilai_ijazah").select("*").eq("tahun_pelajaran", tahunPelajaran),
       supabase.from("skl").select("*").eq("tahun_pelajaran", tahunPelajaran),
       supabase.from("profil_sekolah").select("*").eq("id", 1).maybeSingle(),
@@ -77,47 +46,25 @@ export default function SuratKeteranganLulus() {
     const sMap = {};
     (sklRows || []).forEach((r) => (sMap[r.siswa_id] = r));
     setSklMap(sMap);
-
-    // profil_sekolah hanya menyimpan logo_path & ttd_kepala_sekolah_path
-    // (path di Supabase Storage), bukan URL langsung — makanya harus diubah
-    // dulu jadi URL publik di sini, sama seperti di ProfilSekolah.jsx.
-    // Sebelumnya logo tidak pernah muncul di cetakan SKL karena kolom
-    // logo_url/ttd_url ini memang tidak ada di tabel.
-    let logoUrl = "";
-    let ttdUrl = "";
-    if (profil?.logo_path) {
-      const { data: pub } = supabase.storage.from("profil-sekolah").getPublicUrl(profil.logo_path);
-      logoUrl = pub?.publicUrl || "";
-    }
-    if (profil?.ttd_kepala_sekolah_path) {
-      const { data: pub } = supabase.storage
-        .from("profil-sekolah")
-        .getPublicUrl(profil.ttd_kepala_sekolah_path);
-      ttdUrl = pub?.publicUrl || "";
-    }
-
-    setSekolah(profil ? { ...profil, logo_url: logoUrl, ttd_url: ttdUrl } : null);
-
-    // Pilih siswa pertama di kelas terpilih (reset kalau siswa lama tidak ada di kelas ini)
-    if (siswa?.length && !siswa.some((s) => s.id === selectedId)) {
-      setSelectedId(siswa[0].id);
-    } else if (!siswa?.length) {
-      setSelectedId(null);
-    }
+    setSekolah(profil || null);
+    if (siswa?.length && !selectedId) setSelectedId(siswa[0].id);
     setLoading(false);
   }
 
-  // Buat nomor SKL untuk siswa yang belum punya, urut berdasar urutan nama
-  // (mengikuti nomor urut siswa di tabel), format: {prefix}{urut}/{tahun berjalan}
+  // Buat SKL untuk siswa yang belum punya — SEMUA siswa memakai nomor
+  // surat yang SAMA (nomorSkl), tidak lagi dihitung urut per siswa.
   async function generateNomorUntukSemua() {
+    if (!nomorSkl.trim()) {
+      alert("Isi dulu Nomor Surat SKL-nya.");
+      return;
+    }
     setGenerating(true);
-    const tahun = new Date().getFullYear();
     const rows = siswaList
       .filter((s) => !sklMap[s.id])
-      .map((s, i) => ({
+      .map((s) => ({
         siswa_id: s.id,
         tahun_pelajaran: tahunPelajaran,
-        nomor_skl: `${nomorPrefix}${String(Object.keys(sklMap).length + i + 1).padStart(3, "0")}/${tahun}`,
+        nomor_skl: nomorSkl,
         tanggal_terbit: new Date().toISOString().slice(0, 10),
       }));
     if (rows.length) {
@@ -127,6 +74,32 @@ export default function SuratKeteranganLulus() {
         setGenerating(false);
         return;
       }
+    }
+    setGenerating(false);
+    loadAll();
+  }
+
+  // Terapkan satu nomor surat yang sama ke SEMUA siswa (termasuk yang
+  // sudah punya nomor sebelumnya) — dipakai kalau nomorSkl diubah dan
+  // perlu disamaratakan ulang ke seluruh SKL yang sudah terbit.
+  async function terapkanNomorKeSemua() {
+    if (!nomorSkl.trim()) {
+      alert("Isi dulu Nomor Surat SKL-nya.");
+      return;
+    }
+    if (!window.confirm(`Timpa nomor surat SEMUA siswa (${siswaList.length} siswa) menjadi "${nomorSkl}"?`)) return;
+    setGenerating(true);
+    const rows = siswaList.map((s) => ({
+      siswa_id: s.id,
+      tahun_pelajaran: tahunPelajaran,
+      nomor_skl: nomorSkl,
+      tanggal_terbit: sklMap[s.id]?.tanggal_terbit || new Date().toISOString().slice(0, 10),
+    }));
+    const { error } = await supabase.from("skl").upsert(rows, { onConflict: "siswa_id,tahun_pelajaran" });
+    if (error) {
+      alert("Gagal menyeragamkan nomor SKL: " + error.message);
+      setGenerating(false);
+      return;
     }
     setGenerating(false);
     loadAll();
@@ -146,21 +119,17 @@ export default function SuratKeteranganLulus() {
         tempat_ttd: sekolah.tempat_ttd,
         kepala_sekolah: sekolah.kepala_sekolah,
         nip_kepala_sekolah: sekolah.nip_kepala_sekolah,
-        // logo_url & ttd_url sudah berupa URL publik hasil getPublicUrl()
-        // di loadAll(), diambil dari logo_path & ttd_kepala_sekolah_path.
-        logo_url: sekolah.logo_url,
-        ttd_url: sekolah.ttd_url,
       }
     : null;
 
   return (
     <Layout
       title="Surat Keterangan Lulus"
-      subtitle="Nomor SKL otomatis per siswa, dicetak dari nilai ijazah yang sudah diisi"
+      subtitle="Satu nomor SKL untuk semua siswa, dicetak dari nilai ijazah yang sudah diisi"
       actions={
         <button className="btn-primary" onClick={generateNomorUntukSemua} disabled={generating || loading}>
           {generating ? <Loader2 size={16} className="animate-spin" /> : <FilePlus2 size={16} />}
-          Buat Nomor Untuk Siswa Baru
+          Buat SKL Untuk Siswa Baru
         </button>
       }
     >
@@ -175,29 +144,19 @@ export default function SuratKeteranganLulus() {
           />
         </div>
         <div>
-          <label className="block text-xs font-semibold text-ink-700/60 mb-1">Kelas</label>
-          <select
-            className="input-field w-48"
-            value={kelasId || ""}
-            onChange={(e) => setKelasId(e.target.value)}
-          >
-            {kelasList.map((k) => (
-              <option key={k.id} value={k.id}>
-                {k.nama_kelas} (Tingkat {k.tingkat})
-              </option>
-            ))}
-          </select>
+          <label className="block text-xs font-semibold text-ink-700/60 mb-1">Nomor Surat SKL (dipakai untuk semua siswa)</label>
+          <input className="input-field w-64" value={nomorSkl} onChange={(e) => setNomorSkl(e.target.value)} />
         </div>
-        <div>
-          <label className="block text-xs font-semibold text-ink-700/60 mb-1">Awalan Nomor Surat</label>
-          <input className="input-field w-40" value={nomorPrefix} onChange={(e) => setNomorPrefix(e.target.value)} />
-        </div>
+        <button className="btn-secondary" onClick={terapkanNomorKeSemua} disabled={generating || loading}>
+          {generating ? <Loader2 size={16} className="animate-spin" /> : null}
+          Samakan Nomor Ke Semua Siswa
+        </button>
       </div>
 
       {loading ? (
         <p>Memuat...</p>
       ) : siswaList.length === 0 ? (
-        <div className="card p-6 text-center text-ink-700/60">Belum ada siswa aktif di kelas ini.</div>
+        <div className="card p-6 text-center text-ink-700/60">Belum ada siswa aktif.</div>
       ) : (
         <>
           <div className="card overflow-x-auto mb-6">
@@ -227,7 +186,7 @@ export default function SuratKeteranganLulus() {
                       </td>
                       <td>{skl ? new Date(skl.tanggal_terbit).toLocaleDateString("id-ID") : "-"}</td>
                       <td>
-                        <button className="btn-secondary !px-3 !py-1.5 text-xs" onClick={() => lihatSiswa(s.id)}>
+                        <button className="btn-secondary !px-3 !py-1.5 text-xs" onClick={() => setSelectedId(s.id)}>
                           Lihat
                         </button>
                       </td>
@@ -238,7 +197,7 @@ export default function SuratKeteranganLulus() {
             </table>
           </div>
 
-          <div className="card p-4" ref={previewRef}>
+          <div className="card p-4">
             <div className="flex items-center justify-between mb-4">
               <div>
                 <label className="block text-xs font-semibold text-ink-700/60 mb-1">Pratinjau Siswa</label>
@@ -261,11 +220,14 @@ export default function SuratKeteranganLulus() {
 
             {!sklMap[selectedId] && (
               <p className="text-sm text-amber-600 mb-3">
-                Siswa ini belum punya nomor SKL — klik "Buat Nomor Untuk Siswa Baru" di atas dulu.
+                Siswa ini belum punya nomor SKL — klik "Buat SKL Untuk Siswa Baru" di atas dulu.
               </p>
             )}
 
-            <div className="border border-ink-900/10 rounded-lg overflow-auto" style={{ maxHeight: "70vh" }}>
+            <div
+              className="border border-ink-900/10 rounded-lg overflow-hidden"
+              style={{ transform: "scale(0.72)", transformOrigin: "top center", marginBottom: "-28%" }}
+            >
               <SklPrintTemplate
                 siswa={siswaTerpilih}
                 nilai={nilaiMap[selectedId] || {}}
