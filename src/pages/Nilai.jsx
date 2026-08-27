@@ -54,7 +54,7 @@ function CircuitBackdrop({ patternId }) {
 }
 
 export default function Nilai() {
-  const { profil } = useAuth()
+  const { profil, isAdmin } = useAuth()
   const [activeSubTab, setActiveSubTab] = useState('input') // 'input' | 'kelola'
   const [kelasList, setKelasList] = useState([])
   const [kelasId, setKelasId] = useState('')
@@ -74,12 +74,21 @@ export default function Nilai() {
   const [kelolaLoading, setKelolaLoading] = useState(false)
   const [kelolaFilterMapel, setKelolaFilterMapel] = useState('')
 
+  // Admin: semua kelas. Guru: cuma kelas yang dia jadi wali kelasnya.
+  // (Keamanannya tetap ditegakkan oleh RLS tabel kelas — filter ini
+  // murni supaya dropdown langsung tepat tanpa nunggu RLS "diam-diam"
+  // mengosongkan hasil untuk kelas yang bukan miliknya.)
   useEffect(() => {
-    supabase.from('kelas').select('id, nama_kelas').order('nama_kelas').then(({ data }) => {
+    if (profil === undefined) return // tunggu profil selesai dimuat
+    let query = supabase.from('kelas').select('id, nama_kelas').order('nama_kelas')
+    if (!isAdmin) {
+      query = query.eq('wali_kelas_id', profil?.guru_id || null)
+    }
+    query.then(({ data }) => {
       setKelasList(data || [])
       if (data?.length) setKelasId(data[0].id)
     })
-  }, [])
+  }, [isAdmin, profil])
 
   useEffect(() => {
     if (kelasId) loadSiswa()
