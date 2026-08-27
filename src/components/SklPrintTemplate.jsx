@@ -1,17 +1,19 @@
 import React from "react";
 import { MAPEL_IJAZAH, jumlahNilai } from "./IjazahPrintTemplate";
 
-// Motif bingkai: ubin SVG kecil (diamond + bunga di tengah, warna biru) yang
-// diulang sepanjang tepi lewat CSS border-image — meniru gaya bingkai
-// ornamen biru pada sertifikat, tapi dibuat lebih tipis supaya tidak
-// memakan banyak ruang cetak dan tetap rapi di kertas A4.
+// Motif bingkai KAWUNG — ubin SVG kecil diulang lewat CSS border-image.
+// Dasar biru (#1d3f91) dengan aksen garis & titik tengah merah (#b91c1c),
+// bentuk kawung (4 elips mengelilingi titik pusat) digambar putih pucat
+// (#e6e9f5) supaya kontras di atas dua warna dasar tsb.
 const FRAME_TILE = encodeURIComponent(
   `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-    <rect width="64" height="64" fill="#2748a0"/>
-    <rect x="2" y="2" width="60" height="60" fill="none" stroke="#8fa6e0" stroke-width="1"/>
-    <path d="M32 10 L44 32 L32 54 L20 32 Z" fill="none" stroke="#c9d6f5" stroke-width="2"/>
-    <circle cx="32" cy="32" r="6" fill="#c9d6f5"/>
-    <circle cx="32" cy="32" r="2.4" fill="#2748a0"/>
+    <rect width="64" height="64" fill="#1d3f91"/>
+    <rect x="2" y="2" width="60" height="60" fill="none" stroke="#b91c1c" stroke-width="1.5"/>
+    <ellipse cx="32" cy="18" rx="8" ry="13" fill="none" stroke="#e6e9f5" stroke-width="2"/>
+    <ellipse cx="32" cy="46" rx="8" ry="13" fill="none" stroke="#e6e9f5" stroke-width="2"/>
+    <ellipse cx="18" cy="32" rx="13" ry="8" fill="none" stroke="#e6e9f5" stroke-width="2"/>
+    <ellipse cx="46" cy="32" rx="13" ry="8" fill="none" stroke="#e6e9f5" stroke-width="2"/>
+    <circle cx="32" cy="32" r="5" fill="#b91c1c" stroke="#e6e9f5" stroke-width="1"/>
   </svg>`
 );
 const FRAME_URL = `url("data:image/svg+xml,${FRAME_TILE}")`;
@@ -28,13 +30,8 @@ const SklPrintTemplate = React.forwardRef(function SklPrintTemplate(
     : "";
 
   return (
-    // WRAPPER LUAR — HANYA mengatur lebar kertas (210mm) dan padding cetak.
-    // PENTING: tidak ada lagi minHeight/maxHeight 297mm + overflow:hidden di
-    // sini. Sebelumnya batasan itu memotong apa pun yang melebihi 297mm,
-    // termasuk garis bingkai paling bawah kalau isi suratnya sedikit lebih
-    // panjang dari perkiraan. Sekarang tingginya mengikuti isi (auto),
-    // supaya bingkai di bawah tidak pernah "kepotong" — kalau isinya
-    // memang muat 1 halaman, hasilnya otomatis 1 halaman juga.
+    // WRAPPER LUAR — hanya lebar kertas (210mm) + padding cetak. Tidak ada
+    // batas tinggi/overflow di sini, jadi bingkai tidak pernah kepotong.
     <div
       ref={ref}
       className="print-only"
@@ -50,28 +47,27 @@ const SklPrintTemplate = React.forwardRef(function SklPrintTemplate(
         boxSizing: "border-box",
       }}
     >
-      {/* BINGKAI ORNAMEN BIRU — sekarang "memeluk" langsung kotak konten di
-          bawah ini (yang tingginya auto, mengikuti isi surat), bukan
-          membungkus kotak luar berukuran tetap. Jadi border-image akan
-          selalu selesai tepat di ujung konten, garis atas/bawah/kiri/kanan
-          selalu utuh, berapa pun panjang isi suratnya. */}
+      {/* BINGKAI KAWUNG MERAH-BIRU — memeluk langsung kotak konten (tinggi
+          auto mengikuti isi surat) supaya keempat sisi bingkai selalu utuh. */}
       <div
         style={{
           display: "inline-block",
           width: "100%",
-          border: "5mm solid transparent",
+          border: "6mm solid transparent",
           borderImageSource: FRAME_URL,
           borderImageSlice: 22,
-          borderImageWidth: "5mm",
+          borderImageWidth: "6mm",
           borderImageRepeat: "round",
-          padding: "1.5mm",
+          padding: "2mm",
           boxSizing: "border-box",
         }}
       >
+        {/* Kotak konten TANPA border tambahan — garis kotak tipis lama di
+            dalam bingkai sudah dihapus, isi langsung ditempel di dalam
+            bingkai Kawung dengan sedikit padding supaya tidak mepet. */}
         <div
           style={{
-            border: "1pt solid #2748a0",
-            padding: "5mm 10mm",
+            padding: "4mm 10mm",
             boxSizing: "border-box",
             display: "flex",
             flexDirection: "column",
@@ -85,7 +81,7 @@ const SklPrintTemplate = React.forwardRef(function SklPrintTemplate(
               display: "flex",
               alignItems: "center",
               gap: 14,
-              borderBottom: "3px double #2748a0",
+              borderBottom: "3px double #1d3f91",
               paddingBottom: 6,
               marginBottom: 10,
             }}
@@ -258,8 +254,8 @@ function formatTanggal(iso) {
   }
 }
 
-const th = { border: "1px solid #2748a0", padding: "3px 6px", background: "#eef1fb", fontWeight: "bold", letterSpacing: "0.2px" };
-const td = { border: "1px solid #2748a0", padding: "3px 6px", textAlign: "center", verticalAlign: "middle" };
-const tdGroup = { border: "1px solid #2748a0", padding: "3px 6px", fontWeight: "bold", background: "#f5f7fc" };
+const th = { border: "1px solid #1d3f91", padding: "3px 6px", background: "#eef1fb", fontWeight: "bold", letterSpacing: "0.2px" };
+const td = { border: "1px solid #1d3f91", padding: "3px 6px", textAlign: "center", verticalAlign: "middle" };
+const tdGroup = { border: "1px solid #1d3f91", padding: "3px 6px", fontWeight: "bold", background: "#f5f7fc" };
 
 export default SklPrintTemplate;
