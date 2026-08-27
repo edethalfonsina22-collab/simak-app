@@ -76,6 +76,21 @@ body {
   .print-only * {
     visibility: visible;
   }
+  /* FIX halaman kosong: wrapper pratinjau di SuratKeteranganLulus.jsx
+     (dan halaman cetak lain yang serupa) memakai `transform: scale(...)`
+     inline + class Tailwind `overflow-hidden` supaya pratinjau di layar
+     tampil kecil. Tapi `transform` pada elemen manapun menjadikannya
+     "containing block" baru untuk anak ber-`position: fixed` — jadi
+     .print-only di dalamnya jadi terkurung/dipotong oleh overflow-hidden
+     milik wrapper tsb saat dicetak, alih-alih lepas mengisi kertas A4.
+     Beri class `print-preview-scale` pada wrapper tsb, lalu netralkan
+     transform & overflow-nya khusus saat print (!important menang atas
+     inline style). */
+  .print-preview-scale {
+    transform: none !important;
+    overflow: visible !important;
+    margin-bottom: 0 !important;
+  }
   /* Default: rata tengah horizontal, tetap di ATAS kertas A4 (dipakai
      Kuitansi). Sebelumnya top:0; left:0 membuat Kuitansi menempel pojok
      kiri-atas ("berat sebelah") — sekarang cuma digeser ke tengah secara
