@@ -1,48 +1,63 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
 html, body, #root {
   height: 100%;
 }
+
 body {
   @apply bg-paper text-ink-900 antialiased;
 }
+
 ::selection {
   @apply bg-brass-400/40;
 }
+
 .eyebrow {
   @apply text-[11px] font-semibold tracking-[0.14em] uppercase text-ink-700/60;
 }
+
 .card {
   @apply bg-white rounded-2xl shadow-panel border border-ink-900/[0.06];
 }
+
 .btn-primary {
   @apply inline-flex items-center justify-center gap-2 rounded-lg bg-ink-900 text-paper px-4 py-2.5 text-sm font-semibold hover:bg-ink-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed;
 }
+
 .btn-secondary {
   @apply inline-flex items-center justify-center gap-2 rounded-lg bg-white border border-ink-900/15 text-ink-900 px-4 py-2.5 text-sm font-semibold hover:bg-ink-900/[0.04] transition-colors disabled:opacity-50;
 }
+
 .btn-danger {
   @apply inline-flex items-center justify-center gap-2 rounded-lg bg-red-50 border border-red-200 text-red-700 px-4 py-2.5 text-sm font-semibold hover:bg-red-100 transition-colors;
 }
+
 .input-field {
   @apply w-full rounded-lg border border-ink-900/15 bg-white px-3.5 py-2.5 text-sm text-ink-900 placeholder:text-ink-700/40 focus:outline-none focus:ring-2 focus:ring-brass-400 focus:border-brass-400 transition-shadow;
 }
+
 .table-shell {
   @apply w-full text-sm border-collapse;
 }
+
 .table-shell th {
   @apply text-left text-[11px] font-semibold uppercase tracking-wider text-ink-700/50 px-4 py-3 border-b border-ink-900/10 bg-ink-900/[0.02];
 }
+
 .table-shell td {
   @apply px-4 py-3 border-b border-ink-900/[0.06] text-ink-900;
 }
+
 .table-shell tr:hover td {
   @apply bg-brass-400/[0.05];
 }
+
 .badge {
   @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium;
 }
+
 /* Aturan cetak untuk Kuitansi/Nota — sembunyikan seluruh halaman kecuali
    elemen berkelas .print-only (dipakai oleh KuitansiPrintTemplate) saat
    window.print() dipanggil dari Keuangan.jsx / KuitansiModal.jsx / Kuitansi.jsx */
@@ -86,10 +101,39 @@ body {
     top: auto;
     bottom: 0;
   }
+
+  /* Tambahan khusus untuk Rekap Ijazah (RekapIjazahPrintTemplate.jsx).
+     Tabelnya lebar (9 kolom nilai + biodata) dan dirancang memakai lebar
+     330mm (F4/Folio landscape). Sebelumnya elemen ini ikut memakai @page
+     global di atas (size: A4 -> lebar landscape cuma 297mm), sehingga
+     33mm sisi kanan (kira-kira kolom SBK, PJOK, Mulok, JUMLAH) selalu
+     terpotong saat dicetak walau tampil sempurna di layar/pratinjau.
+     Beri elemen ini @page tersendiri via `page: rekap-landscape;` supaya
+     ukuran kertas cetak PERSIS sama dengan lebar kontennya (330mm) —
+     otomatis landscape, tidak tergantung user memilih orientasi manual.
+     Override `position: static` + `width: 330mm` di sini karena default
+     .print-only di atas memakai `position: fixed` (dibuat untuk Kuitansi
+     yang isinya kecil dan perlu ditengahkan) — untuk tabel selebar ini,
+     fixed positioning bisa bikin lebar tidak mengikuti kertas dengan baik. */
+  .print-rekap {
+    page: rekap-landscape;
+    position: static !important;
+    width: 330mm !important;
+  }
+  @page rekap-landscape {
+    size: 330mm 210mm; /* F4/Folio landscape, sesuai lebar RekapIjazahPrintTemplate.jsx */
+    margin: 0;
+  }
+  .print-rekap table {
+    width: 100% !important;
+    table-layout: auto;
+  }
+
   .no-print {
     display: none !important;
   }
 }
+
 @media screen {
   .print-only {
     display: none;
