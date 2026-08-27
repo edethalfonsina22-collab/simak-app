@@ -262,15 +262,7 @@ export default function Ijazah() {
               </button>
             </div>
 
-            {/* className "print-preview-wrap" ditambahkan supaya overflow:auto
-                dan maxHeight:70vh di bawah ini (dipakai untuk membatasi tinggi
-                kotak pratinjau di LAYAR) tidak ikut membatasi/memotong tinggi
-                RekapIjazahPrintTemplate saat DICETAK. Tanpa class ini, overflow
-                & maxHeight milik div ini tetap berlaku walau div-nya sendiri
-                "disembunyikan" lewat visibility:hidden saat print — sehingga
-                hasil cetak terpotong tinggi ke 70vh dan pecah jadi beberapa
-                halaman kecil. Aturan resetnya ada di index.css. */}
-            <div className="border border-ink-900/10 rounded-lg overflow-auto print-preview-wrap" style={{ maxHeight: "70vh" }}>
+            <div className="border border-ink-900/10 rounded-lg overflow-auto" style={{ maxHeight: "70vh" }}>
               <RekapIjazahPrintTemplate
                 siswaList={siswaUntukRekap}
                 sekolah={sekolahUntukCetak}
