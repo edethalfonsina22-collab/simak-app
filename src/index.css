@@ -129,6 +129,20 @@ body {
     table-layout: auto;
   }
 
+  /* Pembungkus preview di layar (src/pages/Ijazah.jsx, bagian "Pratinjau
+     Rekap") memakai overflow:auto + maxHeight:70vh supaya kotak pratinjau
+     tidak kepanjangan di layar. overflow & max-height ini TETAP berlaku
+     saat print walau div-nya sendiri kena visibility:hidden dari aturan
+     `body * { visibility:hidden }` di atas — sehingga tanpa reset ini,
+     RekapIjazahPrintTemplate ikut terpotong tingginya ke 70vh dan hasil
+     cetak jadi kecil/pecah ke beberapa halaman meski @page & lebarnya
+     sudah benar (lihat .print-rekap di atas). Beri className
+     "print-preview-wrap" pada div pembungkus tsb agar bisa ditarget di sini. */
+  .print-preview-wrap {
+    overflow: visible !important;
+    max-height: none !important;
+  }
+
   .no-print {
     display: none !important;
   }
