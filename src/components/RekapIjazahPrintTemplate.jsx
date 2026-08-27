@@ -29,6 +29,17 @@ export function jumlahNilaiSiswa(nilai) {
 // - sekolah: { nama_sekolah, npsn, kabupaten, provinsi, tempat_ttd,
 //              kepala_sekolah, nip_kepala_sekolah, pengawas, nip_pengawas }
 // - tahunPelajaran: string, mis. "2025/2026"
+//
+// CATATAN PRINT (fix lebar terpotong saat dicetak):
+// Elemen root memakai className "print-only print-rekap" (bukan cuma
+// "print-only" seperti KuitansiPrintTemplate). Class tambahan "print-rekap"
+// dipakai oleh index.css untuk memberi elemen ini @page tersendiri
+// (size: 330mm 210mm / F4 landscape) supaya lebar kertas cetak PERSIS sama
+// dengan lebar konten (330mm) di bawah ini. Sebelumnya konten dicetak
+// memakai @page global (A4 = 297mm lebar landscape) sehingga sisa 33mm di
+// kanan (kira-kira kolom SBK, PJOK, Mulok, JUMLAH) selalu terpotong.
+// Jangan ubah width di sini tanpa menyesuaikan juga @page rekap-landscape
+// di index.css, karena keduanya harus selalu sama nilainya.
 const RekapIjazahPrintTemplate = React.forwardRef(function RekapIjazahPrintTemplate(
   { siswaList, sekolah, tahunPelajaran },
   ref
@@ -41,7 +52,7 @@ const RekapIjazahPrintTemplate = React.forwardRef(function RekapIjazahPrintTempl
   return (
     <div
       ref={ref}
-      className="print-only"
+      className="print-only print-rekap"
       style={{
         // display:block ditambahkan secara eksplisit di sini (inline style)
         // supaya menang atas aturan `@media screen { .print-only { display: none } }`
