@@ -28,22 +28,19 @@ const SklPrintTemplate = React.forwardRef(function SklPrintTemplate(
     : "";
 
   return (
+    // WRAPPER LUAR — HANYA mengatur lebar kertas (210mm) dan padding cetak.
+    // PENTING: tidak ada lagi minHeight/maxHeight 297mm + overflow:hidden di
+    // sini. Sebelumnya batasan itu memotong apa pun yang melebihi 297mm,
+    // termasuk garis bingkai paling bawah kalau isi suratnya sedikit lebih
+    // panjang dari perkiraan. Sekarang tingginya mengikuti isi (auto),
+    // supaya bingkai di bawah tidak pernah "kepotong" — kalau isinya
+    // memang muat 1 halaman, hasilnya otomatis 1 halaman juga.
     <div
       ref={ref}
       className="print-only"
       style={{
-        // display:block ditambahkan secara eksplisit (sama seperti IjazahPrintTemplate)
-        // supaya menang atas aturan `@media screen { .print-only { display:none } }`
-        // di index.css — elemen ini juga dipakai sebagai kotak "Pratinjau" di layar,
-        // jadi harus tetap terlihat saat browsing biasa, bukan cuma saat print.
         display: "block",
         width: "210mm",
-        minHeight: "297mm",
-        maxHeight: "297mm",
-        overflow: "hidden",
-        // Padding luar dikecilkan dari 6mm -> 4mm supaya ada ruang lega tambahan
-        // di bagian bawah untuk bingkai (sebelumnya bingkai bawah nyaris pas di
-        // batas 297mm sehingga garis paling bawahnya terpotong oleh overflow:hidden).
         padding: "4mm",
         background: "#fff",
         fontFamily: "'Times New Roman', serif",
@@ -53,12 +50,15 @@ const SklPrintTemplate = React.forwardRef(function SklPrintTemplate(
         boxSizing: "border-box",
       }}
     >
-      {/* BINGKAI ORNAMEN BIRU — motif diamond/bunga berulang lewat border-image,
-          dibuat tipis supaya konten tetap muat dalam 1 halaman A4. Tinggi
-          mengikuti konten (tidak dipaksa minHeight) karena pembatas 1 halaman
-          sudah ditangani oleh wrapper terluar (maxHeight + overflow:hidden). */}
+      {/* BINGKAI ORNAMEN BIRU — sekarang "memeluk" langsung kotak konten di
+          bawah ini (yang tingginya auto, mengikuti isi surat), bukan
+          membungkus kotak luar berukuran tetap. Jadi border-image akan
+          selalu selesai tepat di ujung konten, garis atas/bawah/kiri/kanan
+          selalu utuh, berapa pun panjang isi suratnya. */}
       <div
         style={{
+          display: "inline-block",
+          width: "100%",
           border: "5mm solid transparent",
           borderImageSource: FRAME_URL,
           borderImageSlice: 22,
@@ -71,9 +71,7 @@ const SklPrintTemplate = React.forwardRef(function SklPrintTemplate(
         <div
           style={{
             border: "1pt solid #2748a0",
-            // Padding dalam dikecilkan sedikit dari "6mm 10mm" -> "4mm 10mm"
-            // (hanya sisi atas-bawah) untuk menambah ruang vertikal ekstra.
-            padding: "4mm 10mm",
+            padding: "5mm 10mm",
             boxSizing: "border-box",
             display: "flex",
             flexDirection: "column",
@@ -88,8 +86,8 @@ const SklPrintTemplate = React.forwardRef(function SklPrintTemplate(
               alignItems: "center",
               gap: 14,
               borderBottom: "3px double #2748a0",
-              paddingBottom: 4,
-              marginBottom: 8,
+              paddingBottom: 6,
+              marginBottom: 10,
             }}
           >
             {sekolah?.logo_url && (
@@ -139,7 +137,7 @@ const SklPrintTemplate = React.forwardRef(function SklPrintTemplate(
           >
             SURAT KETERANGAN LULUS
           </p>
-          <p style={{ textAlign: "center", margin: "0 0 8px 0" }}>Nomor: {skl?.nomor_skl || "-"}</p>
+          <p style={{ textAlign: "center", margin: "0 0 10px 0" }}>Nomor: {skl?.nomor_skl || "-"}</p>
 
           <p style={{ textAlign: "justify", margin: "0 0 6px 0" }}>
             Yang bertanda tangan di bawah ini Kepala {sekolah?.nama_sekolah}
@@ -148,7 +146,7 @@ const SklPrintTemplate = React.forwardRef(function SklPrintTemplate(
             {sekolah?.provinsi ? `, Provinsi ${sekolah.provinsi}` : ""}, menerangkan bahwa:
           </p>
 
-          <table style={{ borderCollapse: "collapse", margin: "0 0 8px 0" }}>
+          <table style={{ borderCollapse: "collapse", margin: "0 0 10px 0" }}>
             <tbody>
               <Baris label="Nama" nilai={siswa?.nama_lengkap} />
               <Baris
@@ -172,7 +170,7 @@ const SklPrintTemplate = React.forwardRef(function SklPrintTemplate(
               width: "100%",
               borderCollapse: "collapse",
               fontSize: "11pt",
-              margin: "0 0 8px 0",
+              margin: "0 0 10px 0",
               pageBreakInside: "avoid",
             }}
           >
@@ -222,7 +220,7 @@ const SklPrintTemplate = React.forwardRef(function SklPrintTemplate(
             yang bersangkutan.
           </p>
 
-          <div style={{ textAlign: "right", marginTop: 12, pageBreakInside: "avoid" }}>
+          <div style={{ textAlign: "right", marginTop: 16, pageBreakInside: "avoid" }}>
             <p style={{ margin: 0 }}>
               {sekolah?.tempat_ttd || sekolah?.kecamatan || ""}, {tanggalTerbit}
             </p>
