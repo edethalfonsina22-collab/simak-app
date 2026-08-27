@@ -119,6 +119,12 @@ export default function SuratKeteranganLulus() {
         tempat_ttd: sekolah.tempat_ttd,
         kepala_sekolah: sekolah.kepala_sekolah,
         nip_kepala_sekolah: sekolah.nip_kepala_sekolah,
+        // Sebelumnya field ini tidak ikut dikirim ke SklPrintTemplate,
+        // makanya logo & tanda tangan tidak pernah muncul di cetakan
+        // (bukan karena bug transform/print — datanya memang tidak
+        // pernah sampai ke komponen cetak).
+        logo_url: sekolah.logo_url,
+        ttd_url: sekolah.ttd_url,
       }
     : null;
 
