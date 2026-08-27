@@ -53,10 +53,10 @@ const SklPrintTemplate = React.forwardRef(function SklPrintTemplate(
         style={{
           display: "inline-block",
           width: "100%",
-          border: "6mm solid transparent",
+          border: "5mm solid transparent",
           borderImageSource: FRAME_URL,
           borderImageSlice: 22,
-          borderImageWidth: "6mm",
+          borderImageWidth: "5mm",
           borderImageRepeat: "round",
           padding: "2mm",
           boxSizing: "border-box",
@@ -67,7 +67,7 @@ const SklPrintTemplate = React.forwardRef(function SklPrintTemplate(
             bingkai Kawung dengan sedikit padding supaya tidak mepet. */}
         <div
           style={{
-            padding: "4mm 10mm",
+            padding: "3mm 10mm",
             boxSizing: "border-box",
             display: "flex",
             flexDirection: "column",
@@ -216,7 +216,7 @@ const SklPrintTemplate = React.forwardRef(function SklPrintTemplate(
             yang bersangkutan.
           </p>
 
-          <div style={{ textAlign: "right", marginTop: 16, pageBreakInside: "avoid" }}>
+          <div style={{ textAlign: "right", marginTop: 10, pageBreakInside: "avoid" }}>
             <p style={{ margin: 0 }}>
               {sekolah?.tempat_ttd || sekolah?.kecamatan || ""}, {tanggalTerbit}
             </p>
