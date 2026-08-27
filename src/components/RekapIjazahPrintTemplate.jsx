@@ -52,6 +52,14 @@ const RekapIjazahPrintTemplate = React.forwardRef(function RekapIjazahPrintTempl
   const daftar = siswaList || [];
   const fmt = (n) => (n === undefined || n === null || n === "" || isNaN(n) ? "-" : Number(n).toFixed(2));
 
+  // Ambang batas jumlah siswa: sampai 10 siswa, tabel nilai + tanda tangan
+  // masih cukup muat digabung dalam 1 halaman. Lebih dari 10 siswa, tabel
+  // sendiri sudah memakan hampir/lebih dari 1 halaman penuh, sehingga blok
+  // tanda tangan dipaksa pindah ke halaman baru yang bersih (bukan berebut
+  // sisa ruang tipis di ujung halaman tabel).
+  const AMBANG_HALAMAN_TERPISAH = 10;
+  const halamanTerpisah = daftar.length > AMBANG_HALAMAN_TERPISAH;
+
   // Ukuran konten menyesuaikan orientasi. Landscape (F4) tetap seperti
   // semula (330mm, font 10.5pt). Potrait (A4, ~210mm dikurangi margin
   // halaman) dibuat lebih ringkas: font & padding sel dikecilkan supaya 9
@@ -63,11 +71,15 @@ const RekapIjazahPrintTemplate = React.forwardRef(function RekapIjazahPrintTempl
   const paddingSel = isLandscape ? "3px 5px" : "2px 3px";
   const paddingHeader = isLandscape ? "4px 5px" : "3px 3px";
   // Jarak sebelum blok tanda tangan (Mengetahui Pengawas / Kepala Sekolah).
-  // Sebelumnya tetap 40 untuk semua orientasi — di potrait ini membuat blok
-  // tanda tangan terdorong ke bawah dan meluber sebagian ke halaman
-  // berikutnya. Dikecilkan (terutama untuk potrait) supaya blok tanda
-  // tangan "naik" dan tetap muat satu halaman bersama tabel nilai.
-  const jarakTandaTangan = isLandscape ? 30 : 12;
+  // - Kalau digabung 1 halaman (<=10 siswa): jarak dibuat rapat supaya naik
+  //   dan tidak meluber ke halaman berikutnya.
+  // - Kalau dipisah ke halaman baru (>10 siswa): blok tanda tangan jadi
+  //   satu-satunya isi di halaman itu, jadi jaraknya dibuat lebih longgar
+  //   (dalam mm, konsisten dengan satuan @page) supaya tidak menempel di
+  //   pojok kiri-atas kertas.
+  const jarakTandaTangan = halamanTerpisah
+    ? (isLandscape ? "40mm" : "60mm")
+    : (isLandscape ? 30 : 12);
 
   return (
     <div
@@ -145,71 +157,79 @@ const RekapIjazahPrintTemplate = React.forwardRef(function RekapIjazahPrintTempl
         </tbody>
       </table>
 
-      <table style={{ width: "100%", borderCollapse: "collapse", marginTop: jarakTandaTangan, fontSize: fontDasar }}>
-        <tbody>
-          <tr>
-            <td style={{ width: "26%" }} />
-            <td style={{ width: "24%", textAlign: "center" }}>
-              Mengetahui
-              <br />
-              Pengawas
-            </td>
-            {/* Kolom pemisah kosong supaya blok Pengawas dan Kepala Sekolah tidak berhimpitan */}
-            <td style={{ width: "12%" }} />
-            <td style={{ width: "38%", textAlign: "center" }}>
-              {sekolah?.tempat_ttd || sekolah?.kabupaten || ""}, {formatTanggal(new Date().toISOString())}
-              <br />
-              Kepala Sekolah
-            </td>
-          </tr>
-          <tr>
-            <td />
-            <td style={{ height: isLandscape ? 50 : 36, textAlign: "center", verticalAlign: "bottom" }}>
-              {sekolah?.ttd_pengawas_url && (
-                <img
-                  src={sekolah.ttd_pengawas_url}
-                  alt="TTD Pengawas"
-                  style={{ height: isLandscape ? 44 : 32 }}
-                  onError={(e) => {
-                    // Kalau gambar TTD gagal dimuat (URL tidak valid/rusak),
-                    // sembunyikan elemen img sepenuhnya supaya tidak muncul
-                    // kotak "broken image" bawaan browser yang mempersempit
-                    // ruang tanda tangan manual.
-                    e.currentTarget.style.display = "none";
-                  }}
-                />
-              )}
-            </td>
-            <td />
-            <td style={{ height: isLandscape ? 50 : 36, textAlign: "center", verticalAlign: "bottom" }}>
-              {sekolah?.ttd_url && (
-                <img
-                  src={sekolah.ttd_url}
-                  alt="TTD Kepala Sekolah"
-                  style={{ height: isLandscape ? 44 : 32 }}
-                  onError={(e) => {
-                    e.currentTarget.style.display = "none";
-                  }}
-                />
-              )}
-            </td>
-          </tr>
-          <tr>
-            <td />
-            <td style={{ textAlign: "center", fontWeight: "bold" }}>
-              <span style={{ textDecoration: "underline" }}>{sekolah?.pengawas}</span>
-              <br />
-              <span style={{ fontWeight: "normal" }}>NIP. {sekolah?.nip_pengawas}</span>
-            </td>
-            <td />
-            <td style={{ textAlign: "center", fontWeight: "bold" }}>
-              <span style={{ textDecoration: "underline" }}>{sekolah?.kepala_sekolah}</span>
-              <br />
-              <span style={{ fontWeight: "normal" }}>NIP. {sekolah?.nip_kepala_sekolah}</span>
-            </td>
-          </tr>
-        </tbody>
-      </table>
+      <div
+        style={
+          halamanTerpisah
+            ? { pageBreakBefore: "always", breakBefore: "page" }
+            : undefined
+        }
+      >
+        <table style={{ width: "100%", borderCollapse: "collapse", marginTop: jarakTandaTangan, fontSize: fontDasar }}>
+          <tbody>
+            <tr>
+              <td style={{ width: "26%" }} />
+              <td style={{ width: "24%", textAlign: "center" }}>
+                Mengetahui
+                <br />
+                Pengawas
+              </td>
+              {/* Kolom pemisah kosong supaya blok Pengawas dan Kepala Sekolah tidak berhimpitan */}
+              <td style={{ width: "12%" }} />
+              <td style={{ width: "38%", textAlign: "center" }}>
+                {sekolah?.tempat_ttd || sekolah?.kabupaten || ""}, {formatTanggal(new Date().toISOString())}
+                <br />
+                Kepala Sekolah
+              </td>
+            </tr>
+            <tr>
+              <td />
+              <td style={{ height: isLandscape ? 50 : 36, textAlign: "center", verticalAlign: "bottom" }}>
+                {sekolah?.ttd_pengawas_url && (
+                  <img
+                    src={sekolah.ttd_pengawas_url}
+                    alt="TTD Pengawas"
+                    style={{ height: isLandscape ? 44 : 32 }}
+                    onError={(e) => {
+                      // Kalau gambar TTD gagal dimuat (URL tidak valid/rusak),
+                      // sembunyikan elemen img sepenuhnya supaya tidak muncul
+                      // kotak "broken image" bawaan browser yang mempersempit
+                      // ruang tanda tangan manual.
+                      e.currentTarget.style.display = "none";
+                    }}
+                  />
+                )}
+              </td>
+              <td />
+              <td style={{ height: isLandscape ? 50 : 36, textAlign: "center", verticalAlign: "bottom" }}>
+                {sekolah?.ttd_url && (
+                  <img
+                    src={sekolah.ttd_url}
+                    alt="TTD Kepala Sekolah"
+                    style={{ height: isLandscape ? 44 : 32 }}
+                    onError={(e) => {
+                      e.currentTarget.style.display = "none";
+                    }}
+                  />
+                )}
+              </td>
+            </tr>
+            <tr>
+              <td />
+              <td style={{ textAlign: "center", fontWeight: "bold" }}>
+                <span style={{ textDecoration: "underline" }}>{sekolah?.pengawas}</span>
+                <br />
+                <span style={{ fontWeight: "normal" }}>NIP. {sekolah?.nip_pengawas}</span>
+              </td>
+              <td />
+              <td style={{ textAlign: "center", fontWeight: "bold" }}>
+                <span style={{ textDecoration: "underline" }}>{sekolah?.kepala_sekolah}</span>
+                <br />
+                <span style={{ fontWeight: "normal" }}>NIP. {sekolah?.nip_kepala_sekolah}</span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 });
