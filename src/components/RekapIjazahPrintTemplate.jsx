@@ -62,6 +62,12 @@ const RekapIjazahPrintTemplate = React.forwardRef(function RekapIjazahPrintTempl
   const paddingKonten = isLandscape ? "14mm 12mm" : "10mm 8mm";
   const paddingSel = isLandscape ? "3px 5px" : "2px 3px";
   const paddingHeader = isLandscape ? "4px 5px" : "3px 3px";
+  // Jarak sebelum blok tanda tangan (Mengetahui Pengawas / Kepala Sekolah).
+  // Sebelumnya tetap 40 untuk semua orientasi — di potrait ini membuat blok
+  // tanda tangan terdorong ke bawah dan meluber sebagian ke halaman
+  // berikutnya. Dikecilkan (terutama untuk potrait) supaya blok tanda
+  // tangan "naik" dan tetap muat satu halaman bersama tabel nilai.
+  const jarakTandaTangan = isLandscape ? 30 : 12;
 
   return (
     <div
@@ -139,7 +145,7 @@ const RekapIjazahPrintTemplate = React.forwardRef(function RekapIjazahPrintTempl
         </tbody>
       </table>
 
-      <table style={{ width: "100%", borderCollapse: "collapse", marginTop: 40, fontSize: fontDasar }}>
+      <table style={{ width: "100%", borderCollapse: "collapse", marginTop: jarakTandaTangan, fontSize: fontDasar }}>
         <tbody>
           <tr>
             <td style={{ width: "26%" }} />
@@ -158,14 +164,16 @@ const RekapIjazahPrintTemplate = React.forwardRef(function RekapIjazahPrintTempl
           </tr>
           <tr>
             <td />
-            <td style={{ height: 50, textAlign: "center", verticalAlign: "bottom" }}>
+            <td style={{ height: isLandscape ? 50 : 36, textAlign: "center", verticalAlign: "bottom" }}>
               {sekolah?.ttd_pengawas_url && (
-                <img src={sekolah.ttd_pengawas_url} alt="TTD Pengawas" style={{ height: 44 }} />
+                <img src={sekolah.ttd_pengawas_url} alt="TTD Pengawas" style={{ height: isLandscape ? 44 : 32 }} />
               )}
             </td>
             <td />
-            <td style={{ height: 50, textAlign: "center", verticalAlign: "bottom" }}>
-              {sekolah?.ttd_url && <img src={sekolah.ttd_url} alt="TTD Kepala Sekolah" style={{ height: 44 }} />}
+            <td style={{ height: isLandscape ? 50 : 36, textAlign: "center", verticalAlign: "bottom" }}>
+              {sekolah?.ttd_url && (
+                <img src={sekolah.ttd_url} alt="TTD Kepala Sekolah" style={{ height: isLandscape ? 44 : 32 }} />
+              )}
             </td>
           </tr>
           <tr>
