@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
 import Layout from "../components/Layout";
 import SklPrintTemplate from "../components/SklPrintTemplate";
@@ -11,22 +11,10 @@ function tahunPelajaranDefault() {
   return m >= 7 ? `${y}/${y + 1}` : `${y - 1}/${y}`;
 }
 
-// ============================================================
-// Kelas 6 dikenali dari kolom `tingkat` di tabel `kelas`, yang
-// disimpan sebagai angka Romawi teks (lihat Kelas.jsx: placeholder
-// "Contoh: VII"). Diterima juga "6" biasa untuk jaga-jaga kalau ada
-// yang input angka biasa saat menambah data kelas.
-// ============================================================
-function isTingkat6(tingkat) {
-  if (!tingkat) return false;
-  const t = String(tingkat).trim().toUpperCase();
-  return t === "VI" || t === "6";
-}
-
-const SEMUA_KELAS_6 = "__semua_kelas_6__";
-
 export default function SuratKeteranganLulus() {
   const [tahunPelajaran, setTahunPelajaran] = useState(tahunPelajaranDefault());
+  const [kelasList, setKelasList] = useState([]);
+  const [kelasId, setKelasId] = useState(null);
   const [siswaList, setSiswaList] = useState([]);
   const [nilaiMap, setNilaiMap] = useState({});
   const [sklMap, setSklMap] = useState({});
@@ -34,35 +22,54 @@ export default function SuratKeteranganLulus() {
   const [loading, setLoading] = useState(true);
   const [selectedId, setSelectedId] = useState(null);
   const [generating, setGenerating] = useState(false);
-  // Default: gabungan semua rombel kelas 6 (6A/VI-A, 6B/VI-B, dst) —
-  // fitur SKL ini memang khusus kelas 6 (kelas kelulusan).
-  const [filterKelasId, setFilterKelasId] = useState(SEMUA_KELAS_6);
-  const [nomorSkl, setNomorSkl] = useState("421.2/001/2026");
+  const [nomorPrefix, setNomorPrefix] = useState("421.2/");
+  const previewRef = useRef(null);
+
+  // Pilih siswa dari tabel lalu gulir otomatis ke kartu pratinjau di bawah,
+  // supaya perubahannya kelihatan jelas (sebelumnya terasa "tidak merespon"
+  // karena kartu pratinjau ada jauh di bawah tabel).
+  function lihatSiswa(id) {
+    setSelectedId(id);
+    previewRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  // Ambil daftar kelas sekali di awal, lalu default-kan ke kelas yang mengandung "6"
+  useEffect(() => {
+    loadKelas();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
-    loadAll();
+    if (kelasId !== null) {
+      loadAll();
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tahunPelajaran]);
+  }, [tahunPelajaran, kelasId]);
+
+  async function loadKelas() {
+    const { data: kelas } = await supabase.from("kelas").select("*").order("nama_kelas");
+    setKelasList(kelas || []);
+    // Tingkat disimpan sebagai angka Romawi (VII, VI, dst), jadi cocokkan persis "VI"
+    // (bukan .includes, karena "VI" juga jadi substring dari "VII" dan "VIII")
+    const kelas6 = (kelas || []).find((k) => String(k.tingkat).trim().toUpperCase() === "VI");
+    setKelasId(kelas6 ? kelas6.id : kelas?.[0]?.id ?? "");
+  }
 
   async function loadAll() {
     setLoading(true);
-    const [{ data: siswa, error: siswaErr }, { data: nilai }, { data: sklRows }, { data: profil }] =
-      await Promise.all([
-        supabase
-          .from("siswa")
-          .select("*, kelas:kelas_id(id, nama_kelas, tingkat, tahun_ajaran)")
-          .eq("status", "aktif")
-          .order("nama_lengkap"),
-        supabase.from("nilai_ijazah").select("*").eq("tahun_pelajaran", tahunPelajaran),
-        supabase.from("skl").select("*").eq("tahun_pelajaran", tahunPelajaran),
-        supabase.from("profil_sekolah").select("*").eq("id", 1).maybeSingle(),
-      ]);
+    let siswaQuery = supabase
+      .from("siswa")
+      .select("*, kelas(tingkat)")
+      .eq("status", "aktif")
+      .order("nama_lengkap");
+    if (kelasId) siswaQuery = siswaQuery.eq("kelas_id", kelasId);
 
-    if (siswaErr) {
-      console.error("Gagal memuat siswa:", siswaErr.message);
-      alert("Gagal memuat data siswa: " + siswaErr.message);
-    }
-
+    const [{ data: siswa }, { data: nilai }, { data: sklRows }, { data: profil }] = await Promise.all([
+      siswaQuery,
+      supabase.from("nilai_ijazah").select("*").eq("tahun_pelajaran", tahunPelajaran),
+      supabase.from("skl").select("*").eq("tahun_pelajaran", tahunPelajaran),
+      supabase.from("profil_sekolah").select("*").eq("id", 1).maybeSingle(),
+    ]);
     setSiswaList(siswa || []);
     const nMap = {};
     (nilai || []).forEach((n) => (nMap[n.siswa_id] = n));
@@ -70,56 +77,47 @@ export default function SuratKeteranganLulus() {
     const sMap = {};
     (sklRows || []).forEach((r) => (sMap[r.siswa_id] = r));
     setSklMap(sMap);
-    setSekolah(profil || null);
+
+    // profil_sekolah hanya menyimpan logo_path & ttd_kepala_sekolah_path
+    // (path di Supabase Storage), bukan URL langsung — makanya harus diubah
+    // dulu jadi URL publik di sini, sama seperti di ProfilSekolah.jsx.
+    // Sebelumnya logo tidak pernah muncul di cetakan SKL karena kolom
+    // logo_url/ttd_url ini memang tidak ada di tabel.
+    let logoUrl = "";
+    let ttdUrl = "";
+    if (profil?.logo_path) {
+      const { data: pub } = supabase.storage.from("profil-sekolah").getPublicUrl(profil.logo_path);
+      logoUrl = pub?.publicUrl || "";
+    }
+    if (profil?.ttd_kepala_sekolah_path) {
+      const { data: pub } = supabase.storage
+        .from("profil-sekolah")
+        .getPublicUrl(profil.ttd_kepala_sekolah_path);
+      ttdUrl = pub?.publicUrl || "";
+    }
+
+    setSekolah(profil ? { ...profil, logo_url: logoUrl, ttd_url: ttdUrl } : null);
+
+    // Pilih siswa pertama di kelas terpilih (reset kalau siswa lama tidak ada di kelas ini)
+    if (siswa?.length && !siswa.some((s) => s.id === selectedId)) {
+      setSelectedId(siswa[0].id);
+    } else if (!siswa?.length) {
+      setSelectedId(null);
+    }
     setLoading(false);
   }
 
-  // Siswa kelas 6 saja (dasar dari semua filter di halaman ini).
-  const siswaKelas6 = useMemo(
-    () => siswaList.filter((s) => isTingkat6(s.kelas?.tingkat)),
-    [siswaList]
-  );
-
-  // Daftar rombel kelas 6 yang tersedia untuk dropdown (misal VI-A, VI-B).
-  // Kalau ada tahun_ajaran ganda dengan nama_kelas sama, tahun ajarannya
-  // ikut ditampilkan supaya tidak ambigu.
-  const kelas6Options = useMemo(() => {
-    const map = new Map();
-    siswaKelas6.forEach((s) => {
-      if (s.kelas?.id && !map.has(s.kelas.id)) map.set(s.kelas.id, s.kelas);
-    });
-    return Array.from(map.values()).sort((a, b) => a.nama_kelas.localeCompare(b.nama_kelas));
-  }, [siswaKelas6]);
-
-  // Siswa yang ditampilkan: kelas 6, lalu dipersempit ke rombel tertentu
-  // kalau dropdown memilih rombel spesifik (bukan "Semua Kelas 6").
-  const siswaTampil = useMemo(() => {
-    if (filterKelasId === SEMUA_KELAS_6) return siswaKelas6;
-    return siswaKelas6.filter((s) => s.kelas_id === filterKelasId);
-  }, [siswaKelas6, filterKelasId]);
-
-  // Auto-pindah siswa terpilih kalau hilang dari daftar tampil.
-  useEffect(() => {
-    if (siswaTampil.length && !siswaTampil.some((s) => s.id === selectedId)) {
-      setSelectedId(siswaTampil[0].id);
-    } else if (!siswaTampil.length) {
-      setSelectedId(null);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [siswaTampil]);
-
+  // Buat nomor SKL untuk siswa yang belum punya, urut berdasar urutan nama
+  // (mengikuti nomor urut siswa di tabel), format: {prefix}{urut}/{tahun berjalan}
   async function generateNomorUntukSemua() {
-    if (!nomorSkl.trim()) {
-      alert("Isi dulu Nomor Surat SKL-nya.");
-      return;
-    }
     setGenerating(true);
-    const rows = siswaTampil
+    const tahun = new Date().getFullYear();
+    const rows = siswaList
       .filter((s) => !sklMap[s.id])
-      .map((s) => ({
+      .map((s, i) => ({
         siswa_id: s.id,
         tahun_pelajaran: tahunPelajaran,
-        nomor_skl: nomorSkl,
+        nomor_skl: `${nomorPrefix}${String(Object.keys(sklMap).length + i + 1).padStart(3, "0")}/${tahun}`,
         tanggal_terbit: new Date().toISOString().slice(0, 10),
       }));
     if (rows.length) {
@@ -129,29 +127,6 @@ export default function SuratKeteranganLulus() {
         setGenerating(false);
         return;
       }
-    }
-    setGenerating(false);
-    loadAll();
-  }
-
-  async function terapkanNomorKeSemua() {
-    if (!nomorSkl.trim()) {
-      alert("Isi dulu Nomor Surat SKL-nya.");
-      return;
-    }
-    if (!window.confirm(`Timpa nomor surat ${siswaTampil.length} siswa kelas 6 menjadi "${nomorSkl}"?`)) return;
-    setGenerating(true);
-    const rows = siswaTampil.map((s) => ({
-      siswa_id: s.id,
-      tahun_pelajaran: tahunPelajaran,
-      nomor_skl: nomorSkl,
-      tanggal_terbit: sklMap[s.id]?.tanggal_terbit || new Date().toISOString().slice(0, 10),
-    }));
-    const { error } = await supabase.from("skl").upsert(rows, { onConflict: "siswa_id,tahun_pelajaran" });
-    if (error) {
-      alert("Gagal menyeragamkan nomor SKL: " + error.message);
-      setGenerating(false);
-      return;
     }
     setGenerating(false);
     loadAll();
@@ -171,6 +146,8 @@ export default function SuratKeteranganLulus() {
         tempat_ttd: sekolah.tempat_ttd,
         kepala_sekolah: sekolah.kepala_sekolah,
         nip_kepala_sekolah: sekolah.nip_kepala_sekolah,
+        // logo_url & ttd_url sudah berupa URL publik hasil getPublicUrl()
+        // di loadAll(), diambil dari logo_path & ttd_kepala_sekolah_path.
         logo_url: sekolah.logo_url,
         ttd_url: sekolah.ttd_url,
       }
@@ -179,11 +156,11 @@ export default function SuratKeteranganLulus() {
   return (
     <Layout
       title="Surat Keterangan Lulus"
-      subtitle="Khusus siswa kelas 6 — satu nomor SKL untuk semua, dicetak dari nilai ijazah yang sudah diisi"
+      subtitle="Nomor SKL otomatis per siswa, dicetak dari nilai ijazah yang sudah diisi"
       actions={
         <button className="btn-primary" onClick={generateNomorUntukSemua} disabled={generating || loading}>
           {generating ? <Loader2 size={16} className="animate-spin" /> : <FilePlus2 size={16} />}
-          Buat SKL Untuk Siswa Baru
+          Buat Nomor Untuk Siswa Baru
         </button>
       }
     >
@@ -198,37 +175,29 @@ export default function SuratKeteranganLulus() {
           />
         </div>
         <div>
-          <label className="block text-xs font-semibold text-ink-700/60 mb-1">Pilih Kelas</label>
+          <label className="block text-xs font-semibold text-ink-700/60 mb-1">Kelas</label>
           <select
             className="input-field w-48"
-            value={filterKelasId}
-            onChange={(e) => setFilterKelasId(e.target.value)}
+            value={kelasId || ""}
+            onChange={(e) => setKelasId(e.target.value)}
           >
-            <option value={SEMUA_KELAS_6}>Semua Kelas 6</option>
-            {kelas6Options.map((k) => (
+            {kelasList.map((k) => (
               <option key={k.id} value={k.id}>
-                {k.nama_kelas}
-                {k.tahun_ajaran ? ` (${k.tahun_ajaran})` : ""}
+                {k.nama_kelas} (Tingkat {k.tingkat})
               </option>
             ))}
           </select>
         </div>
         <div>
-          <label className="block text-xs font-semibold text-ink-700/60 mb-1">Nomor Surat SKL (dipakai untuk semua siswa)</label>
-          <input className="input-field w-64" value={nomorSkl} onChange={(e) => setNomorSkl(e.target.value)} />
+          <label className="block text-xs font-semibold text-ink-700/60 mb-1">Awalan Nomor Surat</label>
+          <input className="input-field w-40" value={nomorPrefix} onChange={(e) => setNomorPrefix(e.target.value)} />
         </div>
-        <button className="btn-secondary" onClick={terapkanNomorKeSemua} disabled={generating || loading}>
-          {generating ? <Loader2 size={16} className="animate-spin" /> : null}
-          Samakan Nomor Ke Semua Siswa
-        </button>
       </div>
 
       {loading ? (
         <p>Memuat...</p>
-      ) : siswaTampil.length === 0 ? (
-        <div className="card p-6 text-center text-ink-700/60">
-          Belum ada siswa aktif di kelas 6{filterKelasId !== SEMUA_KELAS_6 ? " untuk rombel ini" : ""}.
-        </div>
+      ) : siswaList.length === 0 ? (
+        <div className="card p-6 text-center text-ink-700/60">Belum ada siswa aktif di kelas ini.</div>
       ) : (
         <>
           <div className="card overflow-x-auto mb-6">
@@ -237,20 +206,18 @@ export default function SuratKeteranganLulus() {
                 <tr>
                   <th>Nama Siswa</th>
                   <th>NISN</th>
-                  <th>Kelas</th>
                   <th>Nomor SKL</th>
                   <th>Tanggal Terbit</th>
                   <th></th>
                 </tr>
               </thead>
               <tbody>
-                {siswaTampil.map((s) => {
+                {siswaList.map((s) => {
                   const skl = sklMap[s.id];
                   return (
                     <tr key={s.id} className={selectedId === s.id ? "bg-brass-400/10" : ""}>
                       <td className="font-semibold">{s.nama_lengkap}</td>
                       <td className="font-mono text-xs">{s.nisn}</td>
-                      <td className="text-xs">{s.kelas?.nama_kelas || "-"}</td>
                       <td className="font-mono text-xs">
                         {skl ? (
                           skl.nomor_skl
@@ -260,7 +227,7 @@ export default function SuratKeteranganLulus() {
                       </td>
                       <td>{skl ? new Date(skl.tanggal_terbit).toLocaleDateString("id-ID") : "-"}</td>
                       <td>
-                        <button className="btn-secondary !px-3 !py-1.5 text-xs" onClick={() => setSelectedId(s.id)}>
+                        <button className="btn-secondary !px-3 !py-1.5 text-xs" onClick={() => lihatSiswa(s.id)}>
                           Lihat
                         </button>
                       </td>
@@ -271,7 +238,7 @@ export default function SuratKeteranganLulus() {
             </table>
           </div>
 
-          <div className="card p-4">
+          <div className="card p-4" ref={previewRef}>
             <div className="flex items-center justify-between mb-4">
               <div>
                 <label className="block text-xs font-semibold text-ink-700/60 mb-1">Pratinjau Siswa</label>
@@ -280,7 +247,7 @@ export default function SuratKeteranganLulus() {
                   value={selectedId || ""}
                   onChange={(e) => setSelectedId(e.target.value)}
                 >
-                  {siswaTampil.map((s) => (
+                  {siswaList.map((s) => (
                     <option key={s.id} value={s.id}>
                       {s.nama_lengkap}
                     </option>
@@ -294,14 +261,11 @@ export default function SuratKeteranganLulus() {
 
             {!sklMap[selectedId] && (
               <p className="text-sm text-amber-600 mb-3">
-                Siswa ini belum punya nomor SKL — klik "Buat SKL Untuk Siswa Baru" di atas dulu.
+                Siswa ini belum punya nomor SKL — klik "Buat Nomor Untuk Siswa Baru" di atas dulu.
               </p>
             )}
 
-            <div
-              className="print-preview-scale border border-ink-900/10 rounded-lg overflow-hidden"
-              style={{ transform: "scale(0.72)", transformOrigin: "top center", marginBottom: "-28%" }}
-            >
+            <div className="border border-ink-900/10 rounded-lg overflow-auto" style={{ maxHeight: "70vh" }}>
               <SklPrintTemplate
                 siswa={siswaTerpilih}
                 nilai={nilaiMap[selectedId] || {}}
