@@ -77,6 +77,22 @@ body {
     margin-left: auto;
     margin-right: auto;
   }
+  /* Override khusus untuk RekapIjazahPrintTemplate (class "print-rekap"
+     ditambahkan bareng "print-only" di elemen root-nya). Rekap ijazah bisa
+     jadi lebih panjang dari 1 halaman kalau jumlah siswa banyak (>10) —
+     kalau tetap position:fixed seperti .print-only di atas, Chrome punya
+     bug: begitu konten position:fixed lebih tinggi dari 1 halaman cetak,
+     SELURUH kontennya (bukan cuma lanjutannya) digandakan ulang dari awal
+     di setiap halaman tambahan. Diganti ke position:absolute (tetap rata
+     tengah horizontal lewat left/right/margin yang sama, diwariskan dari
+     .print-only di atas) supaya konten panjang dipaginasi normal tanpa
+     duplikasi.
+     Selector ".print-only.print-rekap" (bukan cuma ".print-rekap") dipakai
+     supaya spesifisitasnya lebih tinggi dan pasti menang atas aturan
+     .print-only di atas, terlepas urutan di file ini. */
+  .print-only.print-rekap {
+    position: absolute;
+  }
   /* Tambahan khusus untuk Nota & Kwitansi Jasa: didorong ke bagian PALING
      BAWAH kertas A4, tetap rata tengah horizontal. Tambahkan class ini
      (bersama .print-only) di root elemen NotaPrintTemplate.jsx dan
