@@ -43,13 +43,31 @@ body {
 .badge {
   @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium;
 }
-/* Aturan cetak untuk Kuitansi/Nota — sembunyikan seluruh halaman kecuali
-   elemen berkelas .print-only (dipakai oleh KuitansiPrintTemplate) saat
-   window.print() dipanggil dari Keuangan.jsx / KuitansiModal.jsx / Kuitansi.jsx */
+/* Aturan cetak untuk Kuitansi/Nota/Ijazah/SKL — sembunyikan seluruh halaman
+   kecuali elemen berkelas .print-only saat window.print() dipanggil.
+
+   FIX: sebelumnya `body * { visibility: hidden }` menyembunyikan elemen
+   secara visual TAPI tetap mempertahankan tinggi layout aslinya (visibility
+   tidak melepas elemen dari flow dokumen). Karena tinggi total aplikasi
+   (sidebar, form, tabel-tabel lain, dst) jauh lebih tinggi dari 1 halaman
+   A4, browser menghitung dokumen cetak jadi 2+ halaman — dan karena
+   .print-only memakai `position: fixed`, ia ikut digandakan/diulang di
+   setiap halaman hasil hitungan tsb (perilaku standar CSS untuk elemen
+   fixed saat print), sehingga bingkai/tanda tangan bisa terpotong atau
+   tidak konsisten antar "halaman" tersebut.
+
+   Solusi: kunci ukuran html/body persis 1 halaman A4 dan overflow:hidden
+   supaya konten aplikasi yang tersembunyi (visibility:hidden) tidak lagi
+   dihitung sebagai halaman tambahan oleh mesin cetak browser. */
 @media print {
   @page {
     size: A4;
     margin: 0;
+  }
+  html, body {
+    width: 210mm;
+    height: 297mm;
+    overflow: hidden !important;
   }
   body * {
     visibility: hidden;
@@ -76,22 +94,6 @@ body {
     right: 0;
     margin-left: auto;
     margin-right: auto;
-  }
-  /* Override khusus untuk RekapIjazahPrintTemplate (class "print-rekap"
-     ditambahkan bareng "print-only" di elemen root-nya). Rekap ijazah bisa
-     jadi lebih panjang dari 1 halaman kalau jumlah siswa banyak (>10) —
-     kalau tetap position:fixed seperti .print-only di atas, Chrome punya
-     bug: begitu konten position:fixed lebih tinggi dari 1 halaman cetak,
-     SELURUH kontennya (bukan cuma lanjutannya) digandakan ulang dari awal
-     di setiap halaman tambahan. Diganti ke position:absolute (tetap rata
-     tengah horizontal lewat left/right/margin yang sama, diwariskan dari
-     .print-only di atas) supaya konten panjang dipaginasi normal tanpa
-     duplikasi.
-     Selector ".print-only.print-rekap" (bukan cuma ".print-rekap") dipakai
-     supaya spesifisitasnya lebih tinggi dan pasti menang atas aturan
-     .print-only di atas, terlepas urutan di file ini. */
-  .print-only.print-rekap {
-    position: absolute;
   }
   /* Tambahan khusus untuk Nota & Kwitansi Jasa: didorong ke bagian PALING
      BAWAH kertas A4, tetap rata tengah horizontal. Tambahkan class ini
