@@ -20,6 +20,7 @@ export default function SuratKeteranganLulus() {
   const [loading, setLoading] = useState(true);
   const [selectedId, setSelectedId] = useState(null);
   const [generating, setGenerating] = useState(false);
+  const [filterKelas, setFilterKelas] = useState("semua"); // NEW: filter kelas
   // Diubah dari "Awalan Nomor Surat" (prefix + nomor urut otomatis per
   // siswa) menjadi SATU nomor surat utuh yang sama untuk seluruh siswa —
   // sesuai kebutuhan: SKL diterbitkan kolektif dengan satu nomor surat,
@@ -51,6 +52,28 @@ export default function SuratKeteranganLulus() {
     setLoading(false);
   }
 
+  // Daftar kelas unik yang tersedia dari siswa aktif, untuk isi dropdown filter.
+  const kelasOptions = useMemo(() => {
+    const set = new Set(siswaList.map((s) => s.kelas).filter(Boolean));
+    return Array.from(set).sort();
+  }, [siswaList]);
+
+  // Siswa yang ditampilkan di tabel & dropdown pratinjau, sudah difilter kelas.
+  const siswaTampil = useMemo(() => {
+    if (filterKelas === "semua") return siswaList;
+    return siswaList.filter((s) => s.kelas === filterKelas);
+  }, [siswaList, filterKelas]);
+
+  // Kalau siswa yang lagi dipilih untuk pratinjau hilang dari daftar
+  // tampil (karena filter kelas berubah), otomatis pindah ke siswa
+  // pertama yang masih ada di daftar tampil.
+  useEffect(() => {
+    if (siswaTampil.length && !siswaTampil.some((s) => s.id === selectedId)) {
+      setSelectedId(siswaTampil[0].id);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [siswaTampil]);
+
   // Buat SKL untuk siswa yang belum punya — SEMUA siswa memakai nomor
   // surat yang SAMA (nomorSkl), tidak lagi dihitung urut per siswa.
   async function generateNomorUntukSemua() {
@@ -59,7 +82,7 @@ export default function SuratKeteranganLulus() {
       return;
     }
     setGenerating(true);
-    const rows = siswaList
+    const rows = siswaTampil
       .filter((s) => !sklMap[s.id])
       .map((s) => ({
         siswa_id: s.id,
@@ -82,14 +105,15 @@ export default function SuratKeteranganLulus() {
   // Terapkan satu nomor surat yang sama ke SEMUA siswa (termasuk yang
   // sudah punya nomor sebelumnya) — dipakai kalau nomorSkl diubah dan
   // perlu disamaratakan ulang ke seluruh SKL yang sudah terbit.
+  // Mengikuti filter kelas yang sedang aktif.
   async function terapkanNomorKeSemua() {
     if (!nomorSkl.trim()) {
       alert("Isi dulu Nomor Surat SKL-nya.");
       return;
     }
-    if (!window.confirm(`Timpa nomor surat SEMUA siswa (${siswaList.length} siswa) menjadi "${nomorSkl}"?`)) return;
+    if (!window.confirm(`Timpa nomor surat ${siswaTampil.length} siswa menjadi "${nomorSkl}"?`)) return;
     setGenerating(true);
-    const rows = siswaList.map((s) => ({
+    const rows = siswaTampil.map((s) => ({
       siswa_id: s.id,
       tahun_pelajaran: tahunPelajaran,
       nomor_skl: nomorSkl,
@@ -150,6 +174,21 @@ export default function SuratKeteranganLulus() {
           />
         </div>
         <div>
+          <label className="block text-xs font-semibold text-ink-700/60 mb-1">Pilih Kelas</label>
+          <select
+            className="input-field w-40"
+            value={filterKelas}
+            onChange={(e) => setFilterKelas(e.target.value)}
+          >
+            <option value="semua">Semua Kelas</option>
+            {kelasOptions.map((k) => (
+              <option key={k} value={k}>
+                {k}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
           <label className="block text-xs font-semibold text-ink-700/60 mb-1">Nomor Surat SKL (dipakai untuk semua siswa)</label>
           <input className="input-field w-64" value={nomorSkl} onChange={(e) => setNomorSkl(e.target.value)} />
         </div>
@@ -161,8 +200,10 @@ export default function SuratKeteranganLulus() {
 
       {loading ? (
         <p>Memuat...</p>
-      ) : siswaList.length === 0 ? (
-        <div className="card p-6 text-center text-ink-700/60">Belum ada siswa aktif.</div>
+      ) : siswaTampil.length === 0 ? (
+        <div className="card p-6 text-center text-ink-700/60">
+          {filterKelas === "semua" ? "Belum ada siswa aktif." : `Tidak ada siswa aktif di kelas ${filterKelas}.`}
+        </div>
       ) : (
         <>
           <div className="card overflow-x-auto mb-6">
@@ -171,18 +212,20 @@ export default function SuratKeteranganLulus() {
                 <tr>
                   <th>Nama Siswa</th>
                   <th>NISN</th>
+                  <th>Kelas</th>
                   <th>Nomor SKL</th>
                   <th>Tanggal Terbit</th>
                   <th></th>
                 </tr>
               </thead>
               <tbody>
-                {siswaList.map((s) => {
+                {siswaTampil.map((s) => {
                   const skl = sklMap[s.id];
                   return (
                     <tr key={s.id} className={selectedId === s.id ? "bg-brass-400/10" : ""}>
                       <td className="font-semibold">{s.nama_lengkap}</td>
                       <td className="font-mono text-xs">{s.nisn}</td>
+                      <td className="text-xs">{s.kelas || "-"}</td>
                       <td className="font-mono text-xs">
                         {skl ? (
                           skl.nomor_skl
@@ -212,7 +255,7 @@ export default function SuratKeteranganLulus() {
                   value={selectedId || ""}
                   onChange={(e) => setSelectedId(e.target.value)}
                 >
-                  {siswaList.map((s) => (
+                  {siswaTampil.map((s) => (
                     <option key={s.id} value={s.id}>
                       {s.nama_lengkap}
                     </option>
