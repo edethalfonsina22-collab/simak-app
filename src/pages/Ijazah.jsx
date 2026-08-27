@@ -5,7 +5,14 @@ import { MAPEL_IJAZAH, jumlahNilai, rataRataNilai } from "../components/IjazahPr
 import RekapIjazahPrintTemplate from "../components/RekapIjazahPrintTemplate";
 import ImporNilaiAsesmenModal from "../components/ImporNilaiAsesmenModal";
 import DetailNilaiSiswaModal from "../components/DetailNilaiSiswaModal";
-import { Loader2, Save, Printer, FileEdit } from "lucide-react";
+import {
+  Loader2,
+  Save,
+  Printer,
+  FileEdit,
+  RectangleVertical,
+  RectangleHorizontal,
+} from "lucide-react";
 
 // Tahun pelajaran default: kalau sekarang Juli-Des, "thn/thn+1"; kalau Jan-Jun, "thn-1/thn".
 function tahunPelajaranDefault() {
@@ -26,6 +33,9 @@ export default function Ijazah() {
   const [saving, setSaving] = useState(false);
   const [selectedId, setSelectedId] = useState(null);
   const [detailSiswa, setDetailSiswa] = useState(null); // siswa yang lagi dibuka di modal Detail & Cetak
+
+  // Orientasi kertas untuk cetak rekap: "portrait" (tegak) atau "landscape" (mendatar)
+  const [orientasiCetak, setOrientasiCetak] = useState("landscape");
 
   // Ambil daftar kelas sekali di awal, lalu default-kan ke kelas yang mengandung "6"
   useEffect(() => {
@@ -150,6 +160,24 @@ export default function Ijazah() {
         </div>
       }
     >
+      {/*
+        Atur ukuran kertas saat dialog print dipanggil (window.print()).
+        Ukuran ditulis presisi (bukan cuma kata kunci "landscape"/"portrait")
+        supaya PERSIS sama dengan lebar konten di RekapIjazahPrintTemplate.jsx
+        (330mm F4 landscape, atau 210x297mm A4 potrait) — kalau meleset,
+        kolom paling kanan (SBK/PJOK/Mulok/JUMLAH) bisa kepotong saat cetak.
+        Kalau lebar konten di RekapIjazahPrintTemplate.jsx diubah, ukuran di
+        sini wajib disesuaikan juga.
+      */}
+      <style>{`
+        @media print {
+          @page {
+            size: ${orientasiCetak === "landscape" ? "330mm 210mm" : "210mm 297mm"};
+            margin: 0;
+          }
+        }
+      `}</style>
+
       <div className="card p-4 mb-6 flex flex-wrap items-end gap-4">
         <div>
           <label className="block text-xs font-semibold text-ink-700/60 mb-1">Tahun Pelajaran</label>
@@ -250,16 +278,46 @@ export default function Ijazah() {
           )}
 
           <div className="card p-4">
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
               <div>
                 <label className="block text-xs font-semibold text-ink-700/60 mb-1">Pratinjau Rekap</label>
                 <p className="text-sm text-ink-700/60">
                   {siswaList.length} siswa · Tahun Pelajaran {tahunPelajaran}
                 </p>
               </div>
-              <button className="btn-primary" onClick={() => window.print()}>
-                <Printer size={16} /> Cetak Rekap Ijazah
-              </button>
+
+              <div className="flex items-center gap-2">
+                <div className="flex items-center rounded-lg border border-ink-900/15 overflow-hidden">
+                  <button
+                    type="button"
+                    className={`!px-2.5 !py-1.5 text-xs flex items-center gap-1 transition-colors ${
+                      orientasiCetak === "portrait"
+                        ? "bg-brass-400/20 font-semibold"
+                        : "bg-transparent hover:bg-ink-900/5"
+                    }`}
+                    onClick={() => setOrientasiCetak("portrait")}
+                    title="Cetak posisi Potrait (tegak)"
+                  >
+                    <RectangleVertical size={14} /> Potrait
+                  </button>
+                  <button
+                    type="button"
+                    className={`!px-2.5 !py-1.5 text-xs flex items-center gap-1 border-l border-ink-900/15 transition-colors ${
+                      orientasiCetak === "landscape"
+                        ? "bg-brass-400/20 font-semibold"
+                        : "bg-transparent hover:bg-ink-900/5"
+                    }`}
+                    onClick={() => setOrientasiCetak("landscape")}
+                    title="Cetak posisi Landscape (mendatar)"
+                  >
+                    <RectangleHorizontal size={14} /> Landscape
+                  </button>
+                </div>
+
+                <button className="btn-primary" onClick={() => window.print()}>
+                  <Printer size={16} /> Cetak Rekap Ijazah
+                </button>
+              </div>
             </div>
 
             <div className="border border-ink-900/10 rounded-lg overflow-auto" style={{ maxHeight: "70vh" }}>
@@ -267,6 +325,7 @@ export default function Ijazah() {
                 siswaList={siswaUntukRekap}
                 sekolah={sekolahUntukCetak}
                 tahunPelajaran={tahunPelajaran}
+                orientasi={orientasiCetak}
               />
             </div>
           </div>
