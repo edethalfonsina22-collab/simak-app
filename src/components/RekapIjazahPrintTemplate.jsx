@@ -29,25 +29,39 @@ export function jumlahNilaiSiswa(nilai) {
 // - sekolah: { nama_sekolah, npsn, kabupaten, provinsi, tempat_ttd,
 //              kepala_sekolah, nip_kepala_sekolah, pengawas, nip_pengawas }
 // - tahunPelajaran: string, mis. "2025/2026"
+// - orientasi: "landscape" (default) | "portrait" — mengatur lebar & ukuran
+//   font konten supaya cocok dengan ukuran kertas yang dipilih di halaman
+//   Ijazah.jsx. Landscape pakai F4 (330mm, lega untuk 9 kolom mapel).
+//   Potrait pakai lebar A4 (~186mm konten) sehingga font & padding
+//   dikecilkan supaya kolom tetap muat, meski jadi lebih rapat.
 //
 // CATATAN PRINT (fix lebar terpotong saat dicetak):
 // Elemen root memakai className "print-only print-rekap" (bukan cuma
-// "print-only" seperti KuitansiPrintTemplate). Class tambahan "print-rekap"
-// dipakai oleh index.css untuk memberi elemen ini @page tersendiri
-// (size: 330mm 210mm / F4 landscape) supaya lebar kertas cetak PERSIS sama
-// dengan lebar konten (330mm) di bawah ini. Sebelumnya konten dicetak
-// memakai @page global (A4 = 297mm lebar landscape) sehingga sisa 33mm di
-// kanan (kira-kira kolom SBK, PJOK, Mulok, JUMLAH) selalu terpotong.
-// Jangan ubah width di sini tanpa menyesuaikan juga @page rekap-landscape
-// di index.css, karena keduanya harus selalu sama nilainya.
+// "print-only" seperti KuitansiPrintTemplate). Lebar di sini WAJIB selalu
+// sama persis dengan ukuran @page yang disetel di Ijazah.jsx (lihat style
+// dinamis di sana): 330mm untuk landscape, ~210mm (potrait, dikurangi
+// margin halaman) untuk potrait. Kalau salah satu diubah, sisi kanan tabel
+// (kolom SBK/PJOK/Mulok/JUMLAH) bisa kepotong saat dicetak.
 const RekapIjazahPrintTemplate = React.forwardRef(function RekapIjazahPrintTemplate(
-  { siswaList, sekolah, tahunPelajaran },
+  { siswaList, sekolah, tahunPelajaran, orientasi = "landscape" },
   ref
 ) {
+  const isLandscape = orientasi !== "portrait";
   const groupA = MAPEL_REKAP.filter((m) => m.grup === "A");
   const groupB = MAPEL_REKAP.filter((m) => m.grup === "B");
   const daftar = siswaList || [];
   const fmt = (n) => (n === undefined || n === null || n === "" || isNaN(n) ? "-" : Number(n).toFixed(2));
+
+  // Ukuran konten menyesuaikan orientasi. Landscape (F4) tetap seperti
+  // semula (330mm, font 10.5pt). Potrait (A4, ~210mm dikurangi margin
+  // halaman) dibuat lebih ringkas: font & padding sel dikecilkan supaya 9
+  // kolom mapel + biodata tetap muat dalam lebar yang jauh lebih sempit.
+  const lebarKonten = isLandscape ? "330mm" : "210mm";
+  const tinggiMin = isLandscape ? "210mm" : "297mm";
+  const fontDasar = isLandscape ? "10.5pt" : "7.5pt";
+  const paddingKonten = isLandscape ? "14mm 12mm" : "10mm 8mm";
+  const paddingSel = isLandscape ? "3px 5px" : "2px 3px";
+  const paddingHeader = isLandscape ? "4px 5px" : "3px 3px";
 
   return (
     <div
@@ -60,12 +74,12 @@ const RekapIjazahPrintTemplate = React.forwardRef(function RekapIjazahPrintTempl
         // ini juga dipakai sebagai kotak "Pratinjau" di layar, bukan hanya
         // saat cetak.
         display: "block",
-        width: "330mm", // F4/Folio landscape - kolom cukup banyak untuk 9 mapel + biodata
-        minHeight: "210mm",
-        padding: "14mm 12mm",
+        width: lebarKonten,
+        minHeight: tinggiMin,
+        padding: paddingKonten,
         background: "#fff",
         fontFamily: "'Times New Roman', serif",
-        fontSize: "10.5pt",
+        fontSize: fontDasar,
         lineHeight: 1.4,
         color: "#000",
         boxSizing: "border-box",
@@ -75,7 +89,7 @@ const RekapIjazahPrintTemplate = React.forwardRef(function RekapIjazahPrintTempl
         DATA : PENGISIAN IJAZAH KELULUSAN TAHUN PELAJARAN {tahunPelajaran}
       </p>
 
-      <table style={{ borderCollapse: "collapse", marginBottom: 10, fontSize: "10.5pt" }}>
+      <table style={{ borderCollapse: "collapse", marginBottom: 10, fontSize: fontDasar }}>
         <tbody>
           <Baris label="NAMA SEKOLAH" nilai={sekolah?.nama_sekolah} bold />
           <Baris label="NPSN" nilai={sekolah?.npsn} />
@@ -87,45 +101,45 @@ const RekapIjazahPrintTemplate = React.forwardRef(function RekapIjazahPrintTempl
       <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "center" }}>
         <thead>
           <tr>
-            <th rowSpan={2} style={th}>NO</th>
-            <th rowSpan={2} style={th}>NAMA SISWA</th>
-            <th rowSpan={2} style={th}>TEMPAT TANGGAL LAHIR</th>
-            <th rowSpan={2} style={th}>NOMOR INDUK SISWA</th>
-            <th rowSpan={2} style={th}>NISN</th>
-            <th colSpan={groupA.length} style={th}>KELOMPOK A</th>
-            <th colSpan={groupB.length} style={th}>KELOMPOK B</th>
-            <th rowSpan={2} style={th}>JUMLAH</th>
+            <th rowSpan={2} style={th(paddingHeader)}>NO</th>
+            <th rowSpan={2} style={th(paddingHeader)}>NAMA SISWA</th>
+            <th rowSpan={2} style={th(paddingHeader)}>TEMPAT TANGGAL LAHIR</th>
+            <th rowSpan={2} style={th(paddingHeader)}>NOMOR INDUK SISWA</th>
+            <th rowSpan={2} style={th(paddingHeader)}>NISN</th>
+            <th colSpan={groupA.length} style={th(paddingHeader)}>KELOMPOK A</th>
+            <th colSpan={groupB.length} style={th(paddingHeader)}>KELOMPOK B</th>
+            <th rowSpan={2} style={th(paddingHeader)}>JUMLAH</th>
           </tr>
           <tr>
             {groupA.map((m) => (
-              <th key={m.key} style={th}>{m.label}</th>
+              <th key={m.key} style={th(paddingHeader)}>{m.label}</th>
             ))}
             {groupB.map((m) => (
-              <th key={m.key} style={th}>{m.label}</th>
+              <th key={m.key} style={th(paddingHeader)}>{m.label}</th>
             ))}
           </tr>
         </thead>
         <tbody>
           {daftar.map((siswa, i) => (
             <tr key={siswa.nis || i}>
-              <td style={td}>{i + 1}</td>
-              <td style={{ ...td, textAlign: "left" }}>{siswa?.nama_lengkap}</td>
-              <td style={td}>{`${siswa?.tempat_lahir || ""}, ${formatTanggal(siswa?.tanggal_lahir)}`}</td>
-              <td style={td}>{siswa?.nis}</td>
-              <td style={td}>{siswa?.nisn}</td>
+              <td style={td(paddingSel)}>{i + 1}</td>
+              <td style={{ ...td(paddingSel), textAlign: "left" }}>{siswa?.nama_lengkap}</td>
+              <td style={td(paddingSel)}>{`${siswa?.tempat_lahir || ""}, ${formatTanggal(siswa?.tanggal_lahir)}`}</td>
+              <td style={td(paddingSel)}>{siswa?.nis}</td>
+              <td style={td(paddingSel)}>{siswa?.nisn}</td>
               {groupA.map((m) => (
-                <td key={m.key} style={td}>{fmt(siswa?.nilai?.[m.key])}</td>
+                <td key={m.key} style={td(paddingSel)}>{fmt(siswa?.nilai?.[m.key])}</td>
               ))}
               {groupB.map((m) => (
-                <td key={m.key} style={td}>{fmt(siswa?.nilai?.[m.key])}</td>
+                <td key={m.key} style={td(paddingSel)}>{fmt(siswa?.nilai?.[m.key])}</td>
               ))}
-              <td style={{ ...td, fontWeight: "bold" }}>{fmt(jumlahNilaiSiswa(siswa?.nilai))}</td>
+              <td style={{ ...td(paddingSel), fontWeight: "bold" }}>{fmt(jumlahNilaiSiswa(siswa?.nilai))}</td>
             </tr>
           ))}
         </tbody>
       </table>
 
-      <table style={{ width: "100%", borderCollapse: "collapse", marginTop: 40, fontSize: "10.5pt" }}>
+      <table style={{ width: "100%", borderCollapse: "collapse", marginTop: 40, fontSize: fontDasar }}>
         <tbody>
           <tr>
             <td style={{ width: "26%" }} />
@@ -193,7 +207,7 @@ function formatTanggal(iso) {
   }
 }
 
-const th = { border: "1px solid #000", padding: "4px 5px", background: "#f0f0f0", fontWeight: "bold" };
-const td = { border: "1px solid #000", padding: "3px 5px", textAlign: "center" };
+const th = (padding) => ({ border: "1px solid #000", padding, background: "#f0f0f0", fontWeight: "bold" });
+const td = (padding) => ({ border: "1px solid #000", padding, textAlign: "center" });
 
 export default RekapIjazahPrintTemplate;
