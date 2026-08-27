@@ -119,6 +119,12 @@ body {
     page: rekap-landscape;
     position: static !important;
     width: 330mm !important;
+    /* margin auto supaya tetap tertengah secara horizontal di kertas —
+       tanpa ini kontennya nempel rata kiri, karena position:static di atas
+       menghilangkan efek centering `position:fixed; left:0; right:0;` yang
+       dipakai .print-only untuk Kuitansi. */
+    margin-left: auto !important;
+    margin-right: auto !important;
   }
   @page rekap-landscape {
     size: 330mm 210mm; /* F4/Folio landscape, sesuai lebar RekapIjazahPrintTemplate.jsx */
