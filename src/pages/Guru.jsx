@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabaseClient'
 import Layout from '../components/Layout'
 import BulkImportModal from '../components/BulkImportModal'
 import TeleponLink from '../components/TeleponLink'
-import { Plus, UploadCloud, Pencil, Trash2, Search, X, Loader2, GraduationCap } from 'lucide-react'
+import { Plus, UploadCloud, Pencil, Trash2, Search, X, Loader2, GraduationCap, CalendarDays } from 'lucide-react'
 
 const emptyForm = {
   nip: '',
@@ -26,6 +26,16 @@ function formatTanggal(tgl) {
   }
 }
 
+// Format singkat untuk widget kalender: "Sel, 17 Agu 2026"
+function formatTanggalSingkat(tgl) {
+  if (!tgl) return ''
+  try {
+    return new Date(tgl).toLocaleDateString('id-ID', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })
+  } catch {
+    return tgl
+  }
+}
+
 export default function Guru() {
   const [data, setData] = useState([])
   const [loading, setLoading] = useState(true)
@@ -36,6 +46,10 @@ export default function Guru() {
   const [form, setForm] = useState(emptyForm)
   const [saving, setSaving] = useState(false)
   const [profilLihat, setProfilLihat] = useState(null) // guru yang sedang dilihat detail profilnya
+
+  // Widget "Hari Libur Terdekat" — mengambil dari tabel hari_libur yang sama dengan halaman Hari Libur
+  const [liburMendatang, setLiburMendatang] = useState([])
+  const [loadingLibur, setLoadingLibur] = useState(true)
 
   async function loadData() {
     setLoading(true)
@@ -49,7 +63,23 @@ export default function Guru() {
     }
   }
 
-  useEffect(() => { loadData() }, [])
+  async function loadLiburMendatang() {
+    setLoadingLibur(true)
+    const hariIni = new Date().toISOString().slice(0, 10)
+    const { data: libur } = await supabase
+      .from('hari_libur')
+      .select('*')
+      .gte('tanggal', hariIni)
+      .order('tanggal')
+      .limit(5)
+    setLiburMendatang(libur || [])
+    setLoadingLibur(false)
+  }
+
+  useEffect(() => {
+    loadData()
+    loadLiburMendatang()
+  }, [])
 
   // Foto profil guru — memakai bucket & kolom yang sama persis dengan Profil Saya
   function fotoUrl(path) {
@@ -120,6 +150,39 @@ export default function Guru() {
               value={search} onChange={(e) => setSearch(e.target.value)} />
           </div>
         </div>
+      </div>
+
+      {/* Widget Hari Libur Terdekat — kalender pendidikan, sumber data sama dengan halaman Hari Libur */}
+      <div className="card relative overflow-hidden p-4 mb-4">
+        <span className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-red-900 to-blue-600" />
+        <div className="flex items-center gap-3 mb-3">
+          <div className="w-9 h-9 rounded-full bg-red-900/10 text-red-900 flex items-center justify-center shrink-0">
+            <CalendarDays size={18} />
+          </div>
+          <div>
+            <p className="font-display font-semibold text-sm text-ink-950">Hari Libur Terdekat</p>
+            <p className="text-xs text-ink-700/50">Kalender pendidikan tahun ajaran berjalan</p>
+          </div>
+        </div>
+
+        {loadingLibur && (
+          <p className="text-sm text-ink-700/50 py-2">Memuat...</p>
+        )}
+
+        {!loadingLibur && liburMendatang.length === 0 && (
+          <p className="text-sm text-ink-700/50 py-2">Tidak ada hari libur mendatang yang terjadwal.</p>
+        )}
+
+        {!loadingLibur && liburMendatang.length > 0 && (
+          <ul className="divide-y divide-ink-950/5">
+            {liburMendatang.map((l) => (
+              <li key={l.id} className="flex items-center justify-between py-2 text-sm">
+                <span className="text-ink-950">{l.keterangan}</span>
+                <span className="text-ink-700/50 font-medium shrink-0 ml-4">{formatTanggalSingkat(l.tanggal)}</span>
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
 
       <div className="card overflow-x-auto">
