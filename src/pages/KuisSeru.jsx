@@ -217,6 +217,13 @@ export default function KuisSeru() {
               </div>
             </div>
 
+            {daftarSoal[indexSoal].gambar_url && (
+              <img
+                src={daftarSoal[indexSoal].gambar_url}
+                alt="Gambar soal"
+                className="w-full max-h-56 object-contain rounded-xl bg-ink-50 mb-4"
+              />
+            )}
             <p className="text-base font-semibold text-ink-900 mb-4">{daftarSoal[indexSoal].soal}</p>
 
             <div className="space-y-2 mb-5">
