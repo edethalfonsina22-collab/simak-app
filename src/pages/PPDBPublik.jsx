@@ -10,10 +10,15 @@ const emptyForm = {
   nomor_kk: '',
   tempat_lahir: '',
   tanggal_lahir: '',
+  tahun_lahir: '',
   jenis_kelamin: 'L',
   agama: '',
   nama_ayah: '',
+  nik_ayah: '',
+  tahun_lahir_ayah: '',
   nama_ibu: '',
+  nik_ibu: '',
+  tahun_lahir_ibu: '',
   alamat: '',
   alamat_tinggal: '',
   no_hp_orang_tua: '',
@@ -128,7 +133,13 @@ export default function PPDBPublik() {
     }
 
     setMengirim(true)
-    const { error: err } = await supabase.from('ppdb_pendaftar').insert(form)
+    const payload = {
+      ...form,
+      tahun_lahir: form.tahun_lahir ? Number(form.tahun_lahir) : null,
+      tahun_lahir_ayah: form.tahun_lahir_ayah ? Number(form.tahun_lahir_ayah) : null,
+      tahun_lahir_ibu: form.tahun_lahir_ibu ? Number(form.tahun_lahir_ibu) : null,
+    }
+    const { error: err } = await supabase.from('ppdb_pendaftar').insert(payload)
     setMengirim(false)
     if (err) {
       setError('Gagal mengirim formulir: ' + err.message)
@@ -254,6 +265,17 @@ export default function PPDBPublik() {
             </div>
           </div>
 
+          <div>
+            <label className="label-field">Tahun Lahir (isi jika tanggal pasti tidak diketahui)</label>
+            <input
+              type="number"
+              placeholder="Contoh: 2019"
+              className="input-field"
+              value={form.tahun_lahir}
+              onChange={(e) => ubah('tahun_lahir', e.target.value)}
+            />
+          </div>
+
           <div className="grid sm:grid-cols-2 gap-4">
             <div>
               <label className="label-field">Jenis Kelamin</label>
@@ -271,14 +293,59 @@ export default function PPDBPublik() {
             </div>
           </div>
 
-          <div className="grid sm:grid-cols-2 gap-4">
+          <div className="grid sm:grid-cols-3 gap-4">
             <div>
               <label className="label-field">Nama Ayah</label>
               <input className="input-field" value={form.nama_ayah} onChange={(e) => ubah('nama_ayah', e.target.value)} />
             </div>
             <div>
+              <label className="label-field">NIK Ayah</label>
+              <input
+                className="input-field"
+                placeholder="16 digit"
+                inputMode="numeric"
+                maxLength={16}
+                value={form.nik_ayah}
+                onChange={(e) => ubah('nik_ayah', e.target.value.replace(/\D/g, ''))}
+              />
+            </div>
+            <div>
+              <label className="label-field">Tahun Lahir Ayah</label>
+              <input
+                type="number"
+                placeholder="Contoh: 1988"
+                className="input-field"
+                value={form.tahun_lahir_ayah}
+                onChange={(e) => ubah('tahun_lahir_ayah', e.target.value)}
+              />
+            </div>
+          </div>
+
+          <div className="grid sm:grid-cols-3 gap-4">
+            <div>
               <label className="label-field">Nama Ibu</label>
               <input className="input-field" value={form.nama_ibu} onChange={(e) => ubah('nama_ibu', e.target.value)} />
+            </div>
+            <div>
+              <label className="label-field">NIK Ibu</label>
+              <input
+                className="input-field"
+                placeholder="16 digit"
+                inputMode="numeric"
+                maxLength={16}
+                value={form.nik_ibu}
+                onChange={(e) => ubah('nik_ibu', e.target.value.replace(/\D/g, ''))}
+              />
+            </div>
+            <div>
+              <label className="label-field">Tahun Lahir Ibu</label>
+              <input
+                type="number"
+                placeholder="Contoh: 1990"
+                className="input-field"
+                value={form.tahun_lahir_ibu}
+                onChange={(e) => ubah('tahun_lahir_ibu', e.target.value)}
+              />
             </div>
           </div>
 
