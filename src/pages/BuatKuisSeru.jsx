@@ -125,6 +125,7 @@ export default function BuatKuisSeru() {
       pilihan_c: s.pilihan_c,
       pilihan_d: s.pilihan_d,
       jawaban_benar: s.jawaban_benar,
+      gambar_url: s.gambar_url || null,
       urutan: i + 1,
     }));
     const { error: errSoal } = await supabase.from('soal_kuis_seru').insert(baris);
@@ -327,6 +328,13 @@ export default function BuatKuisSeru() {
                         onChange={() => toggleSoal(s.id)}
                         className="mt-1"
                       />
+                      {s.gambar_url && (
+                        <img
+                          src={s.gambar_url}
+                          alt="Gambar soal"
+                          className="w-8 h-8 object-cover rounded-md shrink-0"
+                        />
+                      )}
                       <span className="text-sm text-ink-800">{s.soal}</span>
                     </label>
                   ))}
