@@ -1,12 +1,14 @@
-import { useState, useEffect } from 'react'
-import BankSoal from './pages/BankSoal'
-import KartuSiswa from './pages/KartuSiswa'
-import Galeri from './pages/Galeri'
-import Dokumen from './pages/Dokumen'
+import { useEffect, useState } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { useAuth } from './lib/AuthContext'
 import { supabase } from './lib/supabaseClient'
+
+import Loader from './components/Loader'
+
 import Login from './pages/Login'
+import Register from './pages/Register'
+import PersetujuanAdmin from './pages/PersetujuanAdmin'
+
 import Dashboard from './pages/Dashboard'
 import Siswa from './pages/Siswa'
 import HasilUjian from './pages/HasilUjian'
@@ -35,6 +37,7 @@ import PPDBAdmin from './pages/PPDBAdmin'
 import Perpustakaan from './pages/Perpustakaan'
 import RPP from './pages/RPP'
 import ArsipRPP from './pages/ArsipRPP'
+import BankSoal from './pages/BankSoal'
 import BuatUjian from './pages/BuatUjian'
 import UjianOnline from './pages/UjianOnline'
 import ProfilSaya from './pages/ProfilSaya'
@@ -52,33 +55,40 @@ import SuratKeteranganLulus from './pages/SuratKeteranganLulus'
 import BuatKuisSeru from './pages/BuatKuisSeru'
 import KuisSeru from './pages/KuisSeru'
 import HasilKuisSeru from './pages/HasilKuisSeru'
-import Loader from './components/Loader'
+import Galeri from './pages/Galeri'
+import Dokumen from './pages/Dokumen'
 
-function ProtectedRoute({ children, adminOnly }) {
+function ProtectedRoute({ children, adminOnly = false }) {
   const { session, loading, isAdmin } = useAuth()
   const [minTimeElapsed, setMinTimeElapsed] = useState(false)
 
   useEffect(() => {
-    const timer = setTimeout(() => setMinTimeElapsed(true), 900)
+    const timer = setTimeout(() => {
+      setMinTimeElapsed(true)
+    }, 900)
+
     return () => clearTimeout(timer)
   }, [])
 
   if (loading || !minTimeElapsed) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-paper">
+      <div className="flex min-h-screen items-center justify-center bg-paper">
         <Loader />
       </div>
     )
   }
-  if (!session) return <Navigate to="/login" replace />
-  if (adminOnly && !isAdmin) return <Navigate to="/" replace />
+
+  if (!session) {
+    return <Navigate to="/login" replace />
+  }
+
+  if (adminOnly && !isAdmin) {
+    return <Navigate to="/" replace />
+  }
+
   return children
 }
 
-// Nota.jsx menerima `sekolah` lewat prop (beda dari Kuitansi.jsx/KuitansiJasa.jsx
-// yang mengambil sendiri profil sekolah secara internal) — wrapper kecil ini
-// mengambilkan profil sekolah dengan cara yang sama supaya kop surat di cetakan
-// nota tetap terisi.
 function NotaDenganSekolah() {
   const [sekolah, setSekolah] = useState(null)
 
@@ -105,66 +115,439 @@ function NotaDenganSekolah() {
 export default function App() {
   return (
     <Routes>
-      {/* Halaman publik — TIDAK perlu login, dibagikan ke orang tua calon siswa */}
+      {/* Halaman publik */}
       <Route path="/ppdb" element={<PPDBPublik />} />
       <Route path="/ujian-online" element={<UjianOnline />} />
-      {/* Kuis Seru: game kuis untuk siswa kelas 1-3, tanpa login (sama pola dengan ujian-online) */}
       <Route path="/kuis-seru" element={<KuisSeru />} />
       <Route path="/login" element={<Login />} />
-      <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-      <Route path="/siswa" element={<ProtectedRoute><Siswa /></ProtectedRoute>} />
-      <Route path="/hasil-ujian" element={<ProtectedRoute><HasilUjian /></ProtectedRoute>} />
-      <Route path="/guru" element={<ProtectedRoute adminOnly><Guru /></ProtectedRoute>} />
-      <Route path="/kelas" element={<ProtectedRoute adminOnly><Kelas /></ProtectedRoute>} />
-      <Route path="/jadwal" element={<ProtectedRoute><Jadwal /></ProtectedRoute>} />
-      <Route path="/presensi" element={<ProtectedRoute><Presensi /></ProtectedRoute>} />
-      <Route path="/nilai" element={<ProtectedRoute><Nilai /></ProtectedRoute>} />
-      <Route path="/rapor" element={<ProtectedRoute><Rapor /></ProtectedRoute>} />
-      <Route path="/rapor/cetak" element={<ProtectedRoute><RaporCetak /></ProtectedRoute>} />
-      <Route path="/nilai-asesmen" element={<ProtectedRoute><NilaiAsesmen /></ProtectedRoute>} />
-      <Route path="/ijazah" element={<ProtectedRoute><Ijazah /></ProtectedRoute>} />
-      <Route path="/skl" element={<ProtectedRoute><SuratKeteranganLulus /></ProtectedRoute>} />
-      <Route path="/inventaris" element={<ProtectedRoute adminOnly><Inventaris /></ProtectedRoute>} />
-      <Route path="/agenda" element={<ProtectedRoute><Agenda /></ProtectedRoute>} />
-      <Route path="/surat" element={<ProtectedRoute adminOnly><Surat /></ProtectedRoute>} />
-      <Route path="/surat-keterangan" element={<ProtectedRoute adminOnly><SuratKeterangan /></ProtectedRoute>} />
-      <Route path="/laporan" element={<ProtectedRoute adminOnly><LaporanBulanan /></ProtectedRoute>} />
-      <Route path="/hari-libur" element={<ProtectedRoute adminOnly><HariLibur /></ProtectedRoute>} />
-      <Route path="/keuangan" element={<ProtectedRoute adminOnly><Keuangan /></ProtectedRoute>} />
-      {/* Keuangan Kelas: BUKAN adminOnly — ini kas kelas yang dipegang wali kelas (guru),
-          admin tetap bisa membuka untuk memantau semua kelas. */}
-      <Route path="/keuangan-kelas" element={<ProtectedRoute><KeuanganKelas /></ProtectedRoute>} />
-      <Route path="/kuitansi" element={<ProtectedRoute adminOnly><Kuitansi /></ProtectedRoute>} />
-      {/* Sebelumnya belum terdaftar di sini meski halamannya sudah ada di src/pages —
-          jadi /nota dan /kuitansi-jasa tidak bisa dibuka sama sekali. */}
-      <Route path="/nota" element={<ProtectedRoute adminOnly><NotaDenganSekolah /></ProtectedRoute>} />
-      <Route path="/kuitansi-jasa" element={<ProtectedRoute adminOnly><KuitansiJasa /></ProtectedRoute>} />
-      <Route path="/backup" element={<ProtectedRoute adminOnly><Backup /></ProtectedRoute>} />
-      <Route path="/profil-sekolah" element={<ProtectedRoute adminOnly><ProfilSekolah /></ProtectedRoute>} />
-      <Route path="/ppdb-admin" element={<ProtectedRoute adminOnly><PPDBAdmin /></ProtectedRoute>} />
-      <Route path="/perpustakaan" element={<ProtectedRoute><Perpustakaan /></ProtectedRoute>} />
-      <Route path="/pengumuman" element={<ProtectedRoute><Pengumuman /></ProtectedRoute>} />
-      <Route path="/galeri" element={<ProtectedRoute><Galeri /></ProtectedRoute>} />
-      <Route path="/dokumen" element={<ProtectedRoute><Dokumen /></ProtectedRoute>} />
-     <Route path="/rpp" element={<ProtectedRoute><RPP /></ProtectedRoute>} />
-<Route path="/arsip-rpp" element={<ProtectedRoute><ArsipRPP /></ProtectedRoute>} />
-      <Route path="/pengajuan-surat-aktif" element={<ProtectedRoute><PengajuanSuratAktif /></ProtectedRoute>} />
-      <Route path="/perbaikan-data-siswa" element={<ProtectedRoute><PengajuanEditSiswa /></ProtectedRoute>} />
-      <Route path="/pengajuan-kebutuhan-kelas" element={<ProtectedRoute><PengajuanKebutuhanKelas /></ProtectedRoute>} />
-      <Route path="/bank-soal" element={<ProtectedRoute><BankSoal /></ProtectedRoute>} />
-      <Route path="/buat-kuis-seru" element={<ProtectedRoute><BuatKuisSeru /></ProtectedRoute>} />
-      <Route path="/hasil-kuis-seru" element={<ProtectedRoute><HasilKuisSeru /></ProtectedRoute>} />
-      <Route path="/kartu" element={<ProtectedRoute adminOnly><KartuSiswa /></ProtectedRoute>} />
-      <Route path="/buat-ujian" element={<ProtectedRoute><BuatUjian /></ProtectedRoute>} />
-      <Route path="/profil-saya" element={<ProtectedRoute><ProfilSaya /></ProtectedRoute>} />
-      <Route path="/sertifikat" element={<ProtectedRoute><SertifikatPenghargaan /></ProtectedRoute>} />
-      <Route path="/portofolio-siswa" element={<ProtectedRoute><PortofolioSiswa /></ProtectedRoute>} />
-      <Route path="/rapat" element={<ProtectedRoute><Rapat /></ProtectedRoute>} />
-      {/* Sengaja TIDAK dibungkus ProtectedRoute — link rapat dibagikan ke
-          peserta yang mungkin belum/tidak punya akun (mis. orang tua, tamu),
-          jadi mereka bisa langsung gabung cukup dengan mengisi nama.
-          RapatVideo sendiri yang menangani kasus sudah login vs tamu. */}
+      <Route path="/register" element={<Register />} />
+
+      {/* Dashboard */}
+      <Route
+        path="/"
+        element={
+          <ProtectedRoute>
+            <Dashboard />
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Persetujuan akun oleh admin */}
+      <Route
+        path="/persetujuan-admin"
+        element={
+          <ProtectedRoute adminOnly>
+            <PersetujuanAdmin />
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Akademik */}
+      <Route
+        path="/siswa"
+        element={
+          <ProtectedRoute>
+            <Siswa />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/hasil-ujian"
+        element={
+          <ProtectedRoute>
+            <HasilUjian />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/guru"
+        element={
+          <ProtectedRoute adminOnly>
+            <Guru />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/kelas"
+        element={
+          <ProtectedRoute adminOnly>
+            <Kelas />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/jadwal"
+        element={
+          <ProtectedRoute>
+            <Jadwal />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/presensi"
+        element={
+          <ProtectedRoute>
+            <Presensi />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/nilai"
+        element={
+          <ProtectedRoute>
+            <Nilai />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/rapor"
+        element={
+          <ProtectedRoute>
+            <Rapor />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/rapor/cetak"
+        element={
+          <ProtectedRoute>
+            <RaporCetak />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/nilai-asesmen"
+        element={
+          <ProtectedRoute>
+            <NilaiAsesmen />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/ijazah"
+        element={
+          <ProtectedRoute>
+            <Ijazah />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/skl"
+        element={
+          <ProtectedRoute>
+            <SuratKeteranganLulus />
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Manajemen */}
+      <Route
+        path="/inventaris"
+        element={
+          <ProtectedRoute adminOnly>
+            <Inventaris />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/agenda"
+        element={
+          <ProtectedRoute>
+            <Agenda />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/surat"
+        element={
+          <ProtectedRoute adminOnly>
+            <Surat />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/surat-keterangan"
+        element={
+          <ProtectedRoute adminOnly>
+            <SuratKeterangan />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/laporan"
+        element={
+          <ProtectedRoute adminOnly>
+            <LaporanBulanan />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/hari-libur"
+        element={
+          <ProtectedRoute adminOnly>
+            <HariLibur />
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Keuangan */}
+      <Route
+        path="/keuangan"
+        element={
+          <ProtectedRoute adminOnly>
+            <Keuangan />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/keuangan-kelas"
+        element={
+          <ProtectedRoute>
+            <KeuanganKelas />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/kuitansi"
+        element={
+          <ProtectedRoute adminOnly>
+            <Kuitansi />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/nota"
+        element={
+          <ProtectedRoute adminOnly>
+            <NotaDenganSekolah />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/kuitansi-jasa"
+        element={
+          <ProtectedRoute adminOnly>
+            <KuitansiJasa />
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Pengaturan */}
+      <Route
+        path="/backup"
+        element={
+          <ProtectedRoute adminOnly>
+            <Backup />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/profil-sekolah"
+        element={
+          <ProtectedRoute adminOnly>
+            <ProfilSekolah />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/ppdb-admin"
+        element={
+          <ProtectedRoute adminOnly>
+            <PPDBAdmin />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/profil-saya"
+        element={
+          <ProtectedRoute>
+            <ProfilSaya />
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Konten */}
+      <Route
+        path="/perpustakaan"
+        element={
+          <ProtectedRoute>
+            <Perpustakaan />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/pengumuman"
+        element={
+          <ProtectedRoute>
+            <Pengumuman />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/galeri"
+        element={
+          <ProtectedRoute>
+            <Galeri />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/dokumen"
+        element={
+          <ProtectedRoute>
+            <Dokumen />
+          </ProtectedRoute>
+        }
+      />
+
+      {/* RPP dan ujian */}
+      <Route
+        path="/rpp"
+        element={
+          <ProtectedRoute>
+            <RPP />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/arsip-rpp"
+        element={
+          <ProtectedRoute>
+            <ArsipRPP />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/bank-soal"
+        element={
+          <ProtectedRoute>
+            <BankSoal />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/buat-ujian"
+        element={
+          <ProtectedRoute>
+            <BuatUjian />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/buat-kuis-seru"
+        element={
+          <ProtectedRoute>
+            <BuatKuisSeru />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/hasil-kuis-seru"
+        element={
+          <ProtectedRoute>
+            <HasilKuisSeru />
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Pengajuan */}
+      <Route
+        path="/pengajuan-surat-aktif"
+        element={
+          <ProtectedRoute>
+            <PengajuanSuratAktif />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/perbaikan-data-siswa"
+        element={
+          <ProtectedRoute>
+            <PengajuanEditSiswa />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/pengajuan-kebutuhan-kelas"
+        element={
+          <ProtectedRoute>
+            <PengajuanKebutuhanKelas />
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Lainnya */}
+      <Route
+        path="/kartu"
+        element={
+          <ProtectedRoute adminOnly>
+            <KartuSiswa />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/sertifikat"
+        element={
+          <ProtectedRoute>
+            <SertifikatPenghargaan />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/portofolio-siswa"
+        element={
+          <ProtectedRoute>
+            <PortofolioSiswa />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/rapat"
+        element={
+          <ProtectedRoute>
+            <Rapat />
+          </ProtectedRoute>
+        }
+      />
+
       <Route path="/rapat/:roomId" element={<RapatVideo />} />
+
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )
