@@ -42,6 +42,7 @@ import {
   FolderHeart,
   PiggyBank,
   FileSpreadsheet,
+  Gamepad2,
 } from 'lucide-react'
 import { useAuth } from '../lib/AuthContext'
 import { supabase } from '../lib/supabaseClient'
@@ -79,6 +80,7 @@ const groupsAdmin = [
       { to: '/buat-ujian', label: 'Buat Ujian', icon: FilePlus },
       { to: '/hasil-ujian', label: 'Hasil Ujian', icon: ClipboardList },
       { to: '/bank-soal', label: 'Bank Soal', icon: Database },
+      { to: '/buat-kuis-seru', label: 'Kuis Seru (Kls 1-3)', icon: Gamepad2 },
     ],
   },
   {
@@ -139,6 +141,7 @@ const linksGuru = [
   { to: '/buat-ujian', label: 'Buat Ujian', icon: FilePlus },
   { to: '/hasil-ujian', label: 'Hasil Ujian', icon: ClipboardList },
   { to: '/bank-soal', label: 'Bank Soal', icon: Database },
+  { to: '/buat-kuis-seru', label: 'Kuis Seru (Kls 1-3)', icon: Gamepad2 },
   { to: '/perpustakaan', label: 'Perpustakaan', icon: Library },
   { to: '/jadwal', label: 'Jadwal Pelajaran', icon: CalendarClock },
   { to: '/agenda', label: 'Agenda Sekolah', icon: CalendarDays },
