@@ -91,7 +91,7 @@ export default function KuisSeru() {
 
   async function lanjutSoalBerikutnya() {
     const soalIni = daftarSoal[indexSoal];
-    const benar = jawabanTerpilih === soalIni.jawaban_benar;
+    const benar = jawabanTerpilih.toUpperCase() === String(soalIni.jawaban_benar).toUpperCase();
 
     const rekapBaru = [
       ...semuaJawaban,
@@ -226,7 +226,7 @@ export default function KuisSeru() {
 
                 const sudahDijawab = jawabanTerpilih !== null;
                 const iniDipilih = jawabanTerpilih === huruf;
-                const iniJawabanBenar = daftarSoal[indexSoal].jawaban_benar === huruf;
+                const iniJawabanBenar = String(daftarSoal[indexSoal].jawaban_benar).toUpperCase() === huruf.toUpperCase();
 
                 let kelasTombol = 'border-ink-200 hover:bg-pink-50/50';
                 if (sudahDijawab && iniJawabanBenar) {
