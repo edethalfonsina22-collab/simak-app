@@ -45,8 +45,8 @@ const SklPrintTemplate = React.forwardRef(function SklPrintTemplate(
         padding: 0,
         background: "#fff",
         fontFamily: "'Times New Roman', serif",
-        fontSize: "12.5pt",
-        lineHeight: 1.45,
+        fontSize: "12pt",
+        lineHeight: 1.35,
         color: "#000",
         boxSizing: "border-box",
         pageBreakInside: "avoid",
@@ -64,9 +64,9 @@ const SklPrintTemplate = React.forwardRef(function SklPrintTemplate(
         }
       `}</style>
 
-      {/* BINGKAI ORNAMEN BIRU — tinggi kotak ini sekarang mengikuti isi konten
-          (tidak lagi dipaksa minHeight 297mm), jadi bingkai membungkus teks
-          rapat, bukan jadi kotak kosong sepanjang halaman. */}
+      {/* BINGKAI ORNAMEN BIRU — sekarang langsung membungkus teks (tidak ada lagi
+          kotak hitam/garis tipis di dalamnya, karena bingkai ini sendiri sudah
+          cukup jadi pembatas). Tinggi kotak mengikuti isi konten (auto height). */}
       <div
         style={{
           border: "4mm solid transparent",
@@ -74,17 +74,10 @@ const SklPrintTemplate = React.forwardRef(function SklPrintTemplate(
           borderImageSlice: 22,
           borderImageWidth: "4mm",
           borderImageRepeat: "round",
-          padding: "1.5mm",
+          padding: "5mm 9mm",
           boxSizing: "border-box",
         }}
       >
-        <div
-          style={{
-            border: "1pt solid #2748a0",
-            padding: "6mm 10mm",
-            boxSizing: "border-box",
-          }}
-        >
           {/* KOP SURAT — logo & teks disusun pakai flex (bukan position:absolute)
               supaya tata letaknya stabil dan tidak bergeser saat dicetak/di-PDF-kan,
               mengikuti pola yang sudah terbukti aman di IjazahPrintTemplate. */}
@@ -94,8 +87,8 @@ const SklPrintTemplate = React.forwardRef(function SklPrintTemplate(
               alignItems: "center",
               gap: 14,
               borderBottom: "3px double #2748a0",
-              paddingBottom: 6,
-              marginBottom: 14,
+              paddingBottom: 5,
+              marginBottom: 10,
             }}
           >
             {sekolah?.logo_url && (
@@ -145,16 +138,16 @@ const SklPrintTemplate = React.forwardRef(function SklPrintTemplate(
           >
             SURAT KETERANGAN LULUS
           </p>
-          <p style={{ textAlign: "center", margin: "0 0 20px 0" }}>Nomor: {skl?.nomor_skl || "-"}</p>
+          <p style={{ textAlign: "center", margin: "0 0 12px 0" }}>Nomor: {skl?.nomor_skl || "-"}</p>
 
-          <p style={{ textAlign: "justify", margin: "0 0 10px 0" }}>
+          <p style={{ textAlign: "justify", margin: "0 0 8px 0" }}>
             Yang bertanda tangan di bawah ini Kepala {sekolah?.nama_sekolah}
             {sekolah?.kecamatan ? `, ${sekolah.kecamatan}` : ""}
             {sekolah?.kabupaten ? `, ${sekolah.kabupaten}` : ""}
             {sekolah?.provinsi ? `, Provinsi ${sekolah.provinsi}` : ""}, menerangkan bahwa:
           </p>
 
-          <table style={{ borderCollapse: "collapse", margin: "0 0 10px 0" }}>
+          <table style={{ borderCollapse: "collapse", margin: "0 0 8px 0" }}>
             <tbody>
               <Baris label="Nama" nilai={siswa?.nama_lengkap} />
               <Baris
@@ -167,7 +160,7 @@ const SklPrintTemplate = React.forwardRef(function SklPrintTemplate(
             </tbody>
           </table>
 
-          <p style={{ textAlign: "justify", margin: "0 0 10px 0" }}>
+          <p style={{ textAlign: "justify", margin: "0 0 8px 0" }}>
             Bahwa siswa/siswi tersebut di atas benar-benar murid Kelas VI {sekolah?.nama_sekolah} dan telah mengikuti
             Asesmen Sekolah Tahun Pelajaran {tahunPelajaran} dan dinyatakan <strong>BERHASIL</strong> dengan nilai
             sebagai berikut:
@@ -177,8 +170,8 @@ const SklPrintTemplate = React.forwardRef(function SklPrintTemplate(
             style={{
               width: "100%",
               borderCollapse: "collapse",
-              fontSize: "11.5pt",
-              margin: "0 0 12px 0",
+              fontSize: "11pt",
+              margin: "0 0 10px 0",
               pageBreakInside: "avoid",
             }}
           >
@@ -233,7 +226,7 @@ const SklPrintTemplate = React.forwardRef(function SklPrintTemplate(
               halaman penuh. pageBreakInside:"avoid" menjaga blok ini (tempat,
               tanggal, nama, NIP) tidak terpisah oleh batas halaman jika suatu
               saat isi surat memanjang ke halaman berikutnya. */}
-          <div style={{ textAlign: "right", marginTop: 16, pageBreakInside: "avoid", breakInside: "avoid" }}>
+          <div style={{ textAlign: "right", marginTop: 10, pageBreakInside: "avoid", breakInside: "avoid" }}>
             <p style={{ margin: 0 }}>
               {sekolah?.tempat_ttd || sekolah?.kecamatan || ""}, {tanggalTerbit}
             </p>
@@ -246,7 +239,6 @@ const SklPrintTemplate = React.forwardRef(function SklPrintTemplate(
             <p style={{ margin: 0, fontWeight: "bold", textDecoration: "underline" }}>{sekolah?.kepala_sekolah}</p>
             <p style={{ margin: 0 }}>NIP. {sekolah?.nip_kepala_sekolah}</p>
           </div>
-        </div>
       </div>
     </div>
   );
@@ -271,8 +263,8 @@ function formatTanggal(iso) {
   }
 }
 
-const th = { border: "1px solid #2748a0", padding: "5px 7px", background: "#eef1fb", fontWeight: "bold", letterSpacing: "0.2px" };
-const td = { border: "1px solid #2748a0", padding: "4px 7px", textAlign: "center", verticalAlign: "middle" };
-const tdGroup = { border: "1px solid #2748a0", padding: "4px 7px", fontWeight: "bold", background: "#f5f7fc" };
+const th = { border: "1px solid #2748a0", padding: "3px 6px", background: "#eef1fb", fontWeight: "bold", letterSpacing: "0.2px" };
+const td = { border: "1px solid #2748a0", padding: "2.5px 6px", textAlign: "center", verticalAlign: "middle" };
+const tdGroup = { border: "1px solid #2748a0", padding: "2.5px 6px", fontWeight: "bold", background: "#f5f7fc" };
 
 export default SklPrintTemplate;
