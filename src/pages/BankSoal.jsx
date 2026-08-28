@@ -3,7 +3,9 @@ import * as XLSX from 'xlsx'
 import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../lib/AuthContext'
 import Layout from '../components/Layout'
-import { Upload, Loader2, Trash2, Database, ChevronDown, ChevronUp } from 'lucide-react'
+import { Upload, Loader2, Trash2, Database, ChevronDown, ChevronUp, ImagePlus, X } from 'lucide-react'
+
+const HURUF_JAWABAN = ['A', 'B', 'C', 'D']
 
 export default function BankSoal() {
   const { profil, isAdmin } = useAuth()
@@ -13,6 +15,91 @@ export default function BankSoal() {
   const [mapelFilter, setMapelFilter] = useState('')
   const [expanded, setExpanded] = useState({})
   const [deletingMapel, setDeletingMapel] = useState('')
+
+  // --- Form tambah 1 soal manual, bisa disertai gambar (mis. soal tebak gambar) ---
+  const [formTerbuka, setFormTerbuka] = useState(false)
+  const [formSoal, setFormSoal] = useState('')
+  const [formPilihan, setFormPilihan] = useState({ A: '', B: '', C: '', D: '' })
+  const [formJawabanBenar, setFormJawabanBenar] = useState('A')
+  const [formKelas, setFormKelas] = useState('')
+  const [formMapel, setFormMapel] = useState('')
+  const [formFileGambar, setFormFileGambar] = useState(null)
+  const [formPreviewGambar, setFormPreviewGambar] = useState('')
+  const [menyimpanManual, setMenyimpanManual] = useState(false)
+  const [pesanErrorManual, setPesanErrorManual] = useState('')
+
+  function pilihFileGambar(file) {
+    setFormFileGambar(file || null)
+    setFormPreviewGambar(file ? URL.createObjectURL(file) : '')
+  }
+
+  function resetFormManual() {
+    setFormSoal('')
+    setFormPilihan({ A: '', B: '', C: '', D: '' })
+    setFormJawabanBenar('A')
+    setFormKelas('')
+    setFormMapel('')
+    setFormFileGambar(null)
+    setFormPreviewGambar('')
+    setPesanErrorManual('')
+  }
+
+  // Simpan 1 soal manual: upload gambar dulu (kalau ada) ke bucket "soal-gambar",
+  // baru simpan barisnya ke tabel bank_soal dengan gambar_url hasil upload.
+  async function simpanSoalManual() {
+    if (!formSoal.trim() || !formPilihan.A.trim() || !formPilihan.B.trim() || !formPilihan.C.trim() || !formPilihan.D.trim()) {
+      setPesanErrorManual('Soal dan semua pilihan (A-D) wajib diisi.')
+      return
+    }
+    if (!formKelas.trim() || !formMapel.trim()) {
+      setPesanErrorManual('Kelas dan mata pelajaran wajib diisi.')
+      return
+    }
+
+    setMenyimpanManual(true)
+    setPesanErrorManual('')
+
+    let gambarUrl = null
+    if (formFileGambar) {
+      const namaFile = `${Date.now()}-${formFileGambar.name.replace(/\s+/g, '-')}`
+      const { error: errUpload } = await supabase.storage
+        .from('soal-gambar')
+        .upload(namaFile, formFileGambar)
+
+      if (errUpload) {
+        setPesanErrorManual('Gagal upload gambar: ' + errUpload.message)
+        setMenyimpanManual(false)
+        return
+      }
+
+      const { data: publicUrlData } = supabase.storage.from('soal-gambar').getPublicUrl(namaFile)
+      gambarUrl = publicUrlData.publicUrl
+    }
+
+    const { error: errSimpan } = await supabase.from('bank_soal').insert({
+      soal: formSoal.trim(),
+      pilihan_a: formPilihan.A.trim(),
+      pilihan_b: formPilihan.B.trim(),
+      pilihan_c: formPilihan.C.trim(),
+      pilihan_d: formPilihan.D.trim(),
+      jawaban_benar: formJawabanBenar,
+      kelas: formKelas.trim(),
+      mata_pelajaran: formMapel.trim(),
+      gambar_url: gambarUrl,
+      guru_id: profil.guru_id,
+    })
+
+    if (errSimpan) {
+      setPesanErrorManual('Gagal menyimpan soal: ' + errSimpan.message)
+      setMenyimpanManual(false)
+      return
+    }
+
+    resetFormManual()
+    setFormTerbuka(false)
+    setMenyimpanManual(false)
+    await load()
+  }
 
   async function load() {
     setLoading(true)
@@ -237,6 +324,128 @@ export default function BankSoal() {
       </div>
 
       <div className="card p-6 mb-6 space-y-3">
+        <div className="flex items-center justify-between">
+          <h3 className="font-display text-lg font-semibold">Tambah Soal Manual (bisa pakai gambar)</h3>
+          <button
+            onClick={() => setFormTerbuka(!formTerbuka)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-ink-900/[0.06] text-ink-700 hover:bg-ink-900/10"
+          >
+            {formTerbuka ? <X size={14} /> : <ImagePlus size={14} />}
+            {formTerbuka ? 'Tutup' : 'Tambah Soal + Gambar'}
+          </button>
+        </div>
+
+        {formTerbuka && (
+          <div className="space-y-3 pt-2">
+            <p className="text-xs text-ink-700/40">
+              Cocok untuk soal tebak gambar (mis. "Ini gambar hewan apa?" lalu tampilkan foto burung).
+              Untuk upload banyak soal sekaligus tanpa gambar, tetap pakai Excel di atas.
+            </p>
+
+            <div className="grid sm:grid-cols-2 gap-3">
+              <div>
+                <label className="eyebrow mb-1 block">Kelas</label>
+                <input
+                  className="input-field"
+                  value={formKelas}
+                  onChange={(e) => setFormKelas(e.target.value)}
+                  placeholder="1"
+                />
+              </div>
+              <div>
+                <label className="eyebrow mb-1 block">Mata Pelajaran</label>
+                <input
+                  className="input-field"
+                  value={formMapel}
+                  onChange={(e) => setFormMapel(e.target.value)}
+                  placeholder="Bahasa Indonesia"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="eyebrow mb-1 block">Pertanyaan</label>
+              <input
+                className="input-field"
+                value={formSoal}
+                onChange={(e) => setFormSoal(e.target.value)}
+                placeholder="Ini gambar hewan apa?"
+              />
+            </div>
+
+            <div>
+              <label className="eyebrow mb-1 block">Gambar (opsional)</label>
+              <input
+                type="file"
+                accept="image/*"
+                onChange={(e) => pilihFileGambar(e.target.files?.[0])}
+                className="input-field"
+              />
+              {formPreviewGambar && (
+                <img
+                  src={formPreviewGambar}
+                  alt="Pratinjau"
+                  className="mt-2 w-32 h-32 object-cover rounded-lg border border-ink-900/10"
+                />
+              )}
+            </div>
+
+            <div className="grid sm:grid-cols-2 gap-3">
+              {HURUF_JAWABAN.map((huruf) => (
+                <div key={huruf}>
+                  <label className="eyebrow mb-1 block">Pilihan {huruf}</label>
+                  <input
+                    className="input-field"
+                    value={formPilihan[huruf]}
+                    onChange={(e) => setFormPilihan({ ...formPilihan, [huruf]: e.target.value })}
+                    placeholder={`Jawaban pilihan ${huruf}`}
+                  />
+                </div>
+              ))}
+            </div>
+
+            <div>
+              <label className="eyebrow mb-1 block">Jawaban Benar</label>
+              <div className="flex gap-2">
+                {HURUF_JAWABAN.map((huruf) => (
+                  <button
+                    key={huruf}
+                    type="button"
+                    onClick={() => setFormJawabanBenar(huruf)}
+                    className={`flex-1 py-2 rounded-lg text-sm font-semibold ${
+                      formJawabanBenar === huruf
+                        ? 'bg-brass-400 text-ink-950'
+                        : 'bg-ink-900/[0.06] text-ink-700'
+                    }`}
+                  >
+                    {huruf}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {pesanErrorManual && (
+              <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{pesanErrorManual}</p>
+            )}
+
+            <button
+              onClick={simpanSoalManual}
+              disabled={menyimpanManual}
+              className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg bg-ink-950 text-white text-sm font-medium hover:bg-ink-900 disabled:opacity-60"
+            >
+              {menyimpanManual ? (
+                <>
+                  <Loader2 size={14} className="animate-spin" /> Menyimpan...
+                </>
+              ) : (
+                'Simpan Soal'
+              )}
+            </button>
+          </div>
+        )}
+      </div>
+
+      <div className="card p-6 mb-6 space-y-3">
         <h3 className="font-display text-lg font-semibold mb-1">Upload Soal Baru</h3>
         <div>
           <label className="eyebrow mb-1.5 block">File Excel (bisa pilih banyak file sekaligus)</label>
@@ -324,9 +533,18 @@ export default function BankSoal() {
                   <ul className="divide-y divide-ink-900/[0.06] border-t border-ink-900/[0.06]">
                     {soalFolder.map((item, i) => (
                       <li key={item.id} className="p-4 flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <p className="text-sm text-ink-900">{i + 1}. {item.soal}</p>
-                          <p className="text-xs text-ink-700/40 mt-1">Jawaban benar: {item.jawaban_benar}</p>
+                        <div className="min-w-0 flex items-start gap-3">
+                          {item.gambar_url && (
+                            <img
+                              src={item.gambar_url}
+                              alt="Gambar soal"
+                              className="w-12 h-12 object-cover rounded-lg border border-ink-900/10 shrink-0"
+                            />
+                          )}
+                          <div className="min-w-0">
+                            <p className="text-sm text-ink-900">{i + 1}. {item.soal}</p>
+                            <p className="text-xs text-ink-700/40 mt-1">Jawaban benar: {item.jawaban_benar}</p>
+                          </div>
                         </div>
                         {canDelete(item) && (
                           <button
