@@ -46,9 +46,11 @@ const SklPrintTemplate = React.forwardRef(function SklPrintTemplate(
         background: "#fff",
         fontFamily: "'Times New Roman', serif",
         fontSize: "12.5pt",
-        lineHeight: 1.5,
+        lineHeight: 1.45,
         color: "#000",
         boxSizing: "border-box",
+        pageBreakInside: "avoid",
+        breakInside: "avoid",
       }}
     >
       {/* @page memastikan browser menyisakan margin cetak yang konsisten (10mm)
@@ -67,19 +69,19 @@ const SklPrintTemplate = React.forwardRef(function SklPrintTemplate(
           rapat, bukan jadi kotak kosong sepanjang halaman. */}
       <div
         style={{
-          border: "5mm solid transparent",
+          border: "4mm solid transparent",
           borderImageSource: FRAME_URL,
           borderImageSlice: 22,
-          borderImageWidth: "5mm",
+          borderImageWidth: "4mm",
           borderImageRepeat: "round",
-          padding: "2mm",
+          padding: "1.5mm",
           boxSizing: "border-box",
         }}
       >
         <div
           style={{
             border: "1pt solid #2748a0",
-            padding: "8mm 10mm",
+            padding: "6mm 10mm",
             boxSizing: "border-box",
           }}
         >
@@ -92,8 +94,8 @@ const SklPrintTemplate = React.forwardRef(function SklPrintTemplate(
               alignItems: "center",
               gap: 14,
               borderBottom: "3px double #2748a0",
-              paddingBottom: 8,
-              marginBottom: 20,
+              paddingBottom: 6,
+              marginBottom: 14,
             }}
           >
             {sekolah?.logo_url && (
@@ -152,7 +154,7 @@ const SklPrintTemplate = React.forwardRef(function SklPrintTemplate(
             {sekolah?.provinsi ? `, Provinsi ${sekolah.provinsi}` : ""}, menerangkan bahwa:
           </p>
 
-          <table style={{ borderCollapse: "collapse", margin: "0 0 16px 0" }}>
+          <table style={{ borderCollapse: "collapse", margin: "0 0 10px 0" }}>
             <tbody>
               <Baris label="Nama" nilai={siswa?.nama_lengkap} />
               <Baris
@@ -175,8 +177,8 @@ const SklPrintTemplate = React.forwardRef(function SklPrintTemplate(
             style={{
               width: "100%",
               borderCollapse: "collapse",
-              fontSize: "12pt",
-              margin: "0 0 18px 0",
+              fontSize: "11.5pt",
+              margin: "0 0 12px 0",
               pageBreakInside: "avoid",
             }}
           >
@@ -231,15 +233,15 @@ const SklPrintTemplate = React.forwardRef(function SklPrintTemplate(
               halaman penuh. pageBreakInside:"avoid" menjaga blok ini (tempat,
               tanggal, nama, NIP) tidak terpisah oleh batas halaman jika suatu
               saat isi surat memanjang ke halaman berikutnya. */}
-          <div style={{ textAlign: "right", marginTop: 34, pageBreakInside: "avoid", breakInside: "avoid" }}>
+          <div style={{ textAlign: "right", marginTop: 16, pageBreakInside: "avoid", breakInside: "avoid" }}>
             <p style={{ margin: 0 }}>
               {sekolah?.tempat_ttd || sekolah?.kecamatan || ""}, {tanggalTerbit}
             </p>
             <p style={{ margin: 0 }}>Kepala Sekolah</p>
             {sekolah?.ttd_url ? (
-              <img src={sekolah.ttd_url} alt="TTD" style={{ height: 60, margin: "6px 0" }} />
+              <img src={sekolah.ttd_url} alt="TTD" style={{ height: 50, margin: "4px 0" }} />
             ) : (
-              <div style={{ height: 60 }} />
+              <div style={{ height: 50 }} />
             )}
             <p style={{ margin: 0, fontWeight: "bold", textDecoration: "underline" }}>{sekolah?.kepala_sekolah}</p>
             <p style={{ margin: 0 }}>NIP. {sekolah?.nip_kepala_sekolah}</p>
