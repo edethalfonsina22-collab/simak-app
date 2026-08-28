@@ -236,7 +236,10 @@ export default function BuatUjian() {
   }
 
   async function copyLinkUjian() {
-    const teks = `Link Ujian: ${buatLinkUjian(ujianDibuat.kode_ujian)}\nKode Ujian: ${ujianDibuat.kode_ujian}`;
+    // Sengaja HANYA menyalin link-nya saja (bukan "Link Ujian: ... Kode Ujian: XXX" digabung),
+    // karena kalau teks gabungan itu ditempel langsung ke address bar, semuanya
+    // ikut terbaca sebagai satu URL dan bikin kode ujian jadi salah/rusak.
+    const teks = buatLinkUjian(ujianDibuat.kode_ujian);
     try {
       await navigator.clipboard.writeText(teks);
       setTersalin(true);
