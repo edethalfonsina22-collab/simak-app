@@ -46,16 +46,22 @@ export default function PPDBAdmin() {
     setProsesId(pendaftar.id)
 
     // 1. Masukkan ke tabel siswa — field disesuaikan dengan skema Data Siswa terbaru
+    //    (termasuk NIK ayah/ibu dan tahun lahir siswa/ayah/ibu, ikut dari formulir PPDB)
     const { error: errSiswa } = await supabase.from('siswa').insert({
       nama_lengkap: pendaftar.nama_lengkap,
       jenis_kelamin: pendaftar.jenis_kelamin,
       agama: pendaftar.agama,
       tempat_lahir: pendaftar.tempat_lahir,
       tanggal_lahir: pendaftar.tanggal_lahir,
+      tahun_lahir: pendaftar.tahun_lahir,
       alamat: pendaftar.alamat,
       alamat_tinggal: pendaftar.alamat_tinggal,
       nama_ayah: pendaftar.nama_ayah,
+      nik_ayah: pendaftar.nik_ayah,
+      tahun_lahir_ayah: pendaftar.tahun_lahir_ayah,
       nama_ibu: pendaftar.nama_ibu,
+      nik_ibu: pendaftar.nik_ibu,
+      tahun_lahir_ibu: pendaftar.tahun_lahir_ibu,
       nama_orang_tua: pendaftar.nama_ayah || pendaftar.nama_ibu,
       no_hp_orang_tua: pendaftar.no_hp_orang_tua,
       nik: pendaftar.nik_siswa,
@@ -133,7 +139,7 @@ export default function PPDBAdmin() {
           <td>${d.nama_lengkap || '-'}</td>
           <td>${d.jenis_kelamin === 'P' ? 'Perempuan' : 'Laki-laki'}</td>
           <td>${d.agama || '-'}</td>
-          <td>${d.tempat_lahir || '-'}, ${formatTanggal(d.tanggal_lahir)}</td>
+          <td>${d.tempat_lahir || '-'}, ${d.tanggal_lahir ? formatTanggal(d.tanggal_lahir) : (d.tahun_lahir || '-')}</td>
           <td>${d.nik_siswa || '-'}</td>
           <td>${d.nomor_kk || '-'}</td>
           <td>${d.nama_ayah || '-'}</td>
@@ -275,7 +281,7 @@ export default function PPDBAdmin() {
             {data.map((d) => (
               <tr key={d.id}>
                 <td className="font-medium">{d.nama_lengkap}</td>
-                <td>{formatTanggal(d.tanggal_lahir)}</td>
+                <td>{d.tanggal_lahir ? formatTanggal(d.tanggal_lahir) : (d.tahun_lahir || '-')}</td>
                 <td>{d.agama || '-'}</td>
                 <td>{d.nama_ayah || '-'}</td>
                 <td>{d.nama_ibu || '-'}</td>
