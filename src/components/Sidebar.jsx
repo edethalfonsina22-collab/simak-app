@@ -72,8 +72,16 @@ const groupsAdmin = [
       { to: '/nilai-asesmen', label: 'Nilai Asesmen', icon: FileSpreadsheet },
       { to: '/rapor', label: 'Rapor Siswa', icon: FileBadge },
       { to: '/ijazah', label: 'Ijazah', icon: ScrollText },
-      { to: '/skl', label: 'Surat Keterangan Lulus', icon: Stamp },
-      { to: '/portofolio-siswa', label: 'Portofolio Siswa', icon: FolderHeart },
+      {
+        to: '/skl',
+        label: 'Surat Keterangan Lulus',
+        icon: Stamp,
+      },
+      {
+        to: '/portofolio-siswa',
+        label: 'Portofolio Siswa',
+        icon: FolderHeart,
+      },
       { to: '/rpp', label: 'RPP', icon: NotebookPen },
       { to: '/arsip-rpp', label: 'Arsip RPP', icon: Archive },
       {
@@ -82,7 +90,11 @@ const groupsAdmin = [
         icon: Award,
       },
       { to: '/buat-ujian', label: 'Buat Ujian', icon: FilePlus },
-      { to: '/hasil-ujian', label: 'Hasil Ujian', icon: ClipboardList },
+      {
+        to: '/hasil-ujian',
+        label: 'Hasil Ujian',
+        icon: ClipboardList,
+      },
       { to: '/bank-soal', label: 'Bank Soal', icon: Database },
       {
         to: '/buat-kuis-seru',
@@ -101,9 +113,21 @@ const groupsAdmin = [
         icon: PiggyBank,
       },
       { to: '/kuitansi', label: 'Kuitansi', icon: Receipt },
-      { to: '/kuitansi-jasa', label: 'Kuitansi Jasa', icon: Receipt },
-      { to: '/nota', label: 'Nota Belanja', icon: ShoppingCart },
-      { to: '/perpustakaan', label: 'Perpustakaan', icon: Library },
+      {
+        to: '/kuitansi-jasa',
+        label: 'Kuitansi Jasa',
+        icon: Receipt,
+      },
+      {
+        to: '/nota',
+        label: 'Nota Belanja',
+        icon: ShoppingCart,
+      },
+      {
+        to: '/perpustakaan',
+        label: 'Perpustakaan',
+        icon: Library,
+      },
       { to: '/inventaris', label: 'Inventaris', icon: Boxes },
     ],
   },
@@ -125,28 +149,56 @@ const groupsAdmin = [
         label: 'Kebutuhan Kelas',
         icon: PackagePlus,
       },
-      { to: '/agenda', label: 'Agenda Sekolah', icon: CalendarDays },
-      { to: '/surat', label: 'Surat Masuk/Keluar', icon: Mail },
+      {
+        to: '/agenda',
+        label: 'Agenda Sekolah',
+        icon: CalendarDays,
+      },
+      {
+        to: '/surat',
+        label: 'Surat Masuk/Keluar',
+        icon: Mail,
+      },
       {
         to: '/surat-keterangan',
         label: 'Surat Keterangan',
         icon: FileSignature,
       },
-      { to: '/ppdb-admin', label: 'PPDB Siswa Baru', icon: UserPlus },
+      {
+        to: '/ppdb-admin',
+        label: 'PPDB Siswa Baru',
+        icon: UserPlus,
+      },
       {
         to: '/persetujuan-admin',
         label: 'Persetujuan Akun',
         icon: UserCheck,
       },
-      { to: '/laporan', label: 'Laporan Bulanan', icon: FileText },
-      { to: '/hari-libur', label: 'Hari Libur', icon: CalendarOff },
-      { to: '/backup', label: 'Backup Data', icon: DatabaseBackup },
+      {
+        to: '/laporan',
+        label: 'Laporan Bulanan',
+        icon: FileText,
+      },
+      {
+        to: '/hari-libur',
+        label: 'Hari Libur',
+        icon: CalendarOff,
+      },
+      {
+        to: '/backup',
+        label: 'Backup Data',
+        icon: DatabaseBackup,
+      },
       {
         to: '/profil-sekolah',
         label: 'Profil Sekolah',
         icon: Landmark,
       },
-      { to: '/kartu', label: 'Cetak Kartu', icon: IdCard },
+      {
+        to: '/kartu',
+        label: 'Cetak Kartu',
+        icon: IdCard,
+      },
     ],
   },
 ]
@@ -172,7 +224,11 @@ const linksGuru = [
   },
   { to: '/rapor', label: 'Rapor Siswa', icon: FileBadge },
   { to: '/ijazah', label: 'Ijazah', icon: ScrollText },
-  { to: '/skl', label: 'Surat Keterangan Lulus', icon: Stamp },
+  {
+    to: '/skl',
+    label: 'Surat Keterangan Lulus',
+    icon: Stamp,
+  },
   {
     to: '/portofolio-siswa',
     label: 'Portofolio Siswa',
@@ -201,21 +257,37 @@ const linksGuru = [
     icon: PackagePlus,
   },
   { to: '/buat-ujian', label: 'Buat Ujian', icon: FilePlus },
-  { to: '/hasil-ujian', label: 'Hasil Ujian', icon: ClipboardList },
+  {
+    to: '/hasil-ujian',
+    label: 'Hasil Ujian',
+    icon: ClipboardList,
+  },
   { to: '/bank-soal', label: 'Bank Soal', icon: Database },
   {
     to: '/buat-kuis-seru',
     label: 'Kuis Seru (Kls 1-3)',
     icon: Gamepad2,
   },
-  { to: '/perpustakaan', label: 'Perpustakaan', icon: Library },
+  {
+    to: '/perpustakaan',
+    label: 'Perpustakaan',
+    icon: Library,
+  },
   {
     to: '/jadwal',
     label: 'Jadwal Pelajaran',
     icon: CalendarClock,
   },
-  { to: '/agenda', label: 'Agenda Sekolah', icon: CalendarDays },
-  { to: '/pengumuman', label: 'Pengumuman', icon: Megaphone },
+  {
+    to: '/agenda',
+    label: 'Agenda Sekolah',
+    icon: CalendarDays,
+  },
+  {
+    to: '/pengumuman',
+    label: 'Pengumuman',
+    icon: Megaphone,
+  },
 ]
 
 function NavItem({ to, label, icon: Icon, end }) {
