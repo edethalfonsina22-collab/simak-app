@@ -152,7 +152,10 @@ export default function BuatKuisSeru() {
   }
 
   async function copyLinkKuis() {
-    const teks = `Ayo main Kuis Seru: ${buatLinkKuis(kuisDibuat.kode_kuis)}\nKode Kuis: ${kuisDibuat.kode_kuis}`;
+    // Sengaja HANYA menyalin link-nya saja (bukan link + "Kode Kuis: XXX" digabung),
+    // karena kalau teks gabungan itu ditempel langsung ke address bar, semuanya
+    // ikut terbaca sebagai satu URL dan bikin kode kuis jadi salah/rusak.
+    const teks = buatLinkKuis(kuisDibuat.kode_kuis);
     try {
       await navigator.clipboard.writeText(teks);
       setTersalin(true);
