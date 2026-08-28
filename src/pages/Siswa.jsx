@@ -13,6 +13,8 @@ const emptyForm = {
   nis: '',
   nisn: '',
   nik: '',
+  // TAMBAHAN: nomor ujian, dipakai di Surat Keterangan Lulus (SKL) / Cetak SKL
+  nomor_ujian: '',
   nama_lengkap: '',
   jenis_kelamin: 'L',
   agama: '',
@@ -49,7 +51,7 @@ const emptyForm = {
 // Header ini HARUS sama persis dengan templateHeaders di BulkImportModal (Impor Massal)
 // supaya file yang diunduh dari sini bisa langsung diupload ulang tanpa perlu diubah nama kolomnya.
 const EXCEL_HEADERS = [
-  'nama_lengkap', 'nis', 'nisn', 'nik', 'kelas', 'jenis_kelamin(L/P)', 'agama',
+  'nama_lengkap', 'nis', 'nisn', 'nik', 'nomor_ujian', 'kelas', 'jenis_kelamin(L/P)', 'agama',
   'tempat_lahir', 'tanggal_lahir(YYYY-MM-DD)', 'tahun_lahir',
   'nama_ayah', 'nik_ayah', 'tahun_lahir_ayah',
   'nama_ibu', 'nik_ibu', 'tahun_lahir_ibu',
@@ -238,7 +240,7 @@ export default function Siswa() {
   }
 
   const filtered = data.filter((s) =>
-    `${s.nama_lengkap} ${s.nis} ${s.nisn} ${s.nik}`.toLowerCase().includes(search.toLowerCase())
+    `${s.nama_lengkap} ${s.nis} ${s.nisn} ${s.nik} ${s.nomor_ujian}`.toLowerCase().includes(search.toLowerCase())
   )
 
   // --- Export: Excel (.xlsx) siap-edit & siap-impor-ulang ---
@@ -251,6 +253,7 @@ export default function Siswa() {
       nis: s.nis || '',
       nisn: s.nisn || '',
       nik: s.nik || '',
+      nomor_ujian: s.nomor_ujian || '',
       kelas: s.kelas?.nama_kelas || '',
       'jenis_kelamin(L/P)': s.jenis_kelamin || '',
       agama: s.agama || '',
@@ -271,7 +274,7 @@ export default function Siswa() {
 
     const ws = XLSX.utils.json_to_sheet(rows, { header: EXCEL_HEADERS })
     ws['!cols'] = [
-      { wch: 24 }, { wch: 10 }, { wch: 12 }, { wch: 18 }, { wch: 10 }, { wch: 16 }, { wch: 12 },
+      { wch: 24 }, { wch: 10 }, { wch: 12 }, { wch: 18 }, { wch: 12 }, { wch: 10 }, { wch: 16 }, { wch: 12 },
       { wch: 16 }, { wch: 20 }, { wch: 12 },
       { wch: 20 }, { wch: 18 }, { wch: 14 },
       { wch: 20 }, { wch: 18 }, { wch: 14 },
@@ -286,7 +289,7 @@ export default function Siswa() {
   function handleExportCSV() {
     setShowExportMenu(false)
     const headers = [
-      'Nama Lengkap', 'NIS', 'NISN', 'NIK', 'Kelas', 'Jenis Kelamin', 'Agama', 'Status',
+      'Nama Lengkap', 'NIS', 'NISN', 'NIK', 'Nomor Ujian', 'Kelas', 'Jenis Kelamin', 'Agama', 'Status',
       'Tempat Lahir', 'Tanggal Lahir', 'Tahun Lahir',
       'Nama Ayah', 'NIK Ayah', 'Tahun Lahir Ayah',
       'Nama Ibu', 'NIK Ibu', 'Tahun Lahir Ibu',
@@ -297,6 +300,7 @@ export default function Siswa() {
       s.nis || '',
       s.nisn || '',
       s.nik || '',
+      s.nomor_ujian || '',
       s.kelas?.nama_kelas || '',
       s.jenis_kelamin === 'L' ? 'Laki-laki' : 'Perempuan',
       s.agama || '',
@@ -464,7 +468,7 @@ export default function Siswa() {
         <div className="relative max-w-sm w-full">
           <input
             className="input-field w-full"
-            placeholder="Cari nama, NIS, NISN, atau NIK..."
+            placeholder="Cari nama, NIS, NISN, NIK, atau Nomor Ujian..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
@@ -615,6 +619,10 @@ export default function Siswa() {
               <Field label="NIK" full>
                 <input className="input-field" placeholder="16 digit NIK sesuai KK/KTP" value={form.nik}
                   onChange={(e) => setForm({ ...form, nik: e.target.value })} />
+              </Field>
+              <Field label="Nomor Ujian" full>
+                <input className="input-field" placeholder="Diisi saat menjelang Asesmen Sekolah / dipakai di SKL" value={form.nomor_ujian}
+                  onChange={(e) => setForm({ ...form, nomor_ujian: e.target.value })} />
               </Field>
               <Field label="Jenis Kelamin">
                 <select className="input-field" value={form.jenis_kelamin}
@@ -812,6 +820,7 @@ export default function Siswa() {
                 <ProfilRow label="NIS" value={profilLihat.nis} />
                 <ProfilRow label="NISN" value={profilLihat.nisn} />
                 <ProfilRow label="NIK" value={profilLihat.nik} />
+                <ProfilRow label="Nomor Ujian" value={profilLihat.nomor_ujian} />
                 <ProfilRow label="Kelas" value={profilLihat.kelas?.nama_kelas} />
                 <ProfilRow label="Jenis Kelamin" value={profilLihat.jenis_kelamin === 'L' ? 'Laki-laki' : 'Perempuan'} />
                 <ProfilRow label="Agama" value={profilLihat.agama} />
@@ -871,6 +880,7 @@ export default function Siswa() {
             nis: String(row.nis || '').trim(),
             nisn: String(row.nisn || '').trim(),
             nik: String(row.nik || '').trim(),
+            nomor_ujian: String(row.nomor_ujian || '').trim(),
             kelas_id: matchedKelas ? matchedKelas.id : null,
             jenis_kelamin: String(row['jenis_kelamin(L/P)'] || row.jenis_kelamin || 'L').trim().toUpperCase(),
             agama: String(row.agama || '').trim(),
