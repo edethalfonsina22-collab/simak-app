@@ -1,5 +1,6 @@
 import {
   createContext,
+  useCallback,
   useContext,
   useEffect,
   useState,
@@ -14,7 +15,7 @@ export function AuthProvider({ children }) {
   const [registrationStatus, setRegistrationStatus] =
     useState(undefined)
 
-  async function loadProfil(userId) {
+  const loadProfil = useCallback(async (userId) => {
     if (!userId) {
       setProfil(null)
       setRegistrationStatus(null)
@@ -30,7 +31,7 @@ export function AuthProvider({ children }) {
 
       supabase
         .from('permohonan_akun')
-        .select('status')
+        .select('status, nama_lengkap, email, role')
         .eq('user_id', userId)
         .maybeSingle(),
     ])
@@ -38,16 +39,13 @@ export function AuthProvider({ children }) {
     const profilData = profilResult.data
     const registrationData = registrationResult.data
 
-    // Jika permohonan tidak ditemukan, anggap akun lama sudah aktif.
     setRegistrationStatus(registrationData?.status || null)
 
-    // Profil default untuk user yang belum memiliki baris profil.
     const profilDasar = profilData || {
-      role: 'guru',
+      role: registrationData?.role || 'guru',
       guru_id: null,
     }
 
-    // Ambil nama dan foto dari tabel guru.
     if (profilDasar.guru_id) {
       const { data: guru } = await supabase
         .from('guru')
@@ -61,9 +59,13 @@ export function AuthProvider({ children }) {
         foto_profil_path: guru?.foto_profil_path || '',
       })
     } else {
-      setProfil(profilDasar)
+      setProfil({
+        ...profilDasar,
+        nama_lengkap: registrationData?.nama_lengkap || '',
+        foto_profil_path: '',
+      })
     }
-  }
+  }, [])
 
   useEffect(() => {
     let mounted = true
@@ -96,7 +98,14 @@ export function AuthProvider({ children }) {
 
         setSession(newSession)
 
-        // Menunda query agar tidak bentrok dengan proses perubahan auth.
+        if (newSession) {
+          setProfil(undefined)
+          setRegistrationStatus(undefined)
+        } else {
+          setProfil(null)
+          setRegistrationStatus(null)
+        }
+
         setTimeout(() => {
           if (mounted) {
             loadProfil(newSession?.user?.id)
@@ -109,11 +118,11 @@ export function AuthProvider({ children }) {
       mounted = false
       subscription.unsubscribe()
     }
-  }, [])
+  }, [loadProfil])
 
   async function signIn(email, password) {
     const result = await supabase.auth.signInWithPassword({
-      email,
+      email: email.trim().toLowerCase(),
       password,
     })
 
@@ -128,7 +137,7 @@ export function AuthProvider({ children }) {
         .eq('user_id', result.data.user.id)
         .maybeSingle()
 
-    // Akun lama yang belum memiliki data permohonan tetap dapat login.
+    // Jika akun lama belum memiliki permohonan, izinkan login.
     if (statusError || !permohonan) {
       return result
     }
@@ -162,7 +171,7 @@ export function AuthProvider({ children }) {
 
   function signUp(email, password, options = {}) {
     return supabase.auth.signUp({
-      email,
+      email: email.trim().toLowerCase(),
       password,
       options,
     })
