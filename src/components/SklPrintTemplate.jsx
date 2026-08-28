@@ -37,9 +37,12 @@ const SklPrintTemplate = React.forwardRef(function SklPrintTemplate(
         // di index.css — elemen ini juga dipakai sebagai kotak "Pratinjau" di layar,
         // jadi harus tetap terlihat saat browsing biasa, bukan cuma saat print.
         display: "block",
-        width: "210mm",
-        minHeight: "297mm",
-        padding: "8mm",
+        // Lebar dibuat sedikit lebih kecil dari 210mm (bukan pas 210mm) supaya
+        // ada ruang aman terhadap area tak-tercetak di tepi kertas saat di-print,
+        // dan diberi margin:auto agar tetap terlihat center di layar.
+        width: "190mm",
+        margin: "0 auto",
+        padding: 0,
         background: "#fff",
         fontFamily: "'Times New Roman', serif",
         fontSize: "12.5pt",
@@ -48,30 +51,36 @@ const SklPrintTemplate = React.forwardRef(function SklPrintTemplate(
         boxSizing: "border-box",
       }}
     >
-      {/* BINGKAI ORNAMEN BIRU — motif diamond/bunga berulang lewat border-image,
-          dibuat lebih tipis daripada gaya sertifikat pada umumnya supaya konten
-          tetap lega. Garis tipis biru di dalamnya menggantikan garis hitam
-          sebelumnya, mengikuti nuansa warna yang sama dengan bingkai luar. */}
+      {/* @page memastikan browser menyisakan margin cetak yang konsisten (10mm)
+          di semua sisi kertas, bukan mengandalkan margin bawaan printer yang
+          berbeda-beda — inilah yang sebelumnya membuat bingkai & tanda tangan
+          terpotong saat benar-benar dicetak. */}
+      <style>{`
+        @media print {
+          @page { size: A4; margin: 10mm; }
+          html, body { margin: 0 !important; padding: 0 !important; }
+        }
+      `}</style>
+
+      {/* BINGKAI ORNAMEN BIRU — tinggi kotak ini sekarang mengikuti isi konten
+          (tidak lagi dipaksa minHeight 297mm), jadi bingkai membungkus teks
+          rapat, bukan jadi kotak kosong sepanjang halaman. */}
       <div
         style={{
-          border: "7mm solid transparent",
+          border: "5mm solid transparent",
           borderImageSource: FRAME_URL,
           borderImageSlice: 22,
-          borderImageWidth: "7mm",
+          borderImageWidth: "5mm",
           borderImageRepeat: "round",
           padding: "2mm",
-          minHeight: "calc(297mm - 16mm)",
           boxSizing: "border-box",
         }}
       >
         <div
           style={{
             border: "1pt solid #2748a0",
-            padding: "10mm 12mm",
-            minHeight: "calc(297mm - 16mm - 14mm - 4mm - 5pt)",
+            padding: "8mm 10mm",
             boxSizing: "border-box",
-            display: "flex",
-            flexDirection: "column",
           }}
         >
           {/* KOP SURAT — logo & teks disusun pakai flex (bukan position:absolute)
@@ -217,7 +226,12 @@ const SklPrintTemplate = React.forwardRef(function SklPrintTemplate(
             yang bersangkutan.
           </p>
 
-          <div style={{ textAlign: "right", marginTop: 34, pageBreakInside: "avoid" }}>
+          {/* TANDA TANGAN — sekarang mengalir langsung setelah paragraf penutup
+              (alur dokumen normal), bukan diposisikan lewat perhitungan tinggi
+              halaman penuh. pageBreakInside:"avoid" menjaga blok ini (tempat,
+              tanggal, nama, NIP) tidak terpisah oleh batas halaman jika suatu
+              saat isi surat memanjang ke halaman berikutnya. */}
+          <div style={{ textAlign: "right", marginTop: 34, pageBreakInside: "avoid", breakInside: "avoid" }}>
             <p style={{ margin: 0 }}>
               {sekolah?.tempat_ttd || sekolah?.kecamatan || ""}, {tanggalTerbit}
             </p>
