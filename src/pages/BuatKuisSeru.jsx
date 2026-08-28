@@ -17,8 +17,11 @@ function buatKodeKuis() {
 const PILIHAN_KELAS = ['1', '2', '3'];
 
 export default function BuatKuisSeru() {
-  const { session } = useAuth();
-  const guruId = session?.user?.id;
+  const { profil } = useAuth();
+  // kuis_seru.guru_id mengacu ke tabel "guru" (id guru), BUKAN id akun login —
+  // sama seperti pola di AuthContext.jsx (profil.guru_id, bukan session.user.id).
+  // Kalau akun admin tidak terhubung ke data guru manapun, guru_id-nya null (kolom memang nullable).
+  const guruId = profil?.guru_id || null;
 
   const [judul, setJudul] = useState('');
   const [mapel, setMapel] = useState('');
