@@ -49,6 +49,8 @@ import RapatVideo from './pages/RapatVideo'
 import Ijazah from './pages/Ijazah'
 import NilaiAsesmen from './pages/NilaiAsesmen'
 import SuratKeteranganLulus from './pages/SuratKeteranganLulus'
+import BuatKuisSeru from './pages/BuatKuisSeru'
+import KuisSeru from './pages/KuisSeru'
 import Loader from './components/Loader'
 
 function ProtectedRoute({ children, adminOnly }) {
@@ -105,6 +107,8 @@ export default function App() {
       {/* Halaman publik — TIDAK perlu login, dibagikan ke orang tua calon siswa */}
       <Route path="/ppdb" element={<PPDBPublik />} />
       <Route path="/ujian-online" element={<UjianOnline />} />
+      {/* Kuis Seru: game kuis untuk siswa kelas 1-3, tanpa login (sama pola dengan ujian-online) */}
+      <Route path="/kuis-seru" element={<KuisSeru />} />
       <Route path="/login" element={<Login />} />
       <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
       <Route path="/siswa" element={<ProtectedRoute><Siswa /></ProtectedRoute>} />
@@ -147,6 +151,7 @@ export default function App() {
       <Route path="/perbaikan-data-siswa" element={<ProtectedRoute><PengajuanEditSiswa /></ProtectedRoute>} />
       <Route path="/pengajuan-kebutuhan-kelas" element={<ProtectedRoute><PengajuanKebutuhanKelas /></ProtectedRoute>} />
       <Route path="/bank-soal" element={<ProtectedRoute><BankSoal /></ProtectedRoute>} />
+      <Route path="/buat-kuis-seru" element={<ProtectedRoute><BuatKuisSeru /></ProtectedRoute>} />
       <Route path="/kartu" element={<ProtectedRoute adminOnly><KartuSiswa /></ProtectedRoute>} />
       <Route path="/buat-ujian" element={<ProtectedRoute><BuatUjian /></ProtectedRoute>} />
       <Route path="/profil-saya" element={<ProtectedRoute><ProfilSaya /></ProtectedRoute>} />
