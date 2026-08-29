@@ -137,13 +137,14 @@ export default function Dokumen() {
       return
     }
 
-    const { error: insertError } = await supabase.from('dokumen').insert({
-      judul: form.judul,
-      deskripsi: form.deskripsi,
-      file_path: path,
-      file_nama: form.file.name,
-      guru_id: profil.guru_id,
-    })
+const { error: insertError } = await supabase.from('dokumen').insert({
+  judul: form.judul,
+  deskripsi: form.deskripsi,
+  file_path: path,
+  file_nama: form.file.name,
+  guru_id: profil.guru_id,
+  sekolah_id: profil.sekolah_id,
+})
 
     if (insertError) {
       alert('Gagal simpan data dokumen: ' + insertError.message)
