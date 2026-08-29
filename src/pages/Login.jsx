@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { Navigate, Link } from 'react-router-dom'
+import { Navigate } from 'react-router-dom'
 import { useAuth } from '../lib/AuthContext'
 import { supabase } from '../lib/supabaseClient'
 import { Loader2, LogIn } from 'lucide-react'
@@ -27,7 +27,8 @@ function MatrixRainBackground() {
     }
 
     function draw() {
-      ctx.fillStyle = 'rgba(3, 10, 8, 0.10)'
+      // Jejak transparan agar karakter lama memudar perlahan (efek trail)
+      ctx.fillStyle = 'rgba(5, 6, 26, 0.10)'
       ctx.fillRect(0, 0, canvas.width, canvas.height)
 
       ctx.font = `${fontSize}px monospace`
@@ -37,7 +38,8 @@ function MatrixRainBackground() {
         const x = i * fontSize
         const y = columns[i] * fontSize
 
-        ctx.fillStyle = Math.random() > 0.975 ? '#c8fff2' : 'rgba(94, 234, 212, 0.55)'
+        // Karakter paling depan lebih terang, sisanya redup — nuansa biru khas
+        ctx.fillStyle = Math.random() > 0.975 ? '#dbeafe' : 'rgba(96, 165, 250, 0.55)'
         ctx.fillText(char, x, y)
 
         if (y > canvas.height && Math.random() > 0.975) {
@@ -73,6 +75,7 @@ export default function Login() {
   const [namaSekolah, setNamaSekolah] = useState('SD Negeri Waria')
 
   useEffect(() => {
+    // Memicu animasi masuk sesaat setelah komponen ter-render
     const t = requestAnimationFrame(() => setMounted(true))
     return () => cancelAnimationFrame(t)
   }, [])
@@ -98,7 +101,7 @@ export default function Login() {
     setLoading(false)
     if (error) {
       setError('Email atau kata sandi salah. Silakan coba lagi.')
-      setShake((s) => s + 1)
+      setShake((s) => s + 1) // ganti key supaya animasi shake bisa diulang
     }
   }
 
@@ -114,6 +117,7 @@ export default function Login() {
           }`}
         >
           <div className="relative w-12 h-12 mx-auto mb-4">
+            {/* Cincin cahaya biru di belakang logo, berdenyut pelan — senada dengan loader */}
             <div className="login-badge-glow absolute inset-0 rounded-xl" />
             <div className="login-badge relative w-12 h-12 rounded-xl flex items-center justify-center font-bold text-xl">
               S
@@ -182,13 +186,6 @@ export default function Login() {
             {loading ? <Loader2 size={16} className="animate-spin" /> : <LogIn size={16} />}
             Masuk
           </button>
-
-          <p className="text-center text-xs mt-1" style={{ color: 'var(--code-text)' }}>
-            Belum punya akun?{' '}
-            <Link to="/register" className="font-semibold" style={{ color: 'var(--text-accent)' }}>
-              Daftar
-            </Link>
-          </p>
         </form>
 
         <p
@@ -201,17 +198,18 @@ export default function Login() {
         </p>
       </div>
 
+      {/* Style khusus halaman login */}
       <style>{`
         .login-shell {
-          --bg-1: #050b09;
-          --bg-2: #0b201c;
-          --accent: #5eead4;
-          --accent-strong: #9dfff0;
-          --ring: rgba(94, 234, 212, 0.28);
-          --ring-soft: rgba(94, 234, 212, 0.12);
-          --text-primary: #eafffa;
-          --text-accent: #5eead4;
-          --code-text: rgba(140, 214, 198, 0.55);
+          --bg-1: #05061a;
+          --bg-2: #0d1440;
+          --accent: #60a5fa;
+          --accent-strong: #bfdbfe;
+          --ring: rgba(59, 130, 246, 0.28);
+          --ring-soft: rgba(59, 130, 246, 0.12);
+          --text-primary: #eaf2ff;
+          --text-accent: #60a5fa;
+          --code-text: rgba(147, 197, 253, 0.55);
           background: linear-gradient(160deg, var(--bg-1), var(--bg-2) 60%, var(--bg-1));
         }
 
@@ -227,7 +225,7 @@ export default function Login() {
           position: absolute;
           inset: 0;
           z-index: 0;
-          background: radial-gradient(circle at 50% 35%, rgba(3, 10, 8, 0.35), rgba(3, 10, 8, 0.75) 75%);
+          background: radial-gradient(circle at 50% 35%, rgba(5, 6, 26, 0.35), rgba(5, 6, 26, 0.75) 75%);
           pointer-events: none;
         }
 
@@ -239,13 +237,13 @@ export default function Login() {
         }
         .login-badge {
           background: linear-gradient(160deg, var(--accent-strong), var(--accent));
-          color: #06201c;
-          box-shadow: 0 0 18px rgba(94, 234, 212, 0.45);
+          color: #071233;
+          box-shadow: 0 0 18px rgba(59, 130, 246, 0.45);
         }
 
         .login-title {
           color: var(--text-primary);
-          text-shadow: 0 0 14px rgba(94, 234, 212, 0.35);
+          text-shadow: 0 0 14px rgba(59, 130, 246, 0.35);
         }
         .login-tagline { color: var(--code-text); }
         .login-school { color: var(--text-accent); }
@@ -253,9 +251,9 @@ export default function Login() {
         .login-card {
           position: relative;
           border-radius: 16px;
-          background: linear-gradient(160deg, rgba(11, 32, 28, 0.88), rgba(5, 11, 9, 0.92));
+          background: linear-gradient(160deg, rgba(13, 20, 64, 0.88), rgba(5, 6, 26, 0.92));
           border: 1px solid var(--ring-soft);
-          box-shadow: 0 0 40px rgba(94, 234, 212, 0.08), 0 20px 40px rgba(0, 0, 0, 0.5);
+          box-shadow: 0 0 40px rgba(59, 130, 246, 0.08), 0 20px 40px rgba(0, 0, 0, 0.5);
           backdrop-filter: blur(6px);
         }
         .login-card::before {
@@ -264,7 +262,7 @@ export default function Login() {
           inset: -1px;
           border-radius: 16px;
           padding: 1px;
-          background: linear-gradient(120deg, rgba(94, 234, 212, 0.35), transparent 35%, transparent 65%, rgba(255, 255, 255, 0.15));
+          background: linear-gradient(120deg, rgba(59, 130, 246, 0.35), transparent 35%, transparent 65%, rgba(255, 255, 255, 0.15));
           -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
           -webkit-mask-composite: xor;
           mask-composite: exclude;
@@ -280,17 +278,17 @@ export default function Login() {
         }
 
         .login-field {
-          background: rgba(94, 234, 212, 0.06);
+          background: rgba(59, 130, 246, 0.06);
           border: 1px solid var(--ring-soft);
           border-radius: 10px;
           padding: 10px 12px;
           color: var(--text-primary);
           outline: none;
         }
-        .login-field::placeholder { color: rgba(234, 255, 250, 0.35); }
+        .login-field::placeholder { color: rgba(234, 242, 255, 0.35); }
         .login-field:focus {
           border-color: var(--accent);
-          box-shadow: 0 0 0 3px rgba(94, 234, 212, 0.18);
+          box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.18);
         }
 
         .login-error { color: #ff9d9d; }
@@ -303,9 +301,9 @@ export default function Login() {
           padding: 11px 16px;
           border-radius: 10px;
           font-weight: 600;
-          color: #06201c;
+          color: #071233;
           background: linear-gradient(135deg, var(--accent-strong), var(--accent));
-          box-shadow: 0 0 20px rgba(94, 234, 212, 0.35);
+          box-shadow: 0 0 20px rgba(59, 130, 246, 0.35);
           border: none;
           cursor: pointer;
         }
@@ -314,7 +312,7 @@ export default function Login() {
         .login-credit { color: var(--code-text); }
         .login-credit span {
           color: var(--text-accent);
-          text-shadow: 0 0 8px rgba(94, 234, 212, 0.4);
+          text-shadow: 0 0 8px rgba(59, 130, 246, 0.4);
         }
 
         @keyframes glow-pulse {
