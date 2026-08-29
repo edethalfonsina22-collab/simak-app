@@ -3,6 +3,7 @@ import BankSoal from './pages/BankSoal'
 import KartuSiswa from './pages/KartuSiswa'
 import Galeri from './pages/Galeri'
 import Dokumen from './pages/Dokumen'
+import ScanDokumen from './pages/ScanDokumen'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { useAuth } from './lib/AuthContext'
 import { supabase } from './lib/supabaseClient'
@@ -146,6 +147,9 @@ export default function App() {
       <Route path="/pengumuman" element={<ProtectedRoute><Pengumuman /></ProtectedRoute>} />
       <Route path="/galeri" element={<ProtectedRoute><Galeri /></ProtectedRoute>} />
       <Route path="/dokumen" element={<ProtectedRoute><Dokumen /></ProtectedRoute>} />
+      {/* Scan Dokumen: OCR upload/foto dokumen jadi teks yang bisa diunduh sebagai
+          Word/txt. Sengaja BUKAN adminOnly — guru juga butuh fitur ini. */}
+      <Route path="/scan-dokumen" element={<ProtectedRoute><ScanDokumen /></ProtectedRoute>} />
      <Route path="/rpp" element={<ProtectedRoute><RPP /></ProtectedRoute>} />
 <Route path="/arsip-rpp" element={<ProtectedRoute><ArsipRPP /></ProtectedRoute>} />
       <Route path="/pengajuan-surat-aktif" element={<ProtectedRoute><PengajuanSuratAktif /></ProtectedRoute>} />
