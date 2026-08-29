@@ -58,8 +58,9 @@ export default function ScanDokumen() {
     })
 
     if (!res.ok) {
-      const detail = await res.text().catch(() => '')
-      throw new Error(`Server AI Scan (Gemini) gagal (${res.status}). ${detail}`)
+      const data = await res.json().catch(() => null)
+      const pesan = data?.error || `Server AI Scan (Gemini) gagal (${res.status}).`
+      throw new Error(res.status === 503 ? `${pesan} Coba pakai OCR Cepat sementara, atau ulangi beberapa saat lagi.` : pesan)
     }
 
     const data = await res.json()
