@@ -215,11 +215,12 @@ function getInisial(nama) {
   return inisial.toUpperCase()
 }
 
-// Label peran yang tampil di header sidebar, termasuk jabatan-jabatan baru
+// Label peran yang tampil di header sidebar — utamakan jabatan yang dipilih
+// sendiri saat daftar (mis. "Kepala Sekolah"), baru fallback ke role teknis.
 function getLabelPeran(profil, isSuperAdmin, isAdminUtama, isAdmin) {
   if (isSuperAdmin) return 'Superadmin'
+  if (profil?.jabatan === 'kepala_sekolah') return 'Kepala Sekolah'
   if (isAdminUtama) return 'Admin Utama'
-  if (profil?.role === 'kepala_sekolah') return 'Kepala Sekolah'
   if (isAdmin) return 'Admin'
   return 'Guru'
 }
