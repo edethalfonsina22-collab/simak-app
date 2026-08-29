@@ -44,6 +44,7 @@ import {
   FileSpreadsheet,
   Gamepad2,
   ScanLine,
+  CalendarRange,
 } from 'lucide-react'
 import { useAuth } from '../lib/AuthContext'
 import { supabase } from '../lib/supabaseClient'
@@ -109,6 +110,7 @@ const groupsAdmin = [
       { to: '/ppdb-admin', label: 'PPDB Siswa Baru', icon: UserPlus },
       { to: '/laporan', label: 'Laporan Bulanan', icon: FileText },
       { to: '/hari-libur', label: 'Hari Libur', icon: CalendarOff },
+      { to: '/kalender-pendidikan', label: 'Kalender Pendidikan', icon: CalendarRange },
       { to: '/backup', label: 'Backup Data', icon: DatabaseBackup },
       { to: '/profil-sekolah', label: 'Profil Sekolah', icon: Landmark },
       { to: '/kartu', label: 'Cetak Kartu', icon: IdCard },
@@ -147,6 +149,7 @@ const linksGuru = [
   { to: '/buat-kuis-seru', label: 'Kuis Seru (Kls 1-3)', icon: Gamepad2 },
   { to: '/perpustakaan', label: 'Perpustakaan', icon: Library },
   { to: '/jadwal', label: 'Jadwal Pelajaran', icon: CalendarClock },
+  { to: '/kalender-pendidikan', label: 'Kalender Pendidikan', icon: CalendarRange },
   { to: '/agenda', label: 'Agenda Sekolah', icon: CalendarDays },
   { to: '/pengumuman', label: 'Pengumuman', icon: Megaphone },
 ]
