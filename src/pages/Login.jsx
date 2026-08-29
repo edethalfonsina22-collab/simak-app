@@ -114,6 +114,14 @@ export default function Login() {
       })
   }, [tab, modeDaftar])
 
+  // Mode "Sekolah Baru" tidak boleh berjabatan Guru (guru sendirian tidak
+  // bisa mendirikan & mengelola sekolah) — set default ke Admin.
+  useEffect(() => {
+    if (modeDaftar === 'baru' && jabatanDaftar === 'guru') {
+      setJabatanDaftar('admin')
+    }
+  }, [modeDaftar, jabatanDaftar])
+
   if (session) return <Navigate to="/" replace />
 
   async function handleSubmit(e) {
@@ -168,7 +176,7 @@ export default function Login() {
     }
 
     if (modeDaftar === 'baru') {
-      setSuksesDaftar('Sekolah dan akun admin utama berhasil dibuat! Silakan masuk.')
+      setSuksesDaftar('Pendaftaran sekolah berhasil dikirim! Menunggu persetujuan Superadmin sebelum bisa masuk.')
     } else {
       setSuksesDaftar('Pendaftaran berhasil! Akun Anda menunggu persetujuan admin sekolah.')
     }
@@ -354,18 +362,35 @@ export default function Login() {
             </div>
 
             {modeDaftar === 'baru' ? (
-              <div>
-                <label className="login-eyebrow mb-1.5 block">Nama Sekolah</label>
-                <input
-                  type="text"
-                  required
-                  className="login-field w-full"
-                  placeholder="SD Negeri Contoh"
-                  value={namaSekolahBaru}
-                  onChange={(e) => setNamaSekolahBaru(e.target.value)}
-                />
+              <div className="space-y-3">
+                <div>
+                  <label className="login-eyebrow mb-1.5 block">Nama Sekolah</label>
+                  <input
+                    type="text"
+                    required
+                    className="login-field w-full"
+                    placeholder="SD Negeri Contoh"
+                    value={namaSekolahBaru}
+                    onChange={(e) => setNamaSekolahBaru(e.target.value)}
+                  />
+                </div>
+
+                <div>
+                  <label className="login-eyebrow mb-1.5 block">Jabatan Anda</label>
+                  <select
+                    required
+                    className="login-field w-full"
+                    value={jabatanDaftar}
+                    onChange={(e) => setJabatanDaftar(e.target.value)}
+                  >
+                    <option value="admin">Admin</option>
+                    <option value="kepala_sekolah">Kepala Sekolah</option>
+                  </select>
+                </div>
+
                 <p className="text-[11px] mt-1.5 login-tagline normal-case tracking-normal">
-                  Anda akan menjadi admin utama sekolah ini dan langsung dapat masuk.
+                  Anda akan menjadi admin utama sekolah ini, tapi tetap perlu menunggu
+                  persetujuan Superadmin sebelum bisa masuk.
                 </p>
               </div>
             ) : (
