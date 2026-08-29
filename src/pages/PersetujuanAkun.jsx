@@ -1,0 +1,159 @@
+import { useEffect, useState } from 'react'
+import { CheckCircle2, XCircle, Clock3, ShieldCheck } from 'lucide-react'
+import { useAuth } from '../lib/AuthContext'
+import { supabase } from '../lib/supabaseClient'
+import Sidebar from '../components/Sidebar'
+
+export default function PersetujuanAkun() {
+  const { isSuperAdmin, sekolahId } = useAuth()
+  const [tab, setTab] = useState('menunggu') // 'menunggu' | 'riwayat'
+  const [daftarAkun, setDaftarAkun] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [prosesId, setProsesId] = useState(null)
+
+  async function muatData() {
+    setLoading(true)
+    let query = supabase
+      .from('profil')
+      .select('id, role, status_akun, nama_lengkap_pendaftar, email_pendaftar, catatan_admin, dibuat_pada, sekolah_id, sekolah:sekolah_id(nama_sekolah)')
+      .order('dibuat_pada', { ascending: false })
+
+    query = tab === 'menunggu' ? query.eq('status_akun', 'menunggu') : query.neq('status_akun', 'menunggu')
+
+    // Admin utama hanya melihat pendaftar di sekolahnya sendiri; superadmin melihat semua sekolah.
+    if (!isSuperAdmin) {
+      query = query.eq('sekolah_id', sekolahId)
+    }
+
+    const { data } = await query
+    setDaftarAkun(data || [])
+    setLoading(false)
+  }
+
+  useEffect(() => {
+    muatData()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab])
+
+  async function ubahStatus(id, statusBaru, catatan = '') {
+    setProsesId(id)
+    await supabase
+      .from('profil')
+      .update({ status_akun: statusBaru, catatan_admin: catatan || null })
+      .eq('id', id)
+    setProsesId(null)
+    muatData()
+  }
+
+  function handleTolak(id) {
+    const catatan = window.prompt('Catatan penolakan (opsional):') || ''
+    ubahStatus(id, 'ditolak', catatan)
+  }
+
+  return (
+    <div className="flex">
+      <Sidebar />
+      <main className="flex-1 min-h-screen bg-paper p-6">
+        <div className="flex items-center gap-3 mb-6">
+          <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+            <ShieldCheck size={20} />
+          </div>
+          <div>
+            <h1 className="font-display font-semibold text-lg text-slate-800">Persetujuan Akun</h1>
+            <p className="text-sm text-slate-500">Kelola pendaftaran akun admin baru{isSuperAdmin ? ' di seluruh sekolah' : ' di sekolah Anda'}.</p>
+          </div>
+        </div>
+
+        <div className="flex gap-2 mb-4">
+          <button
+            onClick={() => setTab('menunggu')}
+            className={`text-sm font-medium px-4 py-2 rounded-lg transition-colors ${
+              tab === 'menunggu' ? 'bg-blue-600 text-white' : 'bg-white text-slate-600 border border-slate-200'
+            }`}
+          >
+            Menunggu
+          </button>
+          <button
+            onClick={() => setTab('riwayat')}
+            className={`text-sm font-medium px-4 py-2 rounded-lg transition-colors ${
+              tab === 'riwayat' ? 'bg-blue-600 text-white' : 'bg-white text-slate-600 border border-slate-200'
+            }`}
+          >
+            Riwayat
+          </button>
+        </div>
+
+        <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+          {loading ? (
+            <p className="p-6 text-sm text-slate-400 text-center">Memuat data...</p>
+          ) : daftarAkun.length === 0 ? (
+            <p className="p-6 text-sm text-slate-400 text-center">
+              {tab === 'menunggu' ? 'Tidak ada pendaftaran yang menunggu persetujuan.' : 'Belum ada riwayat.'}
+            </p>
+          ) : (
+            <table className="w-full text-sm">
+              <thead className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wide">
+                <tr>
+                  <th className="text-left px-4 py-3 font-medium">Nama</th>
+                  <th className="text-left px-4 py-3 font-medium">Email</th>
+                  {isSuperAdmin && <th className="text-left px-4 py-3 font-medium">Sekolah</th>}
+                  <th className="text-left px-4 py-3 font-medium">Status</th>
+                  {tab === 'menunggu' && <th className="text-right px-4 py-3 font-medium">Aksi</th>}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {daftarAkun.map((akun) => (
+                  <tr key={akun.id}>
+                    <td className="px-4 py-3 text-slate-700">{akun.nama_lengkap_pendaftar || '—'}</td>
+                    <td className="px-4 py-3 text-slate-500">{akun.email_pendaftar || '—'}</td>
+                    {isSuperAdmin && (
+                      <td className="px-4 py-3 text-slate-500">{akun.sekolah?.nama_sekolah || '—'}</td>
+                    )}
+                    <td className="px-4 py-3">
+                      <StatusBadge status={akun.status_akun} />
+                    </td>
+                    {tab === 'menunggu' && (
+                      <td className="px-4 py-3 text-right">
+                        <div className="flex justify-end gap-2">
+                          <button
+                            onClick={() => ubahStatus(akun.id, 'disetujui')}
+                            disabled={prosesId === akun.id}
+                            className="flex items-center gap-1 text-xs font-medium px-3 py-1.5 rounded-lg bg-green-50 text-green-600 hover:bg-green-100 disabled:opacity-60"
+                          >
+                            <CheckCircle2 size={14} /> Setujui
+                          </button>
+                          <button
+                            onClick={() => handleTolak(akun.id)}
+                            disabled={prosesId === akun.id}
+                            className="flex items-center gap-1 text-xs font-medium px-3 py-1.5 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 disabled:opacity-60"
+                          >
+                            <XCircle size={14} /> Tolak
+                          </button>
+                        </div>
+                      </td>
+                    )}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      </main>
+    </div>
+  )
+}
+
+function StatusBadge({ status }) {
+  const map = {
+    menunggu: { label: 'Menunggu', cls: 'bg-amber-50 text-amber-600', icon: Clock3 },
+    disetujui: { label: 'Disetujui', cls: 'bg-green-50 text-green-600', icon: CheckCircle2 },
+    ditolak: { label: 'Ditolak', cls: 'bg-red-50 text-red-600', icon: XCircle },
+  }
+  const item = map[status] || map.menunggu
+  const Icon = item.icon
+  return (
+    <span className={`inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-full ${item.cls}`}>
+      <Icon size={12} /> {item.label}
+    </span>
+  )
+}
