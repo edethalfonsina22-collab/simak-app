@@ -17,7 +17,7 @@ export default function PersetujuanAkun() {
     let query = supabase
       .from('profil')
       .select(
-        'id, role, status_akun, nama_lengkap_pendaftar, email_pendaftar, catatan_admin, dibuat_pada, sekolah_id, sekolah:sekolah_id(nama_sekolah)'
+        'id, role, jabatan, status_akun, nama_lengkap_pendaftar, email_pendaftar, catatan_admin, dibuat_pada, sekolah_id, sekolah:sekolah_id(nama_sekolah)'
       )
       .order('dibuat_pada', { ascending: false })
 
@@ -28,11 +28,14 @@ export default function PersetujuanAkun() {
       query = query.eq('sekolah_id', sekolahId)
     }
 
-    // Filter jabatan: pisahkan pendaftar Guru dari pendaftar Admin/Kepala Sekolah
+    // Filter jabatan: pisahkan pendaftar Guru dari pendaftar Admin/Kepala Sekolah.
+    // Pakai kolom 'jabatan' (label pilihan sendiri); fallback ke 'role' untuk data lama.
     if (filterJabatan === 'guru') {
-      query = query.eq('role', 'guru')
+      query = query.or('jabatan.eq.guru,and(jabatan.is.null,role.eq.guru)')
     } else if (filterJabatan === 'admin_kepsek') {
-      query = query.in('role', ['admin', 'kepala_sekolah', 'admin_utama'])
+      query = query.or(
+        'jabatan.in.(admin,kepala_sekolah),and(jabatan.is.null,role.in.(admin,kepala_sekolah,admin_utama))'
+      )
     }
 
     const { data } = await query
@@ -138,7 +141,7 @@ export default function PersetujuanAkun() {
                   <td className="px-4 py-3 text-slate-700">{akun.nama_lengkap_pendaftar || '—'}</td>
                   <td className="px-4 py-3 text-slate-500">{akun.email_pendaftar || '—'}</td>
                   <td className="px-4 py-3">
-                    <JabatanBadge role={akun.role} />
+                    <JabatanBadge jabatan={akun.jabatan} role={akun.role} />
                   </td>
                   {isSuperAdmin && (
                     <td className="px-4 py-3 text-slate-500">{akun.sekolah?.nama_sekolah || '—'}</td>
@@ -191,8 +194,10 @@ function StatusBadge({ status }) {
   )
 }
 
-// Label & warna Jabatan supaya admin langsung paham peran pendaftar saat verifikasi
-function JabatanBadge({ role }) {
+// Label & warna Jabatan supaya admin langsung paham peran pendaftar saat verifikasi.
+// Pakai kolom 'jabatan' (label pilihan sendiri saat daftar); kalau kosong
+// (data lama sebelum kolom ini ada), fallback ke 'role'.
+function JabatanBadge({ jabatan, role }) {
   const map = {
     guru: { label: 'Guru', cls: 'bg-blue-50 text-blue-600' },
     admin: { label: 'Admin', cls: 'bg-purple-50 text-purple-600' },
@@ -200,7 +205,8 @@ function JabatanBadge({ role }) {
     admin_utama: { label: 'Admin Utama', cls: 'bg-indigo-50 text-indigo-600' },
     superadmin: { label: 'Superadmin', cls: 'bg-slate-800 text-white' },
   }
-  const item = map[role] || { label: role || '—', cls: 'bg-slate-100 text-slate-500' }
+  const key = jabatan || role
+  const item = map[key] || { label: key || '—', cls: 'bg-slate-100 text-slate-500' }
   return (
     <span className={`inline-flex items-center text-xs font-medium px-2.5 py-1 rounded-full ${item.cls}`}>
       {item.label}
