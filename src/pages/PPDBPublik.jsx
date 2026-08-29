@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
+import Tesseract from 'tesseract.js'
 import { supabase } from '../lib/supabaseClient'
-import { Loader2, CheckCircle2, School } from 'lucide-react'
+import { Loader2, CheckCircle2, School, ScanLine } from 'lucide-react'
 
 const AGAMA_OPTIONS = ['Islam', 'Kristen', 'Katolik', 'Hindu', 'Buddha', 'Khonghucu', 'Lainnya']
 
@@ -25,6 +26,63 @@ const emptyForm = {
   asal_sekolah: '',
 }
 
+// ---------------------------------------------------------------------
+// Utilitas OCR: membaca teks dari foto Kartu Keluarga (KK) dengan
+// Tesseract.js, lalu mencoba mengekstrak Nomor KK, Alamat, dan daftar
+// anggota keluarga (Nama + NIK) dari teks hasil OCR.
+//
+// Catatan: OCR tidak pernah 100% akurat, apalagi untuk foto yang buram,
+// miring, atau pencahayaan kurang baik. Karena itu, hasil ekstraksi ini
+// HANYA dipakai untuk MENGISI OTOMATIS kolom form — semua kolom tetap
+// bisa diedit manual oleh pengguna sebelum formulir dikirim.
+// ---------------------------------------------------------------------
+function parseTeksKK(rawText) {
+  const text = rawText.replace(/\r/g, '')
+  const baris = text.split('\n').map((l) => l.trim()).filter(Boolean)
+
+  // Nomor KK: 16 digit, biasanya muncul di baris dekat kata "No"
+  let nomorKK = ''
+  const kkDenganLabel = text.match(/No[^\d]{0,15}(\d{16})/i)
+  if (kkDenganLabel) {
+    nomorKK = kkDenganLabel[1]
+  } else {
+    const kkFallback = text.match(/\b(\d{16})\b/)
+    if (kkFallback) nomorKK = kkFallback[1]
+  }
+
+  // Alamat: teks setelah kata "Alamat" sampai baris/label berikutnya
+  let alamat = ''
+  const alamatMatch = text.match(/Alamat\s*[:\-]?\s*(.+)/i)
+  if (alamatMatch) {
+    alamat = alamatMatch[1]
+      .split(/\n|Kode Pos|RT\s*\/\s*RW|Desa|Kelurahan|Kecamatan/i)[0]
+      .replace(/\s+/g, ' ')
+      .trim()
+  }
+
+  // Anggota keluarga: cari baris yang mengandung deretan 16 digit (NIK),
+  // lalu ambil sisa teks di baris yang sama sebagai perkiraan nama.
+  const anggota = []
+  const nikRegex = /(\d{16})/
+  baris.forEach((line) => {
+    const m = line.match(nikRegex)
+    if (!m) return
+    const nik = m[1]
+    if (nik === nomorKK) return // lewati jika ini nomor KK, bukan NIK individu
+
+    let nama = line
+      .replace(nik, '')
+      .replace(/[^A-Za-z.'\- ]/g, ' ')
+      .replace(/\b(NIK|Nama|Lengkap|No)\b/gi, '')
+      .replace(/\s+/g, ' ')
+      .trim()
+
+    anggota.push({ nik, nama: nama || '(nama tidak terbaca, mohon isi manual)' })
+  })
+
+  return { nomorKK, alamat, anggota }
+}
+
 // Ilustrasi anak SD melompat gembira sambil memegang buku.
 // Dibuat sebagai SVG asli (bukan gambar/foto) agar ringan dan bebas hak cipta.
 function IlustrasiSemangatSekolah() {
@@ -36,13 +94,10 @@ function IlustrasiSemangatSekolah() {
           <stop offset="100%" stopColor="#FBEEDB" stopOpacity="0" />
         </radialGradient>
       </defs>
-
       {/* Halo lembut di belakang karakter */}
       <circle cx="200" cy="170" r="150" fill="url(#haloGlow)" />
-
       {/* Bayangan tanah */}
       <ellipse cx="200" cy="322" rx="70" ry="12" fill="#0B1220" opacity="0.08" />
-
       {/* Confetti / bintang melayang */}
       <g className="anim-float-a">
         <path d="M60 90 l4 10 10 4 -10 4 -4 10 -4 -10 -10 -4 10 -4 z" fill="#D9A441" />
@@ -59,40 +114,33 @@ function IlustrasiSemangatSekolah() {
       <g className="anim-float-b">
         <path d="M95 150 l3 7 7 3 -7 3 -3 7 -3 -7 -7 -3 7 -3 z" fill="#6B9080" />
       </g>
-
       {/* Garis gerak melompat */}
       <g className="anim-bounce" opacity="0.5">
         <path d="M150 300 q25 10 50 0" stroke="#0B1220" strokeWidth="4" strokeLinecap="round" fill="none" />
         <path d="M235 300 q20 8 40 0" stroke="#0B1220" strokeWidth="4" strokeLinecap="round" fill="none" />
       </g>
-
       {/* Karakter: anak SD melompat memegang buku */}
       <g className="anim-bounce">
         {/* Tas ransel */}
         <rect x="150" y="150" width="46" height="58" rx="14" fill="#D9524A" />
-
         {/* Kaki (posisi melompat) */}
         <path d="M182 235 q-10 30 -34 42" stroke="#1F2A44" strokeWidth="18" strokeLinecap="round" fill="none" />
         <path d="M198 235 q18 22 14 48" stroke="#1F2A44" strokeWidth="18" strokeLinecap="round" fill="none" />
         {/* Sepatu */}
         <ellipse cx="146" cy="279" rx="14" ry="9" fill="#D9A441" />
         <ellipse cx="214" cy="285" rx="14" ry="9" fill="#D9A441" />
-
         {/* Badan / baju */}
         <rect x="163" y="165" width="54" height="72" rx="20" fill="#6B9080" />
-
         {/* Lengan kiri memegang buku ke atas */}
         <path d="M172 178 q-30 -6 -34 -46" stroke="#E8B48A" strokeWidth="15" strokeLinecap="round" fill="none" />
         {/* Lengan kanan mengayun */}
         <path d="M212 190 q30 10 34 40" stroke="#E8B48A" strokeWidth="15" strokeLinecap="round" fill="none" />
-
         {/* Buku di atas kepala */}
         <g transform="translate(112 108) rotate(-12)">
           <rect x="0" y="0" width="44" height="32" rx="3" fill="#E7A83D" />
           <rect x="4" y="4" width="36" height="24" rx="2" fill="#FFF8EC" />
           <line x1="22" y1="4" x2="22" y2="28" stroke="#E7A83D" strokeWidth="2" />
         </g>
-
         {/* Kepala */}
         <circle cx="190" cy="140" r="30" fill="#E8B48A" />
         {/* Rambut */}
@@ -115,14 +163,75 @@ export default function PPDBPublik() {
   const [terkirim, setTerkirim] = useState(false)
   const [error, setError] = useState('')
 
+  // --- State untuk fitur OCR Kartu Keluarga ---
+  const [kkPreviewUrl, setKkPreviewUrl] = useState('')
+  const [ocrLoading, setOcrLoading] = useState(false)
+  const [ocrProgress, setOcrProgress] = useState(0)
+  const [ocrError, setOcrError] = useState('')
+  const [anggotaTerdeteksi, setAnggotaTerdeteksi] = useState([])
+
   useEffect(() => {
     supabase.from('profil_sekolah').select('*').eq('id', 1).maybeSingle().then(({ data }) => setProfil(data))
   }, [])
 
+  useEffect(() => {
+    // Bersihkan object URL preview saat komponen unmount / gambar diganti
+    return () => {
+      if (kkPreviewUrl) URL.revokeObjectURL(kkPreviewUrl)
+    }
+  }, [kkPreviewUrl])
+
+  async function handleUploadKK(e) {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    setKkPreviewUrl(URL.createObjectURL(file))
+    setOcrError('')
+    setAnggotaTerdeteksi([])
+    setOcrLoading(true)
+    setOcrProgress(0)
+
+    try {
+      const { data: { text } } = await Tesseract.recognize(file, 'ind', {
+        logger: (m) => {
+          if (m.status === 'recognizing text') {
+            setOcrProgress(Math.round(m.progress * 100))
+          }
+        },
+      })
+
+      const hasil = parseTeksKK(text)
+
+      setForm((prev) => ({
+        ...prev,
+        nomor_kk: hasil.nomorKK || prev.nomor_kk,
+        alamat: hasil.alamat || prev.alamat,
+      }))
+      setAnggotaTerdeteksi(hasil.anggota)
+
+      if (!hasil.nomorKK && hasil.anggota.length === 0) {
+        setOcrError('Teks pada foto tidak terbaca dengan baik. Coba unggah foto yang lebih jelas dan terang, atau isi kolom secara manual.')
+      }
+    } catch (err) {
+      setOcrError('Gagal membaca gambar: ' + err.message)
+    } finally {
+      setOcrLoading(false)
+    }
+  }
+
+  function terapkanAnggota(anggota, target) {
+    if (target === 'siswa') {
+      setForm((prev) => ({ ...prev, nama_lengkap: anggota.nama, nik_siswa: anggota.nik }))
+    } else if (target === 'ayah') {
+      setForm((prev) => ({ ...prev, nama_ayah: anggota.nama, nik_ayah: anggota.nik }))
+    } else if (target === 'ibu') {
+      setForm((prev) => ({ ...prev, nama_ibu: anggota.nama, nik_ibu: anggota.nik }))
+    }
+  }
+
   async function handleSubmit(e) {
     e.preventDefault()
     setError('')
-
     if (form.nik_siswa.length !== 16) {
       setError('NIK Siswa harus terdiri dari 16 digit angka.')
       return
@@ -131,7 +240,6 @@ export default function PPDBPublik() {
       setError('Nomor KK harus terdiri dari 16 digit angka.')
       return
     }
-
     setMengirim(true)
     const payload = {
       ...form,
@@ -220,11 +328,67 @@ export default function PPDBPublik() {
         </div>
 
         <form onSubmit={handleSubmit} className="bg-white rounded-2xl shadow-sm p-6 sm:p-8 space-y-4">
+
+          {/* --- Blok Upload & OCR Kartu Keluarga --- */}
+          <div className="rounded-xl border border-dashed border-ink-950/15 bg-paper/60 p-4 space-y-3">
+            <div className="flex items-center gap-2">
+              <ScanLine size={18} className="text-brass-500" />
+              <p className="text-sm font-semibold text-ink-950">Isi Otomatis dari Foto Kartu Keluarga (opsional)</p>
+            </div>
+            <p className="text-xs text-ink-700/60">
+              Unggah foto/scan KK yang jelas dan tidak buram. Sistem akan membaca teksnya dan mencoba mengisi Nomor KK, Alamat, dan data anggota keluarga secara otomatis. <strong>Selalu periksa kembali</strong> hasilnya sebelum mengirim formulir.
+            </p>
+
+            <input
+              type="file"
+              accept="image/*"
+              onChange={handleUploadKK}
+              className="block w-full text-sm text-ink-700/80 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:bg-ink-950 file:text-white file:text-sm file:font-medium file:cursor-pointer cursor-pointer"
+            />
+
+            {kkPreviewUrl && (
+              <img src={kkPreviewUrl} alt="Pratinjau foto KK" className="max-h-40 rounded-lg border border-ink-950/10 object-contain" />
+            )}
+
+            {ocrLoading && (
+              <div className="flex items-center gap-2 text-sm text-ink-700/70">
+                <Loader2 size={16} className="animate-spin" />
+                Membaca dokumen... {ocrProgress}%
+              </div>
+            )}
+
+            {ocrError && <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{ocrError}</p>}
+
+            {anggotaTerdeteksi.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-xs font-medium text-ink-950">Anggota keluarga terdeteksi — klik untuk mengisi kolom terkait:</p>
+                {anggotaTerdeteksi.map((a, i) => (
+                  <div key={i} className="flex flex-wrap items-center justify-between gap-2 bg-white rounded-lg border border-ink-950/10 px-3 py-2 text-sm">
+                    <div>
+                      <span className="font-medium">{a.nama}</span>
+                      <span className="text-ink-700/60"> — NIK {a.nik}</span>
+                    </div>
+                    <div className="flex gap-1.5">
+                      <button type="button" onClick={() => terapkanAnggota(a, 'siswa')} className="px-2 py-1 rounded-md bg-sage-500/10 text-sage-700 text-xs font-medium hover:bg-sage-500/20">
+                        Isi sbg Siswa
+                      </button>
+                      <button type="button" onClick={() => terapkanAnggota(a, 'ayah')} className="px-2 py-1 rounded-md bg-brass-500/10 text-brass-700 text-xs font-medium hover:bg-brass-500/20">
+                        Isi sbg Ayah
+                      </button>
+                      <button type="button" onClick={() => terapkanAnggota(a, 'ibu')} className="px-2 py-1 rounded-md bg-ink-950/5 text-ink-950 text-xs font-medium hover:bg-ink-950/10">
+                        Isi sbg Ibu
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
           <div>
             <label className="label-field">Nama Lengkap Calon Siswa *</label>
             <input required className="input-field" value={form.nama_lengkap} onChange={(e) => ubah('nama_lengkap', e.target.value)} />
           </div>
-
           <div className="grid sm:grid-cols-2 gap-4">
             <div>
               <label className="label-field">NIK Siswa *</label>
@@ -253,7 +417,6 @@ export default function PPDBPublik() {
               />
             </div>
           </div>
-
           <div className="grid sm:grid-cols-2 gap-4">
             <div>
               <label className="label-field">Tempat Lahir</label>
@@ -264,7 +427,6 @@ export default function PPDBPublik() {
               <input type="date" className="input-field" value={form.tanggal_lahir} onChange={(e) => ubah('tanggal_lahir', e.target.value)} />
             </div>
           </div>
-
           <div>
             <label className="label-field">Tahun Lahir (isi jika tanggal pasti tidak diketahui)</label>
             <input
@@ -275,7 +437,6 @@ export default function PPDBPublik() {
               onChange={(e) => ubah('tahun_lahir', e.target.value)}
             />
           </div>
-
           <div className="grid sm:grid-cols-2 gap-4">
             <div>
               <label className="label-field">Jenis Kelamin</label>
@@ -292,7 +453,6 @@ export default function PPDBPublik() {
               </select>
             </div>
           </div>
-
           <div className="grid sm:grid-cols-3 gap-4">
             <div>
               <label className="label-field">Nama Ayah</label>
@@ -320,7 +480,6 @@ export default function PPDBPublik() {
               />
             </div>
           </div>
-
           <div className="grid sm:grid-cols-3 gap-4">
             <div>
               <label className="label-field">Nama Ibu</label>
@@ -348,17 +507,14 @@ export default function PPDBPublik() {
               />
             </div>
           </div>
-
           <div>
             <label className="label-field">Alamat (sesuai KTP/KK)</label>
             <textarea className="input-field" rows={2} value={form.alamat} onChange={(e) => ubah('alamat', e.target.value)} />
           </div>
-
           <div>
             <label className="label-field">Alamat Tempat Tinggal (domisili saat ini)</label>
             <textarea className="input-field" rows={2} value={form.alamat_tinggal} onChange={(e) => ubah('alamat_tinggal', e.target.value)} />
           </div>
-
           <div className="grid sm:grid-cols-2 gap-4">
             <div>
               <label className="label-field">No. HP Orang Tua/Wali *</label>
@@ -375,9 +531,7 @@ export default function PPDBPublik() {
               <input className="input-field" value={form.asal_sekolah} onChange={(e) => ubah('asal_sekolah', e.target.value)} />
             </div>
           </div>
-
           {error && <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{error}</p>}
-
           <button type="submit" className="btn-primary w-full justify-center" disabled={mengirim}>
             {mengirim && <Loader2 size={16} className="animate-spin" />}
             Kirim Pendaftaran
