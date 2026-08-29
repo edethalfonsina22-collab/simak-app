@@ -78,6 +78,7 @@ export default function Login() {
   const [namaSekolahBaru, setNamaSekolahBaru] = useState('')
   const [daftarSekolah, setDaftarSekolah] = useState([])
   const [sekolahDipilih, setSekolahDipilih] = useState('')
+  const [jabatanDaftar, setJabatanDaftar] = useState('guru')
   const [errorDaftar, setErrorDaftar] = useState('')
   const [suksesDaftar, setSuksesDaftar] = useState('')
   const [loadingDaftar, setLoadingDaftar] = useState(false)
@@ -157,6 +158,7 @@ export default function Login() {
       namaLengkap,
       namaSekolah: namaSekolahBaru,
       sekolahId: sekolahDipilih,
+      jabatan: jabatanDaftar,
     })
     setLoadingDaftar(false)
 
@@ -178,6 +180,7 @@ export default function Login() {
     setKonfirmasiPassword('')
     setNamaSekolahBaru('')
     setSekolahDipilih('')
+    setJabatanDaftar('guru')
     setTimeout(() => setTab('masuk'), 1800)
   }
 
@@ -366,21 +369,38 @@ export default function Login() {
                 </p>
               </div>
             ) : (
-              <div>
-                <label className="login-eyebrow mb-1.5 block">Pilih Sekolah</label>
-                <select
-                  required
-                  className="login-field w-full"
-                  value={sekolahDipilih}
-                  onChange={(e) => setSekolahDipilih(e.target.value)}
-                >
-                  <option value="">— Pilih sekolah —</option>
-                  {daftarSekolah.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.nama_sekolah}
-                    </option>
-                  ))}
-                </select>
+              <div className="space-y-3">
+                <div>
+                  <label className="login-eyebrow mb-1.5 block">Pilih Sekolah</label>
+                  <select
+                    required
+                    className="login-field w-full"
+                    value={sekolahDipilih}
+                    onChange={(e) => setSekolahDipilih(e.target.value)}
+                  >
+                    <option value="">— Pilih sekolah —</option>
+                    {daftarSekolah.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.nama_sekolah}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="login-eyebrow mb-1.5 block">Jabatan</label>
+                  <select
+                    required
+                    className="login-field w-full"
+                    value={jabatanDaftar}
+                    onChange={(e) => setJabatanDaftar(e.target.value)}
+                  >
+                    <option value="guru">Guru</option>
+                    <option value="admin">Admin</option>
+                    <option value="kepala_sekolah">Kepala Sekolah</option>
+                  </select>
+                </div>
+
                 <p className="text-[11px] mt-1.5 login-tagline normal-case tracking-normal">
                   Akun Anda akan menunggu persetujuan admin sekolah tersebut.
                 </p>
