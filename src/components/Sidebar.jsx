@@ -13,6 +13,8 @@ import {
   CalendarDays,
   Mail,
   FileBadge,
+  ScrollText,
+  Stamp,
   FileText,
   FileSignature,
   Wallet,
@@ -34,24 +36,34 @@ import {
   UserCog,
   Award,
   Video,
+  Receipt,
+  ShoppingCart,
+  PackagePlus,
+  FolderHeart,
+  PiggyBank,
+  FileSpreadsheet,
+  Gamepad2,
+  ScanLine,
+  CalendarRange,
   ShieldCheck,
 } from 'lucide-react'
 import { useAuth } from '../lib/AuthContext'
 import { supabase } from '../lib/supabaseClient'
 
 // Menu ADMIN dikelompokkan per kategori supaya tidak jadi satu daftar panjang.
-// Dibuat sebagai fungsi karena beberapa menu (mis. Profil Sekolah, Persetujuan Akun)
-// hanya boleh tampil untuk admin utama / superadmin, bukan admin biasa.
+// Dibuat sebagai fungsi karena "Persetujuan Akun" dan "Profil Sekolah" hanya
+// boleh tampil untuk admin utama / superadmin, bukan admin biasa.
 function getGroupsAdmin(isAdminUtama) {
   return [
     {
-      label: null,
+      label: null, // tanpa judul grup — selalu di atas
       links: [
         { to: '/', label: 'Dasbor', icon: LayoutDashboard, end: true },
         { to: '/profil-saya', label: 'Profil Saya', icon: UserCircle },
         { to: '/rapat', label: 'Rapat Video', icon: Video },
         { to: '/galeri', label: 'Galeri Kegiatan', icon: Images },
         { to: '/dokumen', label: 'Dokumen Penting', icon: HardDrive },
+        { to: '/scan-dokumen', label: 'Scan Dokumen', icon: ScanLine },
         { to: '/pengumuman', label: 'Pengumuman', icon: Megaphone },
       ],
     },
@@ -64,19 +76,28 @@ function getGroupsAdmin(isAdminUtama) {
         { to: '/jadwal', label: 'Jadwal Pelajaran', icon: CalendarClock },
         { to: '/presensi', label: 'Presensi', icon: ClipboardCheck },
         { to: '/nilai', label: 'Nilai Siswa', icon: BookOpenCheck },
+        { to: '/nilai-asesmen', label: 'Nilai Asesmen', icon: FileSpreadsheet },
         { to: '/rapor', label: 'Rapor Siswa', icon: FileBadge },
+        { to: '/ijazah', label: 'Ijazah', icon: ScrollText },
+        { to: '/skl', label: 'Surat Keterangan Lulus', icon: Stamp },
+        { to: '/portofolio-siswa', label: 'Portofolio Siswa', icon: FolderHeart },
         { to: '/rpp', label: 'RPP', icon: NotebookPen },
         { to: '/arsip-rpp', label: 'Arsip RPP', icon: Archive },
         { to: '/sertifikat', label: 'Sertifikat & Penghargaan', icon: Award },
         { to: '/buat-ujian', label: 'Buat Ujian', icon: FilePlus },
         { to: '/hasil-ujian', label: 'Hasil Ujian', icon: ClipboardList },
         { to: '/bank-soal', label: 'Bank Soal', icon: Database },
+        { to: '/buat-kuis-seru', label: 'Kuis Seru (Kls 1-3)', icon: Gamepad2 },
       ],
     },
     {
       label: 'Keuangan & Aset',
       links: [
         { to: '/keuangan', label: 'Keuangan', icon: Wallet },
+        { to: '/keuangan-kelas', label: 'Keuangan Kelas', icon: PiggyBank },
+        { to: '/kuitansi', label: 'Kuitansi', icon: Receipt },
+        { to: '/kuitansi-jasa', label: 'Kuitansi Jasa', icon: Receipt },
+        { to: '/nota', label: 'Nota Belanja', icon: ShoppingCart },
         { to: '/perpustakaan', label: 'Perpustakaan', icon: Library },
         { to: '/inventaris', label: 'Inventaris', icon: Boxes },
       ],
@@ -86,14 +107,16 @@ function getGroupsAdmin(isAdminUtama) {
       links: [
         { to: '/pengajuan-surat-aktif', label: 'Pengajuan Surat Aktif', icon: FileCheck2 },
         { to: '/perbaikan-data-siswa', label: 'Perbaikan Data Siswa', icon: UserCog },
+        { to: '/pengajuan-kebutuhan-kelas', label: 'Kebutuhan Kelas', icon: PackagePlus },
         { to: '/agenda', label: 'Agenda Sekolah', icon: CalendarDays },
         { to: '/surat', label: 'Surat Masuk/Keluar', icon: Mail },
         { to: '/surat-keterangan', label: 'Surat Keterangan', icon: FileSignature },
         { to: '/ppdb-admin', label: 'PPDB Siswa Baru', icon: UserPlus },
         { to: '/laporan', label: 'Laporan Bulanan', icon: FileText },
         { to: '/hari-libur', label: 'Hari Libur', icon: CalendarOff },
+        { to: '/kalender-pendidikan', label: 'Kalender Pendidikan', icon: CalendarRange },
         { to: '/backup', label: 'Backup Data', icon: DatabaseBackup },
-        // "Profil Sekolah" dan "Persetujuan Akun" hanya untuk admin utama / superadmin
+        // "Persetujuan Akun" dan "Profil Sekolah" hanya untuk admin utama / superadmin
         ...(isAdminUtama
           ? [
               { to: '/persetujuan-akun', label: 'Persetujuan Akun', icon: ShieldCheck },
@@ -107,26 +130,37 @@ function getGroupsAdmin(isAdminUtama) {
 }
 
 // Menu GURU: tetap ringkas, tidak perlu dikelompokkan
+// Kuitansi, Kuitansi Jasa & Nota Belanja SENGAJA TIDAK ada di sini — ketiga
+// fitur ini admin-only (lihat RLS policy nota_hanya_admin di Supabase).
 const linksGuru = [
   { to: '/', label: 'Dasbor', icon: LayoutDashboard, end: true },
   { to: '/profil-saya', label: 'Profil Saya', icon: UserCircle },
   { to: '/rapat', label: 'Rapat Video', icon: Video },
   { to: '/galeri', label: 'Galeri Kegiatan', icon: Images },
   { to: '/dokumen', label: 'Dokumen Penting', icon: HardDrive },
+  { to: '/scan-dokumen', label: 'Scan Dokumen', icon: ScanLine },
+  { to: '/keuangan-kelas', label: 'Keuangan Kelas', icon: PiggyBank },
   { to: '/siswa', label: 'Data Siswa', icon: Users },
   { to: '/presensi', label: 'Presensi', icon: ClipboardCheck },
   { to: '/nilai', label: 'Nilai Siswa', icon: BookOpenCheck },
+  { to: '/nilai-asesmen', label: 'Nilai Asesmen', icon: FileSpreadsheet },
   { to: '/rapor', label: 'Rapor Siswa', icon: FileBadge },
+  { to: '/ijazah', label: 'Ijazah', icon: ScrollText },
+  { to: '/skl', label: 'Surat Keterangan Lulus', icon: Stamp },
+  { to: '/portofolio-siswa', label: 'Portofolio Siswa', icon: FolderHeart },
   { to: '/rpp', label: 'RPP', icon: NotebookPen },
   { to: '/arsip-rpp', label: 'Arsip RPP', icon: Archive },
   { to: '/sertifikat', label: 'Sertifikat & Penghargaan', icon: Award },
   { to: '/pengajuan-surat-aktif', label: 'Pengajuan Surat Aktif', icon: FileCheck2 },
   { to: '/perbaikan-data-siswa', label: 'Perbaikan Data Siswa', icon: UserCog },
+  { to: '/pengajuan-kebutuhan-kelas', label: 'Kebutuhan Kelas', icon: PackagePlus },
   { to: '/buat-ujian', label: 'Buat Ujian', icon: FilePlus },
   { to: '/hasil-ujian', label: 'Hasil Ujian', icon: ClipboardList },
   { to: '/bank-soal', label: 'Bank Soal', icon: Database },
+  { to: '/buat-kuis-seru', label: 'Kuis Seru (Kls 1-3)', icon: Gamepad2 },
   { to: '/perpustakaan', label: 'Perpustakaan', icon: Library },
   { to: '/jadwal', label: 'Jadwal Pelajaran', icon: CalendarClock },
+  { to: '/kalender-pendidikan', label: 'Kalender Pendidikan', icon: CalendarRange },
   { to: '/agenda', label: 'Agenda Sekolah', icon: CalendarDays },
   { to: '/pengumuman', label: 'Pengumuman', icon: Megaphone },
 ]
@@ -159,6 +193,8 @@ function NavItem({ to, label, icon: Icon, end }) {
   )
 }
 
+// Ambil URL foto guru dari kolom foto_profil_path (isinya path storage,
+// bukan URL lengkap) di bucket "foto-profil".
 function getFotoUrl(fotoProfilPath) {
   if (!fotoProfilPath) return null
   if (fotoProfilPath.startsWith('http')) return fotoProfilPath
@@ -184,7 +220,11 @@ export default function Sidebar() {
   return (
     <aside className="w-64 shrink-0 bg-blue-950 text-white flex flex-col h-screen sticky top-0 border-r border-blue-900/50">
       <div className="relative overflow-hidden px-4 py-5 border-b border-white/10 bg-gradient-to-br from-blue-950 via-blue-900 to-indigo-900">
-        <svg className="absolute inset-0 w-full h-full opacity-[0.35] pointer-events-none" xmlns="http://www.w3.org/2000/svg">
+        {/* Motif batik dekoratif (senada dengan banner dashboard) */}
+        <svg
+          className="absolute inset-0 w-full h-full opacity-[0.35] pointer-events-none"
+          xmlns="http://www.w3.org/2000/svg"
+        >
           <defs>
             <pattern id="batikSidebar" width="46" height="46" patternUnits="userSpaceOnUse">
               <circle cx="23" cy="23" r="12" fill="none" stroke="#fbbf24" strokeWidth="1.4" />
@@ -198,7 +238,11 @@ export default function Sidebar() {
 
         <div className="relative flex items-center gap-3">
           {fotoUrl ? (
-            <img src={fotoUrl} alt={namaTampil} className="w-11 h-11 rounded-full object-cover shrink-0 border-2 border-white/20" />
+            <img
+              src={fotoUrl}
+              alt={namaTampil}
+              className="w-11 h-11 rounded-full object-cover shrink-0 border-2 border-white/20"
+            />
           ) : (
             <div className="w-11 h-11 rounded-full bg-gradient-to-br from-blue-500 to-indigo-400 flex items-center justify-center font-display font-bold text-white text-sm shrink-0 border-2 border-white/20">
               {getInisial(namaTampil)}
@@ -219,9 +263,19 @@ export default function Sidebar() {
       </div>
 
       <nav className="relative flex-1 overflow-y-auto py-4 px-3 bg-gradient-to-b from-blue-950 via-blue-900 to-indigo-950">
-        <svg className="absolute inset-0 w-full h-full opacity-[0.22] pointer-events-none" xmlns="http://www.w3.org/2000/svg">
+        {/* Motif batik area menu — gaya berbeda dari header (kawung/diamond, bukan lingkaran) */}
+        <svg
+          className="absolute inset-0 w-full h-full opacity-[0.22] pointer-events-none"
+          xmlns="http://www.w3.org/2000/svg"
+        >
           <defs>
-            <pattern id="batikMenu" width="36" height="36" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+            <pattern
+              id="batikMenu"
+              width="36"
+              height="36"
+              patternUnits="userSpaceOnUse"
+              patternTransform="rotate(45)"
+            >
               <rect x="12" y="0" width="12" height="12" fill="none" stroke="#fbbf24" strokeWidth="1.2" />
               <circle cx="18" cy="6" r="2.6" fill="#fbbf24" />
               <path d="M0 18 L18 0 M18 36 L36 18" stroke="#fbbf24" strokeWidth="1" />
@@ -231,28 +285,28 @@ export default function Sidebar() {
         </svg>
 
         <div className="relative">
-          {isAdmin ? (
-            groupsAdmin.map((group, i) => (
-              <div key={group.label ?? `top-${i}`} className={i > 0 ? 'mt-5' : ''}>
-                {group.label && (
-                  <p className="px-3 mb-1.5 text-[10px] font-semibold tracking-wider uppercase text-white/35">
-                    {group.label}
-                  </p>
-                )}
-                <div className="space-y-1">
-                  {group.links.map((link) => (
-                    <NavItem key={link.to} {...link} />
-                  ))}
-                </div>
+        {isAdmin ? (
+          groupsAdmin.map((group, i) => (
+            <div key={group.label ?? `top-${i}`} className={i > 0 ? 'mt-5' : ''}>
+              {group.label && (
+                <p className="px-3 mb-1.5 text-[10px] font-semibold tracking-wider uppercase text-white/35">
+                  {group.label}
+                </p>
+              )}
+              <div className="space-y-1">
+                {group.links.map((link) => (
+                  <NavItem key={link.to} {...link} />
+                ))}
               </div>
-            ))
-          ) : (
-            <div className="space-y-1">
-              {linksGuru.map((link) => (
-                <NavItem key={link.to} {...link} />
-              ))}
             </div>
-          )}
+          ))
+        ) : (
+          <div className="space-y-1">
+            {linksGuru.map((link) => (
+              <NavItem key={link.to} {...link} />
+            ))}
+          </div>
+        )}
         </div>
       </nav>
     </aside>
