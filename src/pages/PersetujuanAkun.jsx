@@ -1,16 +1,17 @@
 import { useEffect, useState } from 'react'
-import { CheckCircle2, XCircle, Clock3 } from 'lucide-react'
+import { CheckCircle2, XCircle, Clock3, X, UserCheck, UserPlus } from 'lucide-react'
 import { useAuth } from '../lib/AuthContext'
 import { supabase } from '../lib/supabaseClient'
 import Layout from '../components/Layout'
 
 export default function PersetujuanAkun() {
   const { isSuperAdmin, sekolahId } = useAuth()
-  const [tab, setTab] = useState('menunggu') // 'menunggu' | 'riwayat'
-  const [filterJabatan, setFilterJabatan] = useState('semua') // 'semua' | 'guru' | 'admin_kepsek'
+  const [tab, setTab] = useState('menunggu')
+  const [filterJabatan, setFilterJabatan] = useState('semua')
   const [daftarAkun, setDaftarAkun] = useState([])
   const [loading, setLoading] = useState(true)
   const [prosesId, setProsesId] = useState(null)
+  const [modalGuru, setModalGuru] = useState(null) // akun yang sedang diproses link guru-nya
 
   async function muatData() {
     setLoading(true)
@@ -23,13 +24,10 @@ export default function PersetujuanAkun() {
 
     query = tab === 'menunggu' ? query.eq('status_akun', 'menunggu') : query.neq('status_akun', 'menunggu')
 
-    // Admin utama hanya melihat pendaftar di sekolahnya sendiri; superadmin melihat semua sekolah.
     if (!isSuperAdmin) {
       query = query.eq('sekolah_id', sekolahId)
     }
 
-    // Filter jabatan: pisahkan pendaftar Guru dari pendaftar Admin/Kepala Sekolah.
-    // Pakai kolom 'jabatan' (label pilihan sendiri); fallback ke 'role' untuk data lama.
     if (filterJabatan === 'guru') {
       query = query.or('jabatan.eq.guru,and(jabatan.is.null,role.eq.guru)')
     } else if (filterJabatan === 'admin_kepsek') {
@@ -48,19 +46,31 @@ export default function PersetujuanAkun() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab, filterJabatan])
 
-  async function ubahStatus(id, statusBaru, catatan = '') {
+  async function ubahStatus(id, statusBaru, catatan = '', guruId = null) {
     setProsesId(id)
-    await supabase
-      .from('profil')
-      .update({ status_akun: statusBaru, catatan_admin: catatan || null })
-      .eq('id', id)
+    const payload = { status_akun: statusBaru, catatan_admin: catatan || null }
+    if (guruId) payload.guru_id = guruId
+    await supabase.from('profil').update(payload).eq('id', id)
     setProsesId(null)
+    setModalGuru(null)
     muatData()
   }
 
   function handleTolak(id) {
     const catatan = window.prompt('Catatan penolakan (opsional):') || ''
     ubahStatus(id, 'ditolak', catatan)
+  }
+
+  function isJabatanGuru(akun) {
+    return (akun.jabatan || akun.role) === 'guru'
+  }
+
+  function handleSetujui(akun) {
+    if (isJabatanGuru(akun)) {
+      setModalGuru(akun) // buka modal, jangan langsung ubah status
+    } else {
+      ubahStatus(akun.id, 'aktif')
+    }
   }
 
   return (
@@ -153,7 +163,7 @@ export default function PersetujuanAkun() {
                     <td className="px-4 py-3 text-right">
                       <div className="flex justify-end gap-2">
                         <button
-                          onClick={() => ubahStatus(akun.id, 'aktif')}
+                          onClick={() => handleSetujui(akun)}
                           disabled={prosesId === akun.id}
                           className="flex items-center gap-1 text-xs font-medium px-3 py-1.5 rounded-lg bg-green-50 text-green-600 hover:bg-green-100 disabled:opacity-60"
                         >
@@ -175,7 +185,156 @@ export default function PersetujuanAkun() {
           </table>
         )}
       </div>
+
+      {modalGuru && (
+        <ModalHubungkanGuru
+          akun={modalGuru}
+          onClose={() => setModalGuru(null)}
+          onSelesai={(guruId) => ubahStatus(modalGuru.id, 'aktif', '', guruId)}
+        />
+      )}
     </Layout>
+  )
+}
+
+function ModalHubungkanGuru({ akun, onClose, onSelesai }) {
+  const [daftarGuru, setDaftarGuru] = useState([])
+  const [guruIdTerpilih, setGuruIdTerpilih] = useState('')
+  const [loading, setLoading] = useState(true)
+  const [memproses, setMemproses] = useState(false)
+  const [mode, setMode] = useState('pilih') // 'pilih' | 'baru'
+
+  useEffect(() => {
+    async function muat() {
+      // Guru di sekolah yang sama, yang BELUM terhubung ke akun profil manapun
+      const { data: sudahTerhubung } = await supabase
+        .from('profil')
+        .select('guru_id')
+        .not('guru_id', 'is', null)
+
+      const idTerpakai = (sudahTerhubung || []).map((p) => p.guru_id)
+
+      let query = supabase
+        .from('guru')
+        .select('id, nama_lengkap, nip, mata_pelajaran')
+        .eq('sekolah_id', akun.sekolah_id)
+        .order('nama_lengkap')
+
+      const { data } = await query
+      const belumTerhubung = (data || []).filter((g) => !idTerpakai.includes(g.id))
+      setDaftarGuru(belumTerhubung)
+      setLoading(false)
+    }
+    muat()
+  }, [akun.sekolah_id])
+
+  async function handleHubungkan() {
+    if (!guruIdTerpilih) return
+    setMemproses(true)
+    onSelesai(guruIdTerpilih)
+  }
+
+  async function handleBuatBaru() {
+    setMemproses(true)
+    const { data: guruBaru, error } = await supabase
+      .from('guru')
+      .insert({
+        nama_lengkap: akun.nama_lengkap_pendaftar,
+        email: akun.email_pendaftar,
+        sekolah_id: akun.sekolah_id,
+        status: 'aktif',
+      })
+      .select('id')
+      .single()
+
+    setMemproses(false)
+    if (error) {
+      window.alert('Gagal membuat data guru baru: ' + error.message)
+      return
+    }
+    onSelesai(guruBaru.id)
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center px-4 z-50">
+      <div className="bg-white rounded-2xl max-w-md w-full p-5">
+        <div className="flex items-center justify-between mb-1">
+          <h2 className="font-semibold text-slate-800">Hubungkan Akun Guru</h2>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600">
+            <X size={18} />
+          </button>
+        </div>
+        <p className="text-xs text-slate-500 mb-4">
+          {akun.nama_lengkap_pendaftar} ({akun.email_pendaftar}) perlu dihubungkan ke data Guru
+          supaya muncul di Jadwal, Presensi, Nilai, dan fitur lain.
+        </p>
+
+        <div className="flex gap-2 p-1 bg-slate-100 rounded-lg mb-4">
+          <button
+            onClick={() => setMode('pilih')}
+            className={`flex-1 flex items-center justify-center gap-1.5 text-xs font-medium py-2 rounded-md transition-colors ${
+              mode === 'pilih' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-500'
+            }`}
+          >
+            <UserCheck size={14} /> Data Sudah Ada
+          </button>
+          <button
+            onClick={() => setMode('baru')}
+            className={`flex-1 flex items-center justify-center gap-1.5 text-xs font-medium py-2 rounded-md transition-colors ${
+              mode === 'baru' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-500'
+            }`}
+          >
+            <UserPlus size={14} /> Buat Baru
+          </button>
+        </div>
+
+        {mode === 'pilih' ? (
+          <>
+            {loading ? (
+              <p className="text-sm text-slate-400 text-center py-4">Memuat data guru...</p>
+            ) : daftarGuru.length === 0 ? (
+              <p className="text-sm text-slate-400 text-center py-4">
+                Tidak ada data guru yang belum terhubung di sekolah ini. Gunakan tab "Buat Baru".
+              </p>
+            ) : (
+              <select
+                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm mb-4"
+                value={guruIdTerpilih}
+                onChange={(e) => setGuruIdTerpilih(e.target.value)}
+              >
+                <option value="">-- Pilih Data Guru --</option>
+                {daftarGuru.map((g) => (
+                  <option key={g.id} value={g.id}>
+                    {g.nama_lengkap} {g.nip ? `(NIP: ${g.nip})` : ''} {g.mata_pelajaran ? `- ${g.mata_pelajaran}` : ''}
+                  </option>
+                ))}
+              </select>
+            )}
+            <button
+              onClick={handleHubungkan}
+              disabled={!guruIdTerpilih || memproses}
+              className="w-full bg-blue-600 text-white text-sm font-medium py-2.5 rounded-lg disabled:opacity-50"
+            >
+              {memproses ? 'Memproses...' : 'Hubungkan & Setujui'}
+            </button>
+          </>
+        ) : (
+          <>
+            <p className="text-xs text-slate-500 mb-4">
+              Data guru baru akan dibuat otomatis dari nama & email pendaftaran. Lengkapi NIP, mata
+              pelajaran, dll nanti di halaman Data Guru.
+            </p>
+            <button
+              onClick={handleBuatBaru}
+              disabled={memproses}
+              className="w-full bg-blue-600 text-white text-sm font-medium py-2.5 rounded-lg disabled:opacity-50"
+            >
+              {memproses ? 'Memproses...' : 'Buat Data Guru Baru & Setujui'}
+            </button>
+          </>
+        )}
+      </div>
+    </div>
   )
 }
 
@@ -194,9 +353,6 @@ function StatusBadge({ status }) {
   )
 }
 
-// Label & warna Jabatan supaya admin langsung paham peran pendaftar saat verifikasi.
-// Pakai kolom 'jabatan' (label pilihan sendiri saat daftar); kalau kosong
-// (data lama sebelum kolom ini ada), fallback ke 'role'.
 function JabatanBadge({ jabatan, role }) {
   const map = {
     guru: { label: 'Guru', cls: 'bg-blue-50 text-blue-600' },
