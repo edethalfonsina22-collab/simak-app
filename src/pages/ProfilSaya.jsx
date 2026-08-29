@@ -3,15 +3,111 @@ import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../lib/AuthContext'
 import Layout from '../components/Layout'
 import GrafikAktivitas from '../components/GrafikAktivitas'
-import { Camera, Loader2, Save, Users, School } from 'lucide-react'
+import { Camera, Loader2, Save, Users, School, ShieldCheck } from 'lucide-react'
 // ASUMSI: menggunakan library `react-barcode` untuk membuat kode batang (linear barcode) di sisi klien.
 // Install dulu kalau belum ada: npm install react-barcode
 import Barcode from 'react-barcode'
 // Menggunakan library `qrcode` (sudah ada di package.json) untuk membuat QR code sebagai data URL PNG.
 import QRCode from 'qrcode'
 
+const LABEL_JABATAN = {
+  admin: 'Admin',
+  kepala_sekolah: 'Kepala Sekolah',
+  guru: 'Guru',
+}
+
+// Kartu profil ringkas untuk akun yang tidak tertaut ke tabel `guru` (admin / kepala sekolah).
+// Bukan guru, jadi tidak butuh mata pelajaran, NUPTK, kelas asuh, dsb — cuma data diri dasar
+// dari tabel `profil` yang sudah diisi saat pendaftaran.
+function ProfilAdminCard({ profil, userId }) {
+  const [form, setForm] = useState({
+    nama_lengkap_pendaftar: profil?.nama_lengkap_pendaftar || '',
+    email_pendaftar: profil?.email_pendaftar || '',
+  })
+  const [saving, setSaving] = useState(false)
+  const [savedAt, setSavedAt] = useState(null)
+
+  async function handleSave(e) {
+    e.preventDefault()
+    setSaving(true)
+    const { error } = await supabase
+      .from('profil')
+      .update({
+        nama_lengkap_pendaftar: form.nama_lengkap_pendaftar,
+        email_pendaftar: form.email_pendaftar,
+      })
+      .eq('id', userId)
+
+    if (error) {
+      alert('Gagal menyimpan: ' + error.message)
+    } else {
+      setSavedAt(new Date())
+    }
+    setSaving(false)
+  }
+
+  const labelJabatan = LABEL_JABATAN[profil?.jabatan] || profil?.jabatan || 'Admin'
+
+  return (
+    <form onSubmit={handleSave} className="max-w-2xl space-y-5">
+      <div className="relative overflow-hidden rounded-xl p-6 flex items-center gap-5 bg-gradient-to-br from-blue-900 to-blue-950">
+        <div className="absolute -top-10 -right-10 w-40 h-40 rounded-full bg-white/5 pointer-events-none" />
+        <div className="relative w-16 h-16 rounded-full bg-white/10 ring-2 ring-white/20 flex items-center justify-center shrink-0">
+          <ShieldCheck size={26} className="text-white/80" />
+        </div>
+        <div className="relative min-w-0">
+          <p className="font-display font-semibold text-lg text-white truncate">
+            {form.nama_lengkap_pendaftar || 'Nama belum diisi'}
+          </p>
+          <p className="text-sm text-blue-200/70">{labelJabatan}</p>
+        </div>
+      </div>
+
+      <div className="card relative overflow-hidden p-6 space-y-4">
+        <span className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-900 to-brass-400" />
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label className="text-xs text-ink-700/60 mb-1 block">Nama Lengkap</label>
+            <input
+              className="input w-full"
+              value={form.nama_lengkap_pendaftar}
+              onChange={(e) => setForm({ ...form, nama_lengkap_pendaftar: e.target.value })}
+              required
+            />
+          </div>
+          <div>
+            <label className="text-xs text-ink-700/60 mb-1 block">Email</label>
+            <input
+              className="input w-full"
+              type="email"
+              value={form.email_pendaftar}
+              onChange={(e) => setForm({ ...form, email_pendaftar: e.target.value })}
+            />
+          </div>
+          <div>
+            <label className="text-xs text-ink-700/60 mb-1 block">Jabatan</label>
+            <input className="input w-full" value={labelJabatan} disabled />
+          </div>
+        </div>
+
+        <div className="flex items-center gap-3 pt-2">
+          <button
+            type="submit"
+            disabled={saving}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-brass-400 text-ink-950 text-sm font-medium disabled:opacity-50"
+          >
+            {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+            {saving ? 'Menyimpan...' : 'Simpan'}
+          </button>
+          {savedAt && <span className="text-xs text-sage-500">Tersimpan</span>}
+        </div>
+      </div>
+    </form>
+  )
+}
+
 export default function ProfilSaya() {
-  const { profil } = useAuth()
+  const { profil, session } = useAuth()
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -171,12 +267,34 @@ export default function ProfilSaya() {
     )
   }
 
-  if (!profil?.guru_id || !data) {
+  // Akun tanpa guru_id: kalau role-nya admin (termasuk kepala sekolah), ini memang
+  // wajar — dia bukan baris di tabel `guru`. Tampilkan kartu profil ringkas, bukan
+  // pesan yang menyuruh menautkan ke data guru (yang tidak relevan untuk mereka).
+  if (!profil?.guru_id) {
+    if (profil?.role === 'admin') {
+      return (
+        <Layout title="Profil Saya" subtitle="Data diri dan foto profil Anda">
+          <ProfilAdminCard profil={profil} userId={session?.user?.id} />
+        </Layout>
+      )
+    }
     return (
       <Layout title="Profil Saya" subtitle="Data diri dan foto profil Anda">
         <div className="card p-6">
           <p className="text-sm text-ink-700/60">
             Akun Anda belum terhubung ke data guru. Hubungi admin untuk menautkan akun ini ke salah satu data guru.
+          </p>
+        </div>
+      </Layout>
+    )
+  }
+
+  if (!data) {
+    return (
+      <Layout title="Profil Saya" subtitle="Data diri dan foto profil Anda">
+        <div className="card p-6">
+          <p className="text-sm text-ink-700/60">
+            Data guru untuk akun ini tidak ditemukan. Hubungi admin untuk memeriksa tautan akun.
           </p>
         </div>
       </Layout>
