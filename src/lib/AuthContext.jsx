@@ -20,7 +20,7 @@ export function AuthProvider({ children }) {
       .maybeSingle()
 
     // Kalau belum ada baris profil, anggap 'guru' tanpa akses khusus & otomatis dianggap aktif
-    const profilDasar = data || { role: 'guru', jabatan: 'guru', guru_id: null, sekolah_id: null, status_akun: 'disetujui' }
+    const profilDasar = data || { role: 'guru', jabatan: 'guru', guru_id: null, sekolah_id: null, status_akun: 'aktif' }
 
     // Ambil nama & foto dari tabel guru (dipakai di Sidebar untuk avatar)
     if (profilDasar.guru_id) {
