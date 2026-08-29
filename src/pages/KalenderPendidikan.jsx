@@ -177,7 +177,7 @@ export default function KalenderPendidikan() {
             {/* Grid kalender */}
             <div className="grid grid-cols-7 gap-1.5">
               {NAMA_HARI.map((h) => (
-                <div key={h} className="text-center text-xs font-semibold text-slate-400 py-1">
+                <div key={h} className="text-center text-xs font-display font-bold uppercase tracking-wide text-slate-400 py-1">
                   {h}
                 </div>
               ))}
@@ -189,14 +189,20 @@ export default function KalenderPendidikan() {
                     key={cell.iso}
                     onClick={() => isAdmin && setEditingDate(cell.iso)}
                     title={cell.status ? cell.status.keterangan : 'Hari sekolah'}
-                    className={`min-h-[60px] rounded-lg border flex flex-col items-center justify-center gap-0.5 text-xs transition-colors ${
+                    className={`min-h-[72px] rounded-lg border flex flex-col items-center justify-center gap-1 transition-colors ${
                       cell.status
                         ? `${KETERANGAN[cell.status.kode]?.badge || 'bg-slate-200 text-slate-700'} border-transparent`
                         : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
                     } ${isAdmin ? 'cursor-pointer' : 'cursor-default'}`}
                   >
-                    <span className="font-semibold">{cell.tanggal}</span>
-                    {cell.status && <span className="text-[10px] opacity-90">{cell.status.kode}</span>}
+                    <span className="font-display font-extrabold text-2xl leading-none tracking-tight">
+                      {cell.tanggal}
+                    </span>
+                    {cell.status && (
+                      <span className="font-display font-bold text-[11px] uppercase tracking-wide leading-none px-1.5 py-0.5 rounded bg-black/10">
+                        {cell.status.kode}
+                      </span>
+                    )}
                   </button>
                 )
               )}
