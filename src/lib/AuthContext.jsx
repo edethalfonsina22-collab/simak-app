@@ -6,7 +6,7 @@ const AuthContext = createContext(null)
 export function AuthProvider({ children }) {
   const [session, setSession] = useState(undefined) // undefined = belum dicek, null = tidak login
   const [profil, setProfil] = useState(undefined)
-  // profil: { role: 'guru'|'admin'|'admin_utama'|'superadmin', guru_id, sekolah_id, status_akun, nama_lengkap, foto_profil_path } | null
+  // profil: { role: 'guru'|'admin'|'kepala_sekolah'|'admin_utama'|'superadmin', guru_id, sekolah_id, status_akun, nama_lengkap, foto_profil_path } | null
 
   async function loadProfil(userId) {
     if (!userId) {
@@ -59,7 +59,7 @@ export function AuthProvider({ children }) {
   // Registrasi akun baru — dua mode:
   //  - mode 'baru'   : user membuat sekolah baru, langsung jadi admin_utama & status disetujui otomatis
   //  - mode 'gabung' : user bergabung ke sekolah yang sudah ada, jadi admin biasa & menunggu persetujuan
-  async function daftar({ mode, email, password, namaLengkap, namaSekolah, sekolahId }) {
+  async function daftar({ mode, email, password, namaLengkap, namaSekolah, sekolahId, jabatan }) {
     const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
       email,
       password,
@@ -72,7 +72,9 @@ export function AuthProvider({ children }) {
     }
 
     let targetSekolahId = sekolahId
-    let role = 'admin'
+    // Untuk mode 'gabung', jabatan dipilih sendiri oleh pendaftar saat mengisi form
+    // ('guru' | 'admin' | 'kepala_sekolah'). Default ke 'guru' kalau tidak diisi.
+    let role = jabatan || 'guru'
     let statusAkunBaru = 'menunggu'
 
     if (mode === 'baru') {
@@ -101,7 +103,7 @@ export function AuthProvider({ children }) {
     return { error: null }
   }
 
-  const isAdmin = ['admin', 'admin_utama', 'superadmin'].includes(profil?.role)
+  const isAdmin = ['admin', 'admin_utama', 'superadmin', 'kepala_sekolah'].includes(profil?.role)
   const isAdminUtama = profil?.role === 'admin_utama' || profil?.role === 'superadmin'
   const isSuperAdmin = profil?.role === 'superadmin'
 
