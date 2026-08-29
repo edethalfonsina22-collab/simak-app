@@ -28,17 +28,38 @@ export default function Register() {
   }, [])
 
   if (session) return <Navigate to="/" replace />
+
+  // Background dipakai di kedua state (sukses maupun form)
+  const Background = () => (
+    <div className="absolute inset-0 overflow-hidden">
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_15%,#1e3a8a_0%,transparent_45%),radial-gradient(circle_at_85%_80%,#1d4ed8_0%,transparent_50%),linear-gradient(160deg,#05061a_0%,#0a0f2e_45%,#0d1440_100%)]" />
+      <svg className="absolute inset-0 w-full h-full opacity-20" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <pattern id="grid" width="46" height="46" patternUnits="userSpaceOnUse">
+            <path d="M 46 0 L 0 0 0 46" fill="none" stroke="#3b82f6" strokeWidth="0.5" />
+          </pattern>
+        </defs>
+        <rect width="100%" height="100%" fill="url(#grid)" />
+      </svg>
+      <div className="absolute -top-24 -left-24 w-72 h-72 rounded-full bg-blue-600/20 blur-3xl" />
+      <div className="absolute -bottom-24 -right-16 w-80 h-80 rounded-full bg-cyan-500/10 blur-3xl" />
+    </div>
+  )
+
   if (sukses) {
     return (
-      <div className="min-h-screen flex items-center justify-center px-4">
-        <div className="max-w-sm w-full text-center bg-white p-6 rounded-2xl border border-slate-200">
-          <CheckCircle2 className="mx-auto text-green-500 mb-3" size={40} />
-          <h1 className="text-lg font-semibold text-slate-800">Pendaftaran Berhasil</h1>
-          <p className="text-sm text-slate-500 mt-2">
+      <div className="relative min-h-screen flex items-center justify-center px-4">
+        <Background />
+        <div className="relative max-w-sm w-full text-center bg-slate-900/70 backdrop-blur-xl p-7 rounded-2xl border border-blue-400/30 shadow-[0_0_40px_-10px_rgba(59,130,246,0.35)]">
+          <div className="mx-auto mb-3 w-14 h-14 rounded-full border border-emerald-400/40 flex items-center justify-center bg-emerald-400/10">
+            <CheckCircle2 className="text-emerald-400" size={28} />
+          </div>
+          <h1 className="text-lg font-semibold text-white tracking-wide">Pendaftaran Berhasil</h1>
+          <p className="text-sm text-blue-200/70 mt-2">
             Akun Anda sudah dibuat dan sedang menunggu persetujuan admin sekolah. Anda akan bisa login
             setelah disetujui.
           </p>
-          <Link to="/login" className="inline-block mt-4 text-sm font-medium text-blue-600">
+          <Link to="/login" className="inline-block mt-4 text-sm font-medium text-blue-400 hover:text-blue-300">
             Kembali ke halaman Masuk
           </Link>
         </div>
@@ -111,69 +132,84 @@ export default function Register() {
     setSukses(true)
   }
 
+  const inputClass =
+    'w-full bg-slate-900/60 border border-blue-500/25 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-500 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-500/20'
+  const labelClass = 'text-xs font-medium text-blue-200/70 mb-1 block tracking-wide'
+
   return (
-    <div className="min-h-screen flex items-center justify-center px-4 bg-slate-50">
-      <form onSubmit={handleSubmit} className="w-full max-w-sm bg-white p-6 rounded-2xl border border-slate-200 space-y-4">
+    <div className="relative min-h-screen flex items-center justify-center px-4">
+      <Background />
+
+      <form
+        onSubmit={handleSubmit}
+        className="relative w-full max-w-sm bg-slate-900/70 backdrop-blur-xl p-7 rounded-2xl border border-blue-400/30 shadow-[0_0_40px_-10px_rgba(59,130,246,0.35)] space-y-4"
+      >
         <div className="text-center mb-2">
-          <UserPlus className="mx-auto text-blue-600 mb-2" size={28} />
-          <h1 className="text-lg font-semibold text-slate-800">Daftar Akun</h1>
-          <p className="text-xs text-slate-500 mt-1">Akun akan aktif setelah disetujui admin sekolah.</p>
+          <div className="mx-auto mb-3 w-14 h-14 rounded-full border border-blue-400/40 flex items-center justify-center bg-blue-400/10 shadow-[0_0_20px_-4px_rgba(96,165,250,0.6)]">
+            <UserPlus className="text-blue-300" size={24} />
+          </div>
+          <h1 className="text-xl font-bold text-white tracking-widest uppercase">Daftar Akun</h1>
+          <p className="text-xs text-blue-200/60 mt-1">Akun akan aktif setelah disetujui admin sekolah.</p>
         </div>
 
         <div>
-          <label className="text-xs font-medium text-slate-600 mb-1 block">Nama Lengkap</label>
-          <input required className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm"
+          <label className={labelClass}>Nama Lengkap</label>
+          <input required className={inputClass}
             value={form.nama} onChange={(e) => ubah('nama', e.target.value)} />
         </div>
 
         <div>
-          <label className="text-xs font-medium text-slate-600 mb-1 block">Jabatan</label>
-          <select className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm"
+          <label className={labelClass}>Jabatan</label>
+          <select className={inputClass}
             value={form.jabatan} onChange={(e) => ubah('jabatan', e.target.value)}>
-            <option value="guru">Guru</option>
-            <option value="admin">Admin</option>
-            <option value="kepala_sekolah">Kepala Sekolah</option>
+            <option value="guru" className="bg-slate-900">Guru</option>
+            <option value="admin" className="bg-slate-900">Admin</option>
+            <option value="kepala_sekolah" className="bg-slate-900">Kepala Sekolah</option>
           </select>
         </div>
 
         <div>
-          <label className="text-xs font-medium text-slate-600 mb-1 block">Sekolah</label>
-          <select required className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm"
+          <label className={labelClass}>Sekolah</label>
+          <select required className={inputClass}
             value={form.sekolahId} onChange={(e) => ubah('sekolahId', e.target.value)}>
-            <option value="">-- Pilih Sekolah --</option>
+            <option value="" className="bg-slate-900">-- Pilih Sekolah --</option>
             {daftarSekolah.map((s) => (
-              <option key={s.id} value={s.id}>{s.nama_sekolah}</option>
+              <option key={s.id} value={s.id} className="bg-slate-900">{s.nama_sekolah}</option>
             ))}
           </select>
         </div>
 
         <div>
-          <label className="text-xs font-medium text-slate-600 mb-1 block">Email</label>
-          <input type="email" required className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm"
+          <label className={labelClass}>Email</label>
+          <input type="email" required className={inputClass}
             value={form.email} onChange={(e) => ubah('email', e.target.value)} />
         </div>
 
         <div>
-          <label className="text-xs font-medium text-slate-600 mb-1 block">Kata Sandi</label>
-          <input type="password" required className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm"
+          <label className={labelClass}>Kata Sandi</label>
+          <input type="password" required className={inputClass}
             value={form.password} onChange={(e) => ubah('password', e.target.value)} />
         </div>
 
         <div>
-          <label className="text-xs font-medium text-slate-600 mb-1 block">Konfirmasi Kata Sandi</label>
-          <input type="password" required className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm"
+          <label className={labelClass}>Konfirmasi Kata Sandi</label>
+          <input type="password" required className={inputClass}
             value={form.konfirmasi} onChange={(e) => ubah('konfirmasi', e.target.value)} />
         </div>
 
-        {error && <p className="text-sm text-red-500">{error}</p>}
+        {error && (
+          <p className="text-sm text-red-300 bg-red-500/10 border border-red-500/30 rounded-lg px-3 py-2">
+            {error}
+          </p>
+        )}
 
         <button type="submit" disabled={loading}
-          className="w-full flex items-center justify-center gap-2 bg-blue-600 text-white font-medium py-2.5 rounded-lg disabled:opacity-60">
+          className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-blue-600 to-blue-400 text-white font-medium py-2.5 rounded-lg shadow-[0_0_25px_-6px_rgba(59,130,246,0.7)] hover:brightness-110 transition disabled:opacity-60">
           {loading ? <Loader2 size={16} className="animate-spin" /> : 'Daftar'}
         </button>
 
-        <p className="text-center text-xs text-slate-500">
-          Sudah punya akun? <Link to="/login" className="text-blue-600 font-medium">Masuk</Link>
+        <p className="text-center text-xs text-blue-200/60">
+          Sudah punya akun? <Link to="/login" className="text-blue-400 font-medium hover:text-blue-300">Masuk</Link>
         </p>
       </form>
     </div>
