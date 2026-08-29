@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { Navigate } from 'react-router-dom'
 import { useAuth } from '../lib/AuthContext'
 import { supabase } from '../lib/supabaseClient'
-import { Loader2, LogIn } from 'lucide-react'
+import { Loader2, LogIn, UserPlus } from 'lucide-react'
 
 // Latar belakang animasi "hujan kode" ala Matrix — digambar langsung via canvas,
 // jadi tidak perlu file gambar/video terpisah dan hurufnya benar-benar bergerak.
@@ -27,27 +27,21 @@ function MatrixRainBackground() {
     }
 
     function draw() {
-      // Jejak transparan agar karakter lama memudar perlahan (efek trail)
       ctx.fillStyle = 'rgba(3, 10, 8, 0.10)'
       ctx.fillRect(0, 0, canvas.width, canvas.height)
-
       ctx.font = `${fontSize}px monospace`
 
       for (let i = 0; i < colCount; i++) {
         const char = chars[Math.floor(Math.random() * chars.length)]
         const x = i * fontSize
         const y = columns[i] * fontSize
-
-        // Karakter paling depan lebih terang, sisanya redup — nuansa hijau khas
         ctx.fillStyle = Math.random() > 0.975 ? '#c8fff2' : 'rgba(94, 234, 212, 0.55)'
         ctx.fillText(char, x, y)
-
         if (y > canvas.height && Math.random() > 0.975) {
           columns[i] = 0
         }
         columns[i] += 0.6
       }
-
       animationId = requestAnimationFrame(draw)
     }
 
@@ -65,17 +59,33 @@ function MatrixRainBackground() {
 }
 
 export default function Login() {
-  const { session, signIn } = useAuth()
+  const { session, signIn, daftar } = useAuth()
+  const [tab, setTab] = useState('masuk') // 'masuk' | 'daftar'
+
+  // --- state form Masuk ---
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
-  const [mounted, setMounted] = useState(false)
   const [shake, setShake] = useState(0)
+
+  // --- state form Daftar ---
+  const [modeDaftar, setModeDaftar] = useState('baru') // 'baru' | 'gabung'
+  const [namaLengkap, setNamaLengkap] = useState('')
+  const [emailDaftar, setEmailDaftar] = useState('')
+  const [passwordDaftar, setPasswordDaftar] = useState('')
+  const [konfirmasiPassword, setKonfirmasiPassword] = useState('')
+  const [namaSekolahBaru, setNamaSekolahBaru] = useState('')
+  const [daftarSekolah, setDaftarSekolah] = useState([])
+  const [sekolahDipilih, setSekolahDipilih] = useState('')
+  const [errorDaftar, setErrorDaftar] = useState('')
+  const [suksesDaftar, setSuksesDaftar] = useState('')
+  const [loadingDaftar, setLoadingDaftar] = useState(false)
+
+  const [mounted, setMounted] = useState(false)
   const [namaSekolah, setNamaSekolah] = useState('SD Negeri Waria')
 
   useEffect(() => {
-    // Memicu animasi masuk sesaat setelah komponen ter-render
     const t = requestAnimationFrame(() => setMounted(true))
     return () => cancelAnimationFrame(t)
   }, [])
@@ -91,6 +101,18 @@ export default function Login() {
       })
   }, [])
 
+  // Ambil daftar sekolah yang sudah ada, untuk pilihan "gabung ke sekolah"
+  useEffect(() => {
+    if (tab !== 'daftar' || modeDaftar !== 'gabung') return
+    supabase
+      .from('sekolah')
+      .select('id, nama_sekolah')
+      .order('nama_sekolah', { ascending: true })
+      .then(({ data }) => {
+        if (data) setDaftarSekolah(data)
+      })
+  }, [tab, modeDaftar])
+
   if (session) return <Navigate to="/" replace />
 
   async function handleSubmit(e) {
@@ -101,8 +123,62 @@ export default function Login() {
     setLoading(false)
     if (error) {
       setError('Email atau kata sandi salah. Silakan coba lagi.')
-      setShake((s) => s + 1) // ganti key supaya animasi shake bisa diulang
+      setShake((s) => s + 1)
     }
+  }
+
+  async function handleDaftar(e) {
+    e.preventDefault()
+    setErrorDaftar('')
+    setSuksesDaftar('')
+
+    if (passwordDaftar !== konfirmasiPassword) {
+      setErrorDaftar('Konfirmasi kata sandi tidak cocok.')
+      return
+    }
+    if (passwordDaftar.length < 6) {
+      setErrorDaftar('Kata sandi minimal 6 karakter.')
+      return
+    }
+    if (modeDaftar === 'baru' && !namaSekolahBaru.trim()) {
+      setErrorDaftar('Nama sekolah wajib diisi.')
+      return
+    }
+    if (modeDaftar === 'gabung' && !sekolahDipilih) {
+      setErrorDaftar('Silakan pilih sekolah yang ingin diikuti.')
+      return
+    }
+
+    setLoadingDaftar(true)
+    const { error } = await daftar({
+      mode: modeDaftar,
+      email: emailDaftar,
+      password: passwordDaftar,
+      namaLengkap,
+      namaSekolah: namaSekolahBaru,
+      sekolahId: sekolahDipilih,
+    })
+    setLoadingDaftar(false)
+
+    if (error) {
+      setErrorDaftar(error.message || 'Pendaftaran gagal, silakan coba lagi.')
+      return
+    }
+
+    if (modeDaftar === 'baru') {
+      setSuksesDaftar('Sekolah dan akun admin utama berhasil dibuat! Silakan masuk.')
+    } else {
+      setSuksesDaftar('Pendaftaran berhasil! Akun Anda menunggu persetujuan admin sekolah.')
+    }
+
+    // reset form & alihkan ke tab masuk
+    setNamaLengkap('')
+    setEmailDaftar('')
+    setPasswordDaftar('')
+    setKonfirmasiPassword('')
+    setNamaSekolahBaru('')
+    setSekolahDipilih('')
+    setTimeout(() => setTab('masuk'), 1800)
   }
 
   return (
@@ -117,7 +193,6 @@ export default function Login() {
           }`}
         >
           <div className="relative w-12 h-12 mx-auto mb-4">
-            {/* Cincin cahaya teal di belakang logo, berdenyut pelan — senada dengan loader */}
             <div className="login-badge-glow absolute inset-0 rounded-xl" />
             <div className="login-badge relative w-12 h-12 rounded-xl flex items-center justify-center font-bold text-xl">
               S
@@ -132,73 +207,209 @@ export default function Login() {
           )}
         </div>
 
-        <form
-          onSubmit={handleSubmit}
-          className={`login-card p-6 space-y-4 transition-all duration-700 ease-out delay-150 ${
-            mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
+        {/* Tab Masuk / Daftar */}
+        <div
+          className={`login-tabs flex mb-4 transition-all duration-500 ease-out delay-150 ${
+            mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2'
           }`}
         >
-          <div
-            className={`transition-all duration-500 ease-out delay-300 ${
-              mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2'
-            }`}
-          >
-            <label className="login-eyebrow mb-1.5 block">Email</label>
-            <input
-              type="email"
-              required
-              className="login-field w-full transition-shadow duration-200"
-              placeholder="kepsek@sekolah.sch.id"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-            />
-          </div>
-          <div
-            className={`transition-all duration-500 ease-out delay-[400ms] ${
-              mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2'
-            }`}
-          >
-            <label className="login-eyebrow mb-1.5 block">Kata Sandi</label>
-            <input
-              type="password"
-              required
-              className="login-field w-full transition-shadow duration-200"
-              placeholder="••••••••"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-            />
-          </div>
-
-          {error && (
-            <p
-              key={shake}
-              className="login-error text-sm animate-[shake_0.4s_ease-in-out]"
-            >
-              {error}
-            </p>
-          )}
-
           <button
-            type="submit"
-            disabled={loading}
-            className="login-btn w-full transition-transform duration-150 active:scale-[0.98] hover:scale-[1.01]"
+            type="button"
+            onClick={() => setTab('masuk')}
+            className={`login-tab flex-1 ${tab === 'masuk' ? 'login-tab-active' : ''}`}
           >
-            {loading ? <Loader2 size={16} className="animate-spin" /> : <LogIn size={16} />}
             Masuk
           </button>
-        </form>
+          <button
+            type="button"
+            onClick={() => setTab('daftar')}
+            className={`login-tab flex-1 ${tab === 'daftar' ? 'login-tab-active' : ''}`}
+          >
+            Daftar
+          </button>
+        </div>
+
+        {tab === 'masuk' ? (
+          <form
+            onSubmit={handleSubmit}
+            className={`login-card p-6 space-y-4 transition-all duration-700 ease-out delay-150 ${
+              mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
+            }`}
+          >
+            <div>
+              <label className="login-eyebrow mb-1.5 block">Email</label>
+              <input
+                type="email"
+                required
+                className="login-field w-full transition-shadow duration-200"
+                placeholder="kepsek@sekolah.sch.id"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="login-eyebrow mb-1.5 block">Kata Sandi</label>
+              <input
+                type="password"
+                required
+                className="login-field w-full transition-shadow duration-200"
+                placeholder="••••••••"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+              />
+            </div>
+
+            {error && (
+              <p key={shake} className="login-error text-sm animate-[shake_0.4s_ease-in-out]">
+                {error}
+              </p>
+            )}
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="login-btn w-full transition-transform duration-150 active:scale-[0.98] hover:scale-[1.01]"
+            >
+              {loading ? <Loader2 size={16} className="animate-spin" /> : <LogIn size={16} />}
+              Masuk
+            </button>
+          </form>
+        ) : (
+          <form
+            onSubmit={handleDaftar}
+            className={`login-card p-6 space-y-4 transition-all duration-700 ease-out delay-150 ${
+              mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
+            }`}
+          >
+            <div>
+              <label className="login-eyebrow mb-1.5 block">Nama Lengkap</label>
+              <input
+                type="text"
+                required
+                className="login-field w-full"
+                placeholder="Nama Anda"
+                value={namaLengkap}
+                onChange={(e) => setNamaLengkap(e.target.value)}
+              />
+            </div>
+
+            <div>
+              <label className="login-eyebrow mb-1.5 block">Email</label>
+              <input
+                type="email"
+                required
+                className="login-field w-full"
+                placeholder="nama@email.com"
+                value={emailDaftar}
+                onChange={(e) => setEmailDaftar(e.target.value)}
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="login-eyebrow mb-1.5 block">Kata Sandi</label>
+                <input
+                  type="password"
+                  required
+                  className="login-field w-full"
+                  placeholder="••••••••"
+                  value={passwordDaftar}
+                  onChange={(e) => setPasswordDaftar(e.target.value)}
+                />
+              </div>
+              <div>
+                <label className="login-eyebrow mb-1.5 block">Konfirmasi</label>
+                <input
+                  type="password"
+                  required
+                  className="login-field w-full"
+                  placeholder="••••••••"
+                  value={konfirmasiPassword}
+                  onChange={(e) => setKonfirmasiPassword(e.target.value)}
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="login-eyebrow mb-1.5 block">Jenis Pendaftaran</label>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setModeDaftar('baru')}
+                  className={`login-tab flex-1 !py-2 ${modeDaftar === 'baru' ? 'login-tab-active' : ''}`}
+                >
+                  Sekolah Baru
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setModeDaftar('gabung')}
+                  className={`login-tab flex-1 !py-2 ${modeDaftar === 'gabung' ? 'login-tab-active' : ''}`}
+                >
+                  Gabung Sekolah
+                </button>
+              </div>
+            </div>
+
+            {modeDaftar === 'baru' ? (
+              <div>
+                <label className="login-eyebrow mb-1.5 block">Nama Sekolah</label>
+                <input
+                  type="text"
+                  required
+                  className="login-field w-full"
+                  placeholder="SD Negeri Contoh"
+                  value={namaSekolahBaru}
+                  onChange={(e) => setNamaSekolahBaru(e.target.value)}
+                />
+                <p className="text-[11px] mt-1.5 login-tagline normal-case tracking-normal">
+                  Anda akan menjadi admin utama sekolah ini dan langsung dapat masuk.
+                </p>
+              </div>
+            ) : (
+              <div>
+                <label className="login-eyebrow mb-1.5 block">Pilih Sekolah</label>
+                <select
+                  required
+                  className="login-field w-full"
+                  value={sekolahDipilih}
+                  onChange={(e) => setSekolahDipilih(e.target.value)}
+                >
+                  <option value="">— Pilih sekolah —</option>
+                  {daftarSekolah.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.nama_sekolah}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-[11px] mt-1.5 login-tagline normal-case tracking-normal">
+                  Akun Anda akan menunggu persetujuan admin sekolah tersebut.
+                </p>
+              </div>
+            )}
+
+            {errorDaftar && <p className="login-error text-sm">{errorDaftar}</p>}
+            {suksesDaftar && <p className="login-sukses text-sm">{suksesDaftar}</p>}
+
+            <button
+              type="submit"
+              disabled={loadingDaftar}
+              className="login-btn w-full transition-transform duration-150 active:scale-[0.98] hover:scale-[1.01]"
+            >
+              {loadingDaftar ? <Loader2 size={16} className="animate-spin" /> : <UserPlus size={16} />}
+              Daftar
+            </button>
+          </form>
+        )}
 
         <p
           className={`login-credit text-center text-xs italic mt-5 tracking-wide transition-all duration-700 ease-out delay-500 ${
             mounted ? 'opacity-100' : 'opacity-0'
           }`}
         >
-          This application was crafted by{' '}
-          <span className="not-italic font-semibold">LD_SALIM</span>
+          This application was crafted by <span className="not-italic font-semibold">LD_SALIM</span>
         </p>
       </div>
 
-      {/* Style khusus halaman login */}
       <style>{`
         .login-shell {
           --bg-1: #050b09;
@@ -213,112 +424,68 @@ export default function Login() {
           background: linear-gradient(160deg, var(--bg-1), var(--bg-2) 60%, var(--bg-1));
         }
 
-        .matrix-rain-canvas {
-          position: absolute;
-          inset: 0;
-          width: 100%;
-          height: 100%;
-          z-index: 0;
-        }
+        .matrix-rain-canvas { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 0; }
 
         .login-overlay {
-          position: absolute;
-          inset: 0;
-          z-index: 0;
+          position: absolute; inset: 0; z-index: 0;
           background: radial-gradient(circle at 50% 35%, rgba(3, 10, 8, 0.35), rgba(3, 10, 8, 0.75) 75%);
           pointer-events: none;
         }
 
-        .login-badge-glow {
-          background: var(--accent);
-          filter: blur(10px);
-          opacity: 0.4;
-          animation: glow-pulse 2.8s ease-in-out infinite;
-        }
-        .login-badge {
-          background: linear-gradient(160deg, var(--accent-strong), var(--accent));
-          color: #06201c;
-          box-shadow: 0 0 18px rgba(94, 234, 212, 0.45);
-        }
+        .login-badge-glow { background: var(--accent); filter: blur(10px); opacity: 0.4; animation: glow-pulse 2.8s ease-in-out infinite; }
+        .login-badge { background: linear-gradient(160deg, var(--accent-strong), var(--accent)); color: #06201c; box-shadow: 0 0 18px rgba(94, 234, 212, 0.45); }
 
-        .login-title {
-          color: var(--text-primary);
-          text-shadow: 0 0 14px rgba(94, 234, 212, 0.35);
-        }
+        .login-title { color: var(--text-primary); text-shadow: 0 0 14px rgba(94, 234, 212, 0.35); }
         .login-tagline { color: var(--code-text); }
         .login-school { color: var(--text-accent); }
 
+        .login-tabs { border: 1px solid var(--ring-soft); border-radius: 10px; padding: 3px; background: rgba(94, 234, 212, 0.04); }
+        .login-tab {
+          padding: 8px 10px; border-radius: 8px; font-size: 13px; font-weight: 600;
+          color: var(--code-text); background: transparent; border: none; cursor: pointer;
+          transition: all 0.15s ease;
+        }
+        .login-tab-active { background: linear-gradient(135deg, var(--accent-strong), var(--accent)); color: #06201c; }
+
         .login-card {
-          position: relative;
-          border-radius: 16px;
+          position: relative; border-radius: 16px;
           background: linear-gradient(160deg, rgba(11, 32, 28, 0.88), rgba(5, 11, 9, 0.92));
           border: 1px solid var(--ring-soft);
           box-shadow: 0 0 40px rgba(94, 234, 212, 0.08), 0 20px 40px rgba(0, 0, 0, 0.5);
           backdrop-filter: blur(6px);
         }
         .login-card::before {
-          content: '';
-          position: absolute;
-          inset: -1px;
-          border-radius: 16px;
-          padding: 1px;
+          content: ''; position: absolute; inset: -1px; border-radius: 16px; padding: 1px;
           background: linear-gradient(120deg, rgba(94, 234, 212, 0.35), transparent 35%, transparent 65%, rgba(255, 255, 255, 0.15));
           -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-          -webkit-mask-composite: xor;
-          mask-composite: exclude;
-          pointer-events: none;
+          -webkit-mask-composite: xor; mask-composite: exclude; pointer-events: none;
         }
 
-        .login-eyebrow {
-          font-size: 11px;
-          font-weight: 600;
-          letter-spacing: 0.14em;
-          text-transform: uppercase;
-          color: var(--code-text);
-        }
+        .login-eyebrow { font-size: 11px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--code-text); }
 
         .login-field {
-          background: rgba(94, 234, 212, 0.06);
-          border: 1px solid var(--ring-soft);
-          border-radius: 10px;
-          padding: 10px 12px;
-          color: var(--text-primary);
-          outline: none;
+          background: rgba(94, 234, 212, 0.06); border: 1px solid var(--ring-soft); border-radius: 10px;
+          padding: 10px 12px; color: var(--text-primary); outline: none;
         }
         .login-field::placeholder { color: rgba(234, 255, 250, 0.35); }
-        .login-field:focus {
-          border-color: var(--accent);
-          box-shadow: 0 0 0 3px rgba(94, 234, 212, 0.18);
-        }
+        .login-field:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(94, 234, 212, 0.18); }
+        select.login-field option { background: #0b201c; color: var(--text-primary); }
 
         .login-error { color: #ff9d9d; }
+        .login-sukses { color: #86efac; }
 
         .login-btn {
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          gap: 8px;
-          padding: 11px 16px;
-          border-radius: 10px;
-          font-weight: 600;
-          color: #06201c;
+          display: flex; align-items: center; justify-content: center; gap: 8px;
+          padding: 11px 16px; border-radius: 10px; font-weight: 600; color: #06201c;
           background: linear-gradient(135deg, var(--accent-strong), var(--accent));
-          box-shadow: 0 0 20px rgba(94, 234, 212, 0.35);
-          border: none;
-          cursor: pointer;
+          box-shadow: 0 0 20px rgba(94, 234, 212, 0.35); border: none; cursor: pointer;
         }
         .login-btn:disabled { opacity: 0.7; cursor: default; }
 
         .login-credit { color: var(--code-text); }
-        .login-credit span {
-          color: var(--text-accent);
-          text-shadow: 0 0 8px rgba(94, 234, 212, 0.4);
-        }
+        .login-credit span { color: var(--text-accent); text-shadow: 0 0 8px rgba(94, 234, 212, 0.4); }
 
-        @keyframes glow-pulse {
-          0%, 100% { opacity: 0.3; }
-          50% { opacity: 0.6; }
-        }
+        @keyframes glow-pulse { 0%, 100% { opacity: 0.3; } 50% { opacity: 0.6; } }
         @keyframes shake {
           0%, 100% { transform: translateX(0); }
           20% { transform: translateX(-4px); }
