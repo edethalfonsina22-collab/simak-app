@@ -45,6 +45,7 @@ import PengajuanSuratAktif from './pages/PengajuanSuratAktif'
 import PengajuanEditSiswa from './pages/PengajuanEditSiswa'
 import PengajuanKebutuhanKelas from './pages/PengajuanKebutuhanKelas'
 import HariLibur from './pages/HariLibur'
+import KalenderPendidikan from './pages/KalenderPendidikan'
 import Rapat from './pages/Rapat'
 import RapatVideo from './pages/RapatVideo'
 import Ijazah from './pages/Ijazah'
@@ -131,6 +132,10 @@ export default function App() {
       <Route path="/surat-keterangan" element={<ProtectedRoute adminOnly><SuratKeterangan /></ProtectedRoute>} />
       <Route path="/laporan" element={<ProtectedRoute adminOnly><LaporanBulanan /></ProtectedRoute>} />
       <Route path="/hari-libur" element={<ProtectedRoute adminOnly><HariLibur /></ProtectedRoute>} />
+      {/* Kalender Pendidikan: BUKAN adminOnly — guru tetap bisa melihat kalender,
+          kontrol edit (klik tanggal untuk ubah status) sudah dibatasi di dalam
+          komponen lewat isAdmin dari useAuth(). */}
+      <Route path="/kalender-pendidikan" element={<ProtectedRoute><KalenderPendidikan /></ProtectedRoute>} />
       <Route path="/keuangan" element={<ProtectedRoute adminOnly><Keuangan /></ProtectedRoute>} />
       {/* Keuangan Kelas: BUKAN adminOnly — ini kas kelas yang dipegang wali kelas (guru),
           admin tetap bisa membuka untuk memantau semua kelas. */}
