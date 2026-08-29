@@ -15,12 +15,12 @@ export function AuthProvider({ children }) {
     }
     const { data } = await supabase
       .from('profil')
-      .select('role, guru_id, sekolah_id, status_akun')
+      .select('role, jabatan, guru_id, sekolah_id, status_akun')
       .eq('id', userId)
       .maybeSingle()
 
     // Kalau belum ada baris profil, anggap 'guru' tanpa akses khusus & otomatis dianggap aktif
-    const profilDasar = data || { role: 'guru', guru_id: null, sekolah_id: null, status_akun: 'disetujui' }
+    const profilDasar = data || { role: 'guru', jabatan: 'guru', guru_id: null, sekolah_id: null, status_akun: 'disetujui' }
 
     // Ambil nama & foto dari tabel guru (dipakai di Sidebar untuk avatar)
     if (profilDasar.guru_id) {
@@ -57,8 +57,11 @@ export function AuthProvider({ children }) {
   const refreshProfil = () => loadProfil(session?.user?.id)
 
   // Registrasi akun baru — dua mode:
-  //  - mode 'baru'   : user membuat sekolah baru, langsung jadi admin_utama & status disetujui otomatis
-  //  - mode 'gabung' : user bergabung ke sekolah yang sudah ada, jadi admin biasa & menunggu persetujuan
+  //  - mode 'baru'   : user membuat sekolah baru, jadi admin_utama TAPI tetap
+  //                    menunggu persetujuan Superadmin (sekolah baru belum
+  //                    punya admin siapa pun yang bisa menyetujui sendiri).
+  //  - mode 'gabung' : user bergabung ke sekolah yang sudah ada, menunggu
+  //                    persetujuan admin utama sekolah tersebut.
   async function daftar({ mode, email, password, namaLengkap, namaSekolah, sekolahId, jabatan }) {
     const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
       email,
@@ -72,9 +75,12 @@ export function AuthProvider({ children }) {
     }
 
     let targetSekolahId = sekolahId
-    // Untuk mode 'gabung', jabatan dipilih sendiri oleh pendaftar saat mengisi form
-    // ('guru' | 'admin' | 'kepala_sekolah'). Default ke 'guru' kalau tidak diisi.
-    let role = jabatan || 'guru'
+    // 'jabatan' adalah label yang dipilih pendaftar sendiri di form
+    // ('guru' | 'admin' | 'kepala_sekolah') — dipakai untuk tampilan di
+    // Persetujuan Akun, terpisah dari 'role' teknis di bawah.
+    const jabatanDipilih = jabatan || 'guru'
+    // Untuk mode 'gabung', role teknis mengikuti jabatan yang dipilih.
+    let role = jabatanDipilih
     let statusAkunBaru = 'menunggu'
 
     if (mode === 'baru') {
@@ -86,13 +92,18 @@ export function AuthProvider({ children }) {
       if (sekolahError) return { error: sekolahError }
 
       targetSekolahId = sekolahBaru.id
+      // Pendiri sekolah tetap perlu jadi admin_utama secara TEKNIS supaya nanti
+      // (setelah disetujui Superadmin) dia bisa mengelola & menyetujui akun lain
+      // di sekolahnya sendiri — jabatan yang dia pilih (Admin/Kepala Sekolah)
+      // hanya jadi label, disimpan terpisah di kolom 'jabatan'.
       role = 'admin_utama'
-      statusAkunBaru = 'disetujui' // pembuat sekolah otomatis jadi admin utama yang aktif
+      statusAkunBaru = 'menunggu' // tetap menunggu persetujuan Superadmin
     }
 
     const { error: profilError } = await supabase.from('profil').insert({
       id: userId,
       role,
+      jabatan: jabatanDipilih,
       sekolah_id: targetSekolahId,
       status_akun: statusAkunBaru,
       nama_lengkap_pendaftar: namaLengkap,
