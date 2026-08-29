@@ -7,6 +7,7 @@ import Layout from '../components/Layout'
 export default function PersetujuanAkun() {
   const { isSuperAdmin, sekolahId } = useAuth()
   const [tab, setTab] = useState('menunggu') // 'menunggu' | 'riwayat'
+  const [filterJabatan, setFilterJabatan] = useState('semua') // 'semua' | 'guru' | 'admin_kepsek'
   const [daftarAkun, setDaftarAkun] = useState([])
   const [loading, setLoading] = useState(true)
   const [prosesId, setProsesId] = useState(null)
@@ -27,6 +28,13 @@ export default function PersetujuanAkun() {
       query = query.eq('sekolah_id', sekolahId)
     }
 
+    // Filter jabatan: pisahkan pendaftar Guru dari pendaftar Admin/Kepala Sekolah
+    if (filterJabatan === 'guru') {
+      query = query.eq('role', 'guru')
+    } else if (filterJabatan === 'admin_kepsek') {
+      query = query.in('role', ['admin', 'kepala_sekolah', 'admin_utama'])
+    }
+
     const { data } = await query
     setDaftarAkun(data || [])
     setLoading(false)
@@ -35,7 +43,7 @@ export default function PersetujuanAkun() {
   useEffect(() => {
     muatData()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tab])
+  }, [tab, filterJabatan])
 
   async function ubahStatus(id, statusBaru, catatan = '') {
     setProsesId(id)
@@ -76,12 +84,41 @@ export default function PersetujuanAkun() {
         </button>
       </div>
 
+      <div className="flex gap-2 mb-4">
+        <button
+          onClick={() => setFilterJabatan('semua')}
+          className={`text-xs font-medium px-3 py-1.5 rounded-full transition-colors ${
+            filterJabatan === 'semua' ? 'bg-slate-800 text-white' : 'bg-slate-100 text-slate-600'
+          }`}
+        >
+          Semua Jabatan
+        </button>
+        <button
+          onClick={() => setFilterJabatan('admin_kepsek')}
+          className={`text-xs font-medium px-3 py-1.5 rounded-full transition-colors ${
+            filterJabatan === 'admin_kepsek' ? 'bg-indigo-600 text-white' : 'bg-indigo-50 text-indigo-600'
+          }`}
+        >
+          Admin & Kepala Sekolah
+        </button>
+        <button
+          onClick={() => setFilterJabatan('guru')}
+          className={`text-xs font-medium px-3 py-1.5 rounded-full transition-colors ${
+            filterJabatan === 'guru' ? 'bg-blue-600 text-white' : 'bg-blue-50 text-blue-600'
+          }`}
+        >
+          Guru
+        </button>
+      </div>
+
       <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
         {loading ? (
           <p className="p-6 text-sm text-slate-400 text-center">Memuat data...</p>
         ) : daftarAkun.length === 0 ? (
           <p className="p-6 text-sm text-slate-400 text-center">
-            {tab === 'menunggu' ? 'Tidak ada pendaftaran yang menunggu persetujuan.' : 'Belum ada riwayat.'}
+            {tab === 'menunggu'
+              ? 'Tidak ada pendaftaran yang menunggu persetujuan.'
+              : 'Belum ada riwayat.'}
           </p>
         ) : (
           <table className="w-full text-sm">
@@ -89,6 +126,7 @@ export default function PersetujuanAkun() {
               <tr>
                 <th className="text-left px-4 py-3 font-medium">Nama</th>
                 <th className="text-left px-4 py-3 font-medium">Email</th>
+                <th className="text-left px-4 py-3 font-medium">Jabatan</th>
                 {isSuperAdmin && <th className="text-left px-4 py-3 font-medium">Sekolah</th>}
                 <th className="text-left px-4 py-3 font-medium">Status</th>
                 {tab === 'menunggu' && <th className="text-right px-4 py-3 font-medium">Aksi</th>}
@@ -99,6 +137,9 @@ export default function PersetujuanAkun() {
                 <tr key={akun.id}>
                   <td className="px-4 py-3 text-slate-700">{akun.nama_lengkap_pendaftar || '—'}</td>
                   <td className="px-4 py-3 text-slate-500">{akun.email_pendaftar || '—'}</td>
+                  <td className="px-4 py-3">
+                    <JabatanBadge role={akun.role} />
+                  </td>
                   {isSuperAdmin && (
                     <td className="px-4 py-3 text-slate-500">{akun.sekolah?.nama_sekolah || '—'}</td>
                   )}
@@ -146,6 +187,23 @@ function StatusBadge({ status }) {
   return (
     <span className={`inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-full ${item.cls}`}>
       <Icon size={12} /> {item.label}
+    </span>
+  )
+}
+
+// Label & warna Jabatan supaya admin langsung paham peran pendaftar saat verifikasi
+function JabatanBadge({ role }) {
+  const map = {
+    guru: { label: 'Guru', cls: 'bg-blue-50 text-blue-600' },
+    admin: { label: 'Admin', cls: 'bg-purple-50 text-purple-600' },
+    kepala_sekolah: { label: 'Kepala Sekolah', cls: 'bg-indigo-50 text-indigo-600' },
+    admin_utama: { label: 'Admin Utama', cls: 'bg-indigo-50 text-indigo-600' },
+    superadmin: { label: 'Superadmin', cls: 'bg-slate-800 text-white' },
+  }
+  const item = map[role] || { label: role || '—', cls: 'bg-slate-100 text-slate-500' }
+  return (
+    <span className={`inline-flex items-center text-xs font-medium px-2.5 py-1 rounded-full ${item.cls}`}>
+      {item.label}
     </span>
   )
 }
