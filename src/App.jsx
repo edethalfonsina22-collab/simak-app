@@ -8,6 +8,7 @@ import { Routes, Route, Navigate } from 'react-router-dom'
 import { useAuth } from './lib/AuthContext'
 import { supabase } from './lib/supabaseClient'
 import Login from './pages/Login'
+import Register from './pages/Register'
 import MenungguPersetujuan from './pages/MenungguPersetujuan'
 import PersetujuanAkun from './pages/PersetujuanAkun'
 import Dashboard from './pages/Dashboard'
@@ -146,6 +147,7 @@ export default function App() {
       {/* Kuis Seru: game kuis untuk siswa kelas 1-3, tanpa login (sama pola dengan ujian-online) */}
       <Route path="/kuis-seru" element={<KuisSeru />} />
       <Route path="/login" element={<Login />} />
+      <Route path="/register" element={<Register />} />
       <Route path="/menunggu-persetujuan" element={<RouteMenunggu><MenungguPersetujuan /></RouteMenunggu>} />
       <Route path="/persetujuan-akun" element={<ProtectedRoute adminUtamaOnly><PersetujuanAkun /></ProtectedRoute>} />
       <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
