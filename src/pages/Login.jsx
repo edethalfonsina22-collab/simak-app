@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { Navigate } from 'react-router-dom'
+import { Link, Navigate } from 'react-router-dom'
 import { useAuth } from '../lib/AuthContext'
 import { supabase } from '../lib/supabaseClient'
 import { Loader2, LogIn } from 'lucide-react'
@@ -189,7 +189,18 @@ export default function Login() {
         </form>
 
         <p
-          className={`login-credit text-center text-xs italic mt-5 tracking-wide transition-all duration-700 ease-out delay-500 ${
+          className={`login-register text-center text-sm mt-5 transition-all duration-700 ease-out delay-500 ${
+            mounted ? 'opacity-100' : 'opacity-0'
+          }`}
+        >
+          Belum punya akun?{' '}
+          <Link to="/register" className="login-register-link font-medium">
+            Daftar
+          </Link>
+        </p>
+
+        <p
+          className={`login-credit text-center text-xs italic mt-3 tracking-wide transition-all duration-700 ease-out delay-500 ${
             mounted ? 'opacity-100' : 'opacity-0'
           }`}
         >
@@ -292,6 +303,13 @@ export default function Login() {
         }
 
         .login-error { color: #ff9d9d; }
+
+        .login-register { color: var(--code-text); }
+        .login-register-link {
+          color: var(--text-accent);
+          text-shadow: 0 0 8px rgba(59, 130, 246, 0.4);
+        }
+        .login-register-link:hover { color: var(--accent-strong); }
 
         .login-btn {
           display: flex;
