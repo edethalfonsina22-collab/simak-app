@@ -153,7 +153,7 @@ export default function PersetujuanAkun() {
                     <td className="px-4 py-3 text-right">
                       <div className="flex justify-end gap-2">
                         <button
-                          onClick={() => ubahStatus(akun.id, 'disetujui')}
+                          onClick={() => ubahStatus(akun.id, 'aktif')}
                           disabled={prosesId === akun.id}
                           className="flex items-center gap-1 text-xs font-medium px-3 py-1.5 rounded-lg bg-green-50 text-green-600 hover:bg-green-100 disabled:opacity-60"
                         >
@@ -182,7 +182,7 @@ export default function PersetujuanAkun() {
 function StatusBadge({ status }) {
   const map = {
     menunggu: { label: 'Menunggu', cls: 'bg-amber-50 text-amber-600', icon: Clock3 },
-    disetujui: { label: 'Disetujui', cls: 'bg-green-50 text-green-600', icon: CheckCircle2 },
+    aktif: { label: 'Disetujui', cls: 'bg-green-50 text-green-600', icon: CheckCircle2 },
     ditolak: { label: 'Ditolak', cls: 'bg-red-50 text-red-600', icon: XCircle },
   }
   const item = map[status] || map.menunggu
