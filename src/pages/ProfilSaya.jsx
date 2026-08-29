@@ -12,17 +12,21 @@ import QRCode from 'qrcode'
 
 const LABEL_JABATAN = {
   admin: 'Admin',
+  admin_utama: 'Admin Utama',
+  superadmin: 'Superadmin',
   kepala_sekolah: 'Kepala Sekolah',
   guru: 'Guru',
 }
 
-// Kartu profil ringkas untuk akun yang tidak tertaut ke tabel `guru` (admin / kepala sekolah).
-// Bukan guru, jadi tidak butuh mata pelajaran, NUPTK, kelas asuh, dsb — cuma data diri dasar
-// dari tabel `profil` yang sudah diisi saat pendaftaran.
-function ProfilAdminCard({ profil, userId }) {
+// Kartu profil ringkas untuk akun yang tidak tertaut ke tabel `guru` (admin / admin_utama /
+// superadmin / kepala sekolah). Bukan guru, jadi tidak butuh mata pelajaran, NUPTK, kelas
+// asuh, dsb — cuma data diri dasar dari tabel `profil` yang diisi saat pendaftaran.
+// `adminData` diambil terpisah (bukan dari AuthContext) karena AuthContext hanya
+// mengambil role/jabatan/guru_id/sekolah_id/status_akun, tidak termasuk nama & email pendaftar.
+function ProfilAdminCard({ profil, userId, adminData }) {
   const [form, setForm] = useState({
-    nama_lengkap_pendaftar: profil?.nama_lengkap_pendaftar || '',
-    email_pendaftar: profil?.email_pendaftar || '',
+    nama_lengkap_pendaftar: adminData?.nama_lengkap_pendaftar || '',
+    email_pendaftar: adminData?.email_pendaftar || '',
   })
   const [saving, setSaving] = useState(false)
   const [savedAt, setSavedAt] = useState(null)
@@ -46,7 +50,7 @@ function ProfilAdminCard({ profil, userId }) {
     setSaving(false)
   }
 
-  const labelJabatan = LABEL_JABATAN[profil?.jabatan] || profil?.jabatan || 'Admin'
+  const labelJabatan = LABEL_JABATAN[profil?.jabatan] || LABEL_JABATAN[profil?.role] || profil?.jabatan || 'Admin'
 
   return (
     <form onSubmit={handleSave} className="max-w-2xl space-y-5">
@@ -107,7 +111,7 @@ function ProfilAdminCard({ profil, userId }) {
 }
 
 export default function ProfilSaya() {
-  const { profil, session } = useAuth()
+  const { profil, session, isAdmin } = useAuth()
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -120,6 +124,11 @@ export default function ProfilSaya() {
 
   // QR code identitas guru (dibuat dari qrcode -> data URL PNG)
   const [qrDataUrl, setQrDataUrl] = useState('')
+
+  // Data pendaftar (nama & email) untuk akun admin/kepala sekolah tanpa guru_id.
+  // Diambil terpisah dari AuthContext supaya AuthContext.jsx tidak perlu diubah.
+  const [adminData, setAdminData] = useState(null)
+  const [loadingAdminData, setLoadingAdminData] = useState(true)
 
   useEffect(() => {
     async function load() {
@@ -138,6 +147,25 @@ export default function ProfilSaya() {
     }
     load()
   }, [profil])
+
+  useEffect(() => {
+    async function loadAdminData() {
+      const userId = session?.user?.id
+      if (profil?.guru_id || !isAdmin || !userId) {
+        setLoadingAdminData(false)
+        return
+      }
+      setLoadingAdminData(true)
+      const { data: row } = await supabase
+        .from('profil')
+        .select('nama_lengkap_pendaftar, email_pendaftar')
+        .eq('id', userId)
+        .maybeSingle()
+      setAdminData(row)
+      setLoadingAdminData(false)
+    }
+    loadAdminData()
+  }, [profil, isAdmin, session])
 
   useEffect(() => {
     async function loadSiswaAsuh() {
@@ -259,7 +287,9 @@ export default function ProfilSaya() {
     setSaving(false)
   }
 
-  if (loading) {
+  const sedangMemuat = loading || (!profil?.guru_id && isAdmin && loadingAdminData)
+
+  if (sedangMemuat) {
     return (
       <Layout title="Profil Saya" subtitle="Data diri dan foto profil Anda">
         <p className="text-sm text-ink-700/50">Memuat...</p>
@@ -267,14 +297,15 @@ export default function ProfilSaya() {
     )
   }
 
-  // Akun tanpa guru_id: kalau role-nya admin (termasuk kepala sekolah), ini memang
-  // wajar — dia bukan baris di tabel `guru`. Tampilkan kartu profil ringkas, bukan
-  // pesan yang menyuruh menautkan ke data guru (yang tidak relevan untuk mereka).
+  // Akun tanpa guru_id: kalau role-nya termasuk kelompok admin (admin, admin_utama,
+  // superadmin, kepala_sekolah — persis sama dengan definisi `isAdmin` di AuthContext),
+  // ini memang wajar, dia bukan baris di tabel `guru`. Tampilkan kartu profil ringkas,
+  // bukan pesan yang menyuruh menautkan ke data guru (yang tidak relevan untuk mereka).
   if (!profil?.guru_id) {
-    if (profil?.role === 'admin') {
+    if (isAdmin) {
       return (
         <Layout title="Profil Saya" subtitle="Data diri dan foto profil Anda">
-          <ProfilAdminCard profil={profil} userId={session?.user?.id} />
+          <ProfilAdminCard profil={profil} userId={session?.user?.id} adminData={adminData} />
         </Layout>
       )
     }
