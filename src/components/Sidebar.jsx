@@ -1,4 +1,5 @@
 import { NavLink } from 'react-router-dom'
+import { useEffect, useState } from 'react'
 import {
   LayoutDashboard,
   Users,
@@ -53,7 +54,7 @@ import { supabase } from '../lib/supabaseClient'
 // Menu ADMIN dikelompokkan per kategori supaya tidak jadi satu daftar panjang.
 // Dibuat sebagai fungsi karena "Persetujuan Akun" dan "Profil Sekolah" hanya
 // boleh tampil untuk admin utama / superadmin, bukan admin biasa.
-function getGroupsAdmin(isAdminUtama) {
+function getGroupsAdmin(isAdminUtama, jumlahMenunggu = 0) {
   return [
     {
       label: null, // tanpa judul grup — selalu di atas
@@ -119,7 +120,7 @@ function getGroupsAdmin(isAdminUtama) {
         // "Persetujuan Akun" dan "Profil Sekolah" hanya untuk admin utama / superadmin
         ...(isAdminUtama
           ? [
-              { to: '/persetujuan-akun', label: 'Persetujuan Akun', icon: ShieldCheck },
+              { to: '/persetujuan-akun', label: 'Persetujuan Akun', icon: ShieldCheck, badge: jumlahMenunggu },
               { to: '/profil-sekolah', label: 'Profil Sekolah', icon: Landmark },
             ]
           : []),
@@ -165,7 +166,7 @@ const linksGuru = [
   { to: '/pengumuman', label: 'Pengumuman', icon: Megaphone },
 ]
 
-function NavItem({ to, label, icon: Icon, end }) {
+function NavItem({ to, label, icon: Icon, end, badge }) {
   return (
     <NavLink
       to={to}
@@ -186,7 +187,12 @@ function NavItem({ to, label, icon: Icon, end }) {
             fill={isActive ? 'rgba(255,255,255,0.25)' : 'currentColor'}
             fillOpacity={isActive ? 1 : 0.15}
           />
-          {label}
+          <span className="flex-1">{label}</span>
+          {!!badge && (
+            <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center shrink-0 shadow-sm shadow-red-900/40">
+              {badge > 99 ? '99+' : badge}
+            </span>
+          )}
         </>
       )}
     </NavLink>
@@ -209,13 +215,64 @@ function getInisial(nama) {
   return inisial.toUpperCase()
 }
 
+// Label peran yang tampil di header sidebar, termasuk jabatan-jabatan baru
+function getLabelPeran(profil, isSuperAdmin, isAdminUtama, isAdmin) {
+  if (isSuperAdmin) return 'Superadmin'
+  if (isAdminUtama) return 'Admin Utama'
+  if (profil?.role === 'kepala_sekolah') return 'Kepala Sekolah'
+  if (isAdmin) return 'Admin'
+  return 'Guru'
+}
+
 export default function Sidebar() {
-  const { signOut, session, profil, isAdmin, isAdminUtama, isSuperAdmin } = useAuth()
+  const { signOut, session, profil, isAdmin, isAdminUtama, isSuperAdmin, sekolahId } = useAuth()
   const fotoUrl = getFotoUrl(profil?.foto_profil_path)
   const namaTampil = profil?.nama_lengkap || session?.user?.email || 'Pengguna'
 
-  const labelPeran = isSuperAdmin ? 'Superadmin' : isAdminUtama ? 'Admin Utama' : isAdmin ? 'Admin' : 'Guru'
-  const groupsAdmin = getGroupsAdmin(isAdminUtama)
+  const labelPeran = getLabelPeran(profil, isSuperAdmin, isAdminUtama, isAdmin)
+
+  // Notifikasi real-time: jumlah pendaftaran akun yang masih menunggu persetujuan.
+  // Hanya relevan untuk admin utama / superadmin yang punya menu "Persetujuan Akun".
+  const [jumlahMenunggu, setJumlahMenunggu] = useState(0)
+
+  useEffect(() => {
+    if (!isAdminUtama) {
+      setJumlahMenunggu(0)
+      return
+    }
+
+    let aktif = true
+
+    async function muatJumlahMenunggu() {
+      let query = supabase
+        .from('profil')
+        .select('id', { count: 'exact', head: true })
+        .eq('status_akun', 'menunggu')
+      if (!isSuperAdmin) {
+        query = query.eq('sekolah_id', sekolahId)
+      }
+      const { count } = await query
+      if (aktif) setJumlahMenunggu(count || 0)
+    }
+
+    muatJumlahMenunggu()
+
+    // Dengarkan perubahan tabel profil secara real-time (pendaftar baru, disetujui, ditolak, dll)
+    // supaya badge notifikasi ter-update otomatis tanpa perlu refresh halaman.
+    const channel = supabase
+      .channel('persetujuan-akun-notifikasi')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'profil' }, () => {
+        muatJumlahMenunggu()
+      })
+      .subscribe()
+
+    return () => {
+      aktif = false
+      supabase.removeChannel(channel)
+    }
+  }, [isAdminUtama, isSuperAdmin, sekolahId])
+
+  const groupsAdmin = getGroupsAdmin(isAdminUtama, jumlahMenunggu)
 
   return (
     <aside className="w-64 shrink-0 bg-blue-950 text-white flex flex-col h-screen sticky top-0 border-r border-blue-900/50">
