@@ -1,17 +1,15 @@
-// kalenderPendidikan.js
-// Data dasar Kalender Pendidikan SD/MI - Pemerintah Kabupaten Kepulauan Aru
-// Dinas Pendidikan dan Kebudayaan
-// Tahun Pelajaran 2026/2027
+// src/lib/kalenderPendidikan.js
+// Data dasar Kalender Pendidikan SD/MI — Tahun Pelajaran 2026/2027
 //
 // CATATAN:
-// - Tanggal pada LIBUR_UMUM diambil langsung dari tabel "LIBUR UMUM" pada
-//   dokumen kalender pendidikan resmi, jadi sudah pasti.
+// - Tanggal pada LIBUR_UMUM diambil dari tabel "LIBUR UMUM" pada dokumen
+//   kalender pendidikan resmi, jadi sudah pasti.
 // - Rentang pada KEGIATAN_RANGE (ATS, ASAS, ASKK, TKA, Libur Semester, dll)
-//   adalah estimasi awal hasil pembacaan grid kalender. Silakan sesuaikan
-//   di bawah ini (atau lewat mode edit di aplikasi, jika tabel Supabase
-//   "kalender_overrides" sudah dibuat) agar sesuai SK final.
+//   adalah estimasi awal hasil pembacaan grid kalender. Sesuaikan di sini,
+//   atau langsung lewat mode edit di halaman Kalender Pendidikan (admin)
+//   yang tersimpan ke tabel Supabase "kalender_overrides".
 
-export const TAHUN_AJARAN = '2026/2027';
+export const TAHUN_AJARAN = '2026/2027'
 
 export const BULAN = [
   { key: 'juli_2026', nama: 'Juli', tahun: 2026, bulan: 7 },
@@ -26,7 +24,7 @@ export const BULAN = [
   { key: 'april_2027', nama: 'April', tahun: 2027, bulan: 4 },
   { key: 'mei_2027', nama: 'Mei', tahun: 2027, bulan: 5 },
   { key: 'juni_2027', nama: 'Juni', tahun: 2027, bulan: 6 },
-];
+]
 
 export const SEMESTER = {
   GANJIL: {
@@ -39,7 +37,7 @@ export const SEMESTER = {
     bulan: ['januari_2027', 'februari_2027', 'maret_2027', 'april_2027', 'mei_2027', 'juni_2027'],
     totalHbe: 130,
   },
-};
+}
 
 // Jumlah Hari Belajar Efektif (JML HBE) per bulan, sesuai kolom pada dokumen asli
 export const JML_HBE = {
@@ -55,24 +53,24 @@ export const JML_HBE = {
   april_2027: 26,
   mei_2027: 22,
   juni_2027: 16,
-};
+}
 
-// Kode keterangan (sesuai legenda "KETERANGAN" di dokumen) + warna tampilan
+// Kode keterangan (sesuai legenda "KETERANGAN" di dokumen) + warna badge Tailwind
 export const KETERANGAN = {
-  M: { label: 'Hari Minggu', color: '#e53935', textColor: '#ffffff' },
-  'M+': { label: 'Hari Pertama Masuk Sekolah / MPLS', color: '#43a047', textColor: '#ffffff' },
-  LU: { label: 'Libur Umum', color: '#e53935', textColor: '#ffffff' },
-  ATS: { label: 'Asesmen Tengah Semester', color: '#8e24aa', textColor: '#ffffff' },
-  ASAS: { label: 'Asesmen Sumatif Akhir Semester', color: '#1e88e5', textColor: '#ffffff' },
-  ASKK: { label: 'Asesmen Sumatif Kenaikan Kelas', color: '#1e88e5', textColor: '#ffffff' },
-  R: { label: 'Remedial', color: '#fb8c00', textColor: '#ffffff' },
-  TKA1: { label: 'TKA Tahap 1', color: '#6d4c41', textColor: '#ffffff' },
-  TKA2: { label: 'TKA Tahap 2', color: '#6d4c41', textColor: '#ffffff' },
-  'AS-SD': { label: 'Asesmen Sekolah (AS-SD)', color: '#00897b', textColor: '#ffffff' },
-  LP: { label: 'Pembagian Laporan Pendidikan', color: '#fdd835', textColor: '#000000' },
-  CB: { label: 'Cuti Bersama', color: '#e53935', textColor: '#ffffff' },
-  LS: { label: 'Libur Semester', color: '#fdd835', textColor: '#000000' },
-};
+  M: { label: 'Hari Minggu', dot: 'bg-red-500', badge: 'bg-red-500 text-white' },
+  'M+': { label: 'Hari Pertama Masuk Sekolah / MPLS', dot: 'bg-emerald-500', badge: 'bg-emerald-500 text-white' },
+  LU: { label: 'Libur Umum', dot: 'bg-red-500', badge: 'bg-red-500 text-white' },
+  ATS: { label: 'Asesmen Tengah Semester', dot: 'bg-purple-500', badge: 'bg-purple-500 text-white' },
+  ASAS: { label: 'Asesmen Sumatif Akhir Semester', dot: 'bg-blue-500', badge: 'bg-blue-500 text-white' },
+  ASKK: { label: 'Asesmen Sumatif Kenaikan Kelas', dot: 'bg-blue-500', badge: 'bg-blue-500 text-white' },
+  R: { label: 'Remedial', dot: 'bg-orange-500', badge: 'bg-orange-500 text-white' },
+  TKA1: { label: 'TKA Tahap 1', dot: 'bg-amber-800', badge: 'bg-amber-800 text-white' },
+  TKA2: { label: 'TKA Tahap 2', dot: 'bg-amber-800', badge: 'bg-amber-800 text-white' },
+  'AS-SD': { label: 'Asesmen Sekolah (AS-SD)', dot: 'bg-teal-600', badge: 'bg-teal-600 text-white' },
+  LP: { label: 'Pembagian Laporan Pendidikan', dot: 'bg-yellow-400', badge: 'bg-yellow-400 text-slate-900' },
+  CB: { label: 'Cuti Bersama', dot: 'bg-red-500', badge: 'bg-red-500 text-white' },
+  LS: { label: 'Libur Semester', dot: 'bg-yellow-400', badge: 'bg-yellow-400 text-slate-900' },
+}
 
 // Hari Libur Umum & Keagamaan Nasional (tanggal pasti, dari tabel dokumen)
 export const LIBUR_UMUM = [
@@ -92,7 +90,7 @@ export const LIBUR_UMUM = [
   { tanggal: '2027-05-20', keterangan: 'Hari Raya Waisak', kode: 'LU' },
   { tanggal: '2027-06-01', keterangan: 'Hari Lahir Pancasila', kode: 'LU' },
   { tanggal: '2027-06-06', keterangan: 'Tahun Baru Hijriah', kode: 'LU' },
-];
+]
 
 // Rentang kegiatan sekolah (ESTIMASI AWAL — silakan sesuaikan dengan SK final)
 export const KEGIATAN_RANGE = [
@@ -109,69 +107,49 @@ export const KEGIATAN_RANGE = [
   { mulai: '2027-06-14', selesai: '2027-06-18', kode: 'R', keterangan: 'Remedial Semester Genap' },
   { mulai: '2027-06-19', selesai: '2027-06-19', kode: 'LP', keterangan: 'Pembagian Laporan Pendidikan Semester Genap' },
   { mulai: '2027-06-21', selesai: '2027-07-11', kode: 'LS', keterangan: 'Libur Semester Genap' },
-];
+]
 
 // ---------- Helper functions ----------
 
 export function pad2(n) {
-  return String(n).padStart(2, '0');
+  return String(n).padStart(2, '0')
 }
 
 export function toISODate(tahun, bulan, tanggal) {
-  return `${tahun}-${pad2(bulan)}-${pad2(tanggal)}`;
+  return `${tahun}-${pad2(bulan)}-${pad2(tanggal)}`
 }
 
 export function isMinggu(isoDate) {
-  const d = new Date(`${isoDate}T00:00:00`);
-  return d.getDay() === 0;
+  const d = new Date(`${isoDate}T00:00:00`)
+  return d.getDay() === 0
 }
 
 export function getLiburUmum(isoDate) {
-  return LIBUR_UMUM.find((l) => l.tanggal === isoDate) || null;
+  return LIBUR_UMUM.find((l) => l.tanggal === isoDate) || null
 }
 
 export function getKegiatan(isoDate) {
-  return KEGIATAN_RANGE.find((k) => isoDate >= k.mulai && isoDate <= k.selesai) || null;
+  return KEGIATAN_RANGE.find((k) => isoDate >= k.mulai && isoDate <= k.selesai) || null
 }
 
 /**
  * Menentukan status satu tanggal.
- * Urutan prioritas: override manual (dari Supabase) > Hari Minggu >
- * Libur Umum > Rentang kegiatan > null (hari sekolah biasa).
- * @param {string} isoDate format 'YYYY-MM-DD'
- * @param {object} overrides map { 'YYYY-MM-DD': { kode, keterangan } }
- * @returns {{kode: string, keterangan: string}|null}
+ * Prioritas: override manual (Supabase) > Hari Minggu > Libur Umum >
+ * Rentang kegiatan > null (hari sekolah biasa).
  */
 export function getStatusTanggal(isoDate, overrides = {}) {
-  if (overrides[isoDate]) return overrides[isoDate];
-  if (isMinggu(isoDate)) return { kode: 'M', keterangan: 'Hari Minggu' };
+  if (overrides[isoDate]) return overrides[isoDate]
+  if (isMinggu(isoDate)) return { kode: 'M', keterangan: 'Hari Minggu' }
 
-  const lu = getLiburUmum(isoDate);
-  if (lu) return { kode: lu.kode, keterangan: lu.keterangan };
+  const lu = getLiburUmum(isoDate)
+  if (lu) return { kode: lu.kode, keterangan: lu.keterangan }
 
-  const keg = getKegiatan(isoDate);
-  if (keg) return { kode: keg.kode, keterangan: keg.keterangan };
+  const keg = getKegiatan(isoDate)
+  if (keg) return { kode: keg.kode, keterangan: keg.keterangan }
 
-  return null;
+  return null
 }
 
 export function jumlahHariDalamBulan(tahun, bulan) {
-  return new Date(tahun, bulan, 0).getDate();
+  return new Date(tahun, bulan, 0).getDate()
 }
-
-export default {
-  TAHUN_AJARAN,
-  BULAN,
-  SEMESTER,
-  JML_HBE,
-  KETERANGAN,
-  LIBUR_UMUM,
-  KEGIATAN_RANGE,
-  pad2,
-  toISODate,
-  isMinggu,
-  getLiburUmum,
-  getKegiatan,
-  getStatusTanggal,
-  jumlahHariDalamBulan,
-};
