@@ -43,6 +43,7 @@ import {
   PiggyBank,
   FileSpreadsheet,
   Gamepad2,
+  ScanLine,
 } from 'lucide-react'
 import { useAuth } from '../lib/AuthContext'
 import { supabase } from '../lib/supabaseClient'
@@ -57,6 +58,7 @@ const groupsAdmin = [
       { to: '/rapat', label: 'Rapat Video', icon: Video },
       { to: '/galeri', label: 'Galeri Kegiatan', icon: Images },
       { to: '/dokumen', label: 'Dokumen Penting', icon: HardDrive },
+      { to: '/scan-dokumen', label: 'Scan Dokumen', icon: ScanLine },
       { to: '/pengumuman', label: 'Pengumuman', icon: Megaphone },
     ],
   },
@@ -123,6 +125,7 @@ const linksGuru = [
   { to: '/rapat', label: 'Rapat Video', icon: Video },
   { to: '/galeri', label: 'Galeri Kegiatan', icon: Images },
   { to: '/dokumen', label: 'Dokumen Penting', icon: HardDrive },
+  { to: '/scan-dokumen', label: 'Scan Dokumen', icon: ScanLine },
   { to: '/keuangan-kelas', label: 'Keuangan Kelas', icon: PiggyBank },
   { to: '/siswa', label: 'Data Siswa', icon: Users },
   { to: '/presensi', label: 'Presensi', icon: ClipboardCheck },
