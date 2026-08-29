@@ -1,9 +1,14 @@
 import { useEffect, useState } from 'react'
 import Tesseract from 'tesseract.js'
 import { supabase } from '../lib/supabaseClient'
-import { Loader2, CheckCircle2, School, ScanLine } from 'lucide-react'
+import { Loader2, CheckCircle2, School, ScanLine, Sparkles } from 'lucide-react'
 
 const AGAMA_OPTIONS = ['Islam', 'Kristen', 'Katolik', 'Hindu', 'Buddha', 'Khonghucu', 'Lainnya']
+
+const METODE_SCAN_OPTIONS = [
+  { value: 'tesseract', label: 'OCR Cepat', desc: 'Offline, gratis, cocok untuk foto KK yang jelas dan tidak miring' },
+  { value: 'ai', label: 'AI Scan', desc: 'Lebih akurat untuk foto buram, miring, atau pencahayaan kurang baik' },
+]
 
 const emptyForm = {
   nama_lengkap: '',
@@ -165,6 +170,7 @@ export default function PPDBPublik() {
 
   // --- State untuk fitur OCR Kartu Keluarga ---
   const [kkPreviewUrl, setKkPreviewUrl] = useState('')
+  const [metodeScan, setMetodeScan] = useState('tesseract')
   const [ocrLoading, setOcrLoading] = useState(false)
   const [ocrProgress, setOcrProgress] = useState(0)
   const [ocrError, setOcrError] = useState('')
@@ -181,6 +187,56 @@ export default function PPDBPublik() {
     }
   }, [kkPreviewUrl])
 
+  // --- Metode 1: OCR lokal dengan Tesseract (fitur lama, tidak diubah) ---
+  async function scanKKDenganTesseract(file) {
+    const { data: { text } } = await Tesseract.recognize(file, 'ind', {
+      logger: (m) => {
+        if (m.status === 'recognizing text') {
+          setOcrProgress(Math.round(m.progress * 100))
+        }
+      },
+    })
+    const hasil = parseTeksKK(text)
+    return { nomorKK: hasil.nomorKK, alamat: hasil.alamat, anggota: hasil.anggota, peringatan: null }
+  }
+
+  // --- Metode 2 (baru): AI Scan via backend endpoint yang memanggil Gemini ---
+  // Endpoint ini sudah mengembalikan data terstruktur (bukan teks polos),
+  // jadi tidak perlu parseTeksKK di sini.
+  async function scanKKDenganAI(file) {
+    setOcrProgress(0)
+    const base64 = await fileToBase64(file)
+
+    const res = await fetch('/api/ai-scan-kk', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ image: base64, mimeType: file.type }),
+    })
+
+    if (!res.ok) {
+      const data = await res.json().catch(() => null)
+      const pesan = data?.error || `Server AI Scan gagal (${res.status}).`
+      throw new Error(res.status === 503 ? `${pesan} Coba pakai OCR Cepat sementara, atau ulangi beberapa saat lagi.` : pesan)
+    }
+
+    const data = await res.json()
+    return {
+      nomorKK: data.nomor_kk || '',
+      alamat: data.alamat || '',
+      anggota: (data.anggota || []).map((a) => ({ nama: a.nama, nik: a.nik, statusHubungan: a.status_hubungan })),
+      peringatan: data.peringatan || null,
+    }
+  }
+
+  function fileToBase64(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = () => resolve(reader.result.split(',')[1]) // buang prefix data:...;base64,
+      reader.onerror = () => reject(new Error('Gagal membaca file gambar.'))
+      reader.readAsDataURL(file)
+    })
+  }
+
   async function handleUploadKK(e) {
     const file = e.target.files?.[0]
     if (!file) return
@@ -192,15 +248,8 @@ export default function PPDBPublik() {
     setOcrProgress(0)
 
     try {
-      const { data: { text } } = await Tesseract.recognize(file, 'ind', {
-        logger: (m) => {
-          if (m.status === 'recognizing text') {
-            setOcrProgress(Math.round(m.progress * 100))
-          }
-        },
-      })
-
-      const hasil = parseTeksKK(text)
+      const hasil =
+        metodeScan === 'ai' ? await scanKKDenganAI(file) : await scanKKDenganTesseract(file)
 
       setForm((prev) => ({
         ...prev,
@@ -209,7 +258,9 @@ export default function PPDBPublik() {
       }))
       setAnggotaTerdeteksi(hasil.anggota)
 
-      if (!hasil.nomorKK && hasil.anggota.length === 0) {
+      if (hasil.peringatan) {
+        setOcrError(hasil.peringatan)
+      } else if (!hasil.nomorKK && hasil.anggota.length === 0) {
         setOcrError('Teks pada foto tidak terbaca dengan baik. Coba unggah foto yang lebih jelas dan terang, atau isi kolom secara manual.')
       }
     } catch (err) {
@@ -339,6 +390,28 @@ export default function PPDBPublik() {
               Unggah foto/scan KK yang jelas dan tidak buram. Sistem akan membaca teksnya dan mencoba mengisi Nomor KK, Alamat, dan data anggota keluarga secara otomatis. <strong>Selalu periksa kembali</strong> hasilnya sebelum mengirim formulir.
             </p>
 
+            {/* Pilihan metode scan (baru) */}
+            <div className="grid sm:grid-cols-2 gap-2">
+              {METODE_SCAN_OPTIONS.map((m) => (
+                <button
+                  key={m.value}
+                  type="button"
+                  onClick={() => setMetodeScan(m.value)}
+                  className={`text-left rounded-lg border p-2.5 transition ${
+                    metodeScan === m.value
+                      ? 'border-ink-950 bg-ink-950/5'
+                      : 'border-ink-950/10 hover:border-ink-950/25'
+                  }`}
+                >
+                  <span className="flex items-center gap-1.5 text-xs font-semibold text-ink-950">
+                    {m.value === 'ai' && <Sparkles size={12} className="text-brass-500" />}
+                    {m.label}
+                  </span>
+                  <span className="block text-[11px] text-ink-700/60 mt-0.5">{m.desc}</span>
+                </button>
+              ))}
+            </div>
+
             <input
               type="file"
               accept="image/*"
@@ -353,7 +426,9 @@ export default function PPDBPublik() {
             {ocrLoading && (
               <div className="flex items-center gap-2 text-sm text-ink-700/70">
                 <Loader2 size={16} className="animate-spin" />
-                Membaca dokumen... {ocrProgress}%
+                {metodeScan === 'ai'
+                  ? 'Membaca dokumen dengan AI...'
+                  : `Membaca dokumen... ${ocrProgress}%`}
               </div>
             )}
 
@@ -366,7 +441,8 @@ export default function PPDBPublik() {
                   <div key={i} className="flex flex-wrap items-center justify-between gap-2 bg-white rounded-lg border border-ink-950/10 px-3 py-2 text-sm">
                     <div>
                       <span className="font-medium">{a.nama}</span>
-                      <span className="text-ink-700/60"> — NIK {a.nik}</span>
+                      <span className="text-ink-700/60"> — NIK {a.nik || '(tidak terbaca)'}</span>
+                      {a.statusHubungan && <span className="text-ink-700/40"> · {a.statusHubungan}</span>}
                     </div>
                     <div className="flex gap-1.5">
                       <button type="button" onClick={() => terapkanAnggota(a, 'siswa')} className="px-2 py-1 rounded-md bg-sage-500/10 text-sage-700 text-xs font-medium hover:bg-sage-500/20">
