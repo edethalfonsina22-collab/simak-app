@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabaseClient'
 import Layout from '../components/Layout'
-import { Check, X, Loader2, Copy, Printer, Trash2 } from 'lucide-react'
+import { Check, X, Loader2, Copy, Printer, Trash2, Eye } from 'lucide-react'
 
 const TAB = [
   { value: 'menunggu', label: 'Menunggu' },
@@ -14,12 +14,92 @@ function formatTanggal(iso) {
   return new Date(iso).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })
 }
 
+function formatTempatTanggalLahir(d) {
+  const tempat = d.tempat_lahir || ''
+  const tanggal = d.tanggal_lahir ? formatTanggal(d.tanggal_lahir) : (d.tahun_lahir ? `Tahun ${d.tahun_lahir}` : '-')
+  if (tempat && tanggal !== '-') return `${tempat}, ${tanggal}`
+  return tempat || tanggal
+}
+
+// Baris label-nilai yang dipakai di dalam modal Detail Pendaftar.
+// Field yang kosong tetap ditampilkan sebagai "-" agar admin tahu
+// field tsb memang tidak diisi oleh pendaftar, bukan hilang saat ditarik.
+function BarisDetail({ label, value }) {
+  return (
+    <div className="flex flex-col gap-0.5 py-1.5 border-b border-ink-950/5 last:border-0">
+      <span className="text-[11px] uppercase tracking-wide text-ink-700/40">{label}</span>
+      <span className="text-sm text-ink-950 break-words">{value || '-'}</span>
+    </div>
+  )
+}
+
+function ModalDetailPendaftar({ pendaftar, onClose }) {
+  if (!pendaftar) return null
+  const d = pendaftar
+
+  return (
+    <div
+      className="fixed inset-0 z-50 bg-ink-950/40 flex items-center justify-center p-4"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white rounded-2xl shadow-lg w-full max-w-2xl max-h-[85vh] overflow-y-auto p-6"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="font-display text-lg font-semibold text-ink-950">
+            Detail Pendaftaran — {d.nama_lengkap}
+          </h3>
+          <button className="icon-btn" onClick={onClose} title="Tutup">
+            <X size={16} />
+          </button>
+        </div>
+
+        <div className="grid sm:grid-cols-2 gap-x-6">
+          <div>
+            <p className="text-xs font-semibold text-brass-600 mt-2 mb-1">Data Calon Siswa</p>
+            <BarisDetail label="Nama Lengkap" value={d.nama_lengkap} />
+            <BarisDetail label="NIK Siswa" value={d.nik_siswa} />
+            <BarisDetail label="Nomor KK" value={d.nomor_kk} />
+            <BarisDetail label="Jenis Kelamin" value={d.jenis_kelamin === 'P' ? 'Perempuan' : d.jenis_kelamin === 'L' ? 'Laki-laki' : '-'} />
+            <BarisDetail label="Agama" value={d.agama} />
+            <BarisDetail label="Tempat, Tanggal Lahir" value={formatTempatTanggalLahir(d)} />
+            <BarisDetail label="Asal TK/PAUD" value={d.asal_sekolah} />
+          </div>
+
+          <div>
+            <p className="text-xs font-semibold text-brass-600 mt-2 mb-1">Data Ayah</p>
+            <BarisDetail label="Nama Ayah" value={d.nama_ayah} />
+            <BarisDetail label="NIK Ayah" value={d.nik_ayah} />
+            <BarisDetail label="Tahun Lahir Ayah" value={d.tahun_lahir_ayah} />
+
+            <p className="text-xs font-semibold text-brass-600 mt-3 mb-1">Data Ibu</p>
+            <BarisDetail label="Nama Ibu" value={d.nama_ibu} />
+            <BarisDetail label="NIK Ibu" value={d.nik_ibu} />
+            <BarisDetail label="Tahun Lahir Ibu" value={d.tahun_lahir_ibu} />
+          </div>
+        </div>
+
+        <p className="text-xs font-semibold text-brass-600 mt-3 mb-1">Alamat & Kontak</p>
+        <BarisDetail label="Alamat (sesuai KTP/KK)" value={d.alamat} />
+        <BarisDetail label="Alamat Tempat Tinggal (domisili saat ini)" value={d.alamat_tinggal} />
+        <BarisDetail label="No. HP Orang Tua/Wali" value={d.no_hp_orang_tua} />
+
+        <p className="text-xs font-semibold text-brass-600 mt-3 mb-1">Lainnya</p>
+        <BarisDetail label="Status Pendaftaran" value={d.status} />
+        <BarisDetail label="Tanggal Daftar" value={formatTanggal(d.dibuat_pada)} />
+      </div>
+    </div>
+  )
+}
+
 export default function PPDBAdmin() {
   const [tab, setTab] = useState('menunggu')
   const [data, setData] = useState([])
   const [loading, setLoading] = useState(true)
   const [prosesId, setProsesId] = useState(null)
   const [profil, setProfil] = useState(null)
+  const [detailPendaftar, setDetailPendaftar] = useState(null)
 
   useEffect(() => {
     supabase.from('profil_sekolah').select('*').eq('id', 1).maybeSingle().then(({ data }) => setProfil(data))
@@ -27,11 +107,17 @@ export default function PPDBAdmin() {
 
   async function muatData() {
     setLoading(true)
-    const { data: rows } = await supabase
+    // select('*') sudah menarik SELURUH kolom yang diisi lewat form PPDB Publik
+    // (termasuk nik_siswa, nomor_kk, alamat_tinggal, nik_ayah/ibu, tahun lahir,
+    // dan asal_sekolah) — tidak ada kolom yang sengaja dikecualikan di sini.
+    const { data: rows, error } = await supabase
       .from('ppdb_pendaftar')
       .select('*')
       .eq('status', tab)
       .order('dibuat_pada', { ascending: false })
+    if (error) {
+      alert('Gagal memuat data pendaftar: ' + error.message)
+    }
     setData(rows || [])
     setLoading(false)
   }
@@ -45,8 +131,9 @@ export default function PPDBAdmin() {
     if (!confirm(`Terima ${pendaftar.nama_lengkap} dan tambahkan ke Data Siswa?`)) return
     setProsesId(pendaftar.id)
 
-    // 1. Masukkan ke tabel siswa — field disesuaikan dengan skema Data Siswa terbaru
-    //    (termasuk NIK ayah/ibu dan tahun lahir siswa/ayah/ibu, ikut dari formulir PPDB)
+    // 1. Masukkan ke tabel siswa — SEMUA field yang diisi di formulir PPDB Publik
+    //    ikut dibawa, termasuk NIK ayah/ibu, tahun lahir siswa/ayah/ibu, alamat
+    //    domisili, dan asal TK/PAUD, agar tidak ada data yang tercecer.
     const { error: errSiswa } = await supabase.from('siswa').insert({
       nama_lengkap: pendaftar.nama_lengkap,
       jenis_kelamin: pendaftar.jenis_kelamin,
@@ -66,6 +153,7 @@ export default function PPDBAdmin() {
       no_hp_orang_tua: pendaftar.no_hp_orang_tua,
       nik: pendaftar.nik_siswa,
       nomor_kk: pendaftar.nomor_kk,
+      asal_sekolah: pendaftar.asal_sekolah,
       status: 'aktif',
     })
 
@@ -270,7 +358,7 @@ export default function PPDBAdmin() {
               <th>Nama Ibu</th>
               <th>No. HP</th>
               <th>Tanggal Daftar</th>
-              {(tab === 'menunggu' || tab === 'diterima' || tab === 'ditolak') && <th></th>}
+              <th></th>
             </tr>
           </thead>
           <tbody>
@@ -287,31 +375,36 @@ export default function PPDBAdmin() {
                 <td>{d.nama_ibu || '-'}</td>
                 <td>{d.no_hp_orang_tua}</td>
                 <td>{formatTanggal(d.dibuat_pada)}</td>
-                {tab === 'menunggu' && (
-                  <td>
-                    <div className="flex items-center gap-1 justify-end">
-                      <button
-                        className="icon-btn text-sage-500"
-                        onClick={() => terima(d)}
-                        disabled={prosesId === d.id}
-                        title="Terima"
-                      >
-                        {prosesId === d.id ? <Loader2 size={15} className="animate-spin" /> : <Check size={15} />}
-                      </button>
-                      <button
-                        className="icon-btn text-red-600"
-                        onClick={() => tolak(d)}
-                        disabled={prosesId === d.id}
-                        title="Tolak"
-                      >
-                        <X size={15} />
-                      </button>
-                    </div>
-                  </td>
-                )}
-                {(tab === 'diterima' || tab === 'ditolak') && (
-                  <td>
-                    <div className="flex items-center gap-1 justify-end">
+                <td>
+                  <div className="flex items-center gap-1 justify-end">
+                    <button
+                      className="icon-btn text-ink-700/60"
+                      onClick={() => setDetailPendaftar(d)}
+                      title="Lihat Detail Lengkap"
+                    >
+                      <Eye size={15} />
+                    </button>
+                    {tab === 'menunggu' && (
+                      <>
+                        <button
+                          className="icon-btn text-sage-500"
+                          onClick={() => terima(d)}
+                          disabled={prosesId === d.id}
+                          title="Terima"
+                        >
+                          {prosesId === d.id ? <Loader2 size={15} className="animate-spin" /> : <Check size={15} />}
+                        </button>
+                        <button
+                          className="icon-btn text-red-600"
+                          onClick={() => tolak(d)}
+                          disabled={prosesId === d.id}
+                          title="Tolak"
+                        >
+                          <X size={15} />
+                        </button>
+                      </>
+                    )}
+                    {(tab === 'diterima' || tab === 'ditolak') && (
                       <button
                         className="icon-btn text-red-600"
                         onClick={() => hapus(d)}
@@ -320,14 +413,16 @@ export default function PPDBAdmin() {
                       >
                         {prosesId === d.id ? <Loader2 size={15} className="animate-spin" /> : <Trash2 size={15} />}
                       </button>
-                    </div>
-                  </td>
-                )}
+                    )}
+                  </div>
+                </td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
+
+      <ModalDetailPendaftar pendaftar={detailPendaftar} onClose={() => setDetailPendaftar(null)} />
     </Layout>
   )
 }
