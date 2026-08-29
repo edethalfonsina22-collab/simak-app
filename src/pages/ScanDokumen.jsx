@@ -2,7 +2,7 @@ import { useState } from 'react'
 import Tesseract from 'tesseract.js'
 import { Document, Packer, Paragraph, TextRun } from 'docx'
 import { saveAs } from 'file-saver'
-import { ScanLine, Loader2, Download, FileText, FileType2, Trash2, Camera } from 'lucide-react'
+import { ScanLine, Loader2, Download, FileText, FileType2, Trash2, Camera, Sparkles } from 'lucide-react'
 
 const BAHASA_OPTIONS = [
   { value: 'ind', label: 'Indonesia' },
@@ -10,15 +10,71 @@ const BAHASA_OPTIONS = [
   { value: 'ind+eng', label: 'Indonesia + Inggris' },
 ]
 
+// Dua metode pembacaan teks:
+// - 'tesseract' : OCR lokal di browser (gratis, offline, sudah ada sebelumnya)
+// - 'ai'        : dikirim ke endpoint backend yang memanggil Claude (vision),
+//                 lebih akurat untuk tulisan tangan / dokumen kompleks / tabel
+const METODE_OPTIONS = [
+  { value: 'tesseract', label: 'OCR Cepat', desc: 'Offline, gratis, cocok untuk teks cetak yang jelas' },
+  { value: 'ai', label: 'AI Scan (Gemini)', desc: 'Ditenagai Gemini — lebih akurat untuk tulisan tangan & dokumen rumit' },
+]
+
 export default function ScanDokumen() {
   const [antrian, setAntrian] = useState([]) // { id, name, previewUrl }
   const [bahasa, setBahasa] = useState('ind')
+  const [metodeScan, setMetodeScan] = useState('tesseract')
   const [ocrLoading, setOcrLoading] = useState(false)
   const [ocrProgress, setOcrProgress] = useState(0)
   const [fileSedangDiproses, setFileSedangDiproses] = useState('')
   const [teksHasil, setTeksHasil] = useState('')
   const [namaFile, setNamaFile] = useState('Dokumen Hasil Scan')
   const [error, setError] = useState('')
+
+  // --- Metode 1: OCR lokal dengan Tesseract (fitur lama, tidak diubah) ---
+  async function scanDenganTesseract(file) {
+    const { data: { text } } = await Tesseract.recognize(file, bahasa, {
+      logger: (m) => {
+        if (m.status === 'recognizing text') {
+          setOcrProgress(Math.round(m.progress * 100))
+        }
+      },
+    })
+    return text.trim()
+  }
+
+  // --- Metode 2 (baru): AI Scan via backend endpoint yang memanggil Gemini ---
+  async function scanDenganAI(file) {
+    setOcrProgress(0)
+    const base64 = await fileToBase64(file)
+
+    const res = await fetch('/api/ai-scan', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        image: base64,
+        mimeType: file.type,
+        bahasa, // dikirim sebagai konteks, bukan untuk menerjemahkan teksnya
+      }),
+    })
+
+    if (!res.ok) {
+      const detail = await res.text().catch(() => '')
+      throw new Error(`Server AI Scan (Gemini) gagal (${res.status}). ${detail}`)
+    }
+
+    const data = await res.json()
+    if (!data.text) throw new Error('Respons AI Scan tidak berisi teks.')
+    return data.text.trim()
+  }
+
+  function fileToBase64(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = () => resolve(reader.result.split(',')[1]) // buang prefix data:...;base64,
+      reader.onerror = () => reject(new Error('Gagal membaca file gambar.'))
+      reader.readAsDataURL(file)
+    })
+  }
 
   async function handleUpload(e) {
     const files = Array.from(e.target.files || [])
@@ -35,14 +91,11 @@ export default function ScanDokumen() {
       setOcrProgress(0)
 
       try {
-        const { data: { text } } = await Tesseract.recognize(file, bahasa, {
-          logger: (m) => {
-            if (m.status === 'recognizing text') {
-              setOcrProgress(Math.round(m.progress * 100))
-            }
-          },
-        })
-        const teksBersih = text.trim()
+        const teksBersih =
+          metodeScan === 'ai'
+            ? await scanDenganAI(file)
+            : await scanDenganTesseract(file)
+
         setTeksHasil((prev) => (prev ? prev + '\n\n' + teksBersih : teksBersih))
       } catch (err) {
         setError(`Gagal membaca "${file.name}": ${err.message}`)
@@ -102,6 +155,31 @@ export default function ScanDokumen() {
         </div>
 
         <div className="bg-white rounded-2xl shadow-sm p-6 sm:p-8 space-y-5">
+          {/* Pilihan metode scan (baru) */}
+          <div>
+            <label className="label-field">Metode Pembacaan Teks</label>
+            <div className="grid sm:grid-cols-2 gap-3">
+              {METODE_OPTIONS.map((m) => (
+                <button
+                  key={m.value}
+                  type="button"
+                  onClick={() => setMetodeScan(m.value)}
+                  className={`text-left rounded-xl border p-3 transition ${
+                    metodeScan === m.value
+                      ? 'border-ink-950 bg-ink-950/5'
+                      : 'border-ink-950/10 hover:border-ink-950/25'
+                  }`}
+                >
+                  <span className="flex items-center gap-1.5 text-sm font-semibold text-ink-950">
+                    {m.value === 'ai' && <Sparkles size={14} className="text-brass-500" />}
+                    {m.label}
+                  </span>
+                  <span className="block text-xs text-ink-700/60 mt-0.5">{m.desc}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
           {/* Kontrol bahasa OCR */}
           <div className="grid sm:grid-cols-2 gap-4">
             <div>
@@ -160,7 +238,9 @@ export default function ScanDokumen() {
             {ocrLoading && (
               <div className="flex items-center gap-2 text-sm text-ink-700/70">
                 <Loader2 size={16} className="animate-spin" />
-                Membaca "{fileSedangDiproses}"... {ocrProgress}%
+                {metodeScan === 'ai'
+                  ? `Membaca "${fileSedangDiproses}" dengan Gemini AI...`
+                  : `Membaca "${fileSedangDiproses}"... ${ocrProgress}%`}
               </div>
             )}
 
