@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { Navigate } from 'react-router-dom'
 import { useAuth } from '../lib/AuthContext'
-import { supabase } from '../lib/supabaseClient'
 import { Loader2, LogIn } from 'lucide-react'
 
 // Latar belakang animasi "hujan kode" ala Matrix — digambar langsung via canvas,
@@ -72,23 +71,12 @@ export default function Login() {
   const [loading, setLoading] = useState(false)
   const [mounted, setMounted] = useState(false)
   const [shake, setShake] = useState(0)
-  const [namaSekolah, setNamaSekolah] = useState('Dari pulau menuju dunia, pendidikan membuka cakrawala')
+  const namaSekolah = 'Dari pulau menuju dunia, pendidikan membuka cakrawala'
 
   useEffect(() => {
     // Memicu animasi masuk sesaat setelah komponen ter-render
     const t = requestAnimationFrame(() => setMounted(true))
     return () => cancelAnimationFrame(t)
-  }, [])
-
-  useEffect(() => {
-    supabase
-      .from('profil_sekolah')
-      .select('nama_sekolah')
-      .limit(1)
-      .single()
-      .then(({ data }) => {
-        if (data?.nama_sekolah) setNamaSekolah(data.nama_sekolah)
-      })
   }, [])
 
   if (session) return <Navigate to="/" replace />
