@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { Navigate, Link } from 'react-router-dom'
+import { Navigate } from 'react-router-dom'
 import { useAuth } from '../lib/AuthContext'
 import { supabase } from '../lib/supabaseClient'
 import { Loader2, LogIn } from 'lucide-react'
@@ -27,6 +27,7 @@ function MatrixRainBackground() {
     }
 
     function draw() {
+      // Jejak transparan agar karakter lama memudar perlahan (efek trail)
       ctx.fillStyle = 'rgba(3, 10, 8, 0.10)'
       ctx.fillRect(0, 0, canvas.width, canvas.height)
 
@@ -37,6 +38,7 @@ function MatrixRainBackground() {
         const x = i * fontSize
         const y = columns[i] * fontSize
 
+        // Karakter paling depan lebih terang, sisanya redup — nuansa hijau khas
         ctx.fillStyle = Math.random() > 0.975 ? '#c8fff2' : 'rgba(94, 234, 212, 0.55)'
         ctx.fillText(char, x, y)
 
@@ -70,9 +72,10 @@ export default function Login() {
   const [loading, setLoading] = useState(false)
   const [mounted, setMounted] = useState(false)
   const [shake, setShake] = useState(0)
-  const [namaSekolah, setNamaSekolah] = useState('SD Negeri Waria')
+  const [namaSekolah, setNamaSekolah] = useState('Dari pulau menuju dunia, pendidikan membuka cakrawala')
 
   useEffect(() => {
+    // Memicu animasi masuk sesaat setelah komponen ter-render
     const t = requestAnimationFrame(() => setMounted(true))
     return () => cancelAnimationFrame(t)
   }, [])
@@ -98,7 +101,7 @@ export default function Login() {
     setLoading(false)
     if (error) {
       setError('Email atau kata sandi salah. Silakan coba lagi.')
-      setShake((s) => s + 1)
+      setShake((s) => s + 1) // ganti key supaya animasi shake bisa diulang
     }
   }
 
@@ -114,6 +117,7 @@ export default function Login() {
           }`}
         >
           <div className="relative w-12 h-12 mx-auto mb-4">
+            {/* Cincin cahaya teal di belakang logo, berdenyut pelan — senada dengan loader */}
             <div className="login-badge-glow absolute inset-0 rounded-xl" />
             <div className="login-badge relative w-12 h-12 rounded-xl flex items-center justify-center font-bold text-xl">
               S
@@ -124,7 +128,7 @@ export default function Login() {
             School Management Information System
           </p>
           {namaSekolah && (
-            <p className="login-school text-sm font-medium mt-1.5">{namaSekolah}</p>
+            <p className="login-school text-xs font-medium mt-1.5 px-2 leading-snug">{namaSekolah}</p>
           )}
         </div>
 
@@ -182,13 +186,6 @@ export default function Login() {
             {loading ? <Loader2 size={16} className="animate-spin" /> : <LogIn size={16} />}
             Masuk
           </button>
-
-          <p className="text-center text-xs mt-1" style={{ color: 'var(--code-text)' }}>
-            Belum punya akun?{' '}
-            <Link to="/register" className="font-semibold" style={{ color: 'var(--text-accent)' }}>
-              Daftar
-            </Link>
-          </p>
         </form>
 
         <p
@@ -201,6 +198,7 @@ export default function Login() {
         </p>
       </div>
 
+      {/* Style khusus halaman login */}
       <style>{`
         .login-shell {
           --bg-1: #050b09;
