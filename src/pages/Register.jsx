@@ -5,7 +5,8 @@ import { useAuth } from '../lib/AuthContext'
 import { Loader2, UserPlus, CheckCircle2 } from 'lucide-react'
 
 export default function Register() {
-  const { session } = useAuth()
+  const { session, daftar } = useAuth()
+  const [mode, setMode] = useState('gabung') // 'gabung' | 'baru'
   const [daftarSekolah, setDaftarSekolah] = useState([])
   const [form, setForm] = useState({
     nama: '',
@@ -14,6 +15,7 @@ export default function Register() {
     konfirmasi: '',
     jabatan: 'guru',
     sekolahId: '',
+    namaSekolahBaru: '',
   })
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
@@ -56,8 +58,9 @@ export default function Register() {
           </div>
           <h1 className="text-lg font-semibold text-white tracking-wide">Pendaftaran Berhasil</h1>
           <p className="text-sm text-blue-200/70 mt-2">
-            Akun Anda sudah dibuat dan sedang menunggu persetujuan admin sekolah. Anda akan bisa login
-            setelah disetujui.
+            {mode === 'baru'
+              ? 'Sekolah dan akun Anda sudah dibuat, sedang menunggu persetujuan Superadmin. Anda akan bisa login setelah disetujui.'
+              : 'Akun Anda sudah dibuat dan sedang menunggu persetujuan admin sekolah. Anda akan bisa login setelah disetujui.'}
           </p>
           <Link to="/login" className="inline-block mt-4 text-sm font-medium text-blue-400 hover:text-blue-300">
             Kembali ke halaman Masuk
@@ -83,49 +86,31 @@ export default function Register() {
       setError('Kata sandi minimal 6 karakter.')
       return
     }
-    if (!form.sekolahId) {
+    if (mode === 'gabung' && !form.sekolahId) {
       setError('Pilih sekolah terlebih dahulu.')
+      return
+    }
+    if (mode === 'baru' && !form.namaSekolahBaru.trim()) {
+      setError('Isi nama sekolah yang akan didaftarkan.')
       return
     }
 
     setLoading(true)
 
-    const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+    const { error: daftarError } = await daftar({
+      mode,
+      nama: form.nama,
+      jabatan: form.jabatan,
       email: form.email,
       password: form.password,
+      sekolahId: form.sekolahId,
+      namaSekolahBaru: form.namaSekolahBaru.trim(),
     })
-
-    if (signUpError) {
-      setLoading(false)
-      setError(signUpError.message || 'Gagal mendaftar. Coba lagi.')
-      return
-    }
-
-    const userId = signUpData?.user?.id
-    if (!userId) {
-      setLoading(false)
-      setError('Gagal membuat akun. Coba lagi.')
-      return
-    }
-
-    const { error: profilError } = await supabase.from('profil').insert({
-      id: userId,
-      role: form.jabatan === 'guru' ? 'guru' : 'admin',
-      jabatan: form.jabatan,
-      sekolah_id: form.sekolahId,
-      nama_lengkap_pendaftar: form.nama,
-      email_pendaftar: form.email,
-      status_akun: 'menunggu',
-    })
-
-    // Penting: karena "Confirm email" nonaktif, signUp otomatis membuat sesi login.
-    // User belum disetujui, jadi paksa logout supaya tidak bisa masuk aplikasi dulu.
-    await supabase.auth.signOut()
 
     setLoading(false)
 
-    if (profilError) {
-      setError('Akun terbuat tapi data profil gagal disimpan: ' + profilError.message)
+    if (daftarError) {
+      setError(daftarError.message || 'Gagal mendaftar. Coba lagi.')
       return
     }
 
@@ -149,7 +134,29 @@ export default function Register() {
             <UserPlus className="text-blue-300" size={24} />
           </div>
           <h1 className="text-xl font-bold text-white tracking-widest uppercase">Daftar Akun</h1>
-          <p className="text-xs text-blue-200/60 mt-1">Akun akan aktif setelah disetujui admin sekolah.</p>
+          <p className="text-xs text-blue-200/60 mt-1">Akun akan aktif setelah disetujui admin.</p>
+        </div>
+
+        {/* Toggle mode: Gabung sekolah yang sudah ada / Daftar sekolah baru */}
+        <div className="grid grid-cols-2 gap-2 p-1 bg-slate-900/60 border border-blue-500/25 rounded-lg text-xs font-medium">
+          <button
+            type="button"
+            onClick={() => setMode('gabung')}
+            className={`py-2 rounded-md transition ${
+              mode === 'gabung' ? 'bg-blue-500/80 text-white' : 'text-blue-200/60 hover:text-blue-200'
+            }`}
+          >
+            Gabung Sekolah
+          </button>
+          <button
+            type="button"
+            onClick={() => setMode('baru')}
+            className={`py-2 rounded-md transition ${
+              mode === 'baru' ? 'bg-blue-500/80 text-white' : 'text-blue-200/60 hover:text-blue-200'
+            }`}
+          >
+            Daftar Sekolah Baru
+          </button>
         </div>
 
         <div>
@@ -166,18 +173,32 @@ export default function Register() {
             <option value="admin" className="bg-slate-900">Admin</option>
             <option value="kepala_sekolah" className="bg-slate-900">Kepala Sekolah</option>
           </select>
+          {mode === 'baru' && (
+            <p className="text-[11px] text-blue-200/50 mt-1">
+              Karena mendaftarkan sekolah baru, akun Anda otomatis jadi Admin Utama sekolah ini.
+            </p>
+          )}
         </div>
 
-        <div>
-          <label className={labelClass}>Sekolah</label>
-          <select required className={inputClass}
-            value={form.sekolahId} onChange={(e) => ubah('sekolahId', e.target.value)}>
-            <option value="" className="bg-slate-900">-- Pilih Sekolah --</option>
-            {daftarSekolah.map((s) => (
-              <option key={s.id} value={s.id} className="bg-slate-900">{s.nama_sekolah}</option>
-            ))}
-          </select>
-        </div>
+        {mode === 'gabung' ? (
+          <div>
+            <label className={labelClass}>Sekolah</label>
+            <select required className={inputClass}
+              value={form.sekolahId} onChange={(e) => ubah('sekolahId', e.target.value)}>
+              <option value="" className="bg-slate-900">-- Pilih Sekolah --</option>
+              {daftarSekolah.map((s) => (
+                <option key={s.id} value={s.id} className="bg-slate-900">{s.nama_sekolah}</option>
+              ))}
+            </select>
+          </div>
+        ) : (
+          <div>
+            <label className={labelClass}>Nama Sekolah Baru</label>
+            <input required className={inputClass}
+              placeholder="Contoh: SD Negeri Contoh"
+              value={form.namaSekolahBaru} onChange={(e) => ubah('namaSekolahBaru', e.target.value)} />
+          </div>
+        )}
 
         <div>
           <label className={labelClass}>Email</label>
