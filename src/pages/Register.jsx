@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, Navigate } from 'react-router-dom'
 import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../lib/AuthContext'
-import { Loader2, UserPlus, CheckCircle2 } from 'lucide-react'
+import { Loader2, UserPlus, CheckCircle2, ListChecks, Info } from 'lucide-react'
 
 export default function Register() {
   const { session, daftar } = useAuth()
@@ -121,14 +121,54 @@ export default function Register() {
     'w-full bg-slate-900/60 border border-blue-500/25 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-500 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-500/20'
   const labelClass = 'text-xs font-medium text-blue-200/70 mb-1 block tracking-wide'
 
+  // Kotak petunjuk kecil di kiri/kanan form — reusable, gaya senada dengan
+  // kartu form utama tapi lebih ringkas (dipakai untuk InfoBox langkah &
+  // catatan di bawah).
+  const InfoBox = ({ icon: Icon, title, items, side }) => (
+    <div
+      className={`w-full lg:w-56 shrink-0 bg-slate-900/70 backdrop-blur-xl p-5 rounded-2xl border border-blue-400/20 shadow-[0_0_30px_-12px_rgba(59,130,246,0.3)] ${
+        side === 'left' ? 'order-2 lg:order-1' : 'order-3'
+      }`}
+    >
+      <div className="flex items-center gap-2 mb-3">
+        <div className="w-7 h-7 rounded-full border border-blue-400/30 flex items-center justify-center bg-blue-400/10 shrink-0">
+          <Icon className="text-blue-300" size={14} />
+        </div>
+        <h2 className="text-xs font-semibold text-white tracking-wide uppercase">{title}</h2>
+      </div>
+      <ul className="space-y-2">
+        {items.map((item, i) => (
+          <li key={i} className="text-[11px] leading-relaxed text-blue-200/70 flex gap-2">
+            <span className="text-blue-400 shrink-0">•</span>
+            <span>{item}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+
   return (
-    <div className="relative min-h-screen flex items-center justify-center px-4">
+    <div className="relative min-h-screen flex items-center justify-center px-4 py-10">
       <Background />
 
-      <form
-        onSubmit={handleSubmit}
-        className="relative w-full max-w-sm bg-slate-900/70 backdrop-blur-xl p-7 rounded-2xl border border-blue-400/30 shadow-[0_0_40px_-10px_rgba(59,130,246,0.35)] space-y-4"
-      >
+      <div className="relative w-full max-w-4xl flex flex-col lg:flex-row items-stretch justify-center gap-4">
+        <InfoBox
+          side="left"
+          icon={ListChecks}
+          title="Langkah Pendaftaran"
+          items={[
+            'Isi nama lengkap sesuai identitas resmi.',
+            'Pilih jabatan Anda: Guru, Admin, atau Kepala Sekolah.',
+            'Pilih sekolah yang sudah terdaftar, atau daftarkan sekolah baru.',
+            'Gunakan email aktif — dipakai untuk login.',
+            'Buat kata sandi minimal 6 karakter.',
+          ]}
+        />
+
+        <form
+          onSubmit={handleSubmit}
+          className="relative order-1 lg:order-2 w-full lg:w-[380px] shrink-0 bg-slate-900/70 backdrop-blur-xl p-7 rounded-2xl border border-blue-400/30 shadow-[0_0_40px_-10px_rgba(59,130,246,0.35)] space-y-4"
+        >
         <div className="text-center mb-2">
           <div className="mx-auto mb-3 w-14 h-14 rounded-full border border-blue-400/40 flex items-center justify-center bg-blue-400/10 shadow-[0_0_20px_-4px_rgba(96,165,250,0.6)]">
             <UserPlus className="text-blue-300" size={24} />
@@ -233,6 +273,19 @@ export default function Register() {
           Sudah punya akun? <Link to="/login" className="text-blue-400 font-medium hover:text-blue-300">Masuk</Link>
         </p>
       </form>
+
+        <InfoBox
+          side="right"
+          icon={Info}
+          title="Perlu Diketahui"
+          items={[
+            'Akun baru berstatus "menunggu" sampai disetujui admin sekolah.',
+            'Mode "Daftar Sekolah Baru" menjadikan Anda Admin Utama otomatis.',
+            'Anda baru bisa login setelah akun disetujui.',
+            'Ada kendala? Hubungi admin sekolah Anda secara langsung.',
+          ]}
+        />
+      </div>
     </div>
   )
 }
