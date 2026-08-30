@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
-import { Bell } from 'lucide-react'
+import { Bell, MessageSquare, X } from 'lucide-react'
 import Sidebar from './Sidebar'
+import { useAuth } from '../lib/AuthContext'
 
 // Data contoh sementara — nanti gampang diganti dengan fetch dari Supabase
 // (misal tabel `notifikasi` dengan kolom: judul, deskripsi, dibuat_pada, dibaca)
@@ -108,6 +109,43 @@ function NotificationBell() {
   )
 }
 
+// Banner "Pesan dari Admin" — muncul di atas konten halaman kalau akun yang
+// sedang login punya 'catatan_admin' terisi (dikirim lewat tombol Kirim
+// Pesan / Edit Pesan di halaman Persetujuan Akun). Begitu ditutup, pesan
+// dihapus dari database (lewat tandaiPesanDibaca) supaya tidak muncul lagi.
+function PesanAdminBanner() {
+  const { pesanAdmin, tandaiPesanDibaca } = useAuth()
+  const [menutup, setMenutup] = useState(false)
+  const [memproses, setMemproses] = useState(false)
+
+  if (!pesanAdmin || menutup) return null
+
+  async function handleTutup() {
+    setMemproses(true)
+    setMenutup(true) // langsung sembunyikan di UI supaya terasa responsif
+    await tandaiPesanDibaca()
+    setMemproses(false)
+  }
+
+  return (
+    <div className="mx-8 mt-5 flex items-start gap-3 bg-blue-50 border border-blue-100 rounded-xl px-4 py-3">
+      <MessageSquare size={18} className="text-blue-600 shrink-0 mt-0.5" />
+      <div className="min-w-0 flex-1">
+        <p className="text-sm font-medium text-blue-900">Pesan dari Admin</p>
+        <p className="text-sm text-blue-700 mt-0.5 whitespace-pre-wrap">{pesanAdmin}</p>
+      </div>
+      <button
+        onClick={handleTutup}
+        disabled={memproses}
+        title="Tutup"
+        className="text-blue-400 hover:text-blue-600 shrink-0 disabled:opacity-50"
+      >
+        <X size={16} />
+      </button>
+    </div>
+  )
+}
+
 export default function Layout({ children, title, subtitle, actions }) {
   return (
     <div className="flex min-h-screen bg-slate-50">
@@ -123,6 +161,7 @@ export default function Layout({ children, title, subtitle, actions }) {
             {actions && <div className="flex items-center gap-3">{actions}</div>}
           </div>
         </header>
+        <PesanAdminBanner />
         <div className="px-8 py-7">{children}</div>
       </main>
     </div>
