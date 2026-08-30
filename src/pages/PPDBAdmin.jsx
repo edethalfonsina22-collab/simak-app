@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabaseClient'
 import Layout from '../components/Layout'
+import { useAuth } from '../lib/AuthContext'
 import { Check, X, Loader2, Copy, Printer, Trash2, Eye } from 'lucide-react'
 
 const TAB = [
@@ -94,6 +95,8 @@ function ModalDetailPendaftar({ pendaftar, onClose }) {
 }
 
 export default function PPDBAdmin() {
+  const { profil: authProfil } = useAuth()
+  const sekolahId = authProfil?.sekolah_id
   const [tab, setTab] = useState('menunggu')
   const [data, setData] = useState([])
   const [loading, setLoading] = useState(true)
@@ -102,8 +105,9 @@ export default function PPDBAdmin() {
   const [detailPendaftar, setDetailPendaftar] = useState(null)
 
   useEffect(() => {
-    supabase.from('profil_sekolah').select('*').eq('id', 1).maybeSingle().then(({ data }) => setProfil(data))
-  }, [])
+    if (!sekolahId) return
+    supabase.from('profil_sekolah').select('*').eq('sekolah_id', sekolahId).maybeSingle().then(({ data }) => setProfil(data))
+  }, [sekolahId])
 
   async function muatData() {
     setLoading(true)
