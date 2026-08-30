@@ -20,16 +20,69 @@ const LABEL_JABATAN = {
 
 // Kartu profil ringkas untuk akun yang tidak tertaut ke tabel `guru` (admin / admin_utama /
 // superadmin / kepala sekolah). Bukan guru, jadi tidak butuh mata pelajaran, NUPTK, kelas
-// asuh, dsb — cuma data diri dasar dari tabel `profil` yang diisi saat pendaftaran.
+// asuh, QR/barcode absensi, atau grafik aktivitas guru — tapi tetap dilengkapi foto profil
+// dan info sekolah supaya kualitas kartunya setara dengan kartu guru.
 // `adminData` diambil terpisah (bukan dari AuthContext) karena AuthContext hanya
-// mengambil role/jabatan/guru_id/sekolah_id/status_akun, tidak termasuk nama & email pendaftar.
+// mengambil role/jabatan/guru_id/sekolah_id/status_akun, tidak termasuk nama, email,
+// foto, dan nama sekolah.
 function ProfilAdminCard({ profil, userId, adminData }) {
   const [form, setForm] = useState({
     nama_lengkap_pendaftar: adminData?.nama_lengkap_pendaftar || '',
     email_pendaftar: adminData?.email_pendaftar || '',
   })
+  const [fotoPath, setFotoPath] = useState(adminData?.foto_profil_path || '')
+  const [uploadingFoto, setUploadingFoto] = useState(false)
   const [saving, setSaving] = useState(false)
   const [savedAt, setSavedAt] = useState(null)
+
+  // Sinkronkan form/foto kalau adminData datang belakangan (query async di komponen induk
+  // selesai setelah render pertama komponen ini).
+  useEffect(() => {
+    setForm({
+      nama_lengkap_pendaftar: adminData?.nama_lengkap_pendaftar || '',
+      email_pendaftar: adminData?.email_pendaftar || '',
+    })
+    setFotoPath(adminData?.foto_profil_path || '')
+  }, [adminData])
+
+  function fotoUrl() {
+    if (!fotoPath) return null
+    return supabase.storage.from('foto-profil').getPublicUrl(fotoPath).data.publicUrl
+  }
+
+  async function handleFotoChange(e) {
+    const file = e.target.files?.[0]
+    if (!file || !userId) return
+    setUploadingFoto(true)
+
+    const ext = file.name.split('.').pop()
+    const path = `${userId}/foto.${ext}`
+
+    const { error: uploadError } = await supabase.storage
+      .from('foto-profil')
+      .upload(path, file, { upsert: true })
+
+    if (uploadError) {
+      alert('Gagal upload foto: ' + uploadError.message)
+      setUploadingFoto(false)
+      return
+    }
+
+    // ASUMSI: tabel `profil` punya kolom `foto_profil_path` (sama seperti di tabel `guru`).
+    // Kalau kolom ini belum ada, tambahkan dulu:
+    // alter table profil add column foto_profil_path text;
+    const { error: updateError } = await supabase
+      .from('profil')
+      .update({ foto_profil_path: path })
+      .eq('id', userId)
+
+    if (updateError) {
+      alert('Gagal simpan foto: ' + updateError.message)
+    } else {
+      setFotoPath(path)
+    }
+    setUploadingFoto(false)
+  }
 
   async function handleSave(e) {
     e.preventDefault()
@@ -52,18 +105,87 @@ function ProfilAdminCard({ profil, userId, adminData }) {
 
   const labelJabatan = LABEL_JABATAN[profil?.jabatan] || LABEL_JABATAN[profil?.role] || profil?.jabatan || 'Admin'
 
+  // Superadmin (akses semua sekolah) ditandai dengan sekolah_id kosong.
+  // Admin/kepala sekolah biasa selalu terikat ke satu sekolah spesifik.
+  const isSuperadmin = !profil?.sekolah_id
+  const namaSekolah = adminData?.nama_sekolah
+
   return (
     <form onSubmit={handleSave} className="max-w-2xl space-y-5">
+      {/* Kartu identitas — gaya disamakan dengan kartu guru: gradasi navy + motif batik emas */}
       <div className="relative overflow-hidden rounded-xl p-6 flex items-center gap-5 bg-gradient-to-br from-blue-900 to-blue-950">
         <div className="absolute -top-10 -right-10 w-40 h-40 rounded-full bg-white/5 pointer-events-none" />
-        <div className="relative w-16 h-16 rounded-full bg-white/10 ring-2 ring-white/20 flex items-center justify-center shrink-0">
-          <ShieldCheck size={26} className="text-white/80" />
+        <div className="absolute -bottom-14 -left-6 w-32 h-32 rounded-full bg-white/5 pointer-events-none" />
+
+        {/* Corak batik abstrak emas — sama seperti kartu guru, supaya konsisten secara visual */}
+        <svg
+          className="absolute inset-0 w-full h-full pointer-events-none"
+          preserveAspectRatio="xMidYMid slice"
+          aria-hidden="true"
+        >
+          <defs>
+            <pattern
+              id="batikEmasAdmin"
+              x="0"
+              y="0"
+              width="72"
+              height="72"
+              patternUnits="userSpaceOnUse"
+              patternTransform="rotate(8)"
+            >
+              <g fill="none" stroke="#d4af37" strokeWidth="1.1">
+                <ellipse cx="36" cy="24" rx="9" ry="14" opacity="0.55" />
+                <ellipse cx="36" cy="48" rx="9" ry="14" opacity="0.55" />
+                <ellipse cx="24" cy="36" rx="14" ry="9" opacity="0.55" />
+                <ellipse cx="48" cy="36" rx="14" ry="9" opacity="0.55" />
+                <circle cx="36" cy="36" r="3" opacity="0.7" />
+              </g>
+              <path
+                d="M0 72 L18 54 L36 72 L54 54 L72 72"
+                fill="none"
+                stroke="#d4af37"
+                strokeWidth="0.8"
+                opacity="0.35"
+              />
+              <path d="M0 0 L18 18 L0 36" fill="none" stroke="#d4af37" strokeWidth="0.8" opacity="0.3" />
+              <circle cx="8" cy="8" r="1.3" fill="#d4af37" opacity="0.4" />
+              <circle cx="64" cy="16" r="1.3" fill="#d4af37" opacity="0.4" />
+              <circle cx="16" cy="64" r="1.3" fill="#d4af37" opacity="0.4" />
+            </pattern>
+            <linearGradient id="batikFadeAdmin" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stopColor="#000000" stopOpacity="0" />
+              <stop offset="100%" stopColor="#000000" stopOpacity="0.15" />
+            </linearGradient>
+          </defs>
+          <rect x="0" y="0" width="100%" height="100%" fill="url(#batikEmasAdmin)" />
+          <rect x="0" y="0" width="100%" height="100%" fill="url(#batikFadeAdmin)" />
+        </svg>
+
+        <div className="relative shrink-0">
+          <div className="w-16 h-16 rounded-full bg-white/10 ring-2 ring-white/20 overflow-hidden flex items-center justify-center">
+            {fotoUrl() ? (
+              <img src={fotoUrl()} alt="Foto profil" className="w-full h-full object-cover" />
+            ) : (
+              <ShieldCheck size={26} className="text-white/80" />
+            )}
+          </div>
+          <label className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-brass-400 flex items-center justify-center cursor-pointer shadow-md">
+            {uploadingFoto ? (
+              <Loader2 size={12} className="animate-spin text-ink-950" />
+            ) : (
+              <Camera size={12} className="text-ink-950" />
+            )}
+            <input type="file" accept="image/*" className="hidden" onChange={handleFotoChange} disabled={uploadingFoto} />
+          </label>
         </div>
         <div className="relative min-w-0">
           <p className="font-display font-semibold text-lg text-white truncate">
             {form.nama_lengkap_pendaftar || 'Nama belum diisi'}
           </p>
           <p className="text-sm text-blue-200/70">{labelJabatan}</p>
+          <p className="text-xs text-brass-300/90 mt-0.5 truncate">
+            {isSuperadmin ? 'Akses Semua Sekolah' : namaSekolah || 'Memuat nama sekolah...'}
+          </p>
         </div>
       </div>
 
@@ -91,6 +213,14 @@ function ProfilAdminCard({ profil, userId, adminData }) {
           <div>
             <label className="text-xs text-ink-700/60 mb-1 block">Jabatan</label>
             <input className="input w-full" value={labelJabatan} disabled />
+          </div>
+          <div>
+            <label className="text-xs text-ink-700/60 mb-1 block">Sekolah</label>
+            <input
+              className="input w-full"
+              value={isSuperadmin ? 'Akses Semua Sekolah' : namaSekolah || 'Memuat...'}
+              disabled
+            />
           </div>
         </div>
 
@@ -125,8 +255,8 @@ export default function ProfilSaya() {
   // QR code identitas guru (dibuat dari qrcode -> data URL PNG)
   const [qrDataUrl, setQrDataUrl] = useState('')
 
-  // Data pendaftar (nama & email) untuk akun admin/kepala sekolah tanpa guru_id.
-  // Diambil terpisah dari AuthContext supaya AuthContext.jsx tidak perlu diubah.
+  // Data pendaftar (nama, email, foto, nama sekolah) untuk akun admin/kepala sekolah
+  // tanpa guru_id. Diambil terpisah dari AuthContext supaya AuthContext.jsx tidak perlu diubah.
   const [adminData, setAdminData] = useState(null)
   const [loadingAdminData, setLoadingAdminData] = useState(true)
 
@@ -156,12 +286,29 @@ export default function ProfilSaya() {
         return
       }
       setLoadingAdminData(true)
+
       const { data: row } = await supabase
         .from('profil')
-        .select('nama_lengkap_pendaftar, email_pendaftar')
+        .select('nama_lengkap_pendaftar, email_pendaftar, foto_profil_path')
         .eq('id', userId)
         .maybeSingle()
-      setAdminData(row)
+
+      // Nama sekolah diambil lewat query terpisah (bukan join/embed) supaya tidak
+      // tergantung ada-tidaknya foreign key profil.sekolah_id -> sekolah.id di skema
+      // Supabase. Superadmin (sekolah_id kosong) tidak perlu query ini sama sekali.
+      // ASUMSI: tabel `sekolah` punya kolom `nama_sekolah` — sesuaikan kalau nama
+      // kolomnya berbeda di skema kamu (mis. `nama`).
+      let namaSekolah = null
+      if (profil?.sekolah_id) {
+        const { data: sekolahRow } = await supabase
+          .from('sekolah')
+          .select('nama_sekolah')
+          .eq('id', profil.sekolah_id)
+          .maybeSingle()
+        namaSekolah = sekolahRow?.nama_sekolah || null
+      }
+
+      setAdminData({ ...row, nama_sekolah: namaSekolah })
       setLoadingAdminData(false)
     }
     loadAdminData()
@@ -299,7 +446,7 @@ export default function ProfilSaya() {
 
   // Akun tanpa guru_id: kalau role-nya termasuk kelompok admin (admin, admin_utama,
   // superadmin, kepala_sekolah — persis sama dengan definisi `isAdmin` di AuthContext),
-  // ini memang wajar, dia bukan baris di tabel `guru`. Tampilkan kartu profil ringkas,
+  // ini memang wajar, dia bukan baris di tabel `guru`. Tampilkan kartu profil admin,
   // bukan pesan yang menyuruh menautkan ke data guru (yang tidak relevan untuk mereka).
   if (!profil?.guru_id) {
     if (isAdmin) {
