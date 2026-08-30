@@ -246,7 +246,7 @@ export default function PengajuanSuratAktif() {
 
   // Susun PDF Surat Keterangan (jenis menyesuaikan pengajuan) dan kembalikan bytes-nya.
   async function buatPdfSurat(item) {
-    const { data: sekolah } = await supabase.from('profil_sekolah').select('*').eq('id', 1).maybeSingle()
+    const { data: sekolah } = await supabase.from('profil_sekolah').select('*').eq('sekolah_id', profil?.sekolah_id).maybeSingle()
 
     const jenisSuratItem = item.jenis_surat || 'Aktif Mengajar'
     const isiKeteranganItem =
