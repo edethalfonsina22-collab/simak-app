@@ -1,5 +1,17 @@
 import { useEffect, useState } from 'react'
-import { CheckCircle2, XCircle, Clock3, X, UserCheck, UserPlus } from 'lucide-react'
+import {
+  CheckCircle2,
+  XCircle,
+  Clock3,
+  X,
+  UserCheck,
+  UserPlus,
+  MessageSquare,
+  Pencil,
+  KeyRound,
+  RotateCcw,
+  Trash2,
+} from 'lucide-react'
 import { useAuth } from '../lib/AuthContext'
 import { supabase } from '../lib/supabaseClient'
 import Layout from '../components/Layout'
@@ -12,13 +24,14 @@ export default function PersetujuanAkun() {
   const [loading, setLoading] = useState(true)
   const [prosesId, setProsesId] = useState(null)
   const [modalGuru, setModalGuru] = useState(null) // akun yang sedang diproses link guru-nya
+  const [modalEdit, setModalEdit] = useState(null) // akun yang sedang diedit datanya
 
   async function muatData() {
     setLoading(true)
     let query = supabase
       .from('profil')
       .select(
-        'id, role, jabatan, status_akun, nama_lengkap_pendaftar, email_pendaftar, catatan_admin, dibuat_pada, sekolah_id, sekolah:sekolah_id(nama_sekolah)'
+        'id, role, jabatan, status_akun, nama_lengkap_pendaftar, email_pendaftar, catatan_admin, dibuat_pada, sekolah_id, guru_id, sekolah:sekolah_id(nama_sekolah)'
       )
       .order('dibuat_pada', { ascending: false })
 
@@ -71,6 +84,105 @@ export default function PersetujuanAkun() {
     } else {
       ubahStatus(akun.id, 'aktif')
     }
+  }
+
+  // Kirim/edit pesan (catatan_admin) untuk akun yang sudah disetujui
+  async function handlePesan(akun) {
+    const pesanBaru = window.prompt(
+      `Pesan untuk ${akun.nama_lengkap_pendaftar || 'pengguna ini'}:`,
+      akun.catatan_admin || ''
+    )
+    if (pesanBaru === null) return // dibatalkan
+    setProsesId(akun.id)
+    const { error } = await supabase
+      .from('profil')
+      .update({ catatan_admin: pesanBaru })
+      .eq('id', akun.id)
+    setProsesId(null)
+    if (error) {
+      window.alert('Gagal menyimpan pesan: ' + error.message)
+      return
+    }
+    muatData()
+  }
+
+  // Kirim link reset password ke email pengguna (via Supabase Auth)
+  async function handleResetPassword(akun) {
+    if (!akun.email_pendaftar) {
+      window.alert('Akun ini tidak memiliki email terdaftar.')
+      return
+    }
+    if (!window.confirm(`Kirim link reset password ke ${akun.email_pendaftar}?`)) return
+    setProsesId(akun.id)
+    const { error } = await supabase.auth.resetPasswordForEmail(akun.email_pendaftar)
+    setProsesId(null)
+    if (error) {
+      window.alert('Gagal mengirim link reset password: ' + error.message)
+      return
+    }
+    window.alert('Link reset password berhasil dikirim ke ' + akun.email_pendaftar)
+  }
+
+  // Kembalikan status akun ke "menunggu" — membatalkan keputusan setuju/tolak sebelumnya
+  async function handleResetStatus(akun) {
+    if (
+      !window.confirm(
+        `Kembalikan status akun "${akun.nama_lengkap_pendaftar || akun.email_pendaftar}" ke "Menunggu"? Keputusan sebelumnya akan dibatalkan.`
+      )
+    )
+      return
+    setProsesId(akun.id)
+    const { error } = await supabase
+      .from('profil')
+      .update({ status_akun: 'menunggu', catatan_admin: null, guru_id: null })
+      .eq('id', akun.id)
+    setProsesId(null)
+    if (error) {
+      window.alert('Gagal mereset status akun: ' + error.message)
+      return
+    }
+    muatData()
+  }
+
+  // Simpan perubahan data akun dari modal Edit
+  async function handleSimpanEdit(id, dataBaru) {
+    setProsesId(id)
+    const { error } = await supabase.from('profil').update(dataBaru).eq('id', id)
+    setProsesId(null)
+    setModalEdit(null)
+    if (error) {
+      window.alert('Gagal menyimpan perubahan: ' + error.message)
+      return
+    }
+    muatData()
+  }
+
+  // Hapus akun: data profil + data guru terkait (jika ada) sekaligus
+  async function handleHapus(akun) {
+    if (
+      !window.confirm(
+        `Hapus akun "${akun.nama_lengkap_pendaftar || akun.email_pendaftar}" secara permanen? Data guru terkait (jika ada) juga akan ikut terhapus. Tindakan ini tidak bisa dibatalkan.`
+      )
+    )
+      return
+    setProsesId(akun.id)
+
+    const { error: errProfil } = await supabase.from('profil').delete().eq('id', akun.id)
+    if (errProfil) {
+      setProsesId(null)
+      window.alert('Gagal menghapus data profil: ' + errProfil.message)
+      return
+    }
+
+    if (akun.guru_id) {
+      const { error: errGuru } = await supabase.from('guru').delete().eq('id', akun.guru_id)
+      if (errGuru) {
+        window.alert('Data profil terhapus, tetapi gagal menghapus data guru terkait: ' + errGuru.message)
+      }
+    }
+
+    setProsesId(null)
+    muatData()
   }
 
   return (
@@ -142,7 +254,7 @@ export default function PersetujuanAkun() {
                 <th className="text-left px-4 py-3 font-medium">Jabatan</th>
                 {isSuperAdmin && <th className="text-left px-4 py-3 font-medium">Sekolah</th>}
                 <th className="text-left px-4 py-3 font-medium">Status</th>
-                {tab === 'menunggu' && <th className="text-right px-4 py-3 font-medium">Aksi</th>}
+                <th className="text-right px-4 py-3 font-medium">Aksi</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -158,27 +270,82 @@ export default function PersetujuanAkun() {
                   )}
                   <td className="px-4 py-3">
                     <StatusBadge status={akun.status_akun} />
+                    {akun.status_akun === 'aktif' && akun.catatan_admin && (
+                      <p className="text-[11px] text-slate-400 mt-1 max-w-[220px] truncate" title={akun.catatan_admin}>
+                        "{akun.catatan_admin}"
+                      </p>
+                    )}
                   </td>
-                  {tab === 'menunggu' && (
-                    <td className="px-4 py-3 text-right">
-                      <div className="flex justify-end gap-2">
+                  <td className="px-4 py-3 text-right">
+                    <div className="flex justify-end items-center gap-1.5 flex-wrap">
+                      {akun.status_akun === 'menunggu' && (
+                        <>
+                          <button
+                            onClick={() => handleSetujui(akun)}
+                            disabled={prosesId === akun.id}
+                            className="flex items-center gap-1 text-xs font-medium px-3 py-1.5 rounded-lg bg-green-50 text-green-600 hover:bg-green-100 disabled:opacity-60"
+                          >
+                            <CheckCircle2 size={14} /> Setujui
+                          </button>
+                          <button
+                            onClick={() => handleTolak(akun.id)}
+                            disabled={prosesId === akun.id}
+                            className="flex items-center gap-1 text-xs font-medium px-3 py-1.5 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 disabled:opacity-60"
+                          >
+                            <XCircle size={14} /> Tolak
+                          </button>
+                        </>
+                      )}
+
+                      {akun.status_akun === 'aktif' && (
                         <button
-                          onClick={() => handleSetujui(akun)}
+                          onClick={() => handlePesan(akun)}
                           disabled={prosesId === akun.id}
-                          className="flex items-center gap-1 text-xs font-medium px-3 py-1.5 rounded-lg bg-green-50 text-green-600 hover:bg-green-100 disabled:opacity-60"
+                          className="flex items-center gap-1 text-xs font-medium px-3 py-1.5 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 disabled:opacity-60"
                         >
-                          <CheckCircle2 size={14} /> Setujui
+                          <MessageSquare size={14} /> {akun.catatan_admin ? 'Edit Pesan' : 'Kirim Pesan'}
                         </button>
+                      )}
+
+                      {akun.status_akun !== 'menunggu' && (
                         <button
-                          onClick={() => handleTolak(akun.id)}
+                          onClick={() => handleResetStatus(akun)}
                           disabled={prosesId === akun.id}
-                          className="flex items-center gap-1 text-xs font-medium px-3 py-1.5 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 disabled:opacity-60"
+                          title="Kembalikan ke status Menunggu"
+                          className="w-7 h-7 rounded-lg flex items-center justify-center text-indigo-600 hover:bg-indigo-50 disabled:opacity-60"
                         >
-                          <XCircle size={14} /> Tolak
+                          <RotateCcw size={14} />
                         </button>
-                      </div>
-                    </td>
-                  )}
+                      )}
+
+                      <button
+                        onClick={() => setModalEdit(akun)}
+                        disabled={prosesId === akun.id}
+                        title="Edit data akun"
+                        className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-500 hover:bg-slate-100 disabled:opacity-60"
+                      >
+                        <Pencil size={14} />
+                      </button>
+
+                      <button
+                        onClick={() => handleResetPassword(akun)}
+                        disabled={prosesId === akun.id}
+                        title="Kirim link reset password"
+                        className="w-7 h-7 rounded-lg flex items-center justify-center text-amber-600 hover:bg-amber-50 disabled:opacity-60"
+                      >
+                        <KeyRound size={14} />
+                      </button>
+
+                      <button
+                        onClick={() => handleHapus(akun)}
+                        disabled={prosesId === akun.id}
+                        title="Hapus akun"
+                        className="w-7 h-7 rounded-lg flex items-center justify-center text-red-600 hover:bg-red-50 disabled:opacity-60"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -191,6 +358,14 @@ export default function PersetujuanAkun() {
           akun={modalGuru}
           onClose={() => setModalGuru(null)}
           onSelesai={(guruId) => ubahStatus(modalGuru.id, 'aktif', '', guruId)}
+        />
+      )}
+
+      {modalEdit && (
+        <ModalEditAkun
+          akun={modalEdit}
+          onClose={() => setModalEdit(null)}
+          onSimpan={handleSimpanEdit}
         />
       )}
     </Layout>
@@ -333,6 +508,80 @@ function ModalHubungkanGuru({ akun, onClose, onSelesai }) {
             </button>
           </>
         )}
+      </div>
+    </div>
+  )
+}
+
+function ModalEditAkun({ akun, onClose, onSimpan }) {
+  const [nama, setNama] = useState(akun.nama_lengkap_pendaftar || '')
+  const [email, setEmail] = useState(akun.email_pendaftar || '')
+  const [jabatan, setJabatan] = useState(akun.jabatan || akun.role || 'guru')
+  const [menyimpan, setMenyimpan] = useState(false)
+
+  async function handleSimpan() {
+    setMenyimpan(true)
+    await onSimpan(akun.id, {
+      nama_lengkap_pendaftar: nama,
+      email_pendaftar: email,
+      jabatan,
+    })
+    setMenyimpan(false)
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center px-4 z-50">
+      <div className="bg-white rounded-2xl max-w-md w-full p-5">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="font-semibold text-slate-800">Edit Data Akun</h2>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600">
+            <X size={18} />
+          </button>
+        </div>
+
+        <div className="space-y-3">
+          <div>
+            <label className="text-xs font-medium text-slate-500 mb-1 block">Nama Lengkap</label>
+            <input
+              className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm"
+              value={nama}
+              onChange={(e) => setNama(e.target.value)}
+            />
+          </div>
+          <div>
+            <label className="text-xs font-medium text-slate-500 mb-1 block">Email</label>
+            <input
+              type="email"
+              className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+            />
+            <p className="text-[11px] text-slate-400 mt-1">
+              Catatan: mengubah email di sini hanya mengubah data tampilan, bukan email login akun.
+            </p>
+          </div>
+          <div>
+            <label className="text-xs font-medium text-slate-500 mb-1 block">Jabatan</label>
+            <select
+              className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm"
+              value={jabatan}
+              onChange={(e) => setJabatan(e.target.value)}
+            >
+              <option value="guru">Guru</option>
+              <option value="admin">Admin</option>
+              <option value="kepala_sekolah">Kepala Sekolah</option>
+              <option value="admin_utama">Admin Utama</option>
+            </select>
+          </div>
+        </div>
+
+        <button
+          onClick={handleSimpan}
+          disabled={menyimpan || !nama || !email}
+          className="w-full mt-5 bg-blue-600 text-white text-sm font-medium py-2.5 rounded-lg disabled:opacity-50"
+        >
+          {menyimpan ? 'Menyimpan...' : 'Simpan Perubahan'}
+        </button>
       </div>
     </div>
   )
