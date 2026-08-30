@@ -144,6 +144,8 @@ export default function Siswa() {
   const exportMenuRef = useRef(null)
   const [uploadingId, setUploadingId] = useState(null)
   const [profilLihat, setProfilLihat] = useState(null) // siswa yang sedang dilihat detail profilnya
+  const [selectedIds, setSelectedIds] = useState([]) // TAMBAHAN: untuk fitur Hapus Massal
+  const [bulkDeleting, setBulkDeleting] = useState(false)
 
   async function loadData() {
     setLoading(true)
@@ -240,6 +242,37 @@ export default function Siswa() {
     const { error } = await supabase.from('siswa').delete().eq('id', id)
     if (!error) loadData()
     else alert('Gagal menghapus: ' + error.message)
+  }
+
+  // TAMBAHAN: Hapus Massal — menghapus semua siswa yang dicentang sekaligus
+  function toggleSelectOne(id) {
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    )
+  }
+
+  function toggleSelectAll() {
+    const idsDitampilkan = filtered.map((s) => s.id)
+    const semuaTerpilih = idsDitampilkan.length > 0 && idsDitampilkan.every((id) => selectedIds.includes(id))
+    if (semuaTerpilih) {
+      setSelectedIds((prev) => prev.filter((id) => !idsDitampilkan.includes(id)))
+    } else {
+      setSelectedIds((prev) => Array.from(new Set([...prev, ...idsDitampilkan])))
+    }
+  }
+
+  async function handleBulkDelete() {
+    if (selectedIds.length === 0) return
+    if (!confirm(`Hapus ${selectedIds.length} siswa terpilih? Tindakan ini tidak bisa dibatalkan.`)) return
+    setBulkDeleting(true)
+    const { error } = await supabase.from('siswa').delete().in('id', selectedIds)
+    setBulkDeleting(false)
+    if (!error) {
+      setSelectedIds([])
+      loadData()
+    } else {
+      alert('Gagal menghapus: ' + error.message)
+    }
   }
 
   // --- Logika impor bersama, dipakai oleh "Impor Massal" (template biasa) DAN
@@ -476,6 +509,12 @@ export default function Siswa() {
       subtitle={`${data.length} siswa terdaftar`}
       actions={
         <>
+          {isAdmin && selectedIds.length > 0 && (
+            <button className="btn-secondary text-red-600 hover:bg-red-50" onClick={handleBulkDelete} disabled={bulkDeleting}>
+              {bulkDeleting ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
+              Hapus Massal ({selectedIds.length})
+            </button>
+          )}
           <div className="relative" ref={exportMenuRef}>
             <button className="btn-secondary" onClick={() => setShowExportMenu((v) => !v)}>
               <Download size={16} /> Unduh / Cetak <ChevronDown size={14} />
@@ -545,6 +584,15 @@ export default function Siswa() {
         <table className="table-shell">
           <thead>
             <tr>
+              {isAdmin && (
+                <th>
+                  <input
+                    type="checkbox"
+                    checked={filtered.length > 0 && filtered.every((s) => selectedIds.includes(s.id))}
+                    onChange={toggleSelectAll}
+                  />
+                </th>
+              )}
               <th>Foto</th>
               <th>Nama Lengkap</th>
               <th>NIS</th>
@@ -559,13 +607,22 @@ export default function Siswa() {
           </thead>
           <tbody>
             {loading && (
-              <tr><td colSpan={10} className="text-center py-8 text-ink-700/50">Memuat data...</td></tr>
+              <tr><td colSpan={isAdmin ? 11 : 10} className="text-center py-8 text-ink-700/50">Memuat data...</td></tr>
             )}
             {!loading && filtered.length === 0 && (
-              <tr><td colSpan={10} className="text-center py-8 text-ink-700/50">Belum ada data siswa.</td></tr>
+              <tr><td colSpan={isAdmin ? 11 : 10} className="text-center py-8 text-ink-700/50">Belum ada data siswa.</td></tr>
             )}
             {filtered.map((s) => (
               <tr key={s.id}>
+                {isAdmin && (
+                  <td>
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.includes(s.id)}
+                      onChange={() => toggleSelectOne(s.id)}
+                    />
+                  </td>
+                )}
                 <td>
                   <label className="relative block w-10 h-10 rounded-full overflow-hidden bg-ink-900/[0.06] cursor-pointer shrink-0 group">
                     {fotoUrl(s.foto_path) ? (
