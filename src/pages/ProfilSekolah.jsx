@@ -26,7 +26,7 @@ const emptyForm = {
   kabupaten: '',
   dinas_pendidikan: '',
   kecamatan: '',
-  tempat_ttd: '', // <-- nama tempat untuk tanggal di surat/laporan (mis. "Masidang")
+  tempat_ttd: '', // <-- nama tempat untuk tanggal di surat/laporan (mis. "Waria")
   // TAMBAHAN: dipakai di Halaman Identitas Rapor (kop identitas sekolah)
   kelurahan_desa: '',
   kode_pos: '',
