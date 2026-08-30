@@ -151,7 +151,7 @@ export default function Siswa() {
     setLoading(true)
     const [{ data: siswa }, { data: kelas }] = await Promise.all([
       supabase.from('siswa').select('*, kelas(nama_kelas)').order('nama_lengkap'),
-      supabase.from('kelas').select('id, nama_kelas').order('nama_kelas'),
+      supabase.from('kelas').select('id, nama_kelas, tingkat').order('nama_kelas'),
     ])
     setData(siswa || [])
     setKelasList(kelas || [])
