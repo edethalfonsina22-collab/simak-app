@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabaseClient'
 import Layout from '../components/Layout'
+import { useAuth } from '../lib/AuthContext'
 import { eksporExcel, eksporPDF, eksporPDFDaftarHadir } from '../lib/exportUtils'
 import { susunDaftarHadir, apakahHariMinggu, kodeSel, jumlahHariDalamBulan } from '../lib/daftarHadirUtils'
 import { Printer, FileDown, FileSpreadsheet, Loader2 } from 'lucide-react'
@@ -25,6 +26,8 @@ function rentangBulan(tahun, bulan) {
 }
 
 export default function LaporanBulanan() {
+  const { profil } = useAuth()
+  const sekolahId = profil?.sekolah_id
   const now = new Date()
   const [tahun, setTahun] = useState(now.getFullYear())
   const [bulan, setBulan] = useState(now.getMonth() + 1)
@@ -41,7 +44,8 @@ export default function LaporanBulanan() {
   const [mengeksporPDF, setMengeksporPDF] = useState(false)
 
   useEffect(() => {
-    supabase.from('profil_sekolah').select('*').eq('id', 1).maybeSingle().then(({ data }) => {
+    if (!sekolahId) return
+    supabase.from('profil_sekolah').select('*').eq('sekolah_id', sekolahId).maybeSingle().then(({ data }) => {
       setProfilSekolah(data || {})
       if (data?.logo_path) {
         const { data: pub } = supabase.storage.from('profil-sekolah').getPublicUrl(data.logo_path)
@@ -57,7 +61,7 @@ export default function LaporanBulanan() {
         setTtdUrl('')
       }
     })
-  }, [])
+  }, [sekolahId])
 
   async function muatLaporan() {
     setLoading(true)
