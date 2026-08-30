@@ -137,14 +137,13 @@ export default function Dokumen() {
       return
     }
 
-const { error: insertError } = await supabase.from('dokumen').insert({
-  judul: form.judul,
-  deskripsi: form.deskripsi,
-  file_path: path,
-  file_nama: form.file.name,
-  guru_id: profil.guru_id,
-  sekolah_id: profil.sekolah_id,
-})
+    const { error: insertError } = await supabase.from('dokumen').insert({
+      judul: form.judul,
+      deskripsi: form.deskripsi,
+      file_path: path,
+      file_nama: form.file.name,
+      guru_id: profil.guru_id,
+    })
 
     if (insertError) {
       alert('Gagal simpan data dokumen: ' + insertError.message)
@@ -326,7 +325,8 @@ const { error: insertError } = await supabase.from('dokumen').insert({
                 )}
               </div>
 
-              <FileText size={72} className="absolute -right-3 -bottom-4 text-slate-900/[0.04]" />
+              {/* pointer-events-none ditambahkan agar ikon dekoratif ini tidak menutupi/memblokir klik pada tombol-tombol di atasnya (mis. tombol Hapus) */}
+              <FileText size={72} className="absolute -right-3 -bottom-4 text-slate-900/[0.04] pointer-events-none" />
             </div>
           ))}
         </div>
