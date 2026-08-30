@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
-import { Bell, MessageSquare, X } from 'lucide-react'
+import { useLocation } from 'react-router-dom'
+import { Bell, MessageSquare, X, Menu } from 'lucide-react'
 import Sidebar from './Sidebar'
 import { useAuth } from '../lib/AuthContext'
 
@@ -128,7 +129,7 @@ function PesanAdminBanner() {
   }
 
   return (
-    <div className="mx-8 mt-5 flex items-start gap-3 bg-blue-50 border border-blue-100 rounded-xl px-4 py-3">
+    <div className="mx-4 sm:mx-6 md:mx-8 mt-5 flex items-start gap-3 bg-blue-50 border border-blue-100 rounded-xl px-4 py-3">
       <MessageSquare size={18} className="text-blue-600 shrink-0 mt-0.5" />
       <div className="min-w-0 flex-1">
         <p className="text-sm font-medium text-blue-900">Pesan dari Admin</p>
@@ -147,22 +148,49 @@ function PesanAdminBanner() {
 }
 
 export default function Layout({ children, title, subtitle, actions }) {
+  const [sidebarOpen, setSidebarOpen] = useState(false)
+  const location = useLocation()
+
+  // Tutup drawer otomatis setiap kali pindah halaman (mis. setelah tap menu)
+  useEffect(() => {
+    setSidebarOpen(false)
+  }, [location.pathname])
+
+  // Kunci scroll body saat drawer terbuka di HP supaya konten di belakangnya tidak ikut geser
+  useEffect(() => {
+    document.body.style.overflow = sidebarOpen ? 'hidden' : ''
+    return () => {
+      document.body.style.overflow = ''
+    }
+  }, [sidebarOpen])
+
   return (
     <div className="flex min-h-screen bg-slate-50">
-      <Sidebar />
-      <main className="flex-1 min-w-0">
-        <header className="sticky top-0 z-10 bg-white/90 backdrop-blur border-b border-slate-200 px-8 py-5 flex items-center justify-between">
-          <div>
-            <h1 className="font-display text-2xl font-semibold text-slate-900">{title}</h1>
-            {subtitle && <p className="text-sm text-slate-500 mt-0.5">{subtitle}</p>}
+      <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+      <main className="flex-1 min-w-0 w-full">
+        <header className="sticky top-0 z-30 bg-white/90 backdrop-blur border-b border-slate-200 px-4 sm:px-6 md:px-8 py-3.5 md:py-5 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+            <button
+              onClick={() => setSidebarOpen(true)}
+              title="Buka menu"
+              className="w-10 h-10 -ml-1.5 shrink-0 rounded-lg flex items-center justify-center text-slate-500 hover:bg-slate-100 hover:text-slate-800 transition-colors md:hidden"
+            >
+              <Menu size={21} strokeWidth={2} />
+            </button>
+            <div className="min-w-0">
+              <h1 className="font-display text-lg sm:text-xl md:text-2xl font-semibold text-slate-900 truncate">
+                {title}
+              </h1>
+              {subtitle && <p className="text-xs sm:text-sm text-slate-500 mt-0.5 truncate">{subtitle}</p>}
+            </div>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
             <NotificationBell />
-            {actions && <div className="flex items-center gap-3">{actions}</div>}
+            {actions && <div className="flex items-center gap-2 sm:gap-3">{actions}</div>}
           </div>
         </header>
         <PesanAdminBanner />
-        <div className="px-8 py-7">{children}</div>
+        <div className="px-4 sm:px-6 md:px-8 py-5 md:py-7">{children}</div>
       </main>
     </div>
   )
