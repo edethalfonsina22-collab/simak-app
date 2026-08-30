@@ -385,6 +385,7 @@ export default function LaporanBulanan() {
           <p className="text-center py-8 text-ink-700/50 text-sm">Tidak ada data untuk periode ini.</p>
         )}
         {!loading && !modeGridAktif && baris.length > 0 && (
+          <div className="overflow-x-auto">
           <table className="table-shell">
             <thead>
               <tr>{kolom.map((k) => <th key={k}>{k}</th>)}</tr>
@@ -395,6 +396,7 @@ export default function LaporanBulanan() {
               ))}
             </tbody>
           </table>
+          </div>
         )}
 
         {/* ---------- Tampilan Daftar Hadir (grid kalender, format kertas absensi) ---------- */}
