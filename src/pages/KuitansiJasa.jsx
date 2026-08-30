@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { supabase } from '../lib/supabaseClient'
 import Layout from '../components/Layout'
+import { useAuth } from '../lib/AuthContext'
 import KuitansiJasaModal from '../components/KuitansiJasaModal'
 import PilihKuitansiModal from '../components/PilihKuitansiModal'
 import KuitansiJasaPrintTemplate from '../lib/KuitansiJasaPrintTemplate'
@@ -17,6 +18,8 @@ function formatTanggal(tgl) {
 }
 
 export default function KuitansiJasa() {
+  const { profil } = useAuth()
+  const sekolahId = profil?.sekolah_id
   const [data, setData] = useState([])
   const [loading, setLoading] = useState(true)
   const [pencarian, setPencarian] = useState('')
@@ -44,7 +47,8 @@ export default function KuitansiJasa() {
 
   useEffect(() => {
     loadData()
-    supabase.from('profil_sekolah').select('*').eq('id', 1).maybeSingle().then(({ data }) => {
+    if (!sekolahId) return
+    supabase.from('profil_sekolah').select('*').eq('sekolah_id', sekolahId).maybeSingle().then(({ data }) => {
       if (data) {
         setSekolah({
           nama: data.nama_sekolah,
@@ -53,7 +57,7 @@ export default function KuitansiJasa() {
         })
       }
     })
-  }, [])
+  }, [sekolahId])
 
   const dataTersaring = useMemo(() => {
     return data.filter((d) => {
