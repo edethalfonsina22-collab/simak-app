@@ -247,6 +247,16 @@ export default function Siswa() {
   // cara MEMBACA file & memetakan baris; setelah baris berhasil dipetakan ke bentuk
   // yang sama (object siap-simpan), proses insert/update-nya identik.
   async function importSiswaRows(rows) {
+    // PERBAIKAN: ambil data siswa yang sudah ada LANGSUNG dari server saat proses
+    // impor berjalan (bukan dari state `data` React yang sudah dimuat sebelumnya).
+    // Ini menghindari kondisi balapan (race condition) — misalnya kalau modal impor
+    // dibuka sebelum daftar siswa lama selesai dimuat — yang sebelumnya bisa membuat
+    // SEMUA baris dianggap "siswa baru" dan menciptakan data duplikat.
+    const { data: existing, error: fetchError } = await supabase
+      .from('siswa')
+      .select('id, nis, nisn')
+    if (fetchError) throw fetchError
+
     // Cocokkan tiap baris dengan siswa yang SUDAH ADA berdasarkan NIS atau NISN.
     // Kalau cocok -> UPDATE data siswa itu (tidak menambah baris baru / duplikat).
     // Kalau tidak cocok dengan siapa pun -> INSERT sebagai siswa baru.
@@ -254,7 +264,7 @@ export default function Siswa() {
     const toInsert = []
 
     rows.forEach((row) => {
-      const match = data.find(
+      const match = existing.find(
         (d) =>
           (row.nis && d.nis && String(d.nis).trim() === String(row.nis).trim()) ||
           (row.nisn && d.nisn && String(d.nisn).trim() === String(row.nisn).trim())
