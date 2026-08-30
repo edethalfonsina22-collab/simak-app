@@ -31,8 +31,14 @@ const emptyForm = {
 }
 
 export default function ProfilSekolah() {
-  const { sekolahId, loading: authLoading } = useAuth()
+  // sekolah_id dari akun admin/kepsek yang login — dipakai untuk membedakan
+  // profil_sekolah milik sekolah masing-masing (dulu semua akun baca/tulis
+  // ke baris id=1 yang sama, jadi sekolah baru selalu melihat data sekolah lain).
+  const { profil } = useAuth()
+  const sekolahId = profil?.sekolah_id
+
   const [form, setForm] = useState(emptyForm)
+  const [rowId, setRowId] = useState(null) // id baris profil_sekolah milik sekolah ini
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [uploadingLogo, setUploadingLogo] = useState(false)
@@ -42,20 +48,23 @@ export default function ProfilSekolah() {
   const [ttdUrl, setTtdUrl] = useState('')
 
   async function muatData() {
-    if (!sekolahId) return
+    if (!sekolahId) {
+      setLoading(false)
+      return
+    }
     setLoading(true)
-    const { data, error } = await supabase
+    // ASUMSI: migrasi SQL sudah dijalankan sehingga setiap sekolah_id di tabel
+    // `sekolah` punya tepat satu baris profil_sekolah. Kalau belum, baris ini
+    // bisa saja tidak ketemu (maybeSingle -> null) untuk sekolah yang baru
+    // daftar sebelum migrasi dijalankan.
+    const { data } = await supabase
       .from('profil_sekolah')
       .select('*')
       .eq('sekolah_id', sekolahId)
       .maybeSingle()
-
-    if (error) {
-      alert('Gagal memuat profil sekolah: ' + error.message)
-    }
-
     if (data) {
       setForm({ ...emptyForm, ...data })
+      setRowId(data.id)
       if (data.logo_path) {
         const { data: pub } = supabase.storage.from('profil-sekolah').getPublicUrl(data.logo_path)
         setLogoUrl(pub.publicUrl)
@@ -65,35 +74,36 @@ export default function ProfilSekolah() {
         setTtdUrl(pub.publicUrl)
       }
     } else {
-      // Belum ada baris untuk sekolah ini (mis. sekolah lama sebelum trigger
-      // auto-create dipasang). Form ditampilkan kosong; saat "Simpan" pertama
-      // kali dijalankan sebagai insert (lihat handleSubmit).
-      setForm(emptyForm)
+      // Sekolah ini belum punya baris profil_sekolah sama sekali (mis. migrasi
+      // belum sempat jalan untuk sekolah ini) — buatkan baris kosong sekarang
+      // supaya halaman tetap bisa dipakai untuk mengisi data pertama kali.
+      const { data: baru } = await supabase
+        .from('profil_sekolah')
+        .insert({ sekolah_id: sekolahId })
+        .select()
+        .maybeSingle()
+      if (baru) {
+        setForm({ ...emptyForm, ...baru })
+        setRowId(baru.id)
+      }
     }
     setLoading(false)
   }
 
   useEffect(() => {
-    if (!authLoading) muatData()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [authLoading, sekolahId])
+    muatData()
+  }, [sekolahId])
 
   async function handleSubmit(e) {
     e.preventDefault()
-    if (!sekolahId) return
+    if (!rowId) return
     setSaving(true)
     setTersimpan(false)
     const { id, diperbarui_pada, sekolah_id, ...payload } = form
-
-    // upsert: kalau baris untuk sekolah ini belum ada, dibuat; kalau sudah
-    // ada, diupdate. Match lewat sekolah_id (unique constraint).
     const { error } = await supabase
       .from('profil_sekolah')
-      .upsert(
-        { ...payload, sekolah_id: sekolahId, diperbarui_pada: new Date().toISOString() },
-        { onConflict: 'sekolah_id' }
-      )
-
+      .update({ ...payload, diperbarui_pada: new Date().toISOString() })
+      .eq('id', rowId)
     setSaving(false)
     if (!error) {
       setTersimpan(true)
@@ -109,7 +119,7 @@ export default function ProfilSekolah() {
     setUploadingLogo(true)
 
     const ext = file.name.split('.').pop()
-    const path = `${sekolahId}/logo-${Date.now()}.${ext}`
+    const path = `logo-${Date.now()}.${ext}`
 
     const { error: uploadError } = await supabase.storage.from('profil-sekolah').upload(path, file, {
       upsert: true,
@@ -135,7 +145,7 @@ export default function ProfilSekolah() {
     setUploadingTtd(true)
 
     const ext = file.name.split('.').pop()
-    const path = `${sekolahId}/ttd-kepsek-${Date.now()}.${ext}`
+    const path = `ttd-kepsek-${Date.now()}.${ext}`
 
     const { error: uploadError } = await supabase.storage.from('profil-sekolah').upload(path, file, {
       upsert: true,
@@ -177,10 +187,26 @@ export default function ProfilSekolah() {
     setForm({ ...form, [field]: value })
   }
 
-  if (authLoading || loading) {
+  if (loading) {
     return (
       <Layout title="Profil Sekolah" subtitle="Data umum, visi, misi, dan sejarah sekolah">
         <p className="text-center py-8 text-ink-700/50 text-sm">Memuat data...</p>
+      </Layout>
+    )
+  }
+
+  // Superadmin tidak terikat ke satu sekolah spesifik (sekolah_id kosong), jadi
+  // halaman "Profil Sekolah" per-sekolah ini tidak relevan untuknya.
+  if (!sekolahId) {
+    return (
+      <Layout title="Profil Sekolah" subtitle="Data umum, visi, misi, dan sejarah sekolah">
+        <div className="card p-6">
+          <p className="text-sm text-ink-700/60">
+            Akun Anda tidak terikat ke satu sekolah spesifik, jadi halaman ini tidak tersedia. Pilih
+            sekolah terlebih dahulu (kalau ada fitur pilih-sekolah untuk superadmin), atau hubungi admin
+            sekolah terkait untuk mengubah profil sekolah mereka.
+          </p>
+        </div>
       </Layout>
     )
   }
