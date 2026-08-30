@@ -1,6 +1,7 @@
 import { NavLink } from 'react-router-dom'
 import { useEffect, useState } from 'react'
 import {
+  X,
   LayoutDashboard,
   Users,
   GraduationCap,
@@ -166,11 +167,12 @@ const linksGuru = [
   { to: '/pengumuman', label: 'Pengumuman', icon: Megaphone },
 ]
 
-function NavItem({ to, label, icon: Icon, end, badge }) {
+function NavItem({ to, label, icon: Icon, end, badge, onNavigate }) {
   return (
     <NavLink
       to={to}
       end={end}
+      onClick={onNavigate}
       className={({ isActive }) =>
         `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
           isActive
@@ -225,7 +227,7 @@ function getLabelPeran(profil, isSuperAdmin, isAdminUtama, isAdmin) {
   return 'Guru'
 }
 
-export default function Sidebar() {
+export default function Sidebar({ open = false, onClose = () => {} }) {
   const { signOut, session, profil, isAdmin, isAdminUtama, isSuperAdmin, sekolahId } = useAuth()
   const fotoUrl = getFotoUrl(profil?.foto_profil_path)
   const namaTampil = profil?.nama_lengkap || session?.user?.email || 'Pengguna'
@@ -276,8 +278,29 @@ export default function Sidebar() {
   const groupsAdmin = getGroupsAdmin(isAdminUtama, jumlahMenunggu)
 
   return (
-    <aside className="w-64 shrink-0 bg-blue-950 text-white flex flex-col h-screen sticky top-0 border-r border-blue-900/50">
+    <>
+      {/* Overlay gelap di belakang drawer — hanya tampil di HP saat menu dibuka */}
+      {open && (
+        <div
+          onClick={onClose}
+          className="fixed inset-0 z-40 bg-black/50 backdrop-blur-[1px] md:hidden"
+          aria-hidden="true"
+        />
+      )}
+
+      <aside
+        className={`w-72 max-w-[85vw] md:w-64 shrink-0 bg-blue-950 text-white flex flex-col h-screen fixed md:sticky top-0 left-0 z-50 border-r border-blue-900/50 transition-transform duration-300 ease-out
+          ${open ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0`}
+      >
       <div className="relative overflow-hidden px-4 py-5 border-b border-white/10 bg-gradient-to-br from-blue-950 via-blue-900 to-indigo-900">
+        {/* Tombol tutup — hanya tampil di HP */}
+        <button
+          onClick={onClose}
+          title="Tutup menu"
+          className="absolute top-3 right-3 z-10 w-8 h-8 rounded-lg flex items-center justify-center text-white/70 hover:bg-white/10 hover:text-white transition-colors md:hidden"
+        >
+          <X size={18} />
+        </button>
         {/* Motif batik dekoratif (senada dengan banner dashboard) */}
         <svg
           className="absolute inset-0 w-full h-full opacity-[0.35] pointer-events-none"
@@ -353,7 +376,7 @@ export default function Sidebar() {
               )}
               <div className="space-y-1">
                 {group.links.map((link) => (
-                  <NavItem key={link.to} {...link} />
+                  <NavItem key={link.to} {...link} onNavigate={onClose} />
                 ))}
               </div>
             </div>
@@ -361,12 +384,13 @@ export default function Sidebar() {
         ) : (
           <div className="space-y-1">
             {linksGuru.map((link) => (
-              <NavItem key={link.to} {...link} />
+              <NavItem key={link.to} {...link} onNavigate={onClose} />
             ))}
           </div>
         )}
         </div>
       </nav>
-    </aside>
+      </aside>
+    </>
   )
 }
