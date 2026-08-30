@@ -19,19 +19,29 @@ export function AuthProvider({ children }) {
       .eq('id', userId)
       .maybeSingle()
 
-    // Kalau belum ada baris profil, anggap 'guru' tanpa akses khusus & otomatis dianggap aktif
-    const profilDasar = data || { role: 'guru', jabatan: 'guru', guru_id: null, sekolah_id: null, status_akun: 'aktif' }
+    // PENTING: kalau tidak ada baris profil untuk user ini, JANGAN anggap
+    // sebagai akun aktif. Ini terjadi ketika superadmin menghapus akun lewat
+    // Persetujuan Akun (baris 'profil' dihapus, tapi akun di Supabase Auth
+    // masih ada). Sebelumnya kode ini malah men-default-kan user tanpa
+    // profil jadi { role: 'guru', status_akun: 'aktif' } — yang artinya
+    // akun yang sudah "dihapus" tetap bisa login dan dianggap aktif.
+    // Sekarang: langsung sign out & anggap tidak login sama sekali.
+    if (!data) {
+      await supabase.auth.signOut()
+      setProfil(null)
+      return
+    }
 
     // Ambil nama & foto dari tabel guru (dipakai di Sidebar untuk avatar)
-    if (profilDasar.guru_id) {
+    if (data.guru_id) {
       const { data: guru } = await supabase
         .from('guru')
         .select('nama_lengkap, foto_profil_path')
-        .eq('id', profilDasar.guru_id)
+        .eq('id', data.guru_id)
         .maybeSingle()
-      setProfil({ ...profilDasar, nama_lengkap: guru?.nama_lengkap, foto_profil_path: guru?.foto_profil_path })
+      setProfil({ ...data, nama_lengkap: guru?.nama_lengkap, foto_profil_path: guru?.foto_profil_path })
     } else {
-      setProfil(profilDasar)
+      setProfil(data)
     }
   }
 
