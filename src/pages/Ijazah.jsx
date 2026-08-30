@@ -59,8 +59,29 @@ export default function Ijazah() {
     setKelasId(kelas6 ? kelas6.id : kelas?.[0]?.id ?? "");
   }
 
+  // Ambil sekolah_id user yang sedang login lewat tabel profil.
+  // PENTING: kalau aplikasi kamu sudah punya context/hook auth (mis. useAuth())
+  // yang menyimpan sekolah_id user aktif, ganti fungsi ini untuk memakai itu
+  // saja alih-alih query ulang ke tabel profil di sini — sama seperti catatan
+  // di SuratKeteranganLulus.jsx.
+  async function getSekolahIdAktif() {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return null;
+    const { data: profilUser } = await supabase
+      .from("profil")
+      .select("sekolah_id")
+      .eq("id", user.id)
+      .maybeSingle();
+    return profilUser?.sekolah_id ?? null;
+  }
+
   async function loadAll() {
     setLoading(true);
+
+    const sekolahIdAktif = await getSekolahIdAktif();
+
     let siswaQuery = supabase
       .from("siswa")
       .select("*, kelas(tingkat)")
@@ -68,10 +89,15 @@ export default function Ijazah() {
       .order("nama_lengkap");
     if (kelasId) siswaQuery = siswaQuery.eq("kelas_id", kelasId);
 
+    let profilQuery = supabase.from("profil_sekolah").select("*");
+    profilQuery = sekolahIdAktif
+      ? profilQuery.eq("sekolah_id", sekolahIdAktif).maybeSingle()
+      : profilQuery.limit(0); // tidak ada sekolah_id -> jangan tampilkan profil siapa pun
+
     const [{ data: siswa }, { data: nilai }, { data: profil }] = await Promise.all([
       siswaQuery,
       supabase.from("nilai_ijazah").select("*").eq("tahun_pelajaran", tahunPelajaran),
-      supabase.from("profil_sekolah").select("*").eq("id", 1).maybeSingle(),
+      profilQuery,
     ]);
     setSiswaList(siswa || []);
     const map = {};
