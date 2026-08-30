@@ -127,9 +127,7 @@ export default function Login() {
           <p className="login-tagline text-[11px] font-medium uppercase tracking-[0.2em] mt-2">
             School Management Information System
           </p>
-          {namaSekolah && (
-            <p className="login-school text-sm font-medium mt-1.5">{namaSekolah}</p>
-          )}
+          <p className="login-school text-sm font-medium mt-1.5">WELCOME</p>
         </div>
 
         <form
