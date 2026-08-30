@@ -116,13 +116,16 @@ function RouteMenunggu({ children }) {
 // mengambilkan profil sekolah dengan cara yang sama supaya kop surat di cetakan
 // nota tetap terisi.
 function NotaDenganSekolah() {
+  const { profil } = useAuth()
+  const sekolahId = profil?.sekolah_id
   const [sekolah, setSekolah] = useState(null)
 
   useEffect(() => {
+    if (!sekolahId) return
     supabase
       .from('profil_sekolah')
       .select('*')
-      .eq('id', 1)
+      .eq('sekolah_id', sekolahId)
       .maybeSingle()
       .then(({ data }) => {
         if (data) {
@@ -133,7 +136,7 @@ function NotaDenganSekolah() {
           })
         }
       })
-  }, [])
+  }, [sekolahId])
 
   return <Nota sekolah={sekolah} />
 }
