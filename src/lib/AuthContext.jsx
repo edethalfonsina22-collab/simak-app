@@ -6,7 +6,7 @@ const AuthContext = createContext(null)
 export function AuthProvider({ children }) {
   const [session, setSession] = useState(undefined) // undefined = belum dicek, null = tidak login
   const [profil, setProfil] = useState(undefined)
-  // profil: { role: 'guru'|'admin'|'kepala_sekolah'|'admin_utama'|'superadmin', guru_id, sekolah_id, status_akun, nama_lengkap, foto_profil_path } | null
+  // profil: { role: 'guru'|'admin'|'kepala_sekolah'|'admin_utama'|'superadmin', guru_id, sekolah_id, status_akun, catatan_admin, nama_lengkap, foto_profil_path } | null
 
   async function loadProfil(userId) {
     if (!userId) {
@@ -15,7 +15,7 @@ export function AuthProvider({ children }) {
     }
     const { data } = await supabase
       .from('profil')
-      .select('role, jabatan, guru_id, sekolah_id, status_akun')
+      .select('role, jabatan, guru_id, sekolah_id, status_akun, catatan_admin')
       .eq('id', userId)
       .maybeSingle()
 
@@ -65,6 +65,15 @@ export function AuthProvider({ children }) {
   // Ambil ulang profil user saat ini — dipakai di halaman MenungguPersetujuan
   // untuk mengecek apakah status akun sudah berubah (misal baru saja disetujui admin utama).
   const refreshProfil = () => loadProfil(session?.user?.id)
+
+  // Dipanggil saat user menutup banner "Pesan dari Admin" di Layout —
+  // menghapus catatan_admin di database supaya pesan tidak muncul lagi
+  // setelah dibaca, lalu muat ulang profil supaya state ikut ter-update.
+  async function tandaiPesanDibaca() {
+    if (!session?.user?.id) return
+    await supabase.from('profil').update({ catatan_admin: null }).eq('id', session.user.id)
+    await loadProfil(session.user.id)
+  }
 
   // Registrasi akun baru — dua mode:
   //  - mode 'baru'   : user membuat sekolah baru, jadi admin_utama TAPI tetap
@@ -143,6 +152,8 @@ export function AuthProvider({ children }) {
         isSuperAdmin,
         sekolahId: profil?.sekolah_id ?? null,
         statusAkun: profil?.status_akun ?? null,
+        pesanAdmin: profil?.catatan_admin ?? null,
+        tandaiPesanDibaca,
       }}
     >
       {children}
