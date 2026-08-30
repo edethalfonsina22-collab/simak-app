@@ -58,6 +58,15 @@ const EXCEL_HEADERS = [
   'nama_orang_tua', 'no_hp_orang_tua', 'alamat', 'alamat_tinggal',
 ]
 
+// PERBAIKAN: ambil angka tingkat kelas dari string apapun formatnya
+// (mis. "Kelas 1", "1", "1A", "Kls. 1") supaya pencocokan kelas saat impor
+// tidak gagal hanya karena format penulisan berbeda antara file Excel dan menu Kelas.
+// Aman dipakai karena di sekolah ini kelas hanya per tingkat (1-6), tanpa rombel paralel.
+function extractTingkatNumber(str) {
+  const match = String(str || '').trim().match(/\d+/)
+  return match ? match[0] : null
+}
+
 // Motif batik (kawung + parang) — sama persis dengan Profil Saya, Dasbor, Galeri & Dokumen,
 // warna garis menyesuaikan latar (emas di atas navy).
 function BatikOverlay({ patternId, strokeColor = '#d4af37', opacity = 1, size = 72 }) {
@@ -868,9 +877,25 @@ export default function Siswa() {
         mapRow={(row) => {
           if (!row.nama_lengkap) return null
           const namaKelas = String(row.kelas || '').trim()
-          const matchedKelas = kelasList.find(
+
+          // 1) Coba exact match dulu (case-insensitive), seperti sebelumnya.
+          let matchedKelas = kelasList.find(
             (k) => k.nama_kelas.trim().toLowerCase() === namaKelas.toLowerCase()
           )
+
+          // 2) PERBAIKAN: kalau exact match gagal, cocokkan berdasarkan angka tingkat
+          // kelas saja (mis. "Kelas 3" di file akan tetap nyambung ke kelas apa pun
+          // di sistem yang mengandung angka "3"). Aman karena kelas di sekolah ini
+          // hanya per tingkat 1-6, tanpa rombel paralel (1A/1B dst).
+          if (!matchedKelas) {
+            const targetNum = extractTingkatNumber(namaKelas)
+            if (targetNum) {
+              matchedKelas = kelasList.find(
+                (k) => extractTingkatNumber(k.nama_kelas) === targetNum
+              )
+            }
+          }
+
           const toIntOrNull = (v) => {
             const n = parseInt(String(v || '').trim(), 10)
             return Number.isFinite(n) ? n : null
