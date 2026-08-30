@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabaseClient'
+import { useAuth } from '../lib/AuthContext'
 import Layout from '../components/Layout'
 import { Save, Loader2, CheckCircle2, ImagePlus, PenTool, Trash2 } from 'lucide-react'
 
@@ -11,10 +12,6 @@ const emptyForm = {
   email: '',
   kepala_sekolah: '',
   nip_kepala_sekolah: '',
-  // TAMBAHAN: nama & NIP pengawas sekolah — dipakai di blok tanda tangan
-  // rekap ijazah kelulusan (kolom "Mengetahui, Pengawas").
-  pengawas: '',
-  nip_pengawas: '',
   logo_path: '',
   ttd_kepala_sekolah_path: '',
   tahun_berdiri: '',
@@ -34,6 +31,7 @@ const emptyForm = {
 }
 
 export default function ProfilSekolah() {
+  const { sekolahId, loading: authLoading } = useAuth()
   const [form, setForm] = useState(emptyForm)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -44,8 +42,18 @@ export default function ProfilSekolah() {
   const [ttdUrl, setTtdUrl] = useState('')
 
   async function muatData() {
+    if (!sekolahId) return
     setLoading(true)
-    const { data } = await supabase.from('profil_sekolah').select('*').eq('id', 1).maybeSingle()
+    const { data, error } = await supabase
+      .from('profil_sekolah')
+      .select('*')
+      .eq('sekolah_id', sekolahId)
+      .maybeSingle()
+
+    if (error) {
+      alert('Gagal memuat profil sekolah: ' + error.message)
+    }
+
     if (data) {
       setForm({ ...emptyForm, ...data })
       if (data.logo_path) {
@@ -56,23 +64,36 @@ export default function ProfilSekolah() {
         const { data: pub } = supabase.storage.from('profil-sekolah').getPublicUrl(data.ttd_kepala_sekolah_path)
         setTtdUrl(pub.publicUrl)
       }
+    } else {
+      // Belum ada baris untuk sekolah ini (mis. sekolah lama sebelum trigger
+      // auto-create dipasang). Form ditampilkan kosong; saat "Simpan" pertama
+      // kali dijalankan sebagai insert (lihat handleSubmit).
+      setForm(emptyForm)
     }
     setLoading(false)
   }
 
   useEffect(() => {
-    muatData()
-  }, [])
+    if (!authLoading) muatData()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authLoading, sekolahId])
 
   async function handleSubmit(e) {
     e.preventDefault()
+    if (!sekolahId) return
     setSaving(true)
     setTersimpan(false)
-    const { id, diperbarui_pada, ...payload } = form
+    const { id, diperbarui_pada, sekolah_id, ...payload } = form
+
+    // upsert: kalau baris untuk sekolah ini belum ada, dibuat; kalau sudah
+    // ada, diupdate. Match lewat sekolah_id (unique constraint).
     const { error } = await supabase
       .from('profil_sekolah')
-      .update({ ...payload, diperbarui_pada: new Date().toISOString() })
-      .eq('id', 1)
+      .upsert(
+        { ...payload, sekolah_id: sekolahId, diperbarui_pada: new Date().toISOString() },
+        { onConflict: 'sekolah_id' }
+      )
+
     setSaving(false)
     if (!error) {
       setTersimpan(true)
@@ -88,7 +109,7 @@ export default function ProfilSekolah() {
     setUploadingLogo(true)
 
     const ext = file.name.split('.').pop()
-    const path = `logo-${Date.now()}.${ext}`
+    const path = `${sekolahId}/logo-${Date.now()}.${ext}`
 
     const { error: uploadError } = await supabase.storage.from('profil-sekolah').upload(path, file, {
       upsert: true,
@@ -114,7 +135,7 @@ export default function ProfilSekolah() {
     setUploadingTtd(true)
 
     const ext = file.name.split('.').pop()
-    const path = `ttd-kepsek-${Date.now()}.${ext}`
+    const path = `${sekolahId}/ttd-kepsek-${Date.now()}.${ext}`
 
     const { error: uploadError } = await supabase.storage.from('profil-sekolah').upload(path, file, {
       upsert: true,
@@ -156,7 +177,7 @@ export default function ProfilSekolah() {
     setForm({ ...form, [field]: value })
   }
 
-  if (loading) {
+  if (authLoading || loading) {
     return (
       <Layout title="Profil Sekolah" subtitle="Data umum, visi, misi, dan sejarah sekolah">
         <p className="text-center py-8 text-ink-700/50 text-sm">Memuat data...</p>
@@ -295,15 +316,6 @@ export default function ProfilSekolah() {
             <div>
               <label className="label-field">NIP Kepala Sekolah</label>
               <input className="input-field" value={form.nip_kepala_sekolah} onChange={(e) => ubah('nip_kepala_sekolah', e.target.value)} />
-            </div>
-            {/* TAMBAHAN: dipakai di blok tanda tangan rekap ijazah kelulusan */}
-            <div>
-              <label className="label-field">Nama Pengawas</label>
-              <input className="input-field" value={form.pengawas} onChange={(e) => ubah('pengawas', e.target.value)} />
-            </div>
-            <div>
-              <label className="label-field">NIP Pengawas</label>
-              <input className="input-field" value={form.nip_pengawas} onChange={(e) => ubah('nip_pengawas', e.target.value)} />
             </div>
             <div>
               <label className="label-field">Tahun Berdiri</label>
