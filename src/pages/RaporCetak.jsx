@@ -73,14 +73,34 @@ export default function RaporCetak() {
   async function muatSemua() {
     setLoading(true)
 
+    // Ambil siswa dulu (RLS sudah membatasi ke sekolah sendiri lewat
+    // siswa.sekolah_id) — sekolah_id-nya dipakai untuk memfilter
+    // profil_sekolah di bawah, supaya kop rapor selalu ikut sekolah
+    // pemilik siswa ini, bukan baris profil_sekolah yang salah.
+    const { data: siswaRow } = await supabase
+      .from('siswa')
+      .select('*, kelas(nama_kelas, wali_kelas:guru!wali_kelas_id(nama_lengkap, nip))')
+      .eq('id', siswaId)
+      .single()
+
+    setSiswa(siswaRow || null)
+    if (siswaRow?.foto_path) {
+      const { data: pub } = supabase.storage.from('foto-siswa').getPublicUrl(siswaRow.foto_path)
+      setFotoSiswaUrl(pub.publicUrl)
+    }
+
     const periode = rentangTanggalPeriode(tahunAjaran, semester)
     let queryPresensi = supabase.from('presensi_siswa').select('status').eq('siswa_id', siswaId)
     if (periode) {
       queryPresensi = queryPresensi.gte('tanggal', periode.mulai).lte('tanggal', periode.selesai)
     }
 
+    let profilQuery = supabase.from('profil_sekolah').select('*')
+    profilQuery = siswaRow?.sekolah_id
+      ? profilQuery.eq('sekolah_id', siswaRow.sekolah_id).maybeSingle()
+      : profilQuery.limit(0) // siswa tidak ditemukan / tidak punya sekolah_id -> jangan tampilkan profil siapa pun
+
     const [
-      { data: siswaRow },
       { data: nilaiRows },
       { data: presensiRows },
       { data: capaianRows },
@@ -89,13 +109,6 @@ export default function RaporCetak() {
       { data: catatanRow },
       { data: sekolahRow },
     ] = await Promise.all([
-      supabase
-        .from('siswa')
-        .select(
-          '*, kelas(nama_kelas, wali_kelas:guru!wali_kelas_id(nama_lengkap, nip))'
-        )
-        .eq('id', siswaId)
-        .single(),
       supabase
         .from('nilai')
         // + kompetensi, supaya nilai Pengetahuan & Keterampilan bisa dipisah
@@ -131,19 +144,13 @@ export default function RaporCetak() {
         .eq('semester', semester)
         .eq('tahun_ajaran', tahunAjaran)
         .maybeSingle(),
-      supabase.from('profil_sekolah').select('*').eq('id', 1).maybeSingle(),
+      profilQuery,
     ])
 
     setSekolah(sekolahRow || null)
     if (sekolahRow?.logo_path) {
       const { data: pub } = supabase.storage.from('profil-sekolah').getPublicUrl(sekolahRow.logo_path)
       setLogoUrl(pub.publicUrl)
-    }
-
-    setSiswa(siswaRow || null)
-    if (siswaRow?.foto_path) {
-      const { data: pub } = supabase.storage.from('foto-siswa').getPublicUrl(siswaRow.foto_path)
-      setFotoSiswaUrl(pub.publicUrl)
     }
 
     setNilai(nilaiRows || [])
