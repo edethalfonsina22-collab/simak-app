@@ -99,12 +99,12 @@ export default function Register() {
 
     const { error: daftarError } = await daftar({
       mode,
-      nama: form.nama,
+      namaLengkap: form.nama,
       jabatan: form.jabatan,
       email: form.email,
       password: form.password,
       sekolahId: form.sekolahId,
-      namaSekolahBaru: form.namaSekolahBaru.trim(),
+      namaSekolah: form.namaSekolahBaru.trim(),
     })
 
     setLoading(false)
