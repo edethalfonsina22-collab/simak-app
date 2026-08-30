@@ -18,22 +18,32 @@ const LABEL_JABATAN = {
   guru: 'Guru',
 }
 
-// Kartu profil ringkas untuk akun yang tidak tertaut ke tabel `guru` (admin / admin_utama /
-// superadmin / kepala sekolah). Bukan guru, jadi tidak butuh mata pelajaran, NUPTK, kelas
-// asuh, QR/barcode absensi, atau grafik aktivitas guru — tapi tetap dilengkapi foto profil
-// dan info sekolah supaya kualitas kartunya setara dengan kartu guru.
+// Kartu profil untuk akun yang tidak tertaut ke tabel `guru` (admin / admin_utama /
+// superadmin / kepala sekolah). Dibuat setara dengan kartu guru: foto profil, QR code,
+// barcode identitas, dan field data diri yang sama (NUPTK, pangkat/golongan, no HP,
+// tanggal lahir, pendidikan terakhir, alamat) — plus nama sekolah, karena admin/kepsek
+// tidak punya baris di tabel `guru` untuk menyimpan semua ini.
 // `adminData` diambil terpisah (bukan dari AuthContext) karena AuthContext hanya
-// mengambil role/jabatan/guru_id/sekolah_id/status_akun, tidak termasuk nama, email,
-// foto, dan nama sekolah.
+// mengambil role/jabatan/guru_id/sekolah_id/status_akun, tidak termasuk field-field ini.
 function ProfilAdminCard({ profil, userId, adminData }) {
   const [form, setForm] = useState({
     nama_lengkap_pendaftar: adminData?.nama_lengkap_pendaftar || '',
     email_pendaftar: adminData?.email_pendaftar || '',
+    nuptk: adminData?.nuptk || '',
+    pangkat_golongan: adminData?.pangkat_golongan || '',
+    no_hp: adminData?.no_hp || '',
+    tanggal_lahir: adminData?.tanggal_lahir || '',
+    pendidikan_terakhir: adminData?.pendidikan_terakhir || '',
+    alamat: adminData?.alamat || '',
   })
   const [fotoPath, setFotoPath] = useState(adminData?.foto_profil_path || '')
   const [uploadingFoto, setUploadingFoto] = useState(false)
   const [saving, setSaving] = useState(false)
   const [savedAt, setSavedAt] = useState(null)
+
+  // QR code identitas admin/kepsek (dibuat dari user id -> data URL PNG), sama pola
+  // seperti QR guru tapi memakai userId karena admin/kepsek tidak punya guru_id.
+  const [qrDataUrl, setQrDataUrl] = useState('')
 
   // Sinkronkan form/foto kalau adminData datang belakangan (query async di komponen induk
   // selesai setelah render pertama komponen ini).
@@ -41,9 +51,29 @@ function ProfilAdminCard({ profil, userId, adminData }) {
     setForm({
       nama_lengkap_pendaftar: adminData?.nama_lengkap_pendaftar || '',
       email_pendaftar: adminData?.email_pendaftar || '',
+      nuptk: adminData?.nuptk || '',
+      pangkat_golongan: adminData?.pangkat_golongan || '',
+      no_hp: adminData?.no_hp || '',
+      tanggal_lahir: adminData?.tanggal_lahir || '',
+      pendidikan_terakhir: adminData?.pendidikan_terakhir || '',
+      alamat: adminData?.alamat || '',
     })
     setFotoPath(adminData?.foto_profil_path || '')
   }, [adminData])
+
+  useEffect(() => {
+    if (!userId) {
+      setQrDataUrl('')
+      return
+    }
+    QRCode.toDataURL(String(userId), {
+      width: 144,
+      margin: 1,
+      color: { dark: '#1e3a5f', light: '#ffffff' },
+    })
+      .then(setQrDataUrl)
+      .catch(() => setQrDataUrl(''))
+  }, [userId])
 
   function fotoUrl() {
     if (!fotoPath) return null
@@ -87,11 +117,25 @@ function ProfilAdminCard({ profil, userId, adminData }) {
   async function handleSave(e) {
     e.preventDefault()
     setSaving(true)
+    // ASUMSI: tabel `profil` sudah punya kolom-kolom berikut (sama seperti di tabel
+    // `guru`). Kalau belum ada, tambahkan dulu:
+    // alter table profil add column nuptk text;
+    // alter table profil add column pangkat_golongan text;
+    // alter table profil add column no_hp text;
+    // alter table profil add column tanggal_lahir date;
+    // alter table profil add column pendidikan_terakhir text;
+    // alter table profil add column alamat text;
     const { error } = await supabase
       .from('profil')
       .update({
         nama_lengkap_pendaftar: form.nama_lengkap_pendaftar,
         email_pendaftar: form.email_pendaftar,
+        nuptk: form.nuptk,
+        pangkat_golongan: form.pangkat_golongan,
+        no_hp: form.no_hp,
+        tanggal_lahir: form.tanggal_lahir || null,
+        pendidikan_terakhir: form.pendidikan_terakhir,
+        alamat: form.alamat,
       })
       .eq('id', userId)
 
@@ -112,8 +156,9 @@ function ProfilAdminCard({ profil, userId, adminData }) {
 
   return (
     <form onSubmit={handleSave} className="max-w-2xl space-y-5">
-      {/* Kartu identitas — gaya disamakan dengan kartu guru: gradasi navy + motif batik emas */}
-      <div className="relative overflow-hidden rounded-xl p-6 flex items-center gap-5 bg-gradient-to-br from-blue-900 to-blue-950">
+      {/* Kartu identitas — gaya & tata letak disamakan dengan kartu guru: gradasi navy +
+          motif batik emas, foto di kiri, QR code berseberangan di kanan */}
+      <div className="relative overflow-hidden rounded-xl p-6 flex items-center justify-between gap-5 bg-gradient-to-br from-blue-900 to-blue-950">
         <div className="absolute -top-10 -right-10 w-40 h-40 rounded-full bg-white/5 pointer-events-none" />
         <div className="absolute -bottom-14 -left-6 w-32 h-32 rounded-full bg-white/5 pointer-events-none" />
 
@@ -161,31 +206,42 @@ function ProfilAdminCard({ profil, userId, adminData }) {
           <rect x="0" y="0" width="100%" height="100%" fill="url(#batikFadeAdmin)" />
         </svg>
 
-        <div className="relative shrink-0">
-          <div className="w-16 h-16 rounded-full bg-white/10 ring-2 ring-white/20 overflow-hidden flex items-center justify-center">
-            {fotoUrl() ? (
-              <img src={fotoUrl()} alt="Foto profil" className="w-full h-full object-cover" />
-            ) : (
-              <ShieldCheck size={26} className="text-white/80" />
-            )}
+        <div className="relative flex items-center gap-5 min-w-0">
+          <div className="relative shrink-0">
+            <div className="w-20 h-20 rounded-full bg-white/10 ring-2 ring-white/20 overflow-hidden flex items-center justify-center">
+              {fotoUrl() ? (
+                <img src={fotoUrl()} alt="Foto profil" className="w-full h-full object-cover" />
+              ) : (
+                <ShieldCheck size={28} className="text-white/80" />
+              )}
+            </div>
+            <label className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full bg-brass-400 flex items-center justify-center cursor-pointer shadow-md">
+              {uploadingFoto ? (
+                <Loader2 size={13} className="animate-spin text-ink-950" />
+              ) : (
+                <Camera size={13} className="text-ink-950" />
+              )}
+              <input type="file" accept="image/*" className="hidden" onChange={handleFotoChange} disabled={uploadingFoto} />
+            </label>
           </div>
-          <label className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-brass-400 flex items-center justify-center cursor-pointer shadow-md">
-            {uploadingFoto ? (
-              <Loader2 size={12} className="animate-spin text-ink-950" />
-            ) : (
-              <Camera size={12} className="text-ink-950" />
-            )}
-            <input type="file" accept="image/*" className="hidden" onChange={handleFotoChange} disabled={uploadingFoto} />
-          </label>
+          <div className="min-w-0">
+            <p className="font-display font-semibold text-lg text-white truncate">
+              {form.nama_lengkap_pendaftar || 'Nama belum diisi'}
+            </p>
+            <p className="text-sm text-blue-200/70">{labelJabatan}</p>
+            <p className="text-xs text-brass-300/90 mt-0.5 truncate">
+              {isSuperadmin ? 'Akses Semua Sekolah' : namaSekolah || 'Memuat nama sekolah...'}
+            </p>
+          </div>
         </div>
-        <div className="relative min-w-0">
-          <p className="font-display font-semibold text-lg text-white truncate">
-            {form.nama_lengkap_pendaftar || 'Nama belum diisi'}
-          </p>
-          <p className="text-sm text-blue-200/70">{labelJabatan}</p>
-          <p className="text-xs text-brass-300/90 mt-0.5 truncate">
-            {isSuperadmin ? 'Akses Semua Sekolah' : namaSekolah || 'Memuat nama sekolah...'}
-          </p>
+
+        {/* QR code — berseberangan (sisi kanan) dengan foto profil di sisi kiri, sama seperti kartu guru */}
+        <div className="relative shrink-0 w-[88px] h-[88px] p-2 rounded-lg bg-white shadow-md flex items-center justify-center">
+          {qrDataUrl ? (
+            <img src={qrDataUrl} alt="QR Code identitas admin/kepsek" width={72} height={72} />
+          ) : (
+            <Loader2 size={18} className="animate-spin text-ink-700/30" />
+          )}
         </div>
       </div>
 
@@ -202,12 +258,56 @@ function ProfilAdminCard({ profil, userId, adminData }) {
             />
           </div>
           <div>
+            <label className="text-xs text-ink-700/60 mb-1 block">NUPTK</label>
+            <input
+              className="input w-full"
+              placeholder="mis. 1234567890123456"
+              value={form.nuptk}
+              onChange={(e) => setForm({ ...form, nuptk: e.target.value })}
+            />
+          </div>
+          <div>
+            <label className="text-xs text-ink-700/60 mb-1 block">Pangkat / Golongan</label>
+            <input
+              className="input w-full"
+              placeholder="mis. Penata Muda / III-a"
+              value={form.pangkat_golongan}
+              onChange={(e) => setForm({ ...form, pangkat_golongan: e.target.value })}
+            />
+          </div>
+          <div>
+            <label className="text-xs text-ink-700/60 mb-1 block">Nomor HP</label>
+            <input
+              className="input w-full"
+              value={form.no_hp}
+              onChange={(e) => setForm({ ...form, no_hp: e.target.value })}
+            />
+          </div>
+          <div>
             <label className="text-xs text-ink-700/60 mb-1 block">Email</label>
             <input
               className="input w-full"
               type="email"
               value={form.email_pendaftar}
               onChange={(e) => setForm({ ...form, email_pendaftar: e.target.value })}
+            />
+          </div>
+          <div>
+            <label className="text-xs text-ink-700/60 mb-1 block">Tanggal Lahir</label>
+            <input
+              className="input w-full"
+              type="date"
+              value={form.tanggal_lahir || ''}
+              onChange={(e) => setForm({ ...form, tanggal_lahir: e.target.value })}
+            />
+          </div>
+          <div>
+            <label className="text-xs text-ink-700/60 mb-1 block">Pendidikan Terakhir</label>
+            <input
+              className="input w-full"
+              placeholder="mis. S1 Pendidikan Guru SD"
+              value={form.pendidikan_terakhir}
+              onChange={(e) => setForm({ ...form, pendidikan_terakhir: e.target.value })}
             />
           </div>
           <div>
@@ -220,6 +320,16 @@ function ProfilAdminCard({ profil, userId, adminData }) {
               className="input w-full"
               value={isSuperadmin ? 'Akses Semua Sekolah' : namaSekolah || 'Memuat...'}
               disabled
+            />
+          </div>
+
+          <div className="sm:col-span-2">
+            <label className="text-xs text-ink-700/60 mb-1 block">Alamat</label>
+            <textarea
+              className="input w-full"
+              rows={2}
+              value={form.alamat}
+              onChange={(e) => setForm({ ...form, alamat: e.target.value })}
             />
           </div>
         </div>
@@ -235,6 +345,22 @@ function ProfilAdminCard({ profil, userId, adminData }) {
           </button>
           {savedAt && <span className="text-xs text-sage-500">Tersimpan</span>}
         </div>
+      </div>
+
+      {/* Kode batang ID admin/kepsek — sama pola seperti barcode guru, tapi memakai userId
+          karena tidak ada baris di tabel `guru` untuk akun ini */}
+      <div className="flex flex-col items-center gap-2 py-4 border-t border-ink-900/[0.08]">
+        <div className="p-3 rounded-lg bg-white ring-1 ring-ink-900/[0.08] shadow-sm">
+          <Barcode
+            value={String(userId)}
+            width={1.6}
+            height={56}
+            fontSize={12}
+            background="#ffffff"
+            lineColor="#1e3a5f"
+          />
+        </div>
+        <p className="text-xs text-ink-700/50">ID {labelJabatan}</p>
       </div>
     </form>
   )
@@ -289,7 +415,9 @@ export default function ProfilSaya() {
 
       const { data: row } = await supabase
         .from('profil')
-        .select('nama_lengkap_pendaftar, email_pendaftar, foto_profil_path')
+        .select(
+          'nama_lengkap_pendaftar, email_pendaftar, foto_profil_path, nuptk, pangkat_golongan, no_hp, tanggal_lahir, pendidikan_terakhir, alamat'
+        )
         .eq('id', userId)
         .maybeSingle()
 
