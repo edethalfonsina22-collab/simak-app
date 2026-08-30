@@ -157,31 +157,42 @@ export default function PersetujuanAkun() {
     muatData()
   }
 
-  // Hapus akun: data profil + data guru terkait (jika ada) sekaligus
+  // Hapus akun secara PERMANEN — profil, data guru terkait (jika ada), DAN
+  // akun di Supabase Auth. Ini dikerjakan lewat Edge Function 'hapus-akun'
+  // karena menghapus dari Auth butuh service role key yang tidak boleh
+  // dipakai di frontend. Edge Function juga memverifikasi ulang bahwa
+  // pemanggil memang berwenang (superadmin, atau admin_utama untuk
+  // sekolahnya sendiri) sebelum menghapus apa pun.
   async function handleHapus(akun) {
     if (
       !window.confirm(
-        `Hapus akun "${akun.nama_lengkap_pendaftar || akun.email_pendaftar}" secara permanen? Data guru terkait (jika ada) juga akan ikut terhapus. Tindakan ini tidak bisa dibatalkan.`
+        `Hapus akun "${akun.nama_lengkap_pendaftar || akun.email_pendaftar}" secara permanen? Akun ini juga tidak akan bisa login lagi. Data guru terkait (jika ada) juga akan ikut terhapus. Tindakan ini tidak bisa dibatalkan.`
       )
     )
       return
     setProsesId(akun.id)
 
-    const { error: errProfil } = await supabase.from('profil').delete().eq('id', akun.id)
-    if (errProfil) {
-      setProsesId(null)
-      window.alert('Gagal menghapus data profil: ' + errProfil.message)
+    const { data, error } = await supabase.functions.invoke('hapus-akun', {
+      body: { akun_id: akun.id, guru_id: akun.guru_id || null },
+    })
+
+    setProsesId(null)
+
+    if (error || data?.error) {
+      let pesan = data?.error || error?.message || 'Terjadi kesalahan tak terduga.'
+      // Kalau supabase-js melempar FunctionsHttpError, body JSON asli ada di error.context
+      if (error?.context?.json) {
+        try {
+          const body = await error.context.json()
+          if (body?.error) pesan = body.error
+        } catch {
+          // abaikan, pakai pesan default di atas
+        }
+      }
+      window.alert('Gagal menghapus akun: ' + pesan)
       return
     }
 
-    if (akun.guru_id) {
-      const { error: errGuru } = await supabase.from('guru').delete().eq('id', akun.guru_id)
-      if (errGuru) {
-        window.alert('Data profil terhapus, tetapi gagal menghapus data guru terkait: ' + errGuru.message)
-      }
-    }
-
-    setProsesId(null)
     muatData()
   }
 
