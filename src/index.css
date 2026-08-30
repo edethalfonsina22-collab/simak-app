@@ -6,6 +6,7 @@ html, body, #root {
 }
 body {
   @apply bg-paper text-ink-900 antialiased;
+  overflow-x: hidden;
 }
 ::selection {
   @apply bg-brass-400/40;
