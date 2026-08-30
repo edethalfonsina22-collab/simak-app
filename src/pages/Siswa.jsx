@@ -4,7 +4,9 @@ import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../lib/AuthContext'
 import Layout from '../components/Layout'
 import BulkImportModal from '../components/BulkImportModal'
+import DapodikImportModal from '../components/DapodikImportModal'
 import TeleponLink from '../components/TeleponLink'
+import { matchKelasByName } from '../lib/kelasMatch'
 import { Plus, UploadCloud, Pencil, Trash2, Search, X, Loader2, Download, FileSpreadsheet, Printer, ChevronDown, Camera, IdCard } from 'lucide-react'
 
 const AGAMA_OPTIONS = ['Islam', 'Kristen', 'Katolik', 'Hindu', 'Buddha', 'Khonghucu', 'Lainnya']
@@ -57,15 +59,6 @@ const EXCEL_HEADERS = [
   'nama_ibu', 'nik_ibu', 'tahun_lahir_ibu',
   'nama_orang_tua', 'no_hp_orang_tua', 'alamat', 'alamat_tinggal',
 ]
-
-// PERBAIKAN: ambil angka tingkat kelas dari string apapun formatnya
-// (mis. "Kelas 1", "1", "1A", "Kls. 1") supaya pencocokan kelas saat impor
-// tidak gagal hanya karena format penulisan berbeda antara file Excel dan menu Kelas.
-// Aman dipakai karena di sekolah ini kelas hanya per tingkat (1-6), tanpa rombel paralel.
-function extractTingkatNumber(str) {
-  const match = String(str || '').trim().match(/\d+/)
-  return match ? match[0] : null
-}
 
 // Motif batik (kawung + parang) — sama persis dengan Profil Saya, Dasbor, Galeri & Dokumen,
 // warna garis menyesuaikan latar (emas di atas navy).
@@ -143,6 +136,7 @@ export default function Siswa() {
   const [search, setSearch] = useState('')
   const [showForm, setShowForm] = useState(false)
   const [showImport, setShowImport] = useState(false)
+  const [showImportDapodik, setShowImportDapodik] = useState(false)
   const [editingId, setEditingId] = useState(null)
   const [form, setForm] = useState(emptyForm)
   const [saving, setSaving] = useState(false)
@@ -246,6 +240,53 @@ export default function Siswa() {
     const { error } = await supabase.from('siswa').delete().eq('id', id)
     if (!error) loadData()
     else alert('Gagal menghapus: ' + error.message)
+  }
+
+  // --- Logika impor bersama, dipakai oleh "Impor Massal" (template biasa) DAN
+  // "Impor dari Dapodik" (file unduhan Dapodik). Kedua modal itu berbeda hanya dalam
+  // cara MEMBACA file & memetakan baris; setelah baris berhasil dipetakan ke bentuk
+  // yang sama (object siap-simpan), proses insert/update-nya identik.
+  async function importSiswaRows(rows) {
+    // Cocokkan tiap baris dengan siswa yang SUDAH ADA berdasarkan NIS atau NISN.
+    // Kalau cocok -> UPDATE data siswa itu (tidak menambah baris baru / duplikat).
+    // Kalau tidak cocok dengan siapa pun -> INSERT sebagai siswa baru.
+    const toUpdate = []
+    const toInsert = []
+
+    rows.forEach((row) => {
+      const match = data.find(
+        (d) =>
+          (row.nis && d.nis && String(d.nis).trim() === String(row.nis).trim()) ||
+          (row.nisn && d.nisn && String(d.nisn).trim() === String(row.nisn).trim())
+      )
+      if (match) {
+        toUpdate.push({ id: match.id, ...row })
+      } else {
+        toInsert.push(row)
+      }
+    })
+
+    if (toInsert.length > 0) {
+      const { error } = await supabase.from('siswa').insert(toInsert)
+      if (error) throw error
+    }
+
+    for (const row of toUpdate) {
+      const { id, ...payload } = row
+      const { error } = await supabase.from('siswa').update(payload).eq('id', id)
+      if (error) throw error
+    }
+
+    const tanpaKelas = rows.filter((r) => !r.kelas_id).length
+    setTimeout(() => {
+      let pesan = `Impor selesai: ${toInsert.length} siswa baru ditambahkan, ${toUpdate.length} siswa yang sudah ada di-update (dicocokkan lewat NIS/NISN).`
+      if (tanpaKelas > 0) {
+        pesan += `\n\nCatatan: ${tanpaKelas} baris tidak punya kelas yang cocok — pastikan nama kelas di file sama persis dengan yang ada di menu Kelas, lalu perbaiki manual lewat tombol edit.`
+      }
+      alert(pesan)
+    }, 300)
+
+    return { count: rows.length }
   }
 
   const filtered = data.filter((s) =>
@@ -455,6 +496,11 @@ export default function Siswa() {
           {isAdmin && (
             <button className="btn-secondary" onClick={() => setShowImport(true)}>
               <UploadCloud size={16} /> Impor Massal
+            </button>
+          )}
+          {isAdmin && (
+            <button className="btn-secondary" onClick={() => setShowImportDapodik(true)}>
+              <UploadCloud size={16} /> Impor dari Dapodik
             </button>
           )}
           {isAdmin && (
@@ -878,23 +924,9 @@ export default function Siswa() {
           if (!row.nama_lengkap) return null
           const namaKelas = String(row.kelas || '').trim()
 
-          // 1) Coba exact match dulu (case-insensitive), seperti sebelumnya.
-          let matchedKelas = kelasList.find(
-            (k) => k.nama_kelas.trim().toLowerCase() === namaKelas.toLowerCase()
-          )
-
-          // 2) PERBAIKAN: kalau exact match gagal, cocokkan berdasarkan angka tingkat
-          // kelas saja (mis. "Kelas 3" di file akan tetap nyambung ke kelas apa pun
-          // di sistem yang mengandung angka "3"). Aman karena kelas di sekolah ini
-          // hanya per tingkat 1-6, tanpa rombel paralel (1A/1B dst).
-          if (!matchedKelas) {
-            const targetNum = extractTingkatNumber(namaKelas)
-            if (targetNum) {
-              matchedKelas = kelasList.find(
-                (k) => extractTingkatNumber(k.nama_kelas) === targetNum
-              )
-            }
-          }
+          // Pencocokan kelas (exact match, lalu fallback angka tingkat) sekarang
+          // dipusatkan di lib/kelasMatch.js supaya konsisten dengan modal Impor Dapodik.
+          const matchedKelas = matchKelasByName(kelasList, namaKelas)
 
           const toIntOrNull = (v) => {
             const n = parseInt(String(v || '').trim(), 10)
@@ -925,48 +957,14 @@ export default function Siswa() {
             status: 'aktif',
           }
         }}
-        onImport={async (rows) => {
-          // Cocokkan tiap baris dengan siswa yang SUDAH ADA berdasarkan NIS atau NISN.
-          // Kalau cocok -> UPDATE data siswa itu (tidak menambah baris baru / duplikat).
-          // Kalau tidak cocok dengan siapa pun -> INSERT sebagai siswa baru.
-          const toUpdate = []
-          const toInsert = []
+        onImport={importSiswaRows}
+      />
 
-          rows.forEach((row) => {
-            const match = data.find(
-              (d) =>
-                (row.nis && d.nis && String(d.nis).trim() === String(row.nis).trim()) ||
-                (row.nisn && d.nisn && String(d.nisn).trim() === String(row.nisn).trim())
-            )
-            if (match) {
-              toUpdate.push({ id: match.id, ...row })
-            } else {
-              toInsert.push(row)
-            }
-          })
-
-          if (toInsert.length > 0) {
-            const { error } = await supabase.from('siswa').insert(toInsert)
-            if (error) throw error
-          }
-
-          for (const row of toUpdate) {
-            const { id, ...payload } = row
-            const { error } = await supabase.from('siswa').update(payload).eq('id', id)
-            if (error) throw error
-          }
-
-          const tanpaKelas = rows.filter((r) => !r.kelas_id).length
-          setTimeout(() => {
-            let pesan = `Impor selesai: ${toInsert.length} siswa baru ditambahkan, ${toUpdate.length} siswa yang sudah ada di-update (dicocokkan lewat NIS/NISN).`
-            if (tanpaKelas > 0) {
-              pesan += `\n\nCatatan: ${tanpaKelas} baris tidak punya kelas yang cocok — pastikan nama kelas di file sama persis dengan yang ada di menu Kelas, lalu perbaiki manual lewat tombol edit.`
-            }
-            alert(pesan)
-          }, 300)
-
-          return { count: rows.length }
-        }}
+      <DapodikImportModal
+        open={showImportDapodik}
+        onClose={() => { setShowImportDapodik(false); loadData() }}
+        kelasList={kelasList}
+        onImport={importSiswaRows}
       />
     </Layout>
   )
