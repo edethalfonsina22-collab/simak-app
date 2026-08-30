@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { supabase } from '../lib/supabaseClient'
 import Layout from '../components/Layout'
+import { useAuth } from '../lib/AuthContext'
 import KuitansiModal from '../components/KuitansiModal'
 import PilihBkuModal from '../components/PilihBkuModal'
 import KuitansiPrintTemplate from '../lib/KuitansiPrintTemplate'
@@ -90,6 +91,8 @@ function mapRowKuitansi(row) {
 }
 
 export default function Kuitansi() {
+  const { profil } = useAuth()
+  const sekolahId = profil?.sekolah_id
   const [data, setData] = useState([])
   const [loading, setLoading] = useState(true)
   const [pencarian, setPencarian] = useState('')
@@ -118,7 +121,8 @@ export default function Kuitansi() {
 
   useEffect(() => {
     loadData()
-    supabase.from('profil_sekolah').select('*').eq('id', 1).maybeSingle().then(({ data }) => {
+    if (!sekolahId) return
+    supabase.from('profil_sekolah').select('*').eq('sekolah_id', sekolahId).maybeSingle().then(({ data }) => {
       if (data) {
         setSekolah({
           nama: data.nama_sekolah,
@@ -127,7 +131,7 @@ export default function Kuitansi() {
         })
       }
     })
-  }, [])
+  }, [sekolahId])
 
   const dataTersaring = useMemo(() => {
     return data.filter((d) => {
