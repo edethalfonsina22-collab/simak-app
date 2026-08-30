@@ -163,6 +163,8 @@ function IlustrasiSemangatSekolah() {
 
 export default function PPDBPublik() {
   const [profil, setProfil] = useState(null)
+  const [sekolahId, setSekolahId] = useState(null)
+  const [sekolahLoadError, setSekolahLoadError] = useState(false)
   const [form, setForm] = useState(emptyForm)
   const [mengirim, setMengirim] = useState(false)
   const [terkirim, setTerkirim] = useState(false)
@@ -178,6 +180,22 @@ export default function PPDBPublik() {
 
   useEffect(() => {
     supabase.from('profil_sekolah').select('*').eq('id', 1).maybeSingle().then(({ data }) => setProfil(data))
+
+    // Ambil id baris sekolah (setiap instalasi SIMAK hanya melayani satu sekolah,
+    // jadi cukup ambil baris pertama/satu-satunya) — dibutuhkan agar insert ke
+    // ppdb_pendaftar memenuhi foreign key + kebijakan RLS "siapa_saja_boleh_daftar".
+    supabase
+      .from('sekolah')
+      .select('id')
+      .limit(1)
+      .maybeSingle()
+      .then(({ data, error: sekolahErr }) => {
+        if (sekolahErr || !data) {
+          setSekolahLoadError(true)
+        } else {
+          setSekolahId(data.id)
+        }
+      })
   }, [])
 
   useEffect(() => {
@@ -291,9 +309,14 @@ export default function PPDBPublik() {
       setError('Nomor KK harus terdiri dari 16 digit angka.')
       return
     }
+    if (!sekolahId) {
+      setError('Data sekolah belum termuat. Silakan muat ulang halaman ini dan coba lagi.')
+      return
+    }
     setMengirim(true)
     const payload = {
       ...form,
+      sekolah_id: sekolahId,
       tahun_lahir: form.tahun_lahir ? Number(form.tahun_lahir) : null,
       tahun_lahir_ayah: form.tahun_lahir_ayah ? Number(form.tahun_lahir_ayah) : null,
       tahun_lahir_ibu: form.tahun_lahir_ibu ? Number(form.tahun_lahir_ibu) : null,
@@ -377,6 +400,12 @@ export default function PPDBPublik() {
             </div>
           )}
         </div>
+
+        {sekolahLoadError && (
+          <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2 mb-4 max-w-2xl mx-auto">
+            Gagal memuat data sekolah. Formulir mungkin tidak bisa dikirim — silakan muat ulang halaman.
+          </p>
+        )}
 
         <form onSubmit={handleSubmit} className="bg-white rounded-2xl shadow-sm p-6 sm:p-8 space-y-4">
 
