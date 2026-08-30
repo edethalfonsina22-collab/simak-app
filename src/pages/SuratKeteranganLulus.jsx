@@ -55,8 +55,28 @@ export default function SuratKeteranganLulus() {
     setKelasId(kelas6 ? kelas6.id : kelas?.[0]?.id ?? "");
   }
 
+  // Ambil sekolah_id user yang sedang login lewat tabel profil.
+  // PENTING: kalau aplikasi kamu sudah punya context/hook auth (mis. useAuth())
+  // yang menyimpan sekolah_id user aktif, ganti fungsi ini untuk memakai itu
+  // saja alih-alih query ulang ke tabel profil di sini.
+  async function getSekolahIdAktif() {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return null;
+    const { data: profilUser } = await supabase
+      .from("profil")
+      .select("sekolah_id")
+      .eq("id", user.id)
+      .maybeSingle();
+    return profilUser?.sekolah_id ?? null;
+  }
+
   async function loadAll() {
     setLoading(true);
+
+    const sekolahIdAktif = await getSekolahIdAktif();
+
     let siswaQuery = supabase
       .from("siswa")
       .select("*, kelas(tingkat)")
@@ -64,11 +84,16 @@ export default function SuratKeteranganLulus() {
       .order("nama_lengkap");
     if (kelasId) siswaQuery = siswaQuery.eq("kelas_id", kelasId);
 
+    let profilQuery = supabase.from("profil_sekolah").select("*");
+    profilQuery = sekolahIdAktif
+      ? profilQuery.eq("sekolah_id", sekolahIdAktif).maybeSingle()
+      : profilQuery.limit(0); // tidak ada sekolah_id -> jangan tampilkan profil siapa pun
+
     const [{ data: siswa }, { data: nilai }, { data: sklRows }, { data: profil }] = await Promise.all([
       siswaQuery,
       supabase.from("nilai_ijazah").select("*").eq("tahun_pelajaran", tahunPelajaran),
       supabase.from("skl").select("*").eq("tahun_pelajaran", tahunPelajaran),
-      supabase.from("profil_sekolah").select("*").eq("id", 1).maybeSingle(),
+      profilQuery,
     ]);
     setSiswaList(siswa || []);
     const nMap = {};
@@ -81,8 +106,6 @@ export default function SuratKeteranganLulus() {
     // profil_sekolah hanya menyimpan logo_path & ttd_kepala_sekolah_path
     // (path di Supabase Storage), bukan URL langsung — makanya harus diubah
     // dulu jadi URL publik di sini, sama seperti di ProfilSekolah.jsx.
-    // Sebelumnya logo tidak pernah muncul di cetakan SKL karena kolom
-    // logo_url/ttd_url ini memang tidak ada di tabel.
     let logoUrl = "";
     let ttdUrl = "";
     if (profil?.logo_path) {
@@ -262,6 +285,12 @@ export default function SuratKeteranganLulus() {
             {!sklMap[selectedId] && (
               <p className="text-sm text-amber-600 mb-3">
                 Siswa ini belum punya nomor SKL — klik "Buat Nomor Untuk Siswa Baru" di atas dulu.
+              </p>
+            )}
+
+            {!sekolah && !loading && (
+              <p className="text-sm text-red-600 mb-3">
+                Profil sekolah tidak ditemukan untuk akun ini — kop surat tidak akan tampil sampai profil sekolah diisi.
               </p>
             )}
 
