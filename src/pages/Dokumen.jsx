@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../lib/AuthContext'
 import Layout from '../components/Layout'
-import { FileUp, Loader2, FileText, Download, Trash2, HardDrive, Eye, X } from 'lucide-react'
+import { FileUp, Loader2, FileText, Download, Trash2, HardDrive, Eye, X, Share2 } from 'lucide-react'
+import BagikanKePesanModal from '../components/BagikanKePesanModal'
 
 const CARD_BORDER = ['border-t-blue-500', 'border-t-emerald-500', 'border-t-purple-500', 'border-t-orange-400']
 const ICON_BG = ['bg-blue-500/15 text-blue-600', 'bg-emerald-500/15 text-emerald-600', 'bg-purple-500/15 text-purple-600', 'bg-orange-100 text-orange-500']
@@ -107,6 +108,7 @@ export default function Dokumen() {
   const [showForm, setShowForm] = useState(false)
   const [form, setForm] = useState({ judul: '', deskripsi: '', file: null })
   const [preview, setPreview] = useState(null) // { url, fileName }
+  const [bagikan, setBagikan] = useState(null) // item yang mau dibagikan ke Pesan
 
   async function load() {
     setLoading(true)
@@ -315,6 +317,12 @@ export default function Dokumen() {
                 >
                   <Download size={14} /> Unduh
                 </button>
+                <button
+                  onClick={() => setBagikan(item)}
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-slate-600 hover:bg-slate-100"
+                >
+                  <Share2 size={14} /> Bagikan
+                </button>
                 {canDelete(item) && (
                   <button
                     onClick={() => handleDelete(item)}
@@ -333,6 +341,13 @@ export default function Dokumen() {
       )}
 
       {preview && <PreviewModal url={preview.url} fileName={preview.fileName} onClose={() => setPreview(null)} />}
+
+      {bagikan && (
+        <BagikanKePesanModal
+          file={{ bucket: 'dokumen-penting', path: bagikan.file_path, nama: bagikan.file_nama, tipe: 'dokumen' }}
+          onClose={() => setBagikan(null)}
+        />
+      )}
     </Layout>
   )
 }
