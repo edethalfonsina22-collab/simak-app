@@ -14,10 +14,22 @@ import {
   Download,
   X,
   MessageCircle,
+  Megaphone,
+  Lock,
 } from 'lucide-react'
 
 const IMAGE_EXT = ['jpg', 'jpeg', 'png', 'gif', 'webp']
 const VIDEO_EXT = ['mp4', 'webm', 'ogg', 'mov', 'mkv', 'avi', 'm4v']
+
+// ID semu untuk kontak "Siaran" yang selalu dipin di atas daftar kontak.
+// Bukan uuid asli — dipakai hanya untuk membedakan tampilan di sisi client.
+const SIARAN_ID = '__siaran__'
+
+const TARGET_LABEL = {
+  semua: 'Semua pengguna',
+  admin: 'Semua Admin/Kepala Sekolah',
+  guru: 'Semua Guru',
+}
 
 function getExt(fileName = '') {
   return (fileName.split('.').pop() || '').toLowerCase()
@@ -98,7 +110,7 @@ function LampiranPesan({ bucket, path, nama, tipe }) {
 }
 
 export default function Pesan() {
-  const { session, profil } = useAuth()
+  const { session, profil, isSuperAdmin } = useAuth()
   const myId = session?.user?.id
 
   const [kontak, setKontak] = useState([])
@@ -106,13 +118,19 @@ export default function Pesan() {
   const [ringkasan, setRingkasan] = useState({}) // { [profil_id]: { lastMsg, waktu, unread } }
   const [cari, setCari] = useState('')
 
-  const [aktif, setAktif] = useState(null) // kontak yang sedang dibuka
+  const [aktif, setAktif] = useState(null) // kontak yang sedang dibuka, atau SIARAN_ID
   const [messages, setMessages] = useState([])
   const [loadingMsg, setLoadingMsg] = useState(false)
   const [teks, setTeks] = useState('')
   const [file, setFile] = useState(null)
   const [mengirim, setMengirim] = useState(false)
   const [showChatMobile, setShowChatMobile] = useState(false)
+
+  // --- Siaran superadmin ---
+  const [siaranTerakhir, setSiaranTerakhir] = useState(null) // { isi/file_nama, waktu, unread }
+  const [targetSiaran, setTargetSiaran] = useState('semua')
+
+  const isSiaranAktif = aktif === SIARAN_ID
 
   const bottomRef = useRef(null)
   const fileInputRef = useRef(null)
@@ -141,6 +159,37 @@ export default function Pesan() {
     setRingkasan(map)
   }, [myId])
 
+  // Ringkasan kontak khusus "Siaran": pesan siaran terbaru yang boleh saya
+  // lihat (RLS sudah menyaring sesuai target_role), dan berapa yang belum
+  // saya baca (belum ada baris di pesan_siaran_dibaca untuk saya).
+  const loadRingkasanSiaran = useCallback(async () => {
+    if (!myId) return
+    const { data: siaran } = await supabase
+      .from('pesan_siaran')
+      .select('id, isi, file_nama, dibuat_pada')
+      .order('dibuat_pada', { ascending: false })
+      .limit(200)
+
+    if (!siaran || siaran.length === 0) {
+      setSiaranTerakhir(null)
+      return
+    }
+
+    const { data: sudahDibaca } = await supabase
+      .from('pesan_siaran_dibaca')
+      .select('siaran_id')
+      .eq('profil_id', myId)
+    const idSudahDibaca = new Set((sudahDibaca || []).map((r) => r.siaran_id))
+
+    const unread = siaran.filter((s) => !idSudahDibaca.has(s.id)).length
+    const terbaru = siaran[0]
+    setSiaranTerakhir({
+      lastMsg: terbaru.isi || (terbaru.file_nama ? `📎 ${terbaru.file_nama}` : ''),
+      waktu: terbaru.dibuat_pada,
+      unread,
+    })
+  }, [myId])
+
   const loadKontak = useCallback(async () => {
     setLoadingKontak(true)
     const { data, error } = await supabase.rpc('daftar_kontak_pesan')
@@ -151,10 +200,11 @@ export default function Pesan() {
   useEffect(() => {
     loadKontak()
     loadRingkasan()
-  }, [loadKontak, loadRingkasan])
+    loadRingkasanSiaran()
+  }, [loadKontak, loadRingkasan, loadRingkasanSiaran])
 
-  // Realtime: pesan masuk baru — refresh ringkasan, dan kalau percakapan
-  // yang sedang dibuka relevan, tambahkan langsung + tandai dibaca.
+  // Realtime: pesan pribadi masuk baru — refresh ringkasan, dan kalau
+  // percakapan yang sedang dibuka relevan, tambahkan langsung + tandai dibaca.
   useEffect(() => {
     if (!myId) return
     const channel = supabase
@@ -167,7 +217,11 @@ export default function Pesan() {
           if (m.pengirim_id !== myId && m.penerima_id !== myId) return
           loadRingkasan()
           setAktif((currentAktif) => {
-            if (currentAktif && (m.pengirim_id === currentAktif.profil_id || m.penerima_id === currentAktif.profil_id)) {
+            if (
+              currentAktif &&
+              currentAktif !== SIARAN_ID &&
+              (m.pengirim_id === currentAktif.profil_id || m.penerima_id === currentAktif.profil_id)
+            ) {
               setMessages((prev) => (prev.some((p) => p.id === m.id) ? prev : [...prev, m]))
               if (m.penerima_id === myId) {
                 supabase.from('pesan').update({ dibaca: true }).eq('id', m.id).then(() => {})
@@ -181,6 +235,34 @@ export default function Pesan() {
 
     return () => supabase.removeChannel(channel)
   }, [myId, loadRingkasan])
+
+  // Realtime: siaran baru dari superadmin — refresh ringkasan, dan kalau
+  // panel Siaran sedang dibuka, tambahkan langsung + tandai dibaca.
+  useEffect(() => {
+    if (!myId) return
+    const channel = supabase
+      .channel('pesan-siaran-realtime')
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'pesan_siaran' },
+        (payload) => {
+          const s = payload.new
+          loadRingkasanSiaran()
+          setAktif((currentAktif) => {
+            if (currentAktif === SIARAN_ID) {
+              setMessages((prev) => (prev.some((p) => p.id === s.id) ? prev : [...prev, s]))
+              if (s.pengirim_id !== myId) {
+                supabase.from('pesan_siaran_dibaca').insert({ siaran_id: s.id, profil_id: myId }).then(() => {})
+              }
+            }
+            return currentAktif
+          })
+        }
+      )
+      .subscribe()
+
+    return () => supabase.removeChannel(channel)
+  }, [myId, loadRingkasanSiaran])
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -210,6 +292,31 @@ export default function Pesan() {
     }
   }
 
+  async function bukaSiaran() {
+    setAktif(SIARAN_ID)
+    setShowChatMobile(true)
+    setLoadingMsg(true)
+    const { data } = await supabase
+      .from('pesan_siaran')
+      .select('*')
+      .order('dibuat_pada', { ascending: true })
+    setMessages(data || [])
+    setLoadingMsg(false)
+
+    const { data: sudahDibaca } = await supabase
+      .from('pesan_siaran_dibaca')
+      .select('siaran_id')
+      .eq('profil_id', myId)
+    const idSudahDibaca = new Set((sudahDibaca || []).map((r) => r.siaran_id))
+    const belumDibaca = (data || []).filter((s) => !idSudahDibaca.has(s.id))
+    if (belumDibaca.length > 0) {
+      await supabase.from('pesan_siaran_dibaca').insert(
+        belumDibaca.map((s) => ({ siaran_id: s.id, profil_id: myId }))
+      )
+      loadRingkasanSiaran()
+    }
+  }
+
   async function handleKirim(e) {
     e.preventDefault()
     if (!teks.trim() && !file) return
@@ -235,6 +342,27 @@ export default function Pesan() {
         file_tipe: tipeDariNamaFile(file.name),
         file_size: file.size,
       }
+    }
+
+    if (isSiaranAktif) {
+      const payload = {
+        pengirim_id: myId,
+        isi: teks.trim() || null,
+        target_role: targetSiaran,
+        ...lampiran,
+      }
+      const { data: inserted, error } = await supabase.from('pesan_siaran').insert(payload).select().single()
+      setMengirim(false)
+      if (error) {
+        alert('Gagal mengirim siaran: ' + error.message)
+        return
+      }
+      setMessages((prev) => [...prev, inserted])
+      setTeks('')
+      setFile(null)
+      if (fileInputRef.current) fileInputRef.current.value = ''
+      loadRingkasanSiaran()
+      return
     }
 
     const payload = {
@@ -282,6 +410,33 @@ export default function Pesan() {
                 />
               </div>
             </div>
+
+            {/* Kontak khusus "Siaran" — selalu dipin di atas, tidak ikut difilter pencarian */}
+            <button
+              onClick={bukaSiaran}
+              className={`w-full flex items-center gap-3 px-3 py-2.5 text-left transition-colors border-b border-slate-100 ${
+                isSiaranAktif ? 'bg-amber-50' : 'hover:bg-slate-50'
+              }`}
+            >
+              <span className="w-9 h-9 rounded-full bg-brass-500 text-white flex items-center justify-center shrink-0">
+                <Megaphone size={16} />
+              </span>
+              <span className="flex-1 min-w-0">
+                <span className="flex items-center justify-between gap-1">
+                  <span className="text-sm font-medium text-slate-900 truncate">Siaran</span>
+                  {siaranTerakhir?.waktu && <span className="text-[10px] text-slate-400 shrink-0">{formatWaktu(siaranTerakhir.waktu)}</span>}
+                </span>
+                <span className="flex items-center justify-between gap-1">
+                  <span className="text-xs text-slate-400 truncate block max-w-[140px]">{siaranTerakhir?.lastMsg || 'Info dari superadmin'}</span>
+                  {!!siaranTerakhir?.unread && (
+                    <span className="min-w-[16px] h-4 px-1 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center shrink-0">
+                      {siaranTerakhir.unread > 9 ? '9+' : siaranTerakhir.unread}
+                    </span>
+                  )}
+                </span>
+              </span>
+            </button>
+
             <div className="flex-1 overflow-y-auto">
               {loadingKontak ? (
                 <p className="text-sm text-slate-400 px-4 py-4">Memuat...</p>
@@ -295,7 +450,7 @@ export default function Pesan() {
                       key={k.profil_id}
                       onClick={() => bukaPercakapan(k)}
                       className={`w-full flex items-center gap-3 px-3 py-2.5 text-left transition-colors border-b border-slate-50 ${
-                        aktif?.profil_id === k.profil_id ? 'bg-blue-50' : 'hover:bg-slate-50'
+                        !isSiaranAktif && aktif?.profil_id === k.profil_id ? 'bg-blue-50' : 'hover:bg-slate-50'
                       }`}
                     >
                       <span className="w-9 h-9 rounded-full bg-blue-900 text-white text-xs font-semibold flex items-center justify-center shrink-0">
@@ -327,7 +482,7 @@ export default function Pesan() {
             {!aktif ? (
               <div className="flex-1 flex flex-col items-center justify-center gap-2 text-slate-300">
                 <MessageCircle size={40} />
-                <p className="text-sm text-slate-400">Pilih rekan untuk mulai mengobrol</p>
+                <p className="text-sm text-slate-400">Pilih rekan atau Siaran untuk mulai</p>
               </div>
             ) : (
               <>
@@ -335,17 +490,53 @@ export default function Pesan() {
                   <button onClick={() => setShowChatMobile(false)} className="sm:hidden p-1 -ml-1 rounded-lg hover:bg-slate-100">
                     <ArrowLeft size={18} />
                   </button>
-                  <span className="w-8 h-8 rounded-full bg-blue-900 text-white text-xs font-semibold flex items-center justify-center shrink-0">
-                    {getInisial(aktif.nama_lengkap)}
-                  </span>
-                  <p className="text-sm font-medium text-slate-900">{aktif.nama_lengkap}</p>
+                  {isSiaranAktif ? (
+                    <>
+                      <span className="w-8 h-8 rounded-full bg-brass-500 text-white flex items-center justify-center shrink-0">
+                        <Megaphone size={15} />
+                      </span>
+                      <div>
+                        <p className="text-sm font-medium text-slate-900">Siaran</p>
+                        <p className="text-[11px] text-slate-400">Pengumuman dari Superadmin untuk seluruh pengguna</p>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <span className="w-8 h-8 rounded-full bg-blue-900 text-white text-xs font-semibold flex items-center justify-center shrink-0">
+                        {getInisial(aktif.nama_lengkap)}
+                      </span>
+                      <p className="text-sm font-medium text-slate-900">{aktif.nama_lengkap}</p>
+                    </>
+                  )}
                 </div>
 
                 <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3 bg-slate-50/60">
                   {loadingMsg ? (
-                    <p className="text-sm text-slate-400">Memuat percakapan...</p>
+                    <p className="text-sm text-slate-400">Memuat...</p>
                   ) : messages.length === 0 ? (
-                    <p className="text-sm text-slate-400 text-center mt-6">Belum ada pesan. Mulai percakapan sekarang.</p>
+                    <p className="text-sm text-slate-400 text-center mt-6">
+                      {isSiaranAktif ? 'Belum ada siaran dari superadmin.' : 'Belum ada pesan. Mulai percakapan sekarang.'}
+                    </p>
+                  ) : isSiaranAktif ? (
+                    // Tampilan siaran: kartu pengumuman searah, bukan bubble chat kiri/kanan,
+                    // supaya jelas ini bersifat satu arah dari superadmin.
+                    messages.map((s) => (
+                      <div key={s.id} className="max-w-[85%] mx-auto sm:mx-0 sm:max-w-[80%] bg-white border border-amber-200 rounded-2xl px-4 py-3 shadow-sm">
+                        <div className="flex items-center gap-2 mb-1.5">
+                          <Megaphone size={13} className="text-brass-500" />
+                          <span className="text-[11px] font-semibold text-brass-600 uppercase tracking-wide">
+                            {TARGET_LABEL[s.target_role] || 'Siaran'}
+                          </span>
+                        </div>
+                        {s.file_path && (
+                          <div className={s.isi ? 'mb-2' : ''}>
+                            <LampiranPesan bucket={s.file_bucket} path={s.file_path} nama={s.file_nama} tipe={s.file_tipe} />
+                          </div>
+                        )}
+                        {s.isi && <p className="text-sm text-slate-800 whitespace-pre-wrap break-words">{s.isi}</p>}
+                        <p className="text-[10px] text-slate-400 mt-1.5">{formatWaktu(s.dibuat_pada)}</p>
+                      </div>
+                    ))
                   ) : (
                     messages.map((m) => {
                       const punyaSaya = m.pengirim_id === myId
@@ -371,47 +562,67 @@ export default function Pesan() {
                   <div ref={bottomRef} />
                 </div>
 
-                <form onSubmit={handleKirim} className="p-3 border-t border-slate-100 shrink-0">
-                  {file && (
-                    <div className="flex items-center gap-2 mb-2 px-3 py-1.5 rounded-lg bg-slate-100 text-xs text-slate-600 w-fit max-w-full">
-                      {tipeDariNamaFile(file.name) === 'gambar' ? <ImageIcon size={13} /> : tipeDariNamaFile(file.name) === 'video' ? <Video size={13} /> : <FileText size={13} />}
-                      <span className="truncate max-w-[180px]">{file.name}</span>
-                      <button type="button" onClick={() => { setFile(null); if (fileInputRef.current) fileInputRef.current.value = '' }} className="text-slate-400 hover:text-red-500">
-                        <X size={13} />
+                {isSiaranAktif && !isSuperAdmin ? (
+                  <div className="flex items-center gap-2 px-4 py-3 border-t border-slate-100 shrink-0 text-xs text-slate-400">
+                    <Lock size={13} /> Hanya superadmin yang dapat mengirim siaran.
+                  </div>
+                ) : (
+                  <form onSubmit={handleKirim} className="p-3 border-t border-slate-100 shrink-0">
+                    {isSiaranAktif && (
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="text-xs text-slate-500 shrink-0">Kirim ke:</span>
+                        <select
+                          className="input border-slate-200 text-xs py-1.5"
+                          value={targetSiaran}
+                          onChange={(e) => setTargetSiaran(e.target.value)}
+                        >
+                          <option value="semua">Semua pengguna</option>
+                          <option value="admin">Semua Admin/Kepala Sekolah</option>
+                          <option value="guru">Semua Guru</option>
+                        </select>
+                      </div>
+                    )}
+                    {file && (
+                      <div className="flex items-center gap-2 mb-2 px-3 py-1.5 rounded-lg bg-slate-100 text-xs text-slate-600 w-fit max-w-full">
+                        {tipeDariNamaFile(file.name) === 'gambar' ? <ImageIcon size={13} /> : tipeDariNamaFile(file.name) === 'video' ? <Video size={13} /> : <FileText size={13} />}
+                        <span className="truncate max-w-[180px]">{file.name}</span>
+                        <button type="button" onClick={() => { setFile(null); if (fileInputRef.current) fileInputRef.current.value = '' }} className="text-slate-400 hover:text-red-500">
+                          <X size={13} />
+                        </button>
+                      </div>
+                    )}
+                    <div className="flex items-center gap-2">
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,image/*,video/*"
+                        className="hidden"
+                        onChange={(e) => setFile(e.target.files?.[0] || null)}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        className="p-2 rounded-lg text-slate-500 hover:bg-slate-100 shrink-0"
+                        title="Lampirkan dokumen, gambar, atau video"
+                      >
+                        <Paperclip size={18} />
+                      </button>
+                      <input
+                        className="input flex-1 border-slate-200 text-sm"
+                        placeholder={isSiaranAktif ? 'Tulis pengumuman untuk seluruh pengguna...' : 'Tulis pesan...'}
+                        value={teks}
+                        onChange={(e) => setTeks(e.target.value)}
+                      />
+                      <button
+                        type="submit"
+                        disabled={mengirim || (!teks.trim() && !file)}
+                        className="p-2.5 rounded-lg bg-brass-400 text-ink-950 hover:brightness-95 disabled:opacity-50 transition shrink-0"
+                      >
+                        {mengirim ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />}
                       </button>
                     </div>
-                  )}
-                  <div className="flex items-center gap-2">
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,image/*,video/*"
-                      className="hidden"
-                      onChange={(e) => setFile(e.target.files?.[0] || null)}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => fileInputRef.current?.click()}
-                      className="p-2 rounded-lg text-slate-500 hover:bg-slate-100 shrink-0"
-                      title="Lampirkan dokumen, gambar, atau video"
-                    >
-                      <Paperclip size={18} />
-                    </button>
-                    <input
-                      className="input flex-1 border-slate-200 text-sm"
-                      placeholder="Tulis pesan..."
-                      value={teks}
-                      onChange={(e) => setTeks(e.target.value)}
-                    />
-                    <button
-                      type="submit"
-                      disabled={mengirim || (!teks.trim() && !file)}
-                      className="p-2.5 rounded-lg bg-brass-400 text-ink-950 hover:brightness-95 disabled:opacity-50 transition shrink-0"
-                    >
-                      {mengirim ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />}
-                    </button>
-                  </div>
-                </form>
+                  </form>
+                )}
               </>
             )}
           </div>
