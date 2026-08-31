@@ -292,12 +292,23 @@ export default function Sidebar({ open = false, onClose = () => {} }) {
     let aktif = true
 
     async function muatJumlahPesan() {
-      const { count } = await supabase
+      const { count: jumlahPribadi } = await supabase
         .from('pesan')
         .select('id', { count: 'exact', head: true })
         .eq('penerima_id', session.user.id)
         .eq('dibaca', false)
-      if (aktif) setJumlahPesanBelumDibaca(count || 0)
+
+      // Siaran: RLS otomatis menyaring hanya yang sesuai target_role saya.
+      // Belum dibaca = belum ada baris di pesan_siaran_dibaca untuk saya.
+      const { data: semuaSiaran } = await supabase.from('pesan_siaran').select('id')
+      const { data: siaranDibaca } = await supabase
+        .from('pesan_siaran_dibaca')
+        .select('siaran_id')
+        .eq('profil_id', session.user.id)
+      const idDibaca = new Set((siaranDibaca || []).map((r) => r.siaran_id))
+      const jumlahSiaran = (semuaSiaran || []).filter((s) => !idDibaca.has(s.id)).length
+
+      if (aktif) setJumlahPesanBelumDibaca((jumlahPribadi || 0) + jumlahSiaran)
     }
 
     muatJumlahPesan()
@@ -305,6 +316,12 @@ export default function Sidebar({ open = false, onClose = () => {} }) {
     const channel = supabase
       .channel('pesan-notifikasi')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'pesan' }, () => {
+        muatJumlahPesan()
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'pesan_siaran' }, () => {
+        muatJumlahPesan()
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'pesan_siaran_dibaca' }, () => {
         muatJumlahPesan()
       })
       .subscribe()
