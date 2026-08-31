@@ -15,8 +15,11 @@ const emptyForm = {
   nis: '',
   nisn: '',
   nik: '',
+  no_kk: '',
   // TAMBAHAN: nomor ujian, dipakai di Surat Keterangan Lulus (SKL) / Cetak SKL
   nomor_ujian: '',
+  no_seri_ijazah: '',
+  skhun: '',
   nama_lengkap: '',
   jenis_kelamin: 'L',
   agama: '',
@@ -25,6 +28,20 @@ const emptyForm = {
   tahun_lahir: '',
   alamat: '',
   alamat_tinggal: '',
+  rt: '',
+  rw: '',
+  dusun: '',
+  kelurahan: '',
+  kecamatan: '',
+  kode_pos: '',
+  jenis_tinggal: '',
+  alat_transportasi: '',
+  jarak_rumah_ke_sekolah: '',
+  lintang: '',
+  bujur: '',
+  telepon: '',
+  hp: '',
+  email: '',
   nama_orang_tua: '',
   nama_ayah: '',
   nama_ibu: '',
@@ -32,11 +49,14 @@ const emptyForm = {
   nik_ibu: '',
   tahun_lahir_ayah: '',
   tahun_lahir_ibu: '',
+  penghasilan_ayah: '',
+  penghasilan_ibu: '',
   no_hp_orang_tua: '',
   kelas_id: '',
   status: 'aktif',
   // TAMBAHAN: dipakai di Halaman Identitas Rapor (halaman sampul/identitas peserta didik)
   pendidikan_sebelumnya: '',
+  sekolah_asal: '',
   pendidikan_ayah: '',
   pendidikan_ibu: '',
   pekerjaan_ayah: '',
@@ -46,18 +66,50 @@ const emptyForm = {
   ortu_kabupaten_kota: '',
   ortu_provinsi: '',
   nama_wali: '',
+  nik_wali: '',
+  tahun_lahir_wali: '',
+  pendidikan_wali: '',
   pekerjaan_wali: '',
+  penghasilan_wali: '',
   alamat_wali: '',
+  // TAMBAHAN: Program bantuan sosial (KPS/KIP/KKS/PIP)
+  penerima_kps: '',
+  no_kps: '',
+  penerima_kip: '',
+  nomor_kip: '',
+  nama_di_kip: '',
+  nomor_kks: '',
+  layak_pip: '',
+  alasan_layak_pip: '',
+  no_registrasi_akta_lahir: '',
+  // TAMBAHAN: Rekening siswa (pencairan bantuan)
+  bank: '',
+  no_rekening: '',
+  rekening_atas_nama: '',
+  // TAMBAHAN: Kesehatan, fisik & keluarga
+  kebutuhan_khusus: '',
+  berat_badan: '',
+  tinggi_badan: '',
+  lingkar_kepala: '',
+  anak_ke: '',
+  jumlah_saudara_kandung: '',
 }
 
 // Header ini HARUS sama persis dengan templateHeaders di BulkImportModal (Impor Massal)
 // supaya file yang diunduh dari sini bisa langsung diupload ulang tanpa perlu diubah nama kolomnya.
 const EXCEL_HEADERS = [
-  'nama_lengkap', 'nis', 'nisn', 'nik', 'nomor_ujian', 'kelas', 'jenis_kelamin(L/P)', 'agama',
+  'nama_lengkap', 'nis', 'nisn', 'nik', 'no_kk', 'nomor_ujian', 'no_seri_ijazah', 'skhun', 'kelas', 'jenis_kelamin(L/P)', 'agama',
   'tempat_lahir', 'tanggal_lahir(YYYY-MM-DD)', 'tahun_lahir',
-  'nama_ayah', 'nik_ayah', 'tahun_lahir_ayah',
-  'nama_ibu', 'nik_ibu', 'tahun_lahir_ibu',
+  'nama_ayah', 'nik_ayah', 'tahun_lahir_ayah', 'pendidikan_ayah', 'pekerjaan_ayah', 'penghasilan_ayah',
+  'nama_ibu', 'nik_ibu', 'tahun_lahir_ibu', 'pendidikan_ibu', 'pekerjaan_ibu', 'penghasilan_ibu',
   'nama_orang_tua', 'no_hp_orang_tua', 'alamat', 'alamat_tinggal',
+  'rt', 'rw', 'dusun', 'kelurahan', 'kecamatan', 'kode_pos', 'jenis_tinggal', 'alat_transportasi',
+  'telepon', 'hp', 'email',
+  'penerima_kps(Ya/Tidak)', 'no_kps', 'penerima_kip(Ya/Tidak)', 'nomor_kip', 'nama_di_kip', 'nomor_kks',
+  'layak_pip(Ya/Tidak)', 'alasan_layak_pip', 'no_registrasi_akta_lahir',
+  'bank', 'no_rekening', 'rekening_atas_nama',
+  'kebutuhan_khusus', 'berat_badan', 'tinggi_badan', 'lingkar_kepala', 'anak_ke', 'jumlah_saudara_kandung',
+  'sekolah_asal',
 ]
 
 // Motif batik (kawung + parang) — sama persis dengan Profil Saya, Dasbor, Galeri & Dokumen,
@@ -215,12 +267,22 @@ export default function Siswa() {
   async function handleSubmit(e) {
     e.preventDefault()
     setSaving(true)
+    const toNumOrNull = (v) => (v === '' || v === null || v === undefined ? null : Number(v))
     const payload = {
       ...form,
       kelas_id: form.kelas_id || null,
-      tahun_lahir: form.tahun_lahir ? Number(form.tahun_lahir) : null,
-      tahun_lahir_ayah: form.tahun_lahir_ayah ? Number(form.tahun_lahir_ayah) : null,
-      tahun_lahir_ibu: form.tahun_lahir_ibu ? Number(form.tahun_lahir_ibu) : null,
+      tahun_lahir: toNumOrNull(form.tahun_lahir),
+      tahun_lahir_ayah: toNumOrNull(form.tahun_lahir_ayah),
+      tahun_lahir_ibu: toNumOrNull(form.tahun_lahir_ibu),
+      tahun_lahir_wali: toNumOrNull(form.tahun_lahir_wali),
+      anak_ke: toNumOrNull(form.anak_ke),
+      jumlah_saudara_kandung: toNumOrNull(form.jumlah_saudara_kandung),
+      berat_badan: toNumOrNull(form.berat_badan),
+      tinggi_badan: toNumOrNull(form.tinggi_badan),
+      lingkar_kepala: toNumOrNull(form.lingkar_kepala),
+      jarak_rumah_ke_sekolah: toNumOrNull(form.jarak_rumah_ke_sekolah),
+      lintang: toNumOrNull(form.lintang),
+      bujur: toNumOrNull(form.bujur),
     }
     delete payload.kelas
 
@@ -346,7 +408,10 @@ export default function Siswa() {
       nis: s.nis || '',
       nisn: s.nisn || '',
       nik: s.nik || '',
+      no_kk: s.no_kk || '',
       nomor_ujian: s.nomor_ujian || '',
+      no_seri_ijazah: s.no_seri_ijazah || '',
+      skhun: s.skhun || '',
       kelas: s.kelas?.nama_kelas || '',
       'jenis_kelamin(L/P)': s.jenis_kelamin || '',
       agama: s.agama || '',
@@ -356,23 +421,53 @@ export default function Siswa() {
       nama_ayah: s.nama_ayah || '',
       nik_ayah: s.nik_ayah || '',
       tahun_lahir_ayah: s.tahun_lahir_ayah || '',
+      pendidikan_ayah: s.pendidikan_ayah || '',
+      pekerjaan_ayah: s.pekerjaan_ayah || '',
+      penghasilan_ayah: s.penghasilan_ayah || '',
       nama_ibu: s.nama_ibu || '',
       nik_ibu: s.nik_ibu || '',
       tahun_lahir_ibu: s.tahun_lahir_ibu || '',
+      pendidikan_ibu: s.pendidikan_ibu || '',
+      pekerjaan_ibu: s.pekerjaan_ibu || '',
+      penghasilan_ibu: s.penghasilan_ibu || '',
       nama_orang_tua: s.nama_orang_tua || '',
       no_hp_orang_tua: s.no_hp_orang_tua || '',
       alamat: s.alamat || '',
       alamat_tinggal: s.alamat_tinggal || '',
+      rt: s.rt || '',
+      rw: s.rw || '',
+      dusun: s.dusun || '',
+      kelurahan: s.kelurahan || '',
+      kecamatan: s.kecamatan || '',
+      kode_pos: s.kode_pos || '',
+      jenis_tinggal: s.jenis_tinggal || '',
+      alat_transportasi: s.alat_transportasi || '',
+      telepon: s.telepon || '',
+      hp: s.hp || '',
+      email: s.email || '',
+      'penerima_kps(Ya/Tidak)': s.penerima_kps || '',
+      no_kps: s.no_kps || '',
+      'penerima_kip(Ya/Tidak)': s.penerima_kip || '',
+      nomor_kip: s.nomor_kip || '',
+      nama_di_kip: s.nama_di_kip || '',
+      nomor_kks: s.nomor_kks || '',
+      'layak_pip(Ya/Tidak)': s.layak_pip || '',
+      alasan_layak_pip: s.alasan_layak_pip || '',
+      no_registrasi_akta_lahir: s.no_registrasi_akta_lahir || '',
+      bank: s.bank || '',
+      no_rekening: s.no_rekening || '',
+      rekening_atas_nama: s.rekening_atas_nama || '',
+      kebutuhan_khusus: s.kebutuhan_khusus || '',
+      berat_badan: s.berat_badan || '',
+      tinggi_badan: s.tinggi_badan || '',
+      lingkar_kepala: s.lingkar_kepala || '',
+      anak_ke: s.anak_ke || '',
+      jumlah_saudara_kandung: s.jumlah_saudara_kandung || '',
+      sekolah_asal: s.sekolah_asal || '',
     }))
 
     const ws = XLSX.utils.json_to_sheet(rows, { header: EXCEL_HEADERS })
-    ws['!cols'] = [
-      { wch: 24 }, { wch: 10 }, { wch: 12 }, { wch: 18 }, { wch: 12 }, { wch: 10 }, { wch: 16 }, { wch: 12 },
-      { wch: 16 }, { wch: 20 }, { wch: 12 },
-      { wch: 20 }, { wch: 18 }, { wch: 14 },
-      { wch: 20 }, { wch: 18 }, { wch: 14 },
-      { wch: 22 }, { wch: 16 }, { wch: 30 }, { wch: 30 },
-    ]
+    ws['!cols'] = EXCEL_HEADERS.map(() => ({ wch: 18 }))
     const wb = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(wb, ws, 'Data Siswa')
     XLSX.writeFile(wb, `Data-Siswa-${new Date().toISOString().slice(0, 10)}.xlsx`)
@@ -688,7 +783,7 @@ export default function Siswa() {
 
       {showForm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink-950/50 backdrop-blur-sm p-4">
-          <form onSubmit={handleSubmit} className="card w-full max-w-lg p-6 relative max-h-[90vh] overflow-y-auto">
+          <form onSubmit={handleSubmit} className="card w-full max-w-2xl p-6 relative max-h-[90vh] overflow-y-auto">
             <button type="button" onClick={() => setShowForm(false)} className="absolute top-4 right-4 text-ink-700/40 hover:text-ink-900">
               <X size={20} />
             </button>
@@ -725,7 +820,7 @@ export default function Siswa() {
               </div>
             )}
 
-            <div className="grid grid-cols-2 gap-3">
+            <Seksi judul="Data Pribadi">
               <Field label="Nama Lengkap" full>
                 <input required className="input-field" value={form.nama_lengkap}
                   onChange={(e) => setForm({ ...form, nama_lengkap: e.target.value })} />
@@ -738,13 +833,17 @@ export default function Siswa() {
                 <input className="input-field" value={form.nisn}
                   onChange={(e) => setForm({ ...form, nisn: e.target.value })} />
               </Field>
-              <Field label="NIK" full>
+              <Field label="NIK">
                 <input className="input-field" placeholder="16 digit NIK sesuai KK/KTP" value={form.nik}
                   onChange={(e) => setForm({ ...form, nik: e.target.value })} />
               </Field>
-              <Field label="Nomor Ujian" full>
-                <input className="input-field" placeholder="Diisi saat menjelang Asesmen Sekolah / dipakai di SKL" value={form.nomor_ujian}
-                  onChange={(e) => setForm({ ...form, nomor_ujian: e.target.value })} />
+              <Field label="No. KK">
+                <input className="input-field" value={form.no_kk}
+                  onChange={(e) => setForm({ ...form, no_kk: e.target.value })} />
+              </Field>
+              <Field label="No. Registrasi Akta Lahir" full>
+                <input className="input-field" value={form.no_registrasi_akta_lahir}
+                  onChange={(e) => setForm({ ...form, no_registrasi_akta_lahir: e.target.value })} />
               </Field>
               <Field label="Jenis Kelamin">
                 <select className="input-field" value={form.jenis_kelamin}
@@ -779,67 +878,100 @@ export default function Siswa() {
                 <input type="number" placeholder="Contoh: 2015" className="input-field" value={form.tahun_lahir || ''}
                   onChange={(e) => setForm({ ...form, tahun_lahir: e.target.value })} />
               </Field>
-              <Field label="Pendidikan Sebelumnya" full>
+              <Field label="Anak ke-berapa">
+                <input type="number" className="input-field" value={form.anak_ke || ''}
+                  onChange={(e) => setForm({ ...form, anak_ke: e.target.value })} />
+              </Field>
+              <Field label="Jumlah Saudara Kandung">
+                <input type="number" className="input-field" value={form.jumlah_saudara_kandung || ''}
+                  onChange={(e) => setForm({ ...form, jumlah_saudara_kandung: e.target.value })} />
+              </Field>
+              <Field label="Kebutuhan Khusus">
+                <input className="input-field" placeholder="Contoh: Tidak ada" value={form.kebutuhan_khusus}
+                  onChange={(e) => setForm({ ...form, kebutuhan_khusus: e.target.value })} />
+              </Field>
+              <Field label="Pendidikan Sebelumnya / Sekolah Asal" full>
                 <input className="input-field" placeholder="Contoh: TK Pertiwi Jerwatu"
                   value={form.pendidikan_sebelumnya}
-                  onChange={(e) => setForm({ ...form, pendidikan_sebelumnya: e.target.value })} />
+                  onChange={(e) => setForm({ ...form, pendidikan_sebelumnya: e.target.value, sekolah_asal: e.target.value })} />
               </Field>
+            </Seksi>
 
-              <div className="col-span-2 pt-2 mt-1 border-t border-ink-900/[0.08]">
-                <p className="eyebrow mb-2">Data Ayah</p>
-              </div>
-              <Field label="Nama Ayah">
-                <input className="input-field" value={form.nama_ayah}
-                  onChange={(e) => setForm({ ...form, nama_ayah: e.target.value })} />
+            <Seksi judul="Fisik & Kesehatan">
+              <Field label="Berat Badan (kg)">
+                <input type="number" className="input-field" value={form.berat_badan || ''}
+                  onChange={(e) => setForm({ ...form, berat_badan: e.target.value })} />
               </Field>
-              <Field label="NIK Ayah">
-                <input className="input-field" placeholder="16 digit NIK" value={form.nik_ayah}
-                  onChange={(e) => setForm({ ...form, nik_ayah: e.target.value })} />
+              <Field label="Tinggi Badan (cm)">
+                <input type="number" className="input-field" value={form.tinggi_badan || ''}
+                  onChange={(e) => setForm({ ...form, tinggi_badan: e.target.value })} />
               </Field>
-              <Field label="Tahun Lahir Ayah">
-                <input type="number" placeholder="Contoh: 1985" className="input-field" value={form.tahun_lahir_ayah || ''}
-                  onChange={(e) => setForm({ ...form, tahun_lahir_ayah: e.target.value })} />
+              <Field label="Lingkar Kepala (cm)">
+                <input type="number" className="input-field" value={form.lingkar_kepala || ''}
+                  onChange={(e) => setForm({ ...form, lingkar_kepala: e.target.value })} />
               </Field>
-              <Field label="Pendidikan Ayah">
-                <input className="input-field" value={form.pendidikan_ayah}
-                  onChange={(e) => setForm({ ...form, pendidikan_ayah: e.target.value })} />
-              </Field>
-              <Field label="Pekerjaan Ayah">
-                <input className="input-field" value={form.pekerjaan_ayah}
-                  onChange={(e) => setForm({ ...form, pekerjaan_ayah: e.target.value })} />
-              </Field>
+            </Seksi>
 
-              <div className="col-span-2 pt-2 mt-1 border-t border-ink-900/[0.08]">
-                <p className="eyebrow mb-2">Data Ibu</p>
-              </div>
-              <Field label="Nama Ibu">
-                <input className="input-field" value={form.nama_ibu}
-                  onChange={(e) => setForm({ ...form, nama_ibu: e.target.value })} />
+            <Seksi judul="Alamat">
+              <Field label="Alamat (sesuai KTP/KK)" full>
+                <textarea className="input-field" rows={2} value={form.alamat}
+                  onChange={(e) => setForm({ ...form, alamat: e.target.value })} />
               </Field>
-              <Field label="NIK Ibu">
-                <input className="input-field" placeholder="16 digit NIK" value={form.nik_ibu}
-                  onChange={(e) => setForm({ ...form, nik_ibu: e.target.value })} />
+              <Field label="Alamat Tempat Tinggal (domisili saat ini)" full>
+                <textarea className="input-field" rows={2} value={form.alamat_tinggal}
+                  onChange={(e) => setForm({ ...form, alamat_tinggal: e.target.value })} />
               </Field>
-              <Field label="Tahun Lahir Ibu">
-                <input type="number" placeholder="Contoh: 1988" className="input-field" value={form.tahun_lahir_ibu || ''}
-                  onChange={(e) => setForm({ ...form, tahun_lahir_ibu: e.target.value })} />
+              <Field label="RT"><input className="input-field" value={form.rt} onChange={(e) => setForm({ ...form, rt: e.target.value })} /></Field>
+              <Field label="RW"><input className="input-field" value={form.rw} onChange={(e) => setForm({ ...form, rw: e.target.value })} /></Field>
+              <Field label="Dusun"><input className="input-field" value={form.dusun} onChange={(e) => setForm({ ...form, dusun: e.target.value })} /></Field>
+              <Field label="Kelurahan/Desa"><input className="input-field" value={form.kelurahan} onChange={(e) => setForm({ ...form, kelurahan: e.target.value })} /></Field>
+              <Field label="Kecamatan"><input className="input-field" value={form.kecamatan} onChange={(e) => setForm({ ...form, kecamatan: e.target.value })} /></Field>
+              <Field label="Kode Pos"><input className="input-field" value={form.kode_pos} onChange={(e) => setForm({ ...form, kode_pos: e.target.value })} /></Field>
+              <Field label="Jenis Tinggal">
+                <select className="input-field" value={form.jenis_tinggal} onChange={(e) => setForm({ ...form, jenis_tinggal: e.target.value })}>
+                  <option value="">-</option>
+                  <option value="Bersama Orang Tua">Bersama Orang Tua</option>
+                  <option value="Wali">Wali</option>
+                  <option value="Kost">Kost</option>
+                  <option value="Asrama">Asrama</option>
+                  <option value="Panti Asuhan">Panti Asuhan</option>
+                  <option value="Lainnya">Lainnya</option>
+                </select>
               </Field>
-              <Field label="Pendidikan Ibu">
-                <input className="input-field" value={form.pendidikan_ibu}
-                  onChange={(e) => setForm({ ...form, pendidikan_ibu: e.target.value })} />
-              </Field>
-              <Field label="Pekerjaan Ibu">
-                <input className="input-field" value={form.pekerjaan_ibu}
-                  onChange={(e) => setForm({ ...form, pekerjaan_ibu: e.target.value })} />
-              </Field>
+              <Field label="Alat Transportasi"><input className="input-field" value={form.alat_transportasi} onChange={(e) => setForm({ ...form, alat_transportasi: e.target.value })} /></Field>
+              <Field label="Lintang"><input className="input-field" value={form.lintang} onChange={(e) => setForm({ ...form, lintang: e.target.value })} /></Field>
+              <Field label="Bujur"><input className="input-field" value={form.bujur} onChange={(e) => setForm({ ...form, bujur: e.target.value })} /></Field>
+            </Seksi>
 
+            <Seksi judul="Kontak">
+              <Field label="Telepon"><input className="input-field" value={form.telepon} onChange={(e) => setForm({ ...form, telepon: e.target.value })} /></Field>
+              <Field label="HP"><input className="input-field" value={form.hp} onChange={(e) => setForm({ ...form, hp: e.target.value })} /></Field>
+              <Field label="Email"><input type="email" className="input-field" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></Field>
+              <Field label="No. HP Orang Tua/Wali"><input className="input-field" value={form.no_hp_orang_tua} onChange={(e) => setForm({ ...form, no_hp_orang_tua: e.target.value })} /></Field>
+            </Seksi>
+
+            <Seksi judul="Data Ayah">
+              <Field label="Nama Ayah"><input className="input-field" value={form.nama_ayah} onChange={(e) => setForm({ ...form, nama_ayah: e.target.value })} /></Field>
+              <Field label="NIK Ayah"><input className="input-field" placeholder="16 digit NIK" value={form.nik_ayah} onChange={(e) => setForm({ ...form, nik_ayah: e.target.value })} /></Field>
+              <Field label="Tahun Lahir Ayah"><input type="number" placeholder="Contoh: 1985" className="input-field" value={form.tahun_lahir_ayah || ''} onChange={(e) => setForm({ ...form, tahun_lahir_ayah: e.target.value })} /></Field>
+              <Field label="Pendidikan Ayah"><input className="input-field" value={form.pendidikan_ayah} onChange={(e) => setForm({ ...form, pendidikan_ayah: e.target.value })} /></Field>
+              <Field label="Pekerjaan Ayah"><input className="input-field" value={form.pekerjaan_ayah} onChange={(e) => setForm({ ...form, pekerjaan_ayah: e.target.value })} /></Field>
+              <Field label="Penghasilan Ayah"><input className="input-field" value={form.penghasilan_ayah} onChange={(e) => setForm({ ...form, penghasilan_ayah: e.target.value })} /></Field>
+            </Seksi>
+
+            <Seksi judul="Data Ibu">
+              <Field label="Nama Ibu"><input className="input-field" value={form.nama_ibu} onChange={(e) => setForm({ ...form, nama_ibu: e.target.value })} /></Field>
+              <Field label="NIK Ibu"><input className="input-field" placeholder="16 digit NIK" value={form.nik_ibu} onChange={(e) => setForm({ ...form, nik_ibu: e.target.value })} /></Field>
+              <Field label="Tahun Lahir Ibu"><input type="number" placeholder="Contoh: 1988" className="input-field" value={form.tahun_lahir_ibu || ''} onChange={(e) => setForm({ ...form, tahun_lahir_ibu: e.target.value })} /></Field>
+              <Field label="Pendidikan Ibu"><input className="input-field" value={form.pendidikan_ibu} onChange={(e) => setForm({ ...form, pendidikan_ibu: e.target.value })} /></Field>
+              <Field label="Pekerjaan Ibu"><input className="input-field" value={form.pekerjaan_ibu} onChange={(e) => setForm({ ...form, pekerjaan_ibu: e.target.value })} /></Field>
+              <Field label="Penghasilan Ibu"><input className="input-field" value={form.penghasilan_ibu} onChange={(e) => setForm({ ...form, penghasilan_ibu: e.target.value })} /></Field>
+            </Seksi>
+
+            <Seksi judul="Orang Tua/Wali (Umum)">
               <Field label="Nama Orang Tua/Wali" full>
                 <input className="input-field" value={form.nama_orang_tua}
                   onChange={(e) => setForm({ ...form, nama_orang_tua: e.target.value })} />
-              </Field>
-              <Field label="No. HP Orang Tua">
-                <input className="input-field" value={form.no_hp_orang_tua}
-                  onChange={(e) => setForm({ ...form, no_hp_orang_tua: e.target.value })} />
               </Field>
               <Field label="Status">
                 <select className="input-field" value={form.status}
@@ -849,55 +981,64 @@ export default function Siswa() {
                   <option value="pindah">Pindah</option>
                 </select>
               </Field>
-              <Field label="Alamat (sesuai KTP/KK)" full>
-                <textarea className="input-field" rows={2} value={form.alamat}
-                  onChange={(e) => setForm({ ...form, alamat: e.target.value })} />
-              </Field>
-              <Field label="Alamat Tempat Tinggal (domisili saat ini)" full>
-                <textarea className="input-field" rows={2} value={form.alamat_tinggal}
-                  onChange={(e) => setForm({ ...form, alamat_tinggal: e.target.value })} />
-              </Field>
+            </Seksi>
 
-              {/* TAMBAHAN: khusus untuk Halaman Identitas Rapor — alamat orang tua terpisah
-                  (jalan dipakai dari field "Alamat" di atas) */}
-              <div className="col-span-2 pt-2 mt-1 border-t border-ink-900/[0.08]">
-                <p className="eyebrow mb-2">Alamat Orang Tua (untuk Halaman Identitas Rapor)</p>
-              </div>
-              <Field label="Kelurahan/Desa">
-                <input className="input-field" value={form.ortu_kelurahan_desa}
-                  onChange={(e) => setForm({ ...form, ortu_kelurahan_desa: e.target.value })} />
-              </Field>
-              <Field label="Kecamatan">
-                <input className="input-field" value={form.ortu_kecamatan}
-                  onChange={(e) => setForm({ ...form, ortu_kecamatan: e.target.value })} />
-              </Field>
-              <Field label="Kabupaten/Kota">
-                <input className="input-field" value={form.ortu_kabupaten_kota}
-                  onChange={(e) => setForm({ ...form, ortu_kabupaten_kota: e.target.value })} />
-              </Field>
-              <Field label="Provinsi">
-                <input className="input-field" value={form.ortu_provinsi}
-                  onChange={(e) => setForm({ ...form, ortu_provinsi: e.target.value })} />
-              </Field>
+            <Seksi judul="Alamat Orang Tua (untuk Halaman Identitas Rapor)">
+              <Field label="Kelurahan/Desa"><input className="input-field" value={form.ortu_kelurahan_desa} onChange={(e) => setForm({ ...form, ortu_kelurahan_desa: e.target.value })} /></Field>
+              <Field label="Kecamatan"><input className="input-field" value={form.ortu_kecamatan} onChange={(e) => setForm({ ...form, ortu_kecamatan: e.target.value })} /></Field>
+              <Field label="Kabupaten/Kota"><input className="input-field" value={form.ortu_kabupaten_kota} onChange={(e) => setForm({ ...form, ortu_kabupaten_kota: e.target.value })} /></Field>
+              <Field label="Provinsi"><input className="input-field" value={form.ortu_provinsi} onChange={(e) => setForm({ ...form, ortu_provinsi: e.target.value })} /></Field>
+            </Seksi>
 
-              <div className="col-span-2 pt-2 mt-1 border-t border-ink-900/[0.08]">
-                <p className="eyebrow mb-2">Wali Peserta Didik (isi jika ada, selain orang tua)</p>
-              </div>
-              <Field label="Nama Wali">
-                <input className="input-field" value={form.nama_wali}
-                  onChange={(e) => setForm({ ...form, nama_wali: e.target.value })} />
-              </Field>
-              <Field label="Pekerjaan Wali">
-                <input className="input-field" value={form.pekerjaan_wali}
-                  onChange={(e) => setForm({ ...form, pekerjaan_wali: e.target.value })} />
-              </Field>
+            <Seksi judul="Wali Peserta Didik (isi jika ada, selain orang tua)">
+              <Field label="Nama Wali"><input className="input-field" value={form.nama_wali} onChange={(e) => setForm({ ...form, nama_wali: e.target.value })} /></Field>
+              <Field label="NIK Wali"><input className="input-field" value={form.nik_wali} onChange={(e) => setForm({ ...form, nik_wali: e.target.value })} /></Field>
+              <Field label="Tahun Lahir Wali"><input type="number" className="input-field" value={form.tahun_lahir_wali || ''} onChange={(e) => setForm({ ...form, tahun_lahir_wali: e.target.value })} /></Field>
+              <Field label="Pendidikan Wali"><input className="input-field" value={form.pendidikan_wali} onChange={(e) => setForm({ ...form, pendidikan_wali: e.target.value })} /></Field>
+              <Field label="Pekerjaan Wali"><input className="input-field" value={form.pekerjaan_wali} onChange={(e) => setForm({ ...form, pekerjaan_wali: e.target.value })} /></Field>
+              <Field label="Penghasilan Wali"><input className="input-field" value={form.penghasilan_wali} onChange={(e) => setForm({ ...form, penghasilan_wali: e.target.value })} /></Field>
               <Field label="Alamat Wali" full>
                 <textarea className="input-field" rows={2} value={form.alamat_wali}
                   onChange={(e) => setForm({ ...form, alamat_wali: e.target.value })} />
               </Field>
-            </div>
+            </Seksi>
 
-            <div className="mt-5 flex justify-end gap-3">
+            <Seksi judul="Akademik & Kelulusan">
+              <Field label="Nomor Ujian"><input className="input-field" placeholder="Dipakai di SKL" value={form.nomor_ujian} onChange={(e) => setForm({ ...form, nomor_ujian: e.target.value })} /></Field>
+              <Field label="No. Seri Ijazah"><input className="input-field" value={form.no_seri_ijazah} onChange={(e) => setForm({ ...form, no_seri_ijazah: e.target.value })} /></Field>
+              <Field label="SKHUN"><input className="input-field" value={form.skhun} onChange={(e) => setForm({ ...form, skhun: e.target.value })} /></Field>
+            </Seksi>
+
+            <Seksi judul="Program Bantuan Sosial (KPS/KIP/KKS/PIP)">
+              <Field label="Penerima KPS">
+                <select className="input-field" value={form.penerima_kps} onChange={(e) => setForm({ ...form, penerima_kps: e.target.value })}>
+                  <option value="">-</option><option value="Ya">Ya</option><option value="Tidak">Tidak</option>
+                </select>
+              </Field>
+              <Field label="No. KPS"><input className="input-field" value={form.no_kps} onChange={(e) => setForm({ ...form, no_kps: e.target.value })} /></Field>
+              <Field label="Penerima KIP">
+                <select className="input-field" value={form.penerima_kip} onChange={(e) => setForm({ ...form, penerima_kip: e.target.value })}>
+                  <option value="">-</option><option value="Ya">Ya</option><option value="Tidak">Tidak</option>
+                </select>
+              </Field>
+              <Field label="Nomor KIP"><input className="input-field" value={form.nomor_kip} onChange={(e) => setForm({ ...form, nomor_kip: e.target.value })} /></Field>
+              <Field label="Nama di KIP"><input className="input-field" value={form.nama_di_kip} onChange={(e) => setForm({ ...form, nama_di_kip: e.target.value })} /></Field>
+              <Field label="Nomor KKS"><input className="input-field" value={form.nomor_kks} onChange={(e) => setForm({ ...form, nomor_kks: e.target.value })} /></Field>
+              <Field label="Layak PIP (usulan sekolah)">
+                <select className="input-field" value={form.layak_pip} onChange={(e) => setForm({ ...form, layak_pip: e.target.value })}>
+                  <option value="">-</option><option value="Ya">Ya</option><option value="Tidak">Tidak</option>
+                </select>
+              </Field>
+              <Field label="Alasan Layak PIP" full><input className="input-field" value={form.alasan_layak_pip} onChange={(e) => setForm({ ...form, alasan_layak_pip: e.target.value })} /></Field>
+            </Seksi>
+
+            <Seksi judul="Rekening (untuk pencairan bantuan)">
+              <Field label="Bank"><input className="input-field" value={form.bank} onChange={(e) => setForm({ ...form, bank: e.target.value })} /></Field>
+              <Field label="Nomor Rekening"><input className="input-field" value={form.no_rekening} onChange={(e) => setForm({ ...form, no_rekening: e.target.value })} /></Field>
+              <Field label="Rekening Atas Nama"><input className="input-field" value={form.rekening_atas_nama} onChange={(e) => setForm({ ...form, rekening_atas_nama: e.target.value })} /></Field>
+            </Seksi>
+
+            <div className="mt-5 flex justify-end gap-3 sticky bottom-0 bg-white pt-3">
               <button type="button" className="btn-secondary" onClick={() => setShowForm(false)}>Batal</button>
               <button type="submit" disabled={saving} className="btn-primary">
                 {saving && <Loader2 size={16} className="animate-spin" />}
@@ -938,26 +1079,86 @@ export default function Siswa() {
             </div>
 
             <div className="px-6 -mt-8 pb-6">
-              <div className="card p-4 space-y-3 bg-white shadow-md">
-                <ProfilRow label="NIS" value={profilLihat.nis} />
-                <ProfilRow label="NISN" value={profilLihat.nisn} />
-                <ProfilRow label="NIK" value={profilLihat.nik} />
-                <ProfilRow label="Nomor Ujian" value={profilLihat.nomor_ujian} />
-                <ProfilRow label="Kelas" value={profilLihat.kelas?.nama_kelas} />
-                <ProfilRow label="Jenis Kelamin" value={profilLihat.jenis_kelamin === 'L' ? 'Laki-laki' : 'Perempuan'} />
-                <ProfilRow label="Agama" value={profilLihat.agama} />
-                <ProfilRow label="Tempat, Tanggal Lahir" value={tempatTanggalLahir(profilLihat)} />
-                <ProfilRow label="Tahun Lahir" value={profilLihat.tahun_lahir} />
-                <ProfilRow label="Alamat" value={profilLihat.alamat} />
-                <ProfilRow label="Alamat Tempat Tinggal" value={profilLihat.alamat_tinggal} />
-                <ProfilRow label="Nama Ayah" value={profilLihat.nama_ayah} />
-                <ProfilRow label="NIK Ayah" value={profilLihat.nik_ayah} />
-                <ProfilRow label="Tahun Lahir Ayah" value={profilLihat.tahun_lahir_ayah} />
-                <ProfilRow label="Nama Ibu" value={profilLihat.nama_ibu} />
-                <ProfilRow label="NIK Ibu" value={profilLihat.nik_ibu} />
-                <ProfilRow label="Tahun Lahir Ibu" value={profilLihat.tahun_lahir_ibu} />
-                <ProfilRow label="Nama Orang Tua/Wali" value={profilLihat.nama_orang_tua} />
-                <ProfilRow label="No. HP Orang Tua/Wali" value={profilLihat.no_hp_orang_tua} telepon />
+              <div className="card p-4 space-y-4 bg-white shadow-md">
+                <SeksiProfil judul="Data Pribadi">
+                  <ProfilRow label="NIS" value={profilLihat.nis} />
+                  <ProfilRow label="NISN" value={profilLihat.nisn} />
+                  <ProfilRow label="NIK" value={profilLihat.nik} />
+                  <ProfilRow label="No. KK" value={profilLihat.no_kk} />
+                  <ProfilRow label="No. Registrasi Akta Lahir" value={profilLihat.no_registrasi_akta_lahir} />
+                  <ProfilRow label="Nomor Ujian" value={profilLihat.nomor_ujian} />
+                  <ProfilRow label="Kelas" value={profilLihat.kelas?.nama_kelas} />
+                  <ProfilRow label="Jenis Kelamin" value={profilLihat.jenis_kelamin === 'L' ? 'Laki-laki' : 'Perempuan'} />
+                  <ProfilRow label="Agama" value={profilLihat.agama} />
+                  <ProfilRow label="Tempat, Tanggal Lahir" value={tempatTanggalLahir(profilLihat)} />
+                  <ProfilRow label="Anak ke-berapa" value={profilLihat.anak_ke} />
+                  <ProfilRow label="Jumlah Saudara Kandung" value={profilLihat.jumlah_saudara_kandung} />
+                  <ProfilRow label="Kebutuhan Khusus" value={profilLihat.kebutuhan_khusus} />
+                  <ProfilRow label="Sekolah Asal" value={profilLihat.sekolah_asal || profilLihat.pendidikan_sebelumnya} />
+                </SeksiProfil>
+
+                <SeksiProfil judul="Fisik">
+                  <ProfilRow label="Berat Badan" value={profilLihat.berat_badan ? `${profilLihat.berat_badan} kg` : null} />
+                  <ProfilRow label="Tinggi Badan" value={profilLihat.tinggi_badan ? `${profilLihat.tinggi_badan} cm` : null} />
+                  <ProfilRow label="Lingkar Kepala" value={profilLihat.lingkar_kepala ? `${profilLihat.lingkar_kepala} cm` : null} />
+                </SeksiProfil>
+
+                <SeksiProfil judul="Alamat">
+                  <ProfilRow label="Alamat" value={profilLihat.alamat} />
+                  <ProfilRow label="Alamat Tempat Tinggal" value={profilLihat.alamat_tinggal} />
+                  <ProfilRow
+                    label="Detail"
+                    value={[profilLihat.rt && `RT ${profilLihat.rt}`, profilLihat.rw && `RW ${profilLihat.rw}`, profilLihat.dusun, profilLihat.kelurahan, profilLihat.kecamatan, profilLihat.kode_pos]
+                      .filter(Boolean).join(', ') || null}
+                  />
+                  <ProfilRow label="Jenis Tinggal" value={profilLihat.jenis_tinggal} />
+                  <ProfilRow label="Alat Transportasi" value={profilLihat.alat_transportasi} />
+                </SeksiProfil>
+
+                <SeksiProfil judul="Kontak">
+                  <ProfilRow label="Telepon" value={profilLihat.telepon} telepon />
+                  <ProfilRow label="HP" value={profilLihat.hp} telepon />
+                  <ProfilRow label="Email" value={profilLihat.email} />
+                  <ProfilRow label="No. HP Orang Tua/Wali" value={profilLihat.no_hp_orang_tua} telepon />
+                </SeksiProfil>
+
+                <SeksiProfil judul="Data Ayah">
+                  <ProfilRow label="Nama Ayah" value={profilLihat.nama_ayah} />
+                  <ProfilRow label="NIK Ayah" value={profilLihat.nik_ayah} />
+                  <ProfilRow label="Tahun Lahir Ayah" value={profilLihat.tahun_lahir_ayah} />
+                  <ProfilRow label="Pendidikan Ayah" value={profilLihat.pendidikan_ayah} />
+                  <ProfilRow label="Pekerjaan Ayah" value={profilLihat.pekerjaan_ayah} />
+                  <ProfilRow label="Penghasilan Ayah" value={profilLihat.penghasilan_ayah} />
+                </SeksiProfil>
+
+                <SeksiProfil judul="Data Ibu">
+                  <ProfilRow label="Nama Ibu" value={profilLihat.nama_ibu} />
+                  <ProfilRow label="NIK Ibu" value={profilLihat.nik_ibu} />
+                  <ProfilRow label="Tahun Lahir Ibu" value={profilLihat.tahun_lahir_ibu} />
+                  <ProfilRow label="Pendidikan Ibu" value={profilLihat.pendidikan_ibu} />
+                  <ProfilRow label="Pekerjaan Ibu" value={profilLihat.pekerjaan_ibu} />
+                  <ProfilRow label="Penghasilan Ibu" value={profilLihat.penghasilan_ibu} />
+                </SeksiProfil>
+
+                <SeksiProfil judul="Wali">
+                  <ProfilRow label="Nama Wali" value={profilLihat.nama_wali} />
+                  <ProfilRow label="Pekerjaan Wali" value={profilLihat.pekerjaan_wali} />
+                  <ProfilRow label="Alamat Wali" value={profilLihat.alamat_wali} />
+                </SeksiProfil>
+
+                <SeksiProfil judul="Program Bantuan">
+                  <ProfilRow label="Penerima KPS" value={profilLihat.penerima_kps} />
+                  <ProfilRow label="No. KPS" value={profilLihat.no_kps} />
+                  <ProfilRow label="Penerima KIP" value={profilLihat.penerima_kip} />
+                  <ProfilRow label="Nomor KIP" value={profilLihat.nomor_kip} />
+                  <ProfilRow label="Nomor KKS" value={profilLihat.nomor_kks} />
+                  <ProfilRow label="Layak PIP" value={profilLihat.layak_pip} />
+                  <ProfilRow label="Alasan Layak PIP" value={profilLihat.alasan_layak_pip} />
+                </SeksiProfil>
+
+                <SeksiProfil judul="Nama Orang Tua/Wali (Umum)">
+                  <ProfilRow label="Nama Orang Tua/Wali" value={profilLihat.nama_orang_tua} />
+                </SeksiProfil>
               </div>
 
               <div className="flex gap-2 mt-4">
@@ -999,28 +1200,75 @@ export default function Siswa() {
             const n = parseInt(String(v || '').trim(), 10)
             return Number.isFinite(n) ? n : null
           }
+          const toNumOrNull = (v) => {
+            const s = String(v ?? '').trim()
+            if (s === '') return null
+            const n = Number(s)
+            return Number.isFinite(n) ? n : null
+          }
+          const teks = (v) => String(v ?? '').trim()
           return {
-            nama_lengkap: String(row.nama_lengkap).trim(),
-            nis: String(row.nis || '').trim(),
-            nisn: String(row.nisn || '').trim(),
-            nik: String(row.nik || '').trim(),
-            nomor_ujian: String(row.nomor_ujian || '').trim(),
+            nama_lengkap: teks(row.nama_lengkap),
+            nis: teks(row.nis),
+            nisn: teks(row.nisn),
+            nik: teks(row.nik),
+            no_kk: teks(row.no_kk),
+            nomor_ujian: teks(row.nomor_ujian),
+            no_seri_ijazah: teks(row.no_seri_ijazah),
+            skhun: teks(row.skhun),
             kelas_id: matchedKelas ? matchedKelas.id : null,
-            jenis_kelamin: String(row['jenis_kelamin(L/P)'] || row.jenis_kelamin || 'L').trim().toUpperCase(),
-            agama: String(row.agama || '').trim(),
-            tempat_lahir: String(row.tempat_lahir || '').trim(),
+            jenis_kelamin: teks(row['jenis_kelamin(L/P)'] || row.jenis_kelamin || 'L').toUpperCase(),
+            agama: teks(row.agama),
+            tempat_lahir: teks(row.tempat_lahir),
             tanggal_lahir: row['tanggal_lahir(YYYY-MM-DD)'] || row.tanggal_lahir || null,
             tahun_lahir: toIntOrNull(row.tahun_lahir),
-            nama_ayah: String(row.nama_ayah || '').trim(),
-            nik_ayah: String(row.nik_ayah || '').trim(),
+            nama_ayah: teks(row.nama_ayah),
+            nik_ayah: teks(row.nik_ayah),
             tahun_lahir_ayah: toIntOrNull(row.tahun_lahir_ayah),
-            nama_ibu: String(row.nama_ibu || '').trim(),
-            nik_ibu: String(row.nik_ibu || '').trim(),
+            pendidikan_ayah: teks(row.pendidikan_ayah),
+            pekerjaan_ayah: teks(row.pekerjaan_ayah),
+            penghasilan_ayah: teks(row.penghasilan_ayah),
+            nama_ibu: teks(row.nama_ibu),
+            nik_ibu: teks(row.nik_ibu),
             tahun_lahir_ibu: toIntOrNull(row.tahun_lahir_ibu),
-            nama_orang_tua: String(row.nama_orang_tua || '').trim(),
-            no_hp_orang_tua: String(row.no_hp_orang_tua || '').trim(),
-            alamat: String(row.alamat || '').trim(),
-            alamat_tinggal: String(row.alamat_tinggal || '').trim(),
+            pendidikan_ibu: teks(row.pendidikan_ibu),
+            pekerjaan_ibu: teks(row.pekerjaan_ibu),
+            penghasilan_ibu: teks(row.penghasilan_ibu),
+            nama_orang_tua: teks(row.nama_orang_tua),
+            no_hp_orang_tua: teks(row.no_hp_orang_tua),
+            alamat: teks(row.alamat),
+            alamat_tinggal: teks(row.alamat_tinggal),
+            rt: teks(row.rt),
+            rw: teks(row.rw),
+            dusun: teks(row.dusun),
+            kelurahan: teks(row.kelurahan),
+            kecamatan: teks(row.kecamatan),
+            kode_pos: teks(row.kode_pos),
+            jenis_tinggal: teks(row.jenis_tinggal),
+            alat_transportasi: teks(row.alat_transportasi),
+            telepon: teks(row.telepon),
+            hp: teks(row.hp),
+            email: teks(row.email),
+            penerima_kps: teks(row['penerima_kps(Ya/Tidak)'] || row.penerima_kps),
+            no_kps: teks(row.no_kps),
+            penerima_kip: teks(row['penerima_kip(Ya/Tidak)'] || row.penerima_kip),
+            nomor_kip: teks(row.nomor_kip),
+            nama_di_kip: teks(row.nama_di_kip),
+            nomor_kks: teks(row.nomor_kks),
+            layak_pip: teks(row['layak_pip(Ya/Tidak)'] || row.layak_pip),
+            alasan_layak_pip: teks(row.alasan_layak_pip),
+            no_registrasi_akta_lahir: teks(row.no_registrasi_akta_lahir),
+            bank: teks(row.bank),
+            no_rekening: teks(row.no_rekening),
+            rekening_atas_nama: teks(row.rekening_atas_nama),
+            kebutuhan_khusus: teks(row.kebutuhan_khusus),
+            berat_badan: toNumOrNull(row.berat_badan),
+            tinggi_badan: toNumOrNull(row.tinggi_badan),
+            lingkar_kepala: toNumOrNull(row.lingkar_kepala),
+            anak_ke: toIntOrNull(row.anak_ke),
+            jumlah_saudara_kandung: toIntOrNull(row.jumlah_saudara_kandung),
+            sekolah_asal: teks(row.sekolah_asal),
+            pendidikan_sebelumnya: teks(row.sekolah_asal),
             status: 'aktif',
           }
         }}
@@ -1037,6 +1285,24 @@ export default function Siswa() {
   )
 }
 
+function Seksi({ judul, children }) {
+  return (
+    <div className="mt-5 first:mt-0 pt-4 first:pt-0 border-t first:border-t-0 border-ink-900/[0.08]">
+      <p className="eyebrow mb-2 text-blue-900">{judul}</p>
+      <div className="grid grid-cols-2 gap-3">{children}</div>
+    </div>
+  )
+}
+
+function SeksiProfil({ judul, children }) {
+  return (
+    <div>
+      <p className="eyebrow text-blue-900/70 mb-2">{judul}</p>
+      <div className="space-y-2">{children}</div>
+    </div>
+  )
+}
+
 function Field({ label, children, full }) {
   return (
     <div className={full ? 'col-span-2' : ''}>
@@ -1047,11 +1313,12 @@ function Field({ label, children, full }) {
 }
 
 function ProfilRow({ label, value, telepon }) {
+  if (value === null || value === undefined || value === '') return null
   return (
     <div className="flex items-start justify-between gap-4 text-sm">
       <span className="text-ink-700/50 shrink-0">{label}</span>
       <span className="text-ink-950 font-medium text-right inline-flex items-center gap-1.5">
-        {value || '—'}
+        {value}
         {telepon && <TeleponLink nomor={value} />}
       </span>
     </div>
