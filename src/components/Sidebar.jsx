@@ -48,6 +48,7 @@ import {
   ScanLine,
   CalendarRange,
   ShieldCheck,
+  MessageCircle,
 } from 'lucide-react'
 import { useAuth } from '../lib/AuthContext'
 import { supabase } from '../lib/supabaseClient'
@@ -55,13 +56,14 @@ import { supabase } from '../lib/supabaseClient'
 // Menu ADMIN dikelompokkan per kategori supaya tidak jadi satu daftar panjang.
 // Dibuat sebagai fungsi karena "Persetujuan Akun" dan "Profil Sekolah" hanya
 // boleh tampil untuk admin utama / superadmin, bukan admin biasa.
-function getGroupsAdmin(isAdminUtama, jumlahMenunggu = 0) {
+function getGroupsAdmin(isAdminUtama, jumlahMenunggu = 0, jumlahPesanBelumDibaca = 0) {
   return [
     {
       label: null, // tanpa judul grup — selalu di atas
       links: [
         { to: '/', label: 'Dasbor', icon: LayoutDashboard, end: true },
         { to: '/profil-saya', label: 'Profil Saya', icon: UserCircle },
+        { to: '/pesan', label: 'Pesan', icon: MessageCircle, badge: jumlahPesanBelumDibaca },
         { to: '/rapat', label: 'Rapat Video', icon: Video },
         { to: '/galeri', label: 'Galeri Kegiatan', icon: Images },
         { to: '/dokumen', label: 'Dokumen Penting', icon: HardDrive },
@@ -134,9 +136,11 @@ function getGroupsAdmin(isAdminUtama, jumlahMenunggu = 0) {
 // Menu GURU: tetap ringkas, tidak perlu dikelompokkan
 // Kuitansi, Kuitansi Jasa & Nota Belanja SENGAJA TIDAK ada di sini — ketiga
 // fitur ini admin-only (lihat RLS policy nota_hanya_admin di Supabase).
-const linksGuru = [
+function getLinksGuru(jumlahPesanBelumDibaca = 0) {
+  return [
   { to: '/', label: 'Dasbor', icon: LayoutDashboard, end: true },
   { to: '/profil-saya', label: 'Profil Saya', icon: UserCircle },
+  { to: '/pesan', label: 'Pesan', icon: MessageCircle, badge: jumlahPesanBelumDibaca },
   { to: '/rapat', label: 'Rapat Video', icon: Video },
   { to: '/galeri', label: 'Galeri Kegiatan', icon: Images },
   { to: '/dokumen', label: 'Dokumen Penting', icon: HardDrive },
@@ -165,7 +169,8 @@ const linksGuru = [
   { to: '/kalender-pendidikan', label: 'Kalender Pendidikan', icon: CalendarRange },
   { to: '/agenda', label: 'Agenda Sekolah', icon: CalendarDays },
   { to: '/pengumuman', label: 'Pengumuman', icon: Megaphone },
-]
+  ]
+}
 
 function NavItem({ to, label, icon: Icon, end, badge, onNavigate }) {
   return (
@@ -275,7 +280,43 @@ export default function Sidebar({ open = false, onClose = () => {} }) {
     }
   }, [isAdminUtama, isSuperAdmin, sekolahId])
 
-  const groupsAdmin = getGroupsAdmin(isAdminUtama, jumlahMenunggu)
+  // Notifikasi real-time: jumlah pesan masuk yang belum dibaca (fitur Pesan).
+  const [jumlahPesanBelumDibaca, setJumlahPesanBelumDibaca] = useState(0)
+
+  useEffect(() => {
+    if (!session?.user?.id) {
+      setJumlahPesanBelumDibaca(0)
+      return
+    }
+
+    let aktif = true
+
+    async function muatJumlahPesan() {
+      const { count } = await supabase
+        .from('pesan')
+        .select('id', { count: 'exact', head: true })
+        .eq('penerima_id', session.user.id)
+        .eq('dibaca', false)
+      if (aktif) setJumlahPesanBelumDibaca(count || 0)
+    }
+
+    muatJumlahPesan()
+
+    const channel = supabase
+      .channel('pesan-notifikasi')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'pesan' }, () => {
+        muatJumlahPesan()
+      })
+      .subscribe()
+
+    return () => {
+      aktif = false
+      supabase.removeChannel(channel)
+    }
+  }, [session?.user?.id])
+
+  const groupsAdmin = getGroupsAdmin(isAdminUtama, jumlahMenunggu, jumlahPesanBelumDibaca)
+  const linksGuru = getLinksGuru(jumlahPesanBelumDibaca)
 
   return (
     <>
