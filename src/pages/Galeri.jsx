@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../lib/AuthContext'
 import Layout from '../components/Layout'
-import { ImagePlus, Loader2, X, Trash2, Images, ChevronLeft, ChevronRight, PlayCircle } from 'lucide-react'
+import { ImagePlus, Loader2, X, Trash2, Images, ChevronLeft, ChevronRight, PlayCircle, Share2 } from 'lucide-react'
+import BagikanKePesanModal from '../components/BagikanKePesanModal'
 
 const KATEGORI_LIST = ['Semua', 'Akademik', 'Ekstrakurikuler', 'Perayaan', 'Umum']
 
@@ -83,6 +84,7 @@ export default function Galeri() {
   const [showForm, setShowForm] = useState(false)
   const [filterKategori, setFilterKategori] = useState('Semua')
   const [lightboxIndex, setLightboxIndex] = useState(null) // index item yang lagi dibuka, null = tertutup
+  const [bagikan, setBagikan] = useState(null) // foto/video yang mau dibagikan ke Pesan
 
   const [form, setForm] = useState({ judul: '', deskripsi: '', kategori: 'Umum', files: [] })
 
@@ -443,6 +445,22 @@ export default function Galeri() {
           onClick={closeLightbox}
         >
           <button
+            onClick={(e) => {
+              e.stopPropagation()
+              const f = openAlbum.galeri_foto[lightboxIndex]
+              setBagikan({
+                path: f.foto_path,
+                nama: `${openAlbum.judul} - ${isVideoPath(f.foto_path) ? 'video' : 'foto'} ${lightboxIndex + 1}`,
+                tipe: isVideoPath(f.foto_path) ? 'video' : 'gambar',
+              })
+            }}
+            className="absolute top-4 right-16 w-10 h-10 rounded-full flex items-center justify-center text-white bg-white/10 hover:bg-white/20"
+            title="Bagikan ke Pesan"
+          >
+            <Share2 size={18} />
+          </button>
+
+          <button
             onClick={closeLightbox}
             className="absolute top-4 right-4 w-10 h-10 rounded-full flex items-center justify-center text-white bg-white/10 hover:bg-white/20"
           >
@@ -484,6 +502,12 @@ export default function Galeri() {
             {lightboxIndex + 1} / {openAlbum.galeri_foto.length}
           </span>
         </div>
+      )}
+      {bagikan && (
+        <BagikanKePesanModal
+          file={{ bucket: 'galeri-foto', path: bagikan.path, nama: bagikan.nama, tipe: bagikan.tipe }}
+          onClose={() => setBagikan(null)}
+        />
       )}
     </Layout>
   )
