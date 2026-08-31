@@ -49,6 +49,7 @@ import {
   CalendarRange,
   ShieldCheck,
   MessageCircle,
+  Building2,
 } from 'lucide-react'
 import { useAuth } from '../lib/AuthContext'
 import { supabase } from '../lib/supabaseClient'
@@ -56,7 +57,7 @@ import { supabase } from '../lib/supabaseClient'
 // Menu ADMIN dikelompokkan per kategori supaya tidak jadi satu daftar panjang.
 // Dibuat sebagai fungsi karena "Persetujuan Akun" dan "Profil Sekolah" hanya
 // boleh tampil untuk admin utama / superadmin, bukan admin biasa.
-function getGroupsAdmin(isAdminUtama, jumlahMenunggu = 0, jumlahPesanBelumDibaca = 0) {
+function getGroupsAdmin(isAdminUtama, jumlahMenunggu = 0, jumlahPesanBelumDibaca = 0, jumlahPesanPusatBelumDibaca = 0) {
   return [
     {
       label: null, // tanpa judul grup — selalu di atas
@@ -64,6 +65,9 @@ function getGroupsAdmin(isAdminUtama, jumlahMenunggu = 0, jumlahPesanBelumDibaca
         { to: '/', label: 'Dasbor', icon: LayoutDashboard, end: true },
         { to: '/profil-saya', label: 'Profil Saya', icon: UserCircle },
         { to: '/pesan', label: 'Pesan', icon: MessageCircle, badge: jumlahPesanBelumDibaca },
+        // Chat dua arah dengan Superadmin ("Admin Pusat") — khusus admin-tier,
+        // guru tidak pernah melihat menu ini karena guru pakai getLinksGuru().
+        { to: '/pesan-pusat', label: 'Admin Pusat', icon: Building2, badge: jumlahPesanPusatBelumDibaca },
         { to: '/rapat', label: 'Rapat Video', icon: Video },
         { to: '/galeri', label: 'Galeri Kegiatan', icon: Images },
         { to: '/dokumen', label: 'Dokumen Penting', icon: HardDrive },
@@ -332,7 +336,47 @@ export default function Sidebar({ open = false, onClose = () => {} }) {
     }
   }, [session?.user?.id])
 
-  const groupsAdmin = getGroupsAdmin(isAdminUtama, jumlahMenunggu, jumlahPesanBelumDibaca)
+  // Notifikasi real-time: jumlah pesan Admin Pusat yang belum dibaca.
+  // Guru tidak pernah masuk sini (isAdmin selalu false untuk guru).
+  const [jumlahPesanPusatBelumDibaca, setJumlahPesanPusatBelumDibaca] = useState(0)
+
+  useEffect(() => {
+    if (!session?.user?.id || !isAdmin) {
+      setJumlahPesanPusatBelumDibaca(0)
+      return
+    }
+
+    let aktif = true
+
+    async function muatJumlahPesanPusat() {
+      let query = supabase
+        .from('pesan_pusat')
+        .select('id', { count: 'exact', head: true })
+
+      query = isSuperAdmin
+        ? query.eq('sisi', 'sekolah').eq('dibaca_pusat', false)
+        : query.eq('sisi', 'pusat').eq('dibaca_sekolah', false).eq('sekolah_id', sekolahId)
+
+      const { count } = await query
+      if (aktif) setJumlahPesanPusatBelumDibaca(count || 0)
+    }
+
+    muatJumlahPesanPusat()
+
+    const channel = supabase
+      .channel('pesan-pusat-notifikasi')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'pesan_pusat' }, () => {
+        muatJumlahPesanPusat()
+      })
+      .subscribe()
+
+    return () => {
+      aktif = false
+      supabase.removeChannel(channel)
+    }
+  }, [session?.user?.id, isAdmin, isSuperAdmin, sekolahId])
+
+  const groupsAdmin = getGroupsAdmin(isAdminUtama, jumlahMenunggu, jumlahPesanBelumDibaca, jumlahPesanPusatBelumDibaca)
   const linksGuru = getLinksGuru(jumlahPesanBelumDibaca)
 
   return (
