@@ -331,10 +331,22 @@ export default function PesanPusat() {
       await supabase.storage.from(m.file_bucket).remove([m.file_path])
     }
 
-    const { error } = await supabase.from('pesan_pusat').delete().eq('id', m.id)
+    const { data: dihapus, error } = await supabase
+      .from('pesan_pusat')
+      .delete()
+      .eq('id', m.id)
+      .select()
+
     if (error) {
       alert('Gagal menghapus pesan: ' + error.message)
       setMessages(idLama) // rollback kalau gagal
+      return
+    }
+    if (!dihapus || dihapus.length === 0) {
+      // RLS diam-diam memblokir (delete "berhasil" tapi 0 baris kena) —
+      // butuh policy DELETE di tabel pesan_pusat, lihat policy_delete_pesan_pusat.sql
+      alert('Pesan tidak terhapus — sepertinya izin (RLS policy) DELETE belum diaktifkan di tabel pesan_pusat.')
+      setMessages(idLama) // rollback supaya tidak muncul lagi tiba-tiba
       return
     }
     if (isSuperAdmin) loadRingkasanPusat()
