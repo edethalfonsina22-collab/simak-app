@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useCallback } from 'react'
 import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../lib/AuthContext'
 import Layout from '../components/Layout'
+import StatusGuruModal from '../components/StatusGuruModal'
 import {
   Send,
   Paperclip,
@@ -16,6 +17,7 @@ import {
   ShieldCheck,
   MessageCircle,
   Building2,
+  Users,
 } from 'lucide-react'
 
 // Halaman ini KHUSUS admin-tier (admin, kepala_sekolah, admin_utama) dan
@@ -25,6 +27,12 @@ import {
 // Model data: satu THREAD per sekolah (bukan per-user) di tabel
 // pesan_pusat — semua admin/kepsek satu sekolah berbagi satu percakapan
 // yang sama dengan "Admin Pusat" (Superadmin). Lihat sql/06_chat_admin_pusat.sql.
+//
+// Status Guru: memakai Supabase Realtime Presence (lihat
+// src/hooks/usePresenceTracker.js yang dipasang di Layout.jsx, dan
+// src/hooks/useOnlineGuru.js + src/components/StatusGuruModal.jsx di sini)
+// — Superadmin bisa klik tombol "Status Guru" saat sedang membuka thread
+// sebuah sekolah untuk melihat guru mana yang sedang online.
 
 const IMAGE_EXT = ['jpg', 'jpeg', 'png', 'gif', 'webp']
 const VIDEO_EXT = ['mp4', 'webm', 'ogg', 'mov', 'mkv', 'avi', 'm4v']
@@ -114,6 +122,7 @@ export default function PesanPusat() {
   const [ringkasan, setRingkasan] = useState({}) // { [sekolah_id]: { lastMsg, waktu, unread } }
   const [cari, setCari] = useState('')
   const [sekolahAktif, setSekolahAktif] = useState(null) // { id, nama_sekolah }
+  const [showStatusGuru, setShowStatusGuru] = useState(false)
 
   // sekolah_id percakapan yang sedang dibuka (untuk admin/kepsek selalu = sekolahId sendiri)
   const sekolahIdAktif = isSuperAdmin ? sekolahAktif?.id : sekolahId
@@ -398,10 +407,20 @@ export default function PesanPusat() {
                   <span className="w-8 h-8 rounded-full bg-brass-500 text-white flex items-center justify-center shrink-0">
                     {isSuperAdmin ? <Building2 size={15} /> : <ShieldCheck size={15} />}
                   </span>
-                  <div>
-                    <p className="text-sm font-medium text-slate-900">{headerInfo.nama}</p>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-slate-900 truncate">{headerInfo.nama}</p>
                     <p className="text-[11px] text-slate-400">{headerInfo.sub}</p>
                   </div>
+                  {isSuperAdmin && sekolahAktif && (
+                    <button
+                      onClick={() => setShowStatusGuru(true)}
+                      className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-slate-600 hover:bg-slate-100 shrink-0"
+                      title="Lihat status guru online"
+                    >
+                      <Users size={15} />
+                      <span className="hidden sm:inline">Status Guru</span>
+                    </button>
+                  )}
                 </div>
 
                 <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3 bg-slate-50/60">
@@ -480,6 +499,10 @@ export default function PesanPusat() {
           </div>
         </div>
       </div>
+
+      {showStatusGuru && sekolahAktif && (
+        <StatusGuruModal sekolah={sekolahAktif} onClose={() => setShowStatusGuru(false)} />
+      )}
     </Layout>
   )
 }
