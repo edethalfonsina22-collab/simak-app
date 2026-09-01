@@ -18,6 +18,7 @@ import {
   MessageCircle,
   Building2,
   Users,
+  Trash2,
 } from 'lucide-react'
 
 // Halaman ini KHUSUS admin-tier (admin, kepala_sekolah, admin_utama) dan
@@ -248,6 +249,14 @@ export default function PesanPusat() {
           supabase.from('pesan_pusat').update({ dibaca_sekolah: true }).eq('id', m.id).then(() => {})
         }
       })
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'pesan_pusat' }, (payload) => {
+        // payload.old biasanya hanya berisi kolom "id" (default replica identity),
+        // jadi cukup buang dari state manapun ID-nya cocok — tidak perlu cek sekolah_id.
+        const idDihapus = payload.old?.id
+        if (!idDihapus) return
+        setMessages((prev) => prev.filter((p) => p.id !== idDihapus))
+        if (isSuperAdmin) loadRingkasanPusat()
+      })
       .subscribe()
 
     return () => supabase.removeChannel(channel)
@@ -304,6 +313,30 @@ export default function PesanPusat() {
     setTeks('')
     setFile(null)
     if (fileInputRef.current) fileInputRef.current.value = ''
+    if (isSuperAdmin) loadRingkasanPusat()
+  }
+
+  // Hapus pesan — hanya boleh untuk pesan milik sendiri (dicek juga di
+  // tombolnya lewat punyaSaya, ini lapis kedua). Kalau pesan ada lampiran,
+  // file di storage ikut dihapus supaya tidak jadi sampah di bucket.
+  async function handleHapusPesan(m) {
+    if (m.sisi !== sisiSaya) return
+    const yakin = window.confirm('Hapus pesan ini? Tindakan ini tidak bisa dibatalkan.')
+    if (!yakin) return
+
+    const idLama = messages
+    setMessages((prev) => prev.filter((p) => p.id !== m.id)) // optimistic
+
+    if (m.file_path && m.file_bucket) {
+      await supabase.storage.from(m.file_bucket).remove([m.file_path])
+    }
+
+    const { error } = await supabase.from('pesan_pusat').delete().eq('id', m.id)
+    if (error) {
+      alert('Gagal menghapus pesan: ' + error.message)
+      setMessages(idLama) // rollback kalau gagal
+      return
+    }
     if (isSuperAdmin) loadRingkasanPusat()
   }
 
@@ -432,7 +465,16 @@ export default function PesanPusat() {
                     messages.map((m) => {
                       const punyaSaya = m.sisi === sisiSaya
                       return (
-                        <div key={m.id} className={`flex ${punyaSaya ? 'justify-end' : 'justify-start'}`}>
+                        <div key={m.id} className={`group flex items-end gap-1.5 ${punyaSaya ? 'justify-end' : 'justify-start'}`}>
+                          {punyaSaya && (
+                            <button
+                              onClick={() => handleHapusPesan(m)}
+                              title="Hapus pesan"
+                              className="mb-1 p-1.5 rounded-lg text-slate-300 opacity-0 group-hover:opacity-100 hover:text-red-500 hover:bg-red-50 transition shrink-0"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          )}
                           <div
                             className={`max-w-[75%] rounded-2xl px-3.5 py-2.5 text-sm ${
                               punyaSaya ? 'bg-blue-900 text-white rounded-br-md' : 'bg-white border border-slate-200 text-slate-800 rounded-bl-md'
