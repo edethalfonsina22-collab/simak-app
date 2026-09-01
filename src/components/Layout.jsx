@@ -3,6 +3,7 @@ import { useLocation } from 'react-router-dom'
 import { Bell, MessageSquare, X, Menu } from 'lucide-react'
 import Sidebar from './Sidebar'
 import { useAuth } from '../lib/AuthContext'
+import { usePresenceTracker } from '../hooks/usePresenceTracker'
 
 // Data contoh sementara — nanti gampang diganti dengan fetch dari Supabase
 // (misal tabel `notifikasi` dengan kolom: judul, deskripsi, dibuat_pada, dibaca)
@@ -150,6 +151,12 @@ function PesanAdminBanner() {
 export default function Layout({ children, title, subtitle, actions }) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const location = useLocation()
+
+  // Broadcast status online user yang sedang login (guru/admin/kepsek) lewat
+  // Supabase Realtime Presence — dipasang sekali di sini supaya jalan di
+  // semua halaman berlapis Layout. Dipakai oleh Superadmin di halaman
+  // Admin Pusat (PesanPusat.jsx) untuk melihat guru mana yang sedang online.
+  usePresenceTracker()
 
   // Tutup drawer otomatis setiap kali pindah halaman (mis. setelah tap menu)
   useEffect(() => {
