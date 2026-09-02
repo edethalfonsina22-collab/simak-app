@@ -17,14 +17,34 @@ async function kirimWA(target, pesan) {
 }
 
 export default async function handler(req, res) {
-  // Lindungi endpoint ini supaya tidak bisa dipicu sembarang orang dari luar
   const authHeader = req.headers['authorization']
   if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
     return res.status(401).json({ error: 'Unauthorized' })
   }
 
   try {
-    const hariIni = new Date().toISOString().slice(0, 10)
+    const now = new Date()
+    const hariIni = now.toISOString().slice(0, 10)
+
+    // 1. Skip kalau hari Minggu (jaga-jaga, walau schedule cron sudah dibatasi Senin-Sabtu)
+    if (now.getDay() === 0) {
+      return res.status(200).json({ message: 'Hari Minggu, notifikasi presensi dilewati.' })
+    }
+
+    // 2. Skip kalau tanggal ini terdaftar di tabel hari_libur
+    const { data: libur, error: liburError } = await supabase
+      .from('hari_libur')
+      .select('tanggal, keterangan')
+      .eq('tanggal', hariIni)
+      .maybeSingle()
+
+    if (liburError) throw liburError
+
+    if (libur) {
+      return res.status(200).json({
+        message: `Hari ini tanggal merah (${libur.keterangan}), notifikasi presensi dilewati.`,
+      })
+    }
 
     // Ambil semua guru aktif
     const { data: semuaGuru, error: guruError } = await supabase
@@ -35,14 +55,10 @@ export default async function handler(req, res) {
     if (guruError) throw guruError
 
     // Ambil guru yang SUDAH presensi hari ini
-    // PENTING: hanya hitung "sudah absen" kalau jam_absen benar-benar terisi.
-    // Baris presensi_guru untuk hari ini bisa sudah dibuat lebih dulu (jam_absen masih null),
-    // jadi kalau tidak difilter, guru itu akan salah dianggap sudah absen.
     const { data: sudahAbsen, error: presensiError } = await supabase
       .from('presensi_guru')
       .select('guru_id')
       .eq('tanggal', hariIni)
-      .not('jam_absen', 'is', null)
 
     if (presensiError) throw presensiError
 
@@ -56,10 +72,8 @@ export default async function handler(req, res) {
     const daftarNama = belumAbsen.map((g) => `- ${g.nama_lengkap}`).join('\n')
     const pesanGrup = `*Pengingat Presensi Guru*\nTanggal: ${hariIni}\n\nBerikut guru yang belum mengisi presensi hari ini:\n${daftarNama}\n\nMohon segera diisi melalui aplikasi SIMAK.`
 
-    // 1. Kirim ke grup WA guru
     const hasilGrup = await kirimWA(process.env.FONNTE_GROUP_ID, pesanGrup)
 
-    // 2. Kirim personal ke masing-masing guru yang belum absen
     const hasilPersonal = []
     for (const guru of belumAbsen) {
       if (!guru.no_hp) continue
