@@ -4,64 +4,82 @@ import { useAuth } from '../lib/AuthContext'
 import { supabase } from '../lib/supabaseClient'
 import { Loader2, LogIn } from 'lucide-react'
 
-// Latar belakang animasi "hujan kode" ala Matrix — digambar langsung via canvas,
-// jadi tidak perlu file gambar/video terpisah dan hurufnya benar-benar bergerak.
-function MatrixRainBackground() {
-  const canvasRef = useRef(null)
+// Latar belakang "kain merah putih" yang bergelombang seperti kain sungguhan
+// tertiup angin. Dibangun dari 2 lapis path SVG per warna (fase & amplitudo
+// berbeda) supaya terlihat seperti lipatan kain, bukan garis kaku tunggal.
+function WavyClothBackground() {
+  const svgRef = useRef(null)
+  const redTopRef = useRef(null)
+  const redTop2Ref = useRef(null)
+  const whiteBottomRef = useRef(null)
+  const whiteBottom2Ref = useRef(null)
 
   useEffect(() => {
-    const canvas = canvasRef.current
-    const ctx = canvas.getContext('2d')
+    // Sistem koordinat internal SVG dibuat tetap (0-1000) dan diregangkan
+    // penuh ke ukuran layar lewat preserveAspectRatio="none", jadi gelombang
+    // otomatis menyesuaikan di layar mana pun tanpa perlu resize listener.
+    const W = 1000
+    const H = 1000
     let animationId
-    let columns = []
-    let fontSize = 16
-    let colCount = 0
+    let t = 0
 
-    const chars = 'アイウエオカキクケコサシスセソタチツテト0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ<>/*+-=[]{}#%'
-
-    function resize() {
-      canvas.width = window.innerWidth
-      canvas.height = window.innerHeight
-      colCount = Math.floor(canvas.width / fontSize)
-      columns = new Array(colCount).fill(0).map(() => Math.random() * -100)
-    }
-
-    function draw() {
-      // Jejak transparan agar karakter lama memudar perlahan (efek trail)
-      ctx.fillStyle = 'rgba(5, 6, 26, 0.10)'
-      ctx.fillRect(0, 0, canvas.width, canvas.height)
-
-      ctx.font = `${fontSize}px monospace`
-
-      for (let i = 0; i < colCount; i++) {
-        const char = chars[Math.floor(Math.random() * chars.length)]
-        const x = i * fontSize
-        const y = columns[i] * fontSize
-
-        // Karakter paling depan lebih terang, sisanya redup — nuansa biru khas
-        ctx.fillStyle = Math.random() > 0.975 ? '#dbeafe' : 'rgba(96, 165, 250, 0.55)'
-        ctx.fillText(char, x, y)
-
-        if (y > canvas.height && Math.random() > 0.975) {
-          columns[i] = 0
-        }
-        columns[i] += 0.6
+    function wavePathTop(baseY, amp, waves, phase) {
+      const N = 48
+      const pts = []
+      for (let i = 0; i <= N; i++) {
+        const x = (i / N) * W
+        const y = baseY + amp * Math.sin((i / N) * Math.PI * 2 * waves + phase)
+        pts.push(`${x},${y}`)
       }
-
-      animationId = requestAnimationFrame(draw)
+      return `M0,0 L0,${pts[0].split(',')[1]} L${pts.join(' L')} L${W},0 Z`
     }
 
-    resize()
-    window.addEventListener('resize', resize)
-    animationId = requestAnimationFrame(draw)
-
-    return () => {
-      cancelAnimationFrame(animationId)
-      window.removeEventListener('resize', resize)
+    function wavePathBottom(baseY, amp, waves, phase) {
+      const N = 48
+      const pts = []
+      for (let i = 0; i <= N; i++) {
+        const x = (i / N) * W
+        const y = baseY + amp * Math.sin((i / N) * Math.PI * 2 * waves + phase)
+        pts.push(`${x},${y}`)
+      }
+      return `M0,${H} L0,${pts[0].split(',')[1]} L${pts.join(' L')} L${W},${H} Z`
     }
+
+    function frame() {
+      t += 0.014
+      if (redTopRef.current) {
+        redTopRef.current.setAttribute('d', wavePathTop(260, 32, 2.5, t))
+      }
+      if (redTop2Ref.current) {
+        redTop2Ref.current.setAttribute('d', wavePathTop(266, 24, 2.5, t * 1.3 + 1.5))
+      }
+      if (whiteBottomRef.current) {
+        whiteBottomRef.current.setAttribute('d', wavePathBottom(760, 32, 2.5, -t * 1.1))
+      }
+      if (whiteBottom2Ref.current) {
+        whiteBottom2Ref.current.setAttribute('d', wavePathBottom(754, 24, 2.5, -t * 1.4 + 2))
+      }
+      animationId = requestAnimationFrame(frame)
+    }
+
+    animationId = requestAnimationFrame(frame)
+    return () => cancelAnimationFrame(animationId)
   }, [])
 
-  return <canvas ref={canvasRef} className="matrix-rain-canvas" aria-hidden />
+  return (
+    <svg
+      ref={svgRef}
+      viewBox="0 0 1000 1000"
+      preserveAspectRatio="none"
+      className="wavy-cloth-svg"
+      aria-hidden
+    >
+      <path ref={redTopRef} fill="#c81e1e" />
+      <path ref={redTop2Ref} fill="#e23b3b" opacity="0.55" />
+      <path ref={whiteBottomRef} fill="#f5f5f0" />
+      <path ref={whiteBottom2Ref} fill="#ffffff" opacity="0.6" />
+    </svg>
+  )
 }
 
 export default function Login() {
@@ -107,8 +125,21 @@ export default function Login() {
 
   return (
     <div className="login-shell min-h-screen flex items-center justify-center px-4 relative overflow-hidden">
-      <MatrixRainBackground />
+      <WavyClothBackground />
       <div className="login-overlay" aria-hidden />
+
+      {/* Semboyan Ki Hajar Dewantara, huruf hias, diam di lipatan kain merah */}
+      <div className="cloth-text cloth-text-top" aria-hidden>
+        <p>Ing Ngarsa Sung Tuladha — di depan memberi teladan.</p>
+        <p>Ing Madya Mangun Karsa — di tengah membangun semangat dan ide.</p>
+        <p>Tut Wuri Handayani — di belakang memberi dorongan dan arahan.</p>
+      </div>
+
+      {/* Makna filosofis, huruf hias, diam di lipatan kain putih */}
+      <div className="cloth-text cloth-text-bottom" aria-hidden>
+        <p>Guru tidak selalu harus di depan.</p>
+        <p>Guru memberi ruang bagi murid untuk tumbuh mandiri dan percaya diri.</p>
+      </div>
 
       <div className="w-full max-w-sm relative z-10">
         <div
@@ -117,7 +148,6 @@ export default function Login() {
           }`}
         >
           <div className="relative w-12 h-12 mx-auto mb-4">
-            {/* Cincin cahaya biru di belakang logo, berdenyut pelan — senada dengan loader */}
             <div className="login-badge-glow absolute inset-0 rounded-xl" />
             <div className="login-badge relative w-12 h-12 rounded-xl flex items-center justify-center font-bold text-xl">
               S
@@ -209,6 +239,8 @@ export default function Login() {
 
       {/* Style khusus halaman login */}
       <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@700&display=swap');
+
         .login-shell {
           --bg-1: #05061a;
           --bg-2: #0d1440;
@@ -219,10 +251,10 @@ export default function Login() {
           --text-primary: #eaf2ff;
           --text-accent: #60a5fa;
           --code-text: rgba(147, 197, 253, 0.55);
-          background: linear-gradient(160deg, var(--bg-1), var(--bg-2) 60%, var(--bg-1));
+          background: #05061a;
         }
 
-        .matrix-rain-canvas {
+        .wavy-cloth-svg {
           position: absolute;
           inset: 0;
           width: 100%;
@@ -234,8 +266,45 @@ export default function Login() {
           position: absolute;
           inset: 0;
           z-index: 0;
-          background: radial-gradient(circle at 50% 35%, rgba(5, 6, 26, 0.35), rgba(5, 6, 26, 0.75) 75%);
+          background: radial-gradient(circle at 50% 35%, rgba(5, 6, 26, 0.35), rgba(5, 6, 26, 0.78) 75%);
           pointer-events: none;
+        }
+
+        /* Huruf hias untuk tulisan di atas kain */
+        .cloth-text {
+          position: absolute;
+          left: 24px;
+          right: 24px;
+          z-index: 1;
+          text-align: center;
+          font-family: 'Cinzel Decorative', serif;
+          pointer-events: none;
+        }
+        .cloth-text p {
+          margin: 0 0 6px;
+          font-size: 13px;
+          line-height: 1.5;
+          letter-spacing: 0.01em;
+        }
+        .cloth-text p:last-child { margin-bottom: 0; }
+
+        .cloth-text-top {
+          top: 8%;
+        }
+        .cloth-text-top p {
+          color: #fdecec;
+          text-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+        }
+
+        .cloth-text-bottom {
+          bottom: 8%;
+        }
+        .cloth-text-bottom p {
+          color: #7a1414;
+        }
+
+        @media (max-width: 480px) {
+          .cloth-text p { font-size: 11px; }
         }
 
         .login-badge-glow {
@@ -260,7 +329,7 @@ export default function Login() {
         .login-card {
           position: relative;
           border-radius: 16px;
-          background: linear-gradient(160deg, rgba(13, 20, 64, 0.88), rgba(5, 6, 26, 0.92));
+          background: linear-gradient(160deg, rgba(13, 20, 64, 0.9), rgba(5, 6, 26, 0.94));
           border: 1px solid var(--ring-soft);
           box-shadow: 0 0 40px rgba(59, 130, 246, 0.08), 0 20px 40px rgba(0, 0, 0, 0.5);
           backdrop-filter: blur(6px);
@@ -343,7 +412,7 @@ export default function Login() {
           80% { transform: translateX(3px); }
         }
         @media (prefers-reduced-motion: reduce) {
-          .matrix-rain-canvas { display: none; }
+          .wavy-cloth-svg path { transition: none; }
           * { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
         }
       `}</style>
