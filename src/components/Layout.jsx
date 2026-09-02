@@ -4,39 +4,61 @@ import { Bell, MessageSquare, X, Menu } from 'lucide-react'
 import Sidebar from './Sidebar'
 import { useAuth } from '../lib/AuthContext'
 import { usePresenceTracker } from '../hooks/usePresenceTracker'
+import { supabase } from '../lib/supabaseClient'
 
-// Data contoh sementara — nanti gampang diganti dengan fetch dari Supabase
-// (misal tabel `notifikasi` dengan kolom: judul, deskripsi, dibuat_pada, dibaca)
-const notifikasiContoh = [
-  {
-    id: 1,
-    judul: 'Pengajuan surat aktif baru',
-    deskripsi: 'Ada 1 pengajuan surat aktif menunggu persetujuan Anda.',
-    waktu: '10 menit lalu',
-    dibaca: false,
-  },
-  {
-    id: 2,
-    judul: 'Pengumuman baru diterbitkan',
-    deskripsi: '"Info penting" baru saja ditambahkan ke daftar pengumuman.',
-    waktu: '2 jam lalu',
-    dibaca: false,
-  },
-  {
-    id: 3,
-    judul: 'Dokumen penting diunggah',
-    deskripsi: 'Dokumen baru telah ditambahkan ke arsip sekolah.',
-    waktu: 'Kemarin',
-    dibaca: true,
-  },
-]
+function waktuRelatif(tanggal) {
+  const detik = Math.floor((new Date() - new Date(tanggal)) / 1000)
+  if (detik < 60) return 'Baru saja'
+  const menit = Math.floor(detik / 60)
+  if (menit < 60) return `${menit} menit lalu`
+  const jam = Math.floor(menit / 60)
+  if (jam < 24) return `${jam} jam lalu`
+  const hari = Math.floor(jam / 24)
+  if (hari === 1) return 'Kemarin'
+  return `${hari} hari lalu`
+}
 
 function NotificationBell() {
+  const { session, isAdmin } = useAuth()
   const [open, setOpen] = useState(false)
-  const [notifikasi, setNotifikasi] = useState(notifikasiContoh)
+  const [notifikasi, setNotifikasi] = useState([])
+  const [loading, setLoading] = useState(true)
   const ref = useRef(null)
 
   const belumDibaca = notifikasi.filter((n) => !n.dibaca).length
+
+  async function ambilNotifikasi() {
+    if (!session?.user?.id) return
+    const role = isAdmin ? 'admin' : 'guru'
+
+    const { data, error } = await supabase
+      .from('notifikasi')
+      .select('*')
+      .or(`untuk_user.eq.${session.user.id},untuk_user.is.null`)
+      .or(`untuk_role.eq.${role},untuk_role.eq.semua`)
+      .order('dibuat_pada', { ascending: false })
+      .limit(20)
+
+    if (!error && data) setNotifikasi(data)
+    setLoading(false)
+  }
+
+  useEffect(() => {
+    ambilNotifikasi()
+
+    // Dengarkan notifikasi baru secara realtime
+    const channel = supabase
+      .channel('notifikasi-realtime')
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'notifikasi' },
+        () => ambilNotifikasi()
+      )
+      .subscribe()
+
+    return () => supabase.removeChannel(channel)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session?.user?.id])
 
   // Tutup dropdown saat klik di luar area
   useEffect(() => {
@@ -47,8 +69,13 @@ function NotificationBell() {
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
-  function tandaiSemuaDibaca() {
+  async function tandaiSemuaDibaca() {
+    const idBelumDibaca = notifikasi.filter((n) => !n.dibaca).map((n) => n.id)
+    if (idBelumDibaca.length === 0) return
+
     setNotifikasi((prev) => prev.map((n) => ({ ...n, dibaca: true })))
+
+    await supabase.from('notifikasi').update({ dibaca: true }).in('id', idBelumDibaca)
   }
 
   return (
@@ -81,7 +108,9 @@ function NotificationBell() {
           </div>
 
           <div className="max-h-80 overflow-y-auto">
-            {notifikasi.length === 0 ? (
+            {loading ? (
+              <p className="px-4 py-6 text-sm text-slate-400 text-center">Memuat...</p>
+            ) : notifikasi.length === 0 ? (
               <p className="px-4 py-6 text-sm text-slate-400 text-center">Belum ada notifikasi.</p>
             ) : (
               notifikasi.map((n) => (
@@ -99,7 +128,7 @@ function NotificationBell() {
                   <div className="min-w-0">
                     <p className="text-sm font-medium text-slate-800 truncate">{n.judul}</p>
                     <p className="text-xs text-slate-500 mt-0.5 line-clamp-2">{n.deskripsi}</p>
-                    <p className="text-[11px] text-slate-400 mt-1">{n.waktu}</p>
+                    <p className="text-[11px] text-slate-400 mt-1">{waktuRelatif(n.dibuat_pada)}</p>
                   </div>
                 </div>
               ))
