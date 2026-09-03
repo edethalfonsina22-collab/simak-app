@@ -1,12 +1,15 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Navigate } from 'react-router-dom'
 import {
+  AlertTriangle,
   Building2,
   Check,
   Edit3,
   Loader2,
   Plus,
   Search,
+  Trash2,
+  Users,
   X,
 } from 'lucide-react'
 
@@ -35,6 +38,17 @@ export default function ManajemenSekolah() {
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState(null)
   const [form, setForm] = useState(emptyForm)
+
+  // ------------------------------------------------------------
+  // State untuk hapus sekolah (+ pratinjau guru & siswa di dalamnya)
+  // ------------------------------------------------------------
+  const [deleteTarget, setDeleteTarget] = useState(null)
+  const [loadingIsi, setLoadingIsi] = useState(false)
+  const [daftarGuru, setDaftarGuru] = useState([])
+  const [jumlahSiswa, setJumlahSiswa] = useState(0)
+  const [gagalMuatIsi, setGagalMuatIsi] = useState(false)
+  const [confirmText, setConfirmText] = useState('')
+  const [deleting, setDeleting] = useState(false)
 
   // ------------------------------------------------------------
   // Ambil semua sekolah
@@ -197,6 +211,93 @@ export default function ManajemenSekolah() {
 
     setSaving(false)
     closeForm()
+    await loadSekolah()
+  }
+
+  // ------------------------------------------------------------
+  // Buka modal hapus — sekaligus muat daftar guru & jumlah siswa
+  // di sekolah itu, supaya bisa dicek dulu sebelum yakin menghapus.
+  // ------------------------------------------------------------
+  async function openDelete(sekolah) {
+    setDeleteTarget(sekolah)
+    setConfirmText('')
+    setDaftarGuru([])
+    setJumlahSiswa(0)
+    setGagalMuatIsi(false)
+    setLoadingIsi(true)
+
+    try {
+      // Daftar guru/admin yang terdaftar di sekolah ini (tabel profil).
+      const { data: guruData, error: guruError } = await supabase
+        .from('profil')
+        .select('id, nama_lengkap, jabatan, role')
+        .eq('sekolah_id', sekolah.id)
+        .order('nama_lengkap')
+
+      if (guruError) throw guruError
+
+      setDaftarGuru(guruData || [])
+
+      // Jumlah siswa di sekolah ini (tabel siswa), sekadar info tambahan.
+      const { count, error: siswaError } = await supabase
+        .from('siswa')
+        .select('id', { count: 'exact', head: true })
+        .eq('sekolah_id', sekolah.id)
+
+      if (!siswaError) {
+        setJumlahSiswa(count || 0)
+      }
+    } catch (err) {
+      // Kalau gagal memuat (mis. nama tabel/kolom beda), tetap tampilkan modal
+      // tapi beri peringatan supaya tidak menghapus secara membabi buta.
+      setGagalMuatIsi(true)
+    } finally {
+      setLoadingIsi(false)
+    }
+  }
+
+  function closeDelete() {
+    if (deleting) return
+    setDeleteTarget(null)
+    setConfirmText('')
+    setDaftarGuru([])
+    setJumlahSiswa(0)
+    setGagalMuatIsi(false)
+  }
+
+  const konfirmasiCocok =
+    deleteTarget &&
+    confirmText.trim().toLowerCase() ===
+      (deleteTarget.nama_sekolah || '').trim().toLowerCase()
+
+  async function handleDelete() {
+    if (!deleteTarget || !konfirmasiCocok) return
+
+    setDeleting(true)
+
+    const { error } = await supabase
+      .from('sekolah')
+      .delete()
+      .eq('id', deleteTarget.id)
+
+    if (error) {
+      alert(
+        'Gagal menghapus sekolah: ' +
+          error.message +
+          '\n\nKemungkinan masih ada data guru/siswa yang terhubung ke sekolah ini.'
+      )
+      setDeleting(false)
+      return
+    }
+
+    // Kalau sekolah yang dihapus adalah sekolah aktif, kosongkan.
+    if (deleteTarget.id === sekolahAktifId) {
+      localStorage.removeItem(STORAGE_KEY)
+      setSekolahAktifId('')
+    }
+
+    setDeleting(false)
+    closeDelete()
     await loadSekolah()
   }
 
@@ -397,6 +498,15 @@ export default function ManajemenSekolah() {
                     >
                       <Edit3 size={16} />
                     </button>
+
+                    <button
+                      type="button"
+                      onClick={() => openDelete(sekolah)}
+                      className="flex items-center justify-center rounded-xl border border-slate-200 px-3 text-slate-500 transition hover:border-red-200 hover:bg-red-50 hover:text-red-600"
+                      title="Hapus sekolah"
+                    >
+                      <Trash2 size={16} />
+                    </button>
                   </div>
                 </div>
               )
@@ -488,6 +598,155 @@ export default function ManajemenSekolah() {
               </button>
             </div>
           </form>
+        </div>
+      )}
+
+      {/* =======================================================
+          MODAL HAPUS SEKOLAH — tampilkan dulu isi (guru & siswa)
+          supaya tidak salah hapus sekolah.
+      ======================================================== */}
+      {deleteTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-2xl">
+            <div className="flex items-start justify-between border-b border-slate-100 px-5 py-4">
+              <div className="flex items-start gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-red-50 text-red-600">
+                  <AlertTriangle size={20} />
+                </div>
+
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wider text-red-600">
+                    Hapus Sekolah
+                  </p>
+
+                  <h2 className="mt-0.5 text-lg font-bold text-slate-800">
+                    {deleteTarget.nama_sekolah}
+                  </h2>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={closeDelete}
+                disabled={deleting}
+                className="rounded-lg p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
+              >
+                <X size={19} />
+              </button>
+            </div>
+
+            <div className="max-h-[60vh] space-y-4 overflow-y-auto p-5">
+              <p className="text-sm text-slate-600">
+                Periksa dulu isi sekolah ini sebelum dihapus, supaya tidak
+                salah hapus sekolah yang namanya mirip.
+              </p>
+
+              {loadingIsi ? (
+                <div className="flex items-center justify-center gap-2 rounded-xl border border-slate-200 py-8 text-sm text-slate-500">
+                  <Loader2 size={16} className="animate-spin" />
+                  Memuat data guru & siswa...
+                </div>
+              ) : gagalMuatIsi ? (
+                <div className="rounded-xl bg-amber-50 p-3 text-xs leading-relaxed text-amber-700">
+                  Tidak bisa memuat daftar guru/siswa sekolah ini secara
+                  otomatis. Pastikan Anda sudah benar-benar yakin dengan nama
+                  sekolah di atas sebelum melanjutkan.
+                </div>
+              ) : (
+                <>
+                  <div className="flex flex-wrap gap-3">
+                    <div className="flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-600">
+                      <Users size={15} className="text-blue-500" />
+                      {daftarGuru.length} guru/staf terdaftar
+                    </div>
+
+                    <div className="flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-600">
+                      <Users size={15} className="text-emerald-500" />
+                      {jumlahSiswa} siswa terdaftar
+                    </div>
+                  </div>
+
+                  {daftarGuru.length > 0 ? (
+                    <div className="rounded-xl border border-slate-200">
+                      <p className="border-b border-slate-100 px-3.5 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                        Daftar Guru / Staf di Sekolah Ini
+                      </p>
+
+                      <ul className="max-h-48 divide-y divide-slate-100 overflow-y-auto">
+                        {daftarGuru.map((g) => (
+                          <li
+                            key={g.id}
+                            className="px-3.5 py-2 text-sm text-slate-700"
+                          >
+                            <span className="font-medium">
+                              {g.nama_lengkap || 'Tanpa nama'}
+                            </span>
+                            {g.jabatan && (
+                              <span className="ml-2 text-xs text-slate-400">
+                                ({g.jabatan})
+                              </span>
+                            )}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : (
+                    <div className="rounded-xl bg-slate-50 p-3 text-xs text-slate-500">
+                      Tidak ada guru/staf yang terdaftar di sekolah ini.
+                    </div>
+                  )}
+
+                  {(daftarGuru.length > 0 || jumlahSiswa > 0) && (
+                    <div className="rounded-xl bg-amber-50 p-3 text-xs leading-relaxed text-amber-700">
+                      Sekolah ini masih memiliki data guru/staf dan/atau
+                      siswa. Menghapus sekolah bisa gagal (jika data tersebut
+                      masih terhubung) atau berdampak pada data mereka.
+                      Pastikan ini benar-benar sekolah yang ingin dihapus.
+                    </div>
+                  )}
+                </>
+              )}
+
+              <div className="border-t border-slate-100 pt-4">
+                <label className="mb-1.5 block text-sm font-semibold text-slate-700">
+                  Ketik ulang nama sekolah untuk konfirmasi
+                </label>
+
+                <input
+                  type="text"
+                  value={confirmText}
+                  onChange={(e) => setConfirmText(e.target.value)}
+                  placeholder={deleteTarget.nama_sekolah}
+                  className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm outline-none transition focus:border-red-400 focus:ring-2 focus:ring-red-100"
+                />
+
+                <p className="mt-1.5 text-xs text-slate-400">
+                  Ketik: <span className="font-semibold">{deleteTarget.nama_sekolah}</span>
+                </p>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 border-t border-slate-100 bg-slate-50 px-5 py-4">
+              <button
+                type="button"
+                onClick={closeDelete}
+                disabled={deleting}
+                className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-100"
+              >
+                Batal
+              </button>
+
+              <button
+                type="button"
+                onClick={handleDelete}
+                disabled={!konfirmasiCocok || deleting}
+                className="inline-flex items-center gap-2 rounded-xl bg-red-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {deleting && <Loader2 size={16} className="animate-spin" />}
+                Hapus Permanen
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </Layout>
