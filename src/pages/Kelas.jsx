@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabaseClient'
 import Layout from '../components/Layout'
-import { useAuth } from '../context/AuthContext'
+import { useAuth } from '../lib/AuthContext'
 import { Plus, Pencil, Trash2, X, Loader2, Users } from 'lucide-react'
 import './Kelas.css'
 
