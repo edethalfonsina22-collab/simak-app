@@ -62,8 +62,8 @@ import KuisSeru from './pages/KuisSeru'
 import HasilKuisSeru from './pages/HasilKuisSeru'
 import Loader from './components/Loader'
 
-function ProtectedRoute({ children, adminOnly, adminUtamaOnly }) {
-  const { session, loading, isAdmin, isAdminUtama, statusAkun } = useAuth()
+function ProtectedRoute({ children, adminOnly, adminUtamaOnly, superAdminOnly }) {
+  const { session, loading, isAdmin, isAdminUtama, isSuperAdmin, statusAkun } = useAuth()
   const [minTimeElapsed, setMinTimeElapsed] = useState(false)
 
   useEffect(() => {
@@ -88,6 +88,7 @@ function ProtectedRoute({ children, adminOnly, adminUtamaOnly }) {
 
   if (adminOnly && !isAdmin) return <Navigate to="/" replace />
   if (adminUtamaOnly && !isAdminUtama) return <Navigate to="/" replace />
+  if (superAdminOnly && !isSuperAdmin) return <Navigate to="/" replace />
   return children
 }
 
@@ -190,7 +191,7 @@ export default function App() {
       <Route path="/kuitansi-jasa" element={<ProtectedRoute adminOnly><KuitansiJasa /></ProtectedRoute>} />
       <Route path="/backup" element={<ProtectedRoute adminOnly><Backup /></ProtectedRoute>} />
       <Route path="/profil-sekolah" element={<ProtectedRoute adminUtamaOnly><ProfilSekolah /></ProtectedRoute>} />
-      <Route path="/manajemen-sekolah" element={<ProtectedRoute adminUtamaOnly><ManajemenSekolah /></ProtectedRoute>} />
+      <Route path="/manajemen-sekolah" element={<ProtectedRoute superAdminOnly><ManajemenSekolah /></ProtectedRoute>} />
       <Route path="/ppdb-admin" element={<ProtectedRoute adminOnly><PPDBAdmin /></ProtectedRoute>} />
       <Route path="/perpustakaan" element={<ProtectedRoute><Perpustakaan /></ProtectedRoute>} />
       <Route path="/pengumuman" element={<ProtectedRoute><Pengumuman /></ProtectedRoute>} />
