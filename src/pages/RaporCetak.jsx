@@ -144,8 +144,12 @@ export default function RaporCetak() {
       queryPresensi,
       supabase
         .from('capaian_mapel')
-        // + jenis, untuk mencocokkan deskripsi ke kolom Pengetahuan/Keterampilan
-        .select('mata_pelajaran, jenis, deskripsi_capaian')
+        // + jenis, untuk mencocokkan deskripsi ke kolom Pengetahuan/
+        // Keterampilan + nilai_akhir & predikat — kalau sudah difinalisasi
+        // manual oleh wali kelas lewat tab Rekap Nilai, nilai itu yang
+        // dipakai untuk cetak; kalau masih null, dipakai hitungan otomatis
+        // dari nilai mentah seperti sebelumnya (lihat barisMapel di bawah).
+        .select('mata_pelajaran, jenis, deskripsi_capaian, nilai_akhir, predikat')
         .eq('siswa_id', siswaId)
         .eq('semester', semester)
         .eq('tahun_ajaran', tahunAjaran),
@@ -221,23 +225,43 @@ export default function RaporCetak() {
       Pengetahuan: { Tugas: [], UH: [], UTS: [], UAS: [] },
       Keterampilan: { Tugas: [], UH: [], UTS: [], UAS: [] },
     }
-    const deskripsiPengetahuan =
-      capaianList.find((c) => c.mata_pelajaran === mapel && c.jenis === 'Pengetahuan')?.deskripsi_capaian || ''
-    const deskripsiKeterampilan =
-      capaianList.find((c) => c.mata_pelajaran === mapel && c.jenis === 'Keterampilan')?.deskripsi_capaian || ''
-    const nilaiPengetahuan = nilaiAkhirTertimbang(rr.Pengetahuan)
-    const nilaiKeterampilan = nilaiAkhirTertimbang(rr.Keterampilan)
+    const capaianPengetahuan = capaianList.find((c) => c.mata_pelajaran === mapel && c.jenis === 'Pengetahuan')
+    const capaianKeterampilan = capaianList.find((c) => c.mata_pelajaran === mapel && c.jenis === 'Keterampilan')
+
+    const nilaiPengetahuanOtomatis = nilaiAkhirTertimbang(rr.Pengetahuan)
+    const nilaiKeterampilanOtomatis = nilaiAkhirTertimbang(rr.Keterampilan)
+
+    // Nilai final: kalau sudah difinalisasi manual oleh wali kelas lewat
+    // tab Rekap Nilai (capaian_mapel.nilai_akhir terisi), pakai nilai itu
+    // — kalau tidak (masih null), pakai hitungan otomatis dari nilai
+    // mentah seperti sebelumnya. Pola coalesce(nilai_akhir, otomatis) ini
+    // harus konsisten dengan tab Rekap Nilai di Rapor.jsx.
+    const pengetahuanManual = capaianPengetahuan?.nilai_akhir !== null && capaianPengetahuan?.nilai_akhir !== undefined
+    const keterampilanManual = capaianKeterampilan?.nilai_akhir !== null && capaianKeterampilan?.nilai_akhir !== undefined
+
+    const nilaiPengetahuan = pengetahuanManual ? capaianPengetahuan.nilai_akhir : nilaiPengetahuanOtomatis
+    const nilaiKeterampilan = keterampilanManual ? capaianKeterampilan.nilai_akhir : nilaiKeterampilanOtomatis
+
+    const predikatPengetahuan = pengetahuanManual
+      ? capaianPengetahuan.predikat
+      : predikatDariNilai(nilaiPengetahuanOtomatis)
+    const predikatKeterampilan = keterampilanManual
+      ? capaianKeterampilan.predikat
+      : predikatDariNilai(nilaiKeterampilanOtomatis)
+
     return {
       mapel,
       pengetahuan: {
         nilai: nilaiPengetahuan,
-        predikat: predikatDariNilai(nilaiPengetahuan),
-        deskripsi: deskripsiPengetahuan,
+        predikat: predikatPengetahuan,
+        deskripsi: capaianPengetahuan?.deskripsi_capaian || '',
+        manual: pengetahuanManual,
       },
       keterampilan: {
         nilai: nilaiKeterampilan,
-        predikat: predikatDariNilai(nilaiKeterampilan),
-        deskripsi: deskripsiKeterampilan,
+        predikat: predikatKeterampilan,
+        deskripsi: capaianKeterampilan?.deskripsi_capaian || '',
+        manual: keterampilanManual,
       },
     }
   })
@@ -468,10 +492,16 @@ export default function RaporCetak() {
               <tr key={b.mapel} className="border-b border-ink-950/10 align-top">
                 <td className="py-1.5 pr-2">{i + 1}</td>
                 <td className="py-1.5 pr-2 font-medium">{b.mapel}</td>
-                <td className="py-1.5 pr-2 text-center">{b.pengetahuan.nilai ?? '-'}</td>
+                <td className="py-1.5 pr-2 text-center">
+                  {b.pengetahuan.nilai ?? '-'}
+                  {b.pengetahuan.manual && <sup>*</sup>}
+                </td>
                 <td className="py-1.5 pr-2 text-center">{b.pengetahuan.predikat || '-'}</td>
                 <td className="py-1.5 pr-2">{b.pengetahuan.deskripsi || '-'}</td>
-                <td className="py-1.5 pr-2 text-center border-l-2 border-ink-950/30">{b.keterampilan.nilai ?? '-'}</td>
+                <td className="py-1.5 pr-2 text-center border-l-2 border-ink-950/30">
+                  {b.keterampilan.nilai ?? '-'}
+                  {b.keterampilan.manual && <sup>*</sup>}
+                </td>
                 <td className="py-1.5 pr-2 text-center">{b.keterampilan.predikat || '-'}</td>
                 <td className="py-1.5">{b.keterampilan.deskripsi || '-'}</td>
               </tr>
@@ -484,7 +514,7 @@ export default function RaporCetak() {
           </tbody>
         </table>
         <p className="text-xs text-ink-700/40 -mt-4 mb-6">
-          Nilai Akhir = Tugas 20% + UTS 30% + UAS 50% (UH tidak ikut dihitung). Kalau salah satu komponen belum diisi, bobot sisanya otomatis dinormalisasi.
+          Nilai Akhir = Tugas 20% + UTS 30% + UAS 50% (UH tidak ikut dihitung). Kalau salah satu komponen belum diisi, bobot sisanya otomatis dinormalisasi. Tanda <sup>*</sup> menunjukkan nilai yang sudah difinalisasi manual oleh wali kelas.
         </p>
 
         <h2 className="font-display font-semibold mb-2">B. Profil Pelajar Pancasila (P5)</h2>
