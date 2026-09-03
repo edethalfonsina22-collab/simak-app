@@ -51,7 +51,7 @@ export default function Register() {
     setLoadingSiswa(true)
 
     supabase
-      .from('siswa')
+      .from('siswa_publik_registrasi')
       .select('id, nama_lengkap, nis, nisn')
       .eq('sekolah_id', form.sekolahId)
       .order('nama_lengkap')
