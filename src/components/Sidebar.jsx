@@ -124,6 +124,12 @@ function getGroupsAdmin(isAdminUtama, jumlahMenunggu = 0, jumlahPesanBelumDibaca
         { to: '/hari-libur', label: 'Hari Libur', icon: CalendarOff },
         { to: '/kalender-pendidikan', label: 'Kalender Pendidikan', icon: CalendarRange },
         { to: '/backup', label: 'Backup Data', icon: DatabaseBackup },
+        // Manajemen Sekolah hanya untuk superadmin.
+        ...(isSuperAdmin
+          ? [
+              { to: '/manajemen-sekolah', label: 'Manajemen Sekolah', icon: Building2 },
+            ]
+          : []),
         // "Persetujuan Akun" dan "Profil Sekolah" hanya untuk admin utama / superadmin
         ...(isAdminUtama
           ? [
