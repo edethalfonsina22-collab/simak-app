@@ -278,6 +278,23 @@ export default function ManajemenSekolah() {
 
     setDeleting(true)
 
+    // Tabel profil_sekolah (data profil/alamat sekolah, dipakai di kop surat)
+    // punya foreign key ke sekolah.id — harus dihapus dulu sebelum sekolahnya
+    // sendiri bisa dihapus, kalau tidak akan gagal karena FK constraint.
+    const { error: profilSekolahError } = await supabase
+      .from('profil_sekolah')
+      .delete()
+      .eq('sekolah_id', deleteTarget.id)
+
+    if (profilSekolahError) {
+      alert(
+        'Gagal menghapus data profil sekolah terkait: ' +
+          profilSekolahError.message
+      )
+      setDeleting(false)
+      return
+    }
+
     const { data, error } = await supabase
       .from('sekolah')
       .delete()
@@ -288,7 +305,7 @@ export default function ManajemenSekolah() {
       alert(
         'Gagal menghapus sekolah: ' +
           error.message +
-          '\n\nKemungkinan masih ada data guru/siswa yang terhubung ke sekolah ini.'
+          '\n\nKemungkinan masih ada data lain (guru/siswa/kelas/dll) yang terhubung ke sekolah ini.'
       )
       setDeleting(false)
       return
