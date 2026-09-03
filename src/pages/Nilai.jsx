@@ -220,14 +220,41 @@ export default function Nilai() {
         predikat: predikatDariNilai(nilaiMap[s.id]),
         diisi_oleh: profil?.guru_id || null,
       }))
-    const { error } = await supabase.from('nilai').upsert(rows, { onConflict: 'siswa_id,mata_pelajaran,jenis,kompetensi,semester,tahun_ajaran' })
-    setSaving(false)
-    if (!error) {
-      setSaved(true)
-      if (activeSubTab === 'kelola') loadKelolaData()
-    } else {
-      alert('Gagal menyimpan nilai: ' + error.message)
+
+    if (rows.length === 0) {
+      setSaving(false)
+      return alert('Belum ada nilai yang diisi untuk disimpan.')
     }
+
+    const { data, error } = await supabase
+      .from('nilai')
+      .upsert(rows, { onConflict: 'siswa_id,mata_pelajaran,jenis,kompetensi,semester,tahun_ajaran' })
+      .select()
+
+    setSaving(false)
+
+    if (error) {
+      alert('Gagal menyimpan nilai: ' + error.message)
+      return
+    }
+
+    if (!data || data.length !== rows.length) {
+      // Tidak ada error dari Supabase, tapi jumlah baris yang benar-benar
+      // tersimpan tidak sesuai jumlah yang dikirim — biasanya berarti
+      // kebijakan RLS tabel "nilai" diam-diam menolak sebagian INSERT/UPDATE
+      // (mis. guru bukan pemilik siswa tersebut menurut RLS). Tanpa
+      // pengecekan ini, guru akan melihat "Tersimpan" padahal sebagian atau
+      // seluruh nilai tidak benar-benar masuk ke database, dan nilai itu
+      // tidak akan pernah muncul di halaman Rapor.
+      alert(
+        `Hanya ${data?.length || 0} dari ${rows.length} nilai yang benar-benar tersimpan ke database — kemungkinan kebijakan RLS pada tabel "nilai" belum mengizinkan INSERT/UPDATE untuk sebagian baris ini. Nilai yang gagal tersimpan tidak akan muncul di Rapor.`
+      )
+      setSaved(false)
+    } else {
+      setSaved(true)
+    }
+
+    if (activeSubTab === 'kelola') loadKelolaData()
   }
 
   // --- fungsi untuk tab "Kelola Nilai" ---
@@ -471,10 +498,21 @@ export default function Nilai() {
       }))
     if (baris.length === 0) return alert('Tidak ada baris nilai yang bisa diimpor. Cek kolom "Termasuk" dan kecocokan siswanya.')
     setImportSaving(true)
-    const { error } = await supabase.from('nilai').upsert(baris, { onConflict: 'siswa_id,mata_pelajaran,jenis,kompetensi,semester,tahun_ajaran' })
+    const { data, error } = await supabase
+      .from('nilai')
+      .upsert(baris, { onConflict: 'siswa_id,mata_pelajaran,jenis,kompetensi,semester,tahun_ajaran' })
+      .select()
     setImportSaving(false)
     if (error) {
       alert('Gagal mengimpor nilai: ' + error.message)
+    } else if (!data || data.length !== baris.length) {
+      // Sama seperti handleSave: tidak ada error tapi jumlah baris yang
+      // benar-benar tersimpan tidak sesuai — kemungkinan besar RLS tabel
+      // "nilai" menolak sebagian INSERT/UPDATE secara diam-diam.
+      alert(
+        `Hanya ${data?.length || 0} dari ${baris.length} nilai yang benar-benar tersimpan — kemungkinan kebijakan RLS pada tabel "nilai" belum mengizinkan INSERT/UPDATE untuk sebagian baris. Nilai yang gagal tersimpan tidak akan muncul di Rapor.`
+      )
+      if (activeSubTab === 'kelola') loadKelolaData()
     } else {
       alert(`Berhasil mengimpor ${baris.length} nilai ke tabel Nilai (jenis: ${jenisAkhir}, mapel: ${mapelAkhir}).`)
       if (activeSubTab === 'kelola') loadKelolaData()
