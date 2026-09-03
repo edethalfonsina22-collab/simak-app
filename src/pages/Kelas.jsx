@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabaseClient'
 import Layout from '../components/Layout'
+import { useAuth } from '../context/AuthContext'
 import { Plus, Pencil, Trash2, X, Loader2, Users } from 'lucide-react'
 import './Kelas.css'
 
@@ -38,6 +39,7 @@ function CircuitBackdrop() {
 }
 
 export default function Kelas() {
+  const { sekolahId } = useAuth()
   const [data, setData] = useState([])
   const [guruList, setGuruList] = useState([])
   const [loading, setLoading] = useState(true)
@@ -47,32 +49,94 @@ export default function Kelas() {
   const [saving, setSaving] = useState(false)
 
   async function loadData() {
+    if (!sekolahId) {
+      setData([])
+      setGuruList([])
+      setLoading(false)
+      return
+    }
+
     setLoading(true)
-    const [{ data: kelas }, { data: guru }, { data: siswaCounts }] = await Promise.all([
-      supabase.from('kelas').select('*, guru(nama_lengkap, foto_profil_path)').order('nama_kelas'),
-      supabase.from('guru').select('id, nama_lengkap').order('nama_lengkap'),
-      supabase.from('siswa').select('kelas_id'),
+    const [{ data: kelas, error: kelasError }, { data: guru, error: guruError }, { data: siswaCounts, error: siswaError }] = await Promise.all([
+      supabase
+        .from('kelas')
+        .select('*, guru(nama_lengkap, foto_profil_path)')
+        .eq('sekolah_id', sekolahId)
+        .order('nama_kelas'),
+      supabase
+        .from('guru')
+        .select('id, nama_lengkap')
+        .eq('sekolah_id', sekolahId)
+        .order('nama_lengkap'),
+      supabase
+        .from('siswa')
+        .select('kelas_id')
+        .eq('sekolah_id', sekolahId),
     ])
+
+    if (kelasError || guruError || siswaError) {
+      console.error('Gagal memuat data kelas:', kelasError || guruError || siswaError)
+      alert('Gagal memuat data kelas: ' + (kelasError || guruError || siswaError).message)
+    }
+
     const counts = {}
-    ;(siswaCounts || []).forEach((s) => { if (s.kelas_id) counts[s.kelas_id] = (counts[s.kelas_id] || 0) + 1 })
+    ;(siswaCounts || []).forEach((s) => {
+      if (s.kelas_id) counts[s.kelas_id] = (counts[s.kelas_id] || 0) + 1
+    })
+
     setData((kelas || []).map((k) => ({ ...k, jumlah_siswa: counts[k.id] || 0 })))
     setGuruList(guru || [])
     setLoading(false)
   }
 
-  useEffect(() => { loadData() }, [])
+  useEffect(() => {
+    loadData()
+  }, [sekolahId])
 
   function openAdd() { setForm(emptyForm); setEditingId(null); setShowForm(true) }
   function openEdit(row) { setForm({ ...emptyForm, ...row, wali_kelas_id: row.wali_kelas_id || '' }); setEditingId(row.id); setShowForm(true) }
 
   async function handleSubmit(e) {
     e.preventDefault()
+
+    if (!sekolahId) {
+      alert('Belum ada sekolah aktif. Pilih sekolah terlebih dahulu.')
+      return
+    }
+
     setSaving(true)
-    const payload = { ...form, wali_kelas_id: form.wali_kelas_id || null }
-    delete payload.guru
-    delete payload.jumlah_siswa
+
+    const waliKelasId = form.wali_kelas_id || null
+
+    if (waliKelasId) {
+      const { data: guruValid, error: guruError } = await supabase
+        .from('guru')
+        .select('id')
+        .eq('id', waliKelasId)
+        .eq('sekolah_id', sekolahId)
+        .maybeSingle()
+
+      if (guruError || !guruValid) {
+        setSaving(false)
+        alert('Wali kelas tidak valid atau bukan bagian dari sekolah aktif.')
+        return
+      }
+    }
+
+    const payload = {
+      nama_kelas: form.nama_kelas,
+      tingkat: form.tingkat,
+      wali_kelas_id: waliKelasId,
+      tahun_ajaran: form.tahun_ajaran,
+      sekolah_id: sekolahId,
+    }
+
     const { error } = editingId
-      ? await supabase.from('kelas').update(payload).eq('id', editingId)
+      ? await supabase
+          .from('kelas')
+          .update(payload)
+          .eq('id', editingId)
+          .eq('sekolah_id', sekolahId)
       : await supabase.from('kelas').insert(payload)
     setSaving(false)
     if (!error) { setShowForm(false); loadData() }
@@ -80,8 +144,16 @@ export default function Kelas() {
   }
 
   async function handleDelete(id) {
+    if (!sekolahId) {
+      alert('Belum ada sekolah aktif. Pilih sekolah terlebih dahulu.')
+      return
+    }
     if (!confirm('Hapus kelas ini? Siswa di kelas ini tidak akan terhapus, hanya keluar dari kelas.')) return
-    const { error } = await supabase.from('kelas').delete().eq('id', id)
+    const { error } = await supabase
+      .from('kelas')
+      .delete()
+      .eq('id', id)
+      .eq('sekolah_id', sekolahId)
     if (!error) loadData()
     else alert('Gagal menghapus: ' + error.message)
   }
@@ -93,6 +165,11 @@ export default function Kelas() {
       <div className="kelas-wrap">
         <CircuitBackdrop />
 
+        {!sekolahId ? (
+          <div className="relative rounded-xl border border-white/10 bg-black/10 p-6 text-sm text-ink-700/60">
+            Belum ada sekolah aktif. Pilih sekolah terlebih dahulu untuk melihat dan mengelola data kelas.
+          </div>
+        ) : (
         <div className="relative grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {loading && <p className="text-ink-700/50 text-sm">Memuat data...</p>}
           {!loading && data.length === 0 && <p className="text-ink-700/50 text-sm">Belum ada kelas. Tambahkan kelas pertama Anda.</p>}
@@ -127,9 +204,10 @@ export default function Kelas() {
             </div>
           ))}
         </div>
+        )}
       </div>
 
-      {showForm && (
+      {showForm && sekolahId && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
           <form onSubmit={handleSubmit} className="kelas-modal">
             <button type="button" onClick={() => setShowForm(false)} className="kelas-modal-close"><X size={20} /></button>
