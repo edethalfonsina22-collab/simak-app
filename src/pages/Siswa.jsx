@@ -181,7 +181,7 @@ function tempatTanggalLahir(s) {
 }
 
 export default function Siswa() {
-  const { isAdmin } = useAuth()
+  const { isAdmin, isSuperAdmin, sekolahId } = useAuth()
   const [data, setData] = useState([])
   const [kelasList, setKelasList] = useState([])
   const [loading, setLoading] = useState(true)
@@ -200,11 +200,33 @@ export default function Siswa() {
   const [bulkDeleting, setBulkDeleting] = useState(false)
 
   async function loadData() {
+    if (!sekolahId) {
+      setData([])
+      setKelasList([])
+      setSelectedIds([])
+      setLoading(false)
+      return
+    }
+
     setLoading(true)
-    const [{ data: siswa }, { data: kelas }] = await Promise.all([
-      supabase.from('siswa').select('*, kelas(nama_kelas)').order('nama_lengkap'),
-      supabase.from('kelas').select('id, nama_kelas, tingkat').order('nama_kelas'),
+
+    // PENTING: sekolahId adalah sekolah aktif untuk superadmin, dan sekolah
+    // milik akun untuk admin sekolah. Semua query dibatasi ke sekolah ini.
+    const [{ data: siswa, error: siswaError }, { data: kelas, error: kelasError }] = await Promise.all([
+      supabase
+        .from('siswa')
+        .select('*, kelas(nama_kelas)')
+        .eq('sekolah_id', sekolahId)
+        .order('nama_lengkap'),
+      supabase
+        .from('kelas')
+        .select('id, nama_kelas, tingkat')
+        .eq('sekolah_id', sekolahId)
+        .order('nama_kelas'),
     ])
+
+    if (siswaError) console.error('Gagal memuat siswa:', siswaError)
+    if (kelasError) console.error('Gagal memuat kelas:', kelasError)
     setData(siswa || [])
     setKelasList(kelas || [])
     setLoading(false)
@@ -218,7 +240,7 @@ export default function Siswa() {
   useEffect(() => {
     loadData()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [sekolahId])
 
   // Tutup dropdown export saat klik di luar area tombolnya
   useEffect(() => {
@@ -238,8 +260,28 @@ export default function Siswa() {
   }
 
   async function handleFotoUpload(siswaId, file) {
+    if (!sekolahId) {
+      alert('Sekolah aktif belum dipilih.')
+      return
+    }
+
+    // Validasi kepemilikan siswa dilakukan SEBELUM upload storage, supaya
+    // superadmin/admin tidak dapat menargetkan siswa dari sekolah lain hanya
+    // dengan mengirimkan ID secara manual.
+    const { data: siswaTarget, error: siswaTargetError } = await supabase
+      .from('siswa')
+      .select('id')
+      .eq('id', siswaId)
+      .eq('sekolah_id', sekolahId)
+      .maybeSingle()
+
+    if (siswaTargetError || !siswaTarget) {
+      alert('Siswa tidak ditemukan pada sekolah aktif.')
+      return
+    }
+
     setUploadingId(siswaId)
-    const ext = file.name.split('.').pop()
+    const ext = file.name.split('.').pop()?.toLowerCase() || 'jpg'
     const path = `${siswaId}/foto.${ext}`
     const { error: uploadError } = await supabase.storage.from('foto-siswa').upload(path, file, { upsert: true })
     if (uploadError) {
@@ -247,7 +289,19 @@ export default function Siswa() {
       setUploadingId(null)
       return
     }
-    await supabase.from('siswa').update({ foto_path: path }).eq('id', siswaId)
+
+    const { error: updateError } = await supabase
+      .from('siswa')
+      .update({ foto_path: path })
+      .eq('id', siswaId)
+      .eq('sekolah_id', sekolahId)
+
+    if (updateError) {
+      alert('Gagal menyimpan foto: ' + updateError.message)
+      setUploadingId(null)
+      return
+    }
+
     await loadData()
     setUploadingId(null)
   }
@@ -268,8 +322,32 @@ export default function Siswa() {
     e.preventDefault()
     setSaving(true)
     const toNumOrNull = (v) => (v === '' || v === null || v === undefined ? null : Number(v))
+    if (!sekolahId) {
+      setSaving(false)
+      alert('Sekolah aktif belum dipilih.')
+      return
+    }
+
+    // Jangan pernah mempercayai kelas_id dari form/client. Pastikan kelas
+    // tersebut benar-benar milik sekolah aktif sebelum siswa disimpan.
+    if (form.kelas_id) {
+      const { data: kelasTarget, error: kelasTargetError } = await supabase
+        .from('kelas')
+        .select('id')
+        .eq('id', form.kelas_id)
+        .eq('sekolah_id', sekolahId)
+        .maybeSingle()
+
+      if (kelasTargetError || !kelasTarget) {
+        setSaving(false)
+        alert('Kelas yang dipilih tidak valid untuk sekolah aktif.')
+        return
+      }
+    }
+
     const payload = {
       ...form,
+      sekolah_id: sekolahId,
       kelas_id: form.kelas_id || null,
       tahun_lahir: toNumOrNull(form.tahun_lahir),
       tahun_lahir_ayah: toNumOrNull(form.tahun_lahir_ayah),
@@ -287,8 +365,14 @@ export default function Siswa() {
     delete payload.kelas
 
     const { error } = editingId
-      ? await supabase.from('siswa').update(payload).eq('id', editingId)
-      : await supabase.from('siswa').insert(payload)
+      ? await supabase
+          .from('siswa')
+          .update(payload)
+          .eq('id', editingId)
+          .eq('sekolah_id', sekolahId)
+      : await supabase
+          .from('siswa')
+          .insert(payload)
 
     setSaving(false)
     if (!error) {
@@ -301,7 +385,11 @@ export default function Siswa() {
 
   async function handleDelete(id) {
     if (!confirm('Hapus data siswa ini? Tindakan ini tidak bisa dibatalkan.')) return
-    const { error } = await supabase.from('siswa').delete().eq('id', id)
+    const { error } = await supabase
+      .from('siswa')
+      .delete()
+      .eq('id', id)
+      .eq('sekolah_id', sekolahId)
     if (!error) loadData()
     else alert('Gagal menghapus: ' + error.message)
   }
@@ -327,7 +415,11 @@ export default function Siswa() {
     if (selectedIds.length === 0) return
     if (!confirm(`Hapus ${selectedIds.length} siswa terpilih? Tindakan ini tidak bisa dibatalkan.`)) return
     setBulkDeleting(true)
-    const { error } = await supabase.from('siswa').delete().in('id', selectedIds)
+    const { error } = await supabase
+      .from('siswa')
+      .delete()
+      .in('id', selectedIds)
+      .eq('sekolah_id', sekolahId)
     setBulkDeleting(false)
     if (!error) {
       setSelectedIds([])
@@ -347,9 +439,12 @@ export default function Siswa() {
     // Ini menghindari kondisi balapan (race condition) — misalnya kalau modal impor
     // dibuka sebelum daftar siswa lama selesai dimuat — yang sebelumnya bisa membuat
     // SEMUA baris dianggap "siswa baru" dan menciptakan data duplikat.
+    if (!sekolahId) throw new Error('Sekolah aktif belum dipilih.')
+
     const { data: existing, error: fetchError } = await supabase
       .from('siswa')
       .select('id, nis, nisn')
+      .eq('sekolah_id', sekolahId)
     if (fetchError) throw fetchError
 
     // Cocokkan tiap baris dengan siswa yang SUDAH ADA berdasarkan NIS atau NISN.
@@ -365,9 +460,9 @@ export default function Siswa() {
           (row.nisn && d.nisn && String(d.nisn).trim() === String(row.nisn).trim())
       )
       if (match) {
-        toUpdate.push({ id: match.id, ...row })
+        toUpdate.push({ id: match.id, ...row, sekolah_id: sekolahId })
       } else {
-        toInsert.push(row)
+        toInsert.push({ ...row, sekolah_id: sekolahId })
       }
     })
 
@@ -378,7 +473,11 @@ export default function Siswa() {
 
     for (const row of toUpdate) {
       const { id, ...payload } = row
-      const { error } = await supabase.from('siswa').update(payload).eq('id', id)
+      const { error } = await supabase
+        .from('siswa')
+        .update(payload)
+        .eq('id', id)
+        .eq('sekolah_id', sekolahId)
       if (error) throw error
     }
 
@@ -596,6 +695,17 @@ export default function Siswa() {
     const printWindow = window.open('', '_blank')
     printWindow.document.write(html)
     printWindow.document.close()
+  }
+
+  if (!sekolahId) {
+    return (
+      <Layout title="Data Siswa" subtitle="Belum ada sekolah aktif">
+        <div className="card p-8 text-center">
+          <p className="font-display text-lg font-semibold text-ink-950">Belum ada sekolah aktif.</p>
+          <p className="text-sm text-ink-700/60 mt-1">Pilih sekolah aktif terlebih dahulu untuk melihat data siswa.</p>
+        </div>
+      </Layout>
+    )
   }
 
   return (
