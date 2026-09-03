@@ -272,22 +272,57 @@ export default function Rapor() {
   const [kdLoading, setKdLoading] = useState(false)
   const [kdBaru, setKdBaru] = useState({ kode: '', teks: '' })
 
+  // Kelas hanya menampilkan kelas milik guru yang sedang login
+  // (wali_kelas_id = auth.uid()). RLS di database juga sudah membatasi
+  // ini di level server, tapi query di sini tetap eksplisit difilter
+  // supaya UI konsisten dan tidak sempat memuat data yang tidak relevan.
   useEffect(() => {
-    supabase
-      .from('kelas')
-      .select('id, nama_kelas')
-      .order('nama_kelas')
-      .then(({ data }) => setKelasList(data || []))
+    async function muatKelasGuru() {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      if (!user) {
+        setKelasList([])
+        return
+      }
+      const { data, error } = await supabase
+        .from('kelas')
+        .select('id, nama_kelas')
+        .eq('wali_kelas_id', user.id)
+        .order('nama_kelas')
+      if (error) {
+        console.error(error)
+        setKelasList([])
+        return
+      }
+      setKelasList(data || [])
+    }
+    muatKelasGuru()
   }, [])
 
+  // Siswa hanya dimuat dari kelas-kelas milik guru yang login (kelasList
+  // di atas). Menunggu kelasList terisi dulu supaya filter kelas_id benar.
   useEffect(() => {
-    supabase
-      .from('siswa')
-      // + kelas_id, supaya daftar siswa bisa difilter otomatis per kelas
-      .select('id, nama_lengkap, nis, kelas_id, kelas(nama_kelas)')
-      .order('nama_lengkap')
-      .then(({ data }) => setSiswaList(data || []))
-  }, [])
+    async function muatSiswaGuru() {
+      if (kelasList.length === 0) {
+        setSiswaList([])
+        return
+      }
+      const kelasIds = kelasList.map((k) => k.id)
+      const { data, error } = await supabase
+        .from('siswa')
+        .select('id, nama_lengkap, nis, kelas_id, kelas(nama_kelas)')
+        .in('kelas_id', kelasIds)
+        .order('nama_lengkap')
+      if (error) {
+        console.error(error)
+        setSiswaList([])
+        return
+      }
+      setSiswaList(data || [])
+    }
+    muatSiswaGuru()
+  }, [kelasList])
 
   async function muatRapor(idOverride) {
     const idSiswa = idOverride || siswaId
@@ -384,7 +419,8 @@ export default function Rapor() {
   const siswaTerpilih = siswaList.find((s) => s.id === siswaId)
 
   // Daftar siswa yang tampil di dropdown & tabel — otomatis terfilter kalau
-  // sebuah kelas dipilih, kalau tidak tampilkan semua siswa.
+  // sebuah kelas dipilih, kalau tidak tampilkan semua siswa (yang sudah
+  // difilter ke kelas milik guru lewat muatSiswaGuru di atas).
   const siswaTerfilter = kelasId ? siswaList.filter((s) => s.kelas_id === kelasId) : siswaList
 
   // ---------- Ringkasan nilai — kini dipecah per kompetensi ----------
@@ -768,7 +804,7 @@ export default function Rapor() {
                 setSiswaId('')
               }}
             >
-              <option value="">-- Semua kelas --</option>
+              <option value="">-- Semua kelas saya --</option>
               {kelasList.map((k) => (
                 <option key={k.id} value={k.id}>
                   {k.nama_kelas}
@@ -817,6 +853,11 @@ export default function Rapor() {
             </button>
           )}
         </div>
+        {kelasList.length === 0 && (
+          <p className="text-sm text-ink-700/50 mt-3">
+            Anda belum terdaftar sebagai wali kelas manapun, jadi belum ada kelas/siswa yang bisa ditampilkan.
+          </p>
+        )}
       </div>
 
       {kelasId && (
