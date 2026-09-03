@@ -16,10 +16,19 @@ export default function Register() {
     jabatan: 'guru',
     sekolahId: '',
     namaSekolahBaru: '',
+    siswaId: '',
+    hubungan: '',
   })
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [sukses, setSukses] = useState(false)
+
+  // Daftar siswa untuk sekolah yang dipilih — hanya dimuat kalau jabatan
+  // yang dipilih adalah "orang_tua", karena mereka wajib memilih anak.
+  const [daftarSiswa, setDaftarSiswa] = useState([])
+  const [loadingSiswa, setLoadingSiswa] = useState(false)
+
+  const isOrangTua = form.jabatan === 'orang_tua'
 
   useEffect(() => {
     supabase
@@ -28,6 +37,34 @@ export default function Register() {
       .order('nama_sekolah')
       .then(({ data }) => setDaftarSekolah(data || []))
   }, [])
+
+  // Muat daftar siswa dari sekolah yang dipilih, khusus untuk pendaftar
+  // orang tua/wali — supaya mereka bisa memilih anak dari daftar, bukan
+  // mengetik manual (mengurangi risiko salah hubung ke siswa lain).
+  useEffect(() => {
+    if (!isOrangTua || !form.sekolahId) {
+      setDaftarSiswa([])
+      return
+    }
+
+    let aktif = true
+    setLoadingSiswa(true)
+
+    supabase
+      .from('siswa')
+      .select('id, nama_lengkap, nis, nisn')
+      .eq('sekolah_id', form.sekolahId)
+      .order('nama_lengkap')
+      .then(({ data }) => {
+        if (!aktif) return
+        setDaftarSiswa(data || [])
+        setLoadingSiswa(false)
+      })
+
+    return () => {
+      aktif = false
+    }
+  }, [isOrangTua, form.sekolahId])
 
   if (session) return <Navigate to="/" replace />
 
@@ -60,7 +97,9 @@ export default function Register() {
           <p className="text-sm text-blue-200/70 mt-2">
             {mode === 'baru'
               ? 'Sekolah dan akun Anda sudah dibuat, sedang menunggu persetujuan Superadmin. Anda akan bisa login setelah disetujui.'
-              : 'Akun Anda sudah dibuat dan sedang menunggu persetujuan admin sekolah. Anda akan bisa login setelah disetujui.'}
+              : isOrangTua
+                ? 'Akun Anda sudah dibuat dan permintaan menghubungkan Anda dengan anak sedang menunggu persetujuan admin sekolah. Anda akan bisa login setelah disetujui.'
+                : 'Akun Anda sudah dibuat dan sedang menunggu persetujuan admin sekolah. Anda akan bisa login setelah disetujui.'}
           </p>
           <Link to="/login" className="inline-block mt-4 text-sm font-medium text-blue-400 hover:text-blue-300">
             Kembali ke halaman Masuk
@@ -72,6 +111,17 @@ export default function Register() {
 
   function ubah(field, value) {
     setForm((f) => ({ ...f, [field]: value }))
+  }
+
+  // Jabatan "orang_tua" hanya boleh bergabung ke sekolah yang sudah ada
+  // (tidak bisa sekaligus mendaftarkan sekolah baru), jadi mode dikunci
+  // ke 'gabung' begitu jabatan ini dipilih. siswaId & hubungan direset
+  // setiap kali jabatan berganti supaya tidak salah bawa data lama.
+  function ubahJabatan(value) {
+    setForm((f) => ({ ...f, jabatan: value, siswaId: '', hubungan: '' }))
+    if (value === 'orang_tua') {
+      setMode('gabung')
+    }
   }
 
   async function handleSubmit(e) {
@@ -94,6 +144,14 @@ export default function Register() {
       setError('Isi nama sekolah yang akan didaftarkan.')
       return
     }
+    if (isOrangTua && !form.siswaId) {
+      setError('Pilih anak Anda dari daftar siswa.')
+      return
+    }
+    if (isOrangTua && !form.hubungan) {
+      setError('Pilih hubungan Anda dengan anak.')
+      return
+    }
 
     setLoading(true)
 
@@ -105,6 +163,8 @@ export default function Register() {
       password: form.password,
       sekolahId: form.sekolahId,
       namaSekolah: form.namaSekolahBaru.trim(),
+      siswaId: form.siswaId || undefined,
+      hubungan: form.hubungan || undefined,
     })
 
     setLoading(false)
@@ -158,8 +218,9 @@ export default function Register() {
           title="Langkah Pendaftaran"
           items={[
             'Isi nama lengkap sesuai identitas resmi.',
-            'Pilih jabatan Anda: Guru, Admin, atau Kepala Sekolah.',
-            'Pilih sekolah yang sudah terdaftar, atau daftarkan sekolah baru.',
+            'Pilih jabatan Anda: Guru, Admin, Kepala Sekolah, atau Orang Tua/Wali Murid.',
+            'Guru/Admin/Kepala Sekolah: pilih sekolah yang sudah terdaftar, atau daftarkan sekolah baru.',
+            'Orang Tua/Wali: pilih sekolah anak Anda, lalu pilih nama anak dari daftar siswa sekolah tersebut.',
             'Gunakan email aktif — dipakai untuk login.',
             'Buat kata sandi minimal 6 karakter.',
           ]}
@@ -177,26 +238,25 @@ export default function Register() {
           <p className="text-xs text-blue-200/60 mt-1">Akun akan aktif setelah disetujui admin.</p>
         </div>
 
-        {/* Toggle mode: Gabung sekolah yang sudah ada / Daftar sekolah baru */}
-        <div className="grid grid-cols-2 gap-2 p-1 bg-slate-900/60 border border-blue-500/25 rounded-lg text-xs font-medium">
-          <button
-            type="button"
-            onClick={() => setMode('gabung')}
-            className={`py-2 rounded-md transition ${
-              mode === 'gabung' ? 'bg-blue-500/80 text-white' : 'text-blue-200/60 hover:text-blue-200'
-            }`}
-          >
-            Gabung Sekolah
-          </button>
-          <button
-            type="button"
-            onClick={() => setMode('baru')}
-            className={`py-2 rounded-md transition ${
-              mode === 'baru' ? 'bg-blue-500/80 text-white' : 'text-blue-200/60 hover:text-blue-200'
-            }`}
-          >
-            Daftar Sekolah Baru
-          </button>
+        <div>
+          <label className={labelClass}>Jabatan</label>
+          <select className={inputClass}
+            value={form.jabatan} onChange={(e) => ubahJabatan(e.target.value)}>
+            <option value="guru" className="bg-slate-900">Guru</option>
+            <option value="admin" className="bg-slate-900">Admin</option>
+            <option value="kepala_sekolah" className="bg-slate-900">Kepala Sekolah</option>
+            <option value="orang_tua" className="bg-slate-900">Orang Tua / Wali Murid</option>
+          </select>
+          {mode === 'baru' && !isOrangTua && (
+            <p className="text-[11px] text-blue-200/50 mt-1">
+              Karena mendaftarkan sekolah baru, akun Anda otomatis jadi Admin Utama sekolah ini.
+            </p>
+          )}
+          {isOrangTua && (
+            <p className="text-[11px] text-blue-200/50 mt-1">
+              Akun Orang Tua/Wali hanya dapat bergabung ke sekolah yang sudah terdaftar, lalu dihubungkan ke data anak Anda.
+            </p>
+          )}
         </div>
 
         <div>
@@ -205,22 +265,33 @@ export default function Register() {
             value={form.nama} onChange={(e) => ubah('nama', e.target.value)} />
         </div>
 
-        <div>
-          <label className={labelClass}>Jabatan</label>
-          <select className={inputClass}
-            value={form.jabatan} onChange={(e) => ubah('jabatan', e.target.value)}>
-            <option value="guru" className="bg-slate-900">Guru</option>
-            <option value="admin" className="bg-slate-900">Admin</option>
-            <option value="kepala_sekolah" className="bg-slate-900">Kepala Sekolah</option>
-          </select>
-          {mode === 'baru' && (
-            <p className="text-[11px] text-blue-200/50 mt-1">
-              Karena mendaftarkan sekolah baru, akun Anda otomatis jadi Admin Utama sekolah ini.
-            </p>
-          )}
-        </div>
+        {/* Toggle mode: Gabung sekolah yang sudah ada / Daftar sekolah baru.
+            Disembunyikan untuk Orang Tua/Wali — mereka wajib gabung ke
+            sekolah yang sudah ada (tidak bisa mendaftarkan sekolah baru). */}
+        {!isOrangTua && (
+          <div className="grid grid-cols-2 gap-2 p-1 bg-slate-900/60 border border-blue-500/25 rounded-lg text-xs font-medium">
+            <button
+              type="button"
+              onClick={() => setMode('gabung')}
+              className={`py-2 rounded-md transition ${
+                mode === 'gabung' ? 'bg-blue-500/80 text-white' : 'text-blue-200/60 hover:text-blue-200'
+              }`}
+            >
+              Gabung Sekolah
+            </button>
+            <button
+              type="button"
+              onClick={() => setMode('baru')}
+              className={`py-2 rounded-md transition ${
+                mode === 'baru' ? 'bg-blue-500/80 text-white' : 'text-blue-200/60 hover:text-blue-200'
+              }`}
+            >
+              Daftar Sekolah Baru
+            </button>
+          </div>
+        )}
 
-        {mode === 'gabung' ? (
+        {mode === 'gabung' || isOrangTua ? (
           <div>
             <label className={labelClass}>Sekolah</label>
             <select required className={inputClass}
@@ -238,6 +309,57 @@ export default function Register() {
               placeholder="Contoh: SD Negeri Contoh"
               value={form.namaSekolahBaru} onChange={(e) => ubah('namaSekolahBaru', e.target.value)} />
           </div>
+        )}
+
+        {/* Khusus Orang Tua/Wali: pilih anak dari daftar siswa sekolah yang
+            baru saja dipilih, lalu pilih hubungan dengan anak tersebut. */}
+        {isOrangTua && (
+          <>
+            <div>
+              <label className={labelClass}>Nama Anak</label>
+              <select
+                required
+                className={inputClass}
+                value={form.siswaId}
+                onChange={(e) => ubah('siswaId', e.target.value)}
+                disabled={!form.sekolahId || loadingSiswa}
+              >
+                <option value="" className="bg-slate-900">
+                  {!form.sekolahId
+                    ? '-- Pilih sekolah terlebih dahulu --'
+                    : loadingSiswa
+                      ? 'Memuat daftar siswa...'
+                      : daftarSiswa.length === 0
+                        ? 'Tidak ada siswa di sekolah ini'
+                        : '-- Pilih Anak --'}
+                </option>
+                {daftarSiswa.map((s) => (
+                  <option key={s.id} value={s.id} className="bg-slate-900">
+                    {s.nama_lengkap}
+                    {s.nis ? ` (NIS: ${s.nis})` : ''}
+                  </option>
+                ))}
+              </select>
+              <p className="text-[11px] text-blue-200/50 mt-1">
+                Tidak menemukan nama anak Anda? Hubungi admin sekolah untuk memastikan data siswa sudah terdaftar.
+              </p>
+            </div>
+
+            <div>
+              <label className={labelClass}>Hubungan dengan Anak</label>
+              <select
+                required
+                className={inputClass}
+                value={form.hubungan}
+                onChange={(e) => ubah('hubungan', e.target.value)}
+              >
+                <option value="" className="bg-slate-900">-- Pilih Hubungan --</option>
+                <option value="ayah" className="bg-slate-900">Ayah</option>
+                <option value="ibu" className="bg-slate-900">Ibu</option>
+                <option value="wali" className="bg-slate-900">Wali</option>
+              </select>
+            </div>
+          </>
         )}
 
         <div>
@@ -281,6 +403,7 @@ export default function Register() {
           items={[
             'Akun baru berstatus "menunggu" sampai disetujui admin sekolah.',
             'Mode "Daftar Sekolah Baru" menjadikan Anda Admin Utama otomatis.',
+            'Akun Orang Tua/Wali akan dihubungkan ke data anak yang dipilih, menunggu persetujuan admin.',
             'Anda baru bisa login setelah akun disetujui.',
             'Ada kendala? Hubungi admin sekolah Anda secara langsung.',
           ]}
