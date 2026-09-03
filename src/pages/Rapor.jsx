@@ -272,10 +272,15 @@ export default function Rapor() {
   const [kdLoading, setKdLoading] = useState(false)
   const [kdBaru, setKdBaru] = useState({ kode: '', teks: '' })
 
-  // Kelas hanya menampilkan kelas milik guru yang sedang login
-  // (wali_kelas_id = auth.uid()). RLS di database juga sudah membatasi
-  // ini di level server, tapi query di sini tetap eksplisit difilter
-  // supaya UI konsisten dan tidak sempat memuat data yang tidak relevan.
+  // Kelas hanya menampilkan kelas milik guru yang sedang login.
+  // PENTING: kelas.wali_kelas_id menunjuk ke guru.id, BUKAN langsung ke
+  // auth.users.id. Jembatannya adalah tabel `profil`:
+  //   profil.id      = auth.uid()  (user yang login)
+  //   profil.guru_id = guru.id     (dipakai di kelas.wali_kelas_id)
+  // Jadi kita ambil guru_id dari profil dulu, baru filter kelas dengan itu.
+  // RLS di database juga sudah membatasi ini di level server dengan logika
+  // yang sama, tapi query di sini tetap eksplisit difilter supaya UI
+  // konsisten dan tidak sempat memuat data yang tidak relevan.
   useEffect(() => {
     async function muatKelasGuru() {
       const {
@@ -285,10 +290,23 @@ export default function Rapor() {
         setKelasList([])
         return
       }
+
+      const { data: profilData, error: profilError } = await supabase
+        .from('profil')
+        .select('guru_id')
+        .eq('id', user.id)
+        .maybeSingle()
+
+      if (profilError || !profilData?.guru_id) {
+        console.error(profilError)
+        setKelasList([])
+        return
+      }
+
       const { data, error } = await supabase
         .from('kelas')
         .select('id, nama_kelas')
-        .eq('wali_kelas_id', user.id)
+        .eq('wali_kelas_id', profilData.guru_id)
         .order('nama_kelas')
       if (error) {
         console.error(error)
