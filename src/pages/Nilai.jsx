@@ -114,6 +114,12 @@ export default function Nilai() {
   // Jenis untuk Ujian Online — dulu selalu fixed "UTS" (lihat komentar di
   // IMPOR_UJIAN_JENIS_OPTS di atas), sekarang jadi dropdown yang bisa dipilih.
   const [importJenisUjian, setImportJenisUjian] = useState('UTS')
+  // Mata pelajaran untuk impor dari Ujian Online — diisi otomatis kalau
+  // judul/mata_pelajaran ujian berhasil terbaca dari tabel "ujian", tapi
+  // tetap bisa diedit manual. Ini sengaja dipisah dari data ujian supaya
+  // proses impor TETAP bisa jalan walau tabel "ujian" gagal terbaca (mis.
+  // karena RLS) — karena sumber utama nilai sekarang murni dari hasil_ujian.
+  const [mapelImporUjian, setMapelImporUjian] = useState('')
   const [importPreview, setImportPreview] = useState([])
   const [importLoading, setImportLoading] = useState(false)
   const [importSaving, setImportSaving] = useState(false)
@@ -269,22 +275,93 @@ export default function Nilai() {
 
   // --- fungsi untuk tab "Impor Otomatis" ---
 
-  // Muat ulang daftar ujian/kuis begitu kelas atau sumber (Ujian Online/Kuis Seru) berganti.
+  // Muat ulang daftar ujian/kuis begitu kelas, sumber (Ujian Online/Kuis
+  // Seru), atau daftar siswa aktif kelas ini berganti. "siswaList.length"
+  // sengaja ditambahkan sebagai dependency karena loadDaftarUjian sekarang
+  // butuh siswaList untuk mencocokkan NIS (lihat komentar di dalamnya).
   useEffect(() => {
     if (activeSubTab !== 'impor' || !kelasId) return
     setImportSelectedId('')
     setImportPreview([])
+    setMapelImporUjian('')
     if (importSumber === 'ujian') loadDaftarUjian()
     else loadDaftarKuis()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeSubTab, importSumber, kelasId, kelasAktif?.nama_kelas])
+  }, [activeSubTab, importSumber, kelasId, kelasAktif?.nama_kelas, siswaList.length])
 
+  // Sumber daftar ujian yang bisa diimpor SEKARANG diambil langsung dari
+  // tabel hasil_ujian (dicocokkan lewat NIS siswa aktif di kelas ini) —
+  // BUKAN lagi dari tabel "ujian" yang difilter kelas_id + guru_id.
+  //
+  // Alasan: guru_id di tabel "ujian" sempat tersimpan tidak konsisten
+  // (auth.uid() vs guru.id), dan kebijakan RLS tabel "ujian" mungkin
+  // membatasi guru hanya melihat baris miliknya sendiri berdasarkan salah
+  // satu dari dua nilai itu — sehingga ujian yang baru dibuat guru bisa
+  // "hilang" dari daftar impor walau hasil siswanya sudah masuk sempurna
+  // ke hasil_ujian (halaman Hasil Ujian yang terpisah terbukti tetap bisa
+  // menampilkannya). Dengan sumber dari hasil_ujian, daftar impor jadi
+  // otomatis sinkron dengan apa pun yang tampil di halaman Hasil Ujian.
+  //
+  // Info judul & mata_pelajaran TETAP butuh baca ke tabel "ujian" (karena
+  // hasil_ujian tidak menyimpannya sendiri), tapi ini sekadar pelengkap
+  // tampilan: kalau gagal terbaca, judul di-fallback ke label generik dan
+  // mata pelajaran dikosongkan supaya guru mengisinya manual lewat kotak
+  // "Mata Pelajaran" — impor tetap bisa jalan tanpa ini.
   async function loadDaftarUjian() {
     setImportLoading(true)
-    let q = supabase.from('ujian').select('id, judul, mata_pelajaran, created_at').eq('kelas_id', kelasId).order('created_at', { ascending: false })
-    if (!isAdmin) q = q.eq('guru_id', profil?.guru_id || null)
-    const { data } = await q
-    setDaftarImpor(data || [])
+
+    if (siswaList.length === 0) {
+      setDaftarImpor([])
+      setImportLoading(false)
+      return
+    }
+
+    const nisAktif = siswaList.map((s) => (s.nis || '').trim()).filter(Boolean)
+    if (nisAktif.length === 0) {
+      setDaftarImpor([])
+      setImportLoading(false)
+      return
+    }
+
+    const { data: hasilData, error: errHasil } = await supabase
+      .from('hasil_ujian')
+      .select('ujian_id')
+      .in('nis_siswa', nisAktif)
+
+    if (errHasil) {
+      alert('Gagal memuat daftar hasil ujian: ' + errHasil.message)
+      setDaftarImpor([])
+      setImportLoading(false)
+      return
+    }
+
+    const idUjianUnik = [...new Set((hasilData || []).map((h) => h.ujian_id).filter(Boolean))]
+    if (idUjianUnik.length === 0) {
+      setDaftarImpor([])
+      setImportLoading(false)
+      return
+    }
+
+    // Baca info tambahan (judul, mata pelajaran, waktu dibuat) — kalau
+    // gagal/kosong (mis. terhalang RLS), tetap lanjut dengan data seadanya.
+    const { data: ujianData } = await supabase
+      .from('ujian')
+      .select('id, judul, mata_pelajaran, created_at')
+      .in('id', idUjianUnik)
+
+    const daftar = idUjianUnik
+      .map((id) => {
+        const info = (ujianData || []).find((u) => u.id === id)
+        return {
+          id,
+          judul: info?.judul || `Ujian (kode internal ${id.slice(0, 8)})`,
+          mata_pelajaran: info?.mata_pelajaran || '',
+          created_at: info?.created_at || null,
+        }
+      })
+      .sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''))
+
+    setDaftarImpor(daftar)
     setImportLoading(false)
   }
 
@@ -307,10 +384,17 @@ export default function Nilai() {
   async function pilihImporRecord(id) {
     setImportSelectedId(id)
     setImportPreview([])
+    setMapelImporUjian('')
     if (!id) return
     setImportLoading(true)
-    if (importSumber === 'ujian') await muatPreviewUjian(id)
-    else await muatPreviewKuis(id)
+    if (importSumber === 'ujian') {
+      // Isi awal kotak Mata Pelajaran dari data ujian kalau berhasil terbaca
+      const rec = daftarImpor.find((r) => r.id === id)
+      setMapelImporUjian(rec?.mata_pelajaran || '')
+      await muatPreviewUjian(id)
+    } else {
+      await muatPreviewKuis(id)
+    }
     setImportLoading(false)
   }
 
@@ -364,11 +448,19 @@ export default function Nilai() {
     // (Ujian Online maupun Kuis Seru) dipilih lewat dropdown, tidak ada
     // lagi yang di-fixed ke satu jenis tertentu.
     const jenisAkhir = importSumber === 'ujian' ? importJenisUjian : importJenisKuis
+    // Mata pelajaran: untuk Ujian Online dipakai dari kotak yang bisa
+    // diedit manual (mapelImporUjian), bukan langsung dari rec.mata_pelajaran
+    // — supaya impor tetap bisa jalan walau info ujian gagal terbaca dari
+    // tabel "ujian". Untuk Kuis Seru tetap dari data kuisnya seperti semula.
+    const mapelAkhir = importSumber === 'ujian' ? mapelImporUjian.trim() : rec.mata_pelajaran
+    if (!mapelAkhir) {
+      return alert('Isi dulu Mata Pelajaran untuk ujian ini sebelum diimpor.')
+    }
     const baris = importPreview
       .filter((r) => r.termasuk && r.siswaId && r.skor !== null && r.skor !== undefined)
       .map((r) => ({
         siswa_id: r.siswaId,
-        mata_pelajaran: rec.mata_pelajaran,
+        mata_pelajaran: mapelAkhir,
         jenis: jenisAkhir,
         kompetensi: importKompetensi,
         semester,
@@ -384,7 +476,7 @@ export default function Nilai() {
     if (error) {
       alert('Gagal mengimpor nilai: ' + error.message)
     } else {
-      alert(`Berhasil mengimpor ${baris.length} nilai ke tabel Nilai (jenis: ${jenisAkhir}, mapel: ${rec.mata_pelajaran}).`)
+      alert(`Berhasil mengimpor ${baris.length} nilai ke tabel Nilai (jenis: ${jenisAkhir}, mapel: ${mapelAkhir}).`)
       if (activeSubTab === 'kelola') loadKelolaData()
     }
   }
@@ -518,6 +610,18 @@ export default function Nilai() {
             </select>
           </div>
         )}
+        {activeSubTab === 'impor' && importSumber === 'ujian' && (
+          <div>
+            <label className="nilai-label">Mata Pelajaran</label>
+            <input
+              className="nilai-input"
+              value={mapelImporUjian}
+              onChange={(e) => setMapelImporUjian(e.target.value)}
+              placeholder={recordTerpilih ? 'Isi manual kalau kosong' : 'Pilih ujian dulu'}
+              disabled={!importSelectedId}
+            />
+          </div>
+        )}
         <div>
           <label className="nilai-label">Semester</label>
           <select className="nilai-input" value={semester} onChange={(e) => setSemester(e.target.value)}>
@@ -643,14 +747,23 @@ export default function Nilai() {
                 disabled={daftarImpor.length === 0}
               >
                 <option value="">
-                  {daftarImpor.length === 0 ? `Belum ada ${importSumber === 'ujian' ? 'ujian' : 'kuis'} untuk kelas ini` : '— pilih —'}
+                  {daftarImpor.length === 0
+                    ? `Belum ada hasil ${importSumber === 'ujian' ? 'Ujian Online' : 'Kuis Seru'} untuk siswa di kelas ini`
+                    : '— pilih —'}
                 </option>
-                {daftarImpor.map((r) => <option key={r.id} value={r.id}>{r.judul} ({r.mata_pelajaran})</option>)}
+                {daftarImpor.map((r) => (
+                  <option key={r.id} value={r.id}>
+                    {r.judul}{r.mata_pelajaran ? ` (${r.mata_pelajaran})` : ''}
+                  </option>
+                ))}
               </select>
             </div>
             <div className="text-sm nilai-muted self-end pb-2">
               Nilai akan disimpan sebagai jenis <b>{jenisImporTerpilih}</b> untuk <b>Semester {semester}</b>, tahun ajaran <b>{tahunAjaran}</b>
-              {recordTerpilih && <> · mapel <b>{recordTerpilih.mata_pelajaran}</b></>}.
+              {importSumber === 'ujian'
+                ? (mapelImporUjian && <> · mapel <b>{mapelImporUjian}</b></>)
+                : (recordTerpilih && <> · mapel <b>{recordTerpilih.mata_pelajaran}</b></>)}
+              .
             </div>
           </div>
 
