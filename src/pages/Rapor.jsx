@@ -210,10 +210,31 @@ function rentangTanggalPeriode(tahunAjaran, semester) {
   return { mulai: `${tahunAwal}-07-01`, selesai: `${tahunAwal}-12-31` }
 }
 
-// Rata-rata sederhana dari sebuah array nilai angka. null jika kosong.
-function rataRataArr(arr) {
-  if (!arr || arr.length === 0) return null
-  return (arr.reduce((a, b) => a + b, 0) / arr.length).toFixed(1)
+// Bobot komponen nilai untuk menghitung Nilai Akhir per mapel per kompetensi.
+// UH tidak diberi bobot (tidak ikut dihitung ke Nilai Akhir) — hanya
+// menambah data pendukung, sesuai keputusan: Nilai Akhir = gabungan
+// tertimbang dari Tugas, UTS, dan UAS saja.
+const BOBOT_JENIS_NILAI = { Tugas: 0.2, UTS: 0.3, UAS: 0.5 }
+
+// Menghitung Nilai Akhir tertimbang dari kumpulan nilai per jenis
+// (mis. { Tugas: [80,85], UTS: [78], UAS: [90] }). Kalau salah satu jenis
+// belum ada nilainya sama sekali, bobotnya TIDAK dianggap 0 — melainkan
+// ditiadakan dari perhitungan dan bobot yang tersisa dinormalisasi ulang,
+// supaya guru yang belum sempat input UAS misalnya tidak dirugikan nilai
+// akhirnya jadi kekecilan secara tidak adil. null kalau semua jenis kosong.
+function nilaiAkhirTertimbang(perJenis) {
+  let totalNilaiBerbobot = 0
+  let totalBobotTerpakai = 0
+  for (const [jenis, bobot] of Object.entries(BOBOT_JENIS_NILAI)) {
+    const arr = perJenis[jenis]
+    if (arr && arr.length > 0) {
+      const rataJenis = arr.reduce((a, b) => a + b, 0) / arr.length
+      totalNilaiBerbobot += rataJenis * bobot
+      totalBobotTerpakai += bobot
+    }
+  }
+  if (totalBobotTerpakai === 0) return null
+  return (totalNilaiBerbobot / totalBobotTerpakai).toFixed(1)
 }
 
 // Dropdown Tahun Ajaran otomatis: 2 tahun ke belakang s.d. 2 tahun ke depan
@@ -473,19 +494,29 @@ export default function Rapor() {
   // muatSiswaGuru di atas).
   const siswaTerfilter = kelasId ? siswaList.filter((s) => s.kelas_id === kelasId) : siswaList
 
-  // ---------- Ringkasan nilai — kini dipecah per kompetensi ----------
+  // ---------- Ringkasan nilai — kini dipecah per kompetensi & per jenis,
+  // lalu digabung jadi Nilai Akhir tertimbang (lihat BOBOT_JENIS_NILAI di
+  // atas). Ini otomatis mengambil field `jenis` yang sudah diisi dari
+  // halaman Nilai Siswa (input manual maupun impor dari Ujian Online/Kuis
+  // Seru), jadi tidak perlu input tambahan apa pun di halaman Rapor ini.
   const rekapPerMapelKompetensi = {}
   for (const n of nilai) {
     if (!rekapPerMapelKompetensi[n.mata_pelajaran]) {
-      rekapPerMapelKompetensi[n.mata_pelajaran] = { Pengetahuan: [], Keterampilan: [] }
+      rekapPerMapelKompetensi[n.mata_pelajaran] = {
+        Pengetahuan: { Tugas: [], UH: [], UTS: [], UAS: [] },
+        Keterampilan: { Tugas: [], UH: [], UTS: [], UAS: [] },
+      }
     }
     const kk = n.kompetensi === 'Keterampilan' ? 'Keterampilan' : 'Pengetahuan'
-    rekapPerMapelKompetensi[n.mata_pelajaran][kk].push(n.nilai)
+    // Jenis yang tidak dikenal (data lama/tidak standar) dianggap Tugas
+    // supaya tetap ikut terhitung, bukan hilang begitu saja dari rekap.
+    const jj = ['Tugas', 'UH', 'UTS', 'UAS'].includes(n.jenis) ? n.jenis : 'Tugas'
+    rekapPerMapelKompetensi[n.mata_pelajaran][kk][jj].push(n.nilai)
   }
   const barisMapel = Object.entries(rekapPerMapelKompetensi).map(([mapel, kel]) => ({
     mapel,
-    rataRataPengetahuan: rataRataArr(kel.Pengetahuan),
-    rataRataKeterampilan: rataRataArr(kel.Keterampilan),
+    rataRataPengetahuan: nilaiAkhirTertimbang(kel.Pengetahuan),
+    rataRataKeterampilan: nilaiAkhirTertimbang(kel.Keterampilan),
   }))
 
   // ---------- Deskripsi capaian (per kompetensi) ----------
@@ -964,24 +995,29 @@ export default function Rapor() {
             {activeTab === 'ringkasan' && (
               <>
                 {barisMapel.length > 0 ? (
-                  <table className="table-shell mb-6">
-                    <thead>
-                      <tr>
-                        <th>Mata Pelajaran</th>
-                        <th>Nilai Pengetahuan</th>
-                        <th>Nilai Keterampilan</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {barisMapel.map((b) => (
-                        <tr key={b.mapel}>
-                          <td className="font-medium">{b.mapel}</td>
-                          <td>{b.rataRataPengetahuan ?? '-'}</td>
-                          <td>{b.rataRataKeterampilan ?? '-'}</td>
+                  <>
+                    <table className="table-shell mb-2">
+                      <thead>
+                        <tr>
+                          <th>Mata Pelajaran</th>
+                          <th>Nilai Akhir Pengetahuan</th>
+                          <th>Nilai Akhir Keterampilan</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody>
+                        {barisMapel.map((b) => (
+                          <tr key={b.mapel}>
+                            <td className="font-medium">{b.mapel}</td>
+                            <td>{b.rataRataPengetahuan ?? '-'}</td>
+                            <td>{b.rataRataKeterampilan ?? '-'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                    <p className="text-xs text-ink-700/40 mb-6">
+                      Nilai Akhir = Tugas 20% + UTS 30% + UAS 50% (UH tidak ikut dihitung). Kalau salah satu komponen belum diisi, bobot sisanya otomatis dinormalisasi.
+                    </p>
+                  </>
                 ) : (
                   <p className="text-sm text-ink-700/50 mb-6">Belum ada data nilai untuk periode ini.</p>
                 )}
@@ -1057,7 +1093,7 @@ export default function Rapor() {
                                 <label className="text-xs font-semibold text-ink-700/70">
                                   {komp.label}
                                   {rataRata !== undefined && rataRata !== null && (
-                                    <span className="text-ink-700/40 font-normal"> · rata-rata {rataRata}</span>
+                                    <span className="text-ink-700/40 font-normal"> · Nilai Akhir {rataRata}</span>
                                   )}
                                 </label>
                                 <div className="flex items-center gap-2">
