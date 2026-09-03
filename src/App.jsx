@@ -36,6 +36,7 @@ import Nota from './pages/Nota'
 import KuitansiJasa from './pages/KuitansiJasa'
 import Backup from './pages/Backup'
 import ProfilSekolah from './pages/ProfilSekolah'
+import ManajemenSekolah from './pages/ManajemenSekolah'
 import PPDBPublik from './pages/PPDBPublik'
 import PPDBAdmin from './pages/PPDBAdmin'
 import Perpustakaan from './pages/Perpustakaan'
@@ -189,6 +190,7 @@ export default function App() {
       <Route path="/kuitansi-jasa" element={<ProtectedRoute adminOnly><KuitansiJasa /></ProtectedRoute>} />
       <Route path="/backup" element={<ProtectedRoute adminOnly><Backup /></ProtectedRoute>} />
       <Route path="/profil-sekolah" element={<ProtectedRoute adminUtamaOnly><ProfilSekolah /></ProtectedRoute>} />
+      <Route path="/manajemen-sekolah" element={<ProtectedRoute adminUtamaOnly><ManajemenSekolah /></ProtectedRoute>} />
       <Route path="/ppdb-admin" element={<ProtectedRoute adminOnly><PPDBAdmin /></ProtectedRoute>} />
       <Route path="/perpustakaan" element={<ProtectedRoute><Perpustakaan /></ProtectedRoute>} />
       <Route path="/pengumuman" element={<ProtectedRoute><Pengumuman /></ProtectedRoute>} />
