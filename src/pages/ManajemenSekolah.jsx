@@ -281,10 +281,11 @@ export default function ManajemenSekolah() {
     // Tabel profil_sekolah (data profil/alamat sekolah, dipakai di kop surat)
     // punya foreign key ke sekolah.id — harus dihapus dulu sebelum sekolahnya
     // sendiri bisa dihapus, kalau tidak akan gagal karena FK constraint.
-    const { error: profilSekolahError } = await supabase
+    const { data: profilSekolahDihapus, error: profilSekolahError } = await supabase
       .from('profil_sekolah')
       .delete()
       .eq('sekolah_id', deleteTarget.id)
+      .select('id')
 
     if (profilSekolahError) {
       alert(
@@ -293,6 +294,29 @@ export default function ManajemenSekolah() {
       )
       setDeleting(false)
       return
+    }
+
+    // Sama seperti tabel sekolah: kalau RLS memblokir DELETE di sini, tidak
+    // akan ada error — tapi baris yang kembali (data) akan kosong padahal
+    // baris profil_sekolah untuk sekolah ini masih ada di database.
+    if (!profilSekolahDihapus || profilSekolahDihapus.length === 0) {
+      const { count: masihAda } = await supabase
+        .from('profil_sekolah')
+        .select('id', { count: 'exact', head: true })
+        .eq('sekolah_id', deleteTarget.id)
+
+      if (masihAda > 0) {
+        alert(
+          'Data profil sekolah (tabel "profil_sekolah") tidak berhasil ' +
+            'dihapus — kemungkinan besar RLS policy tabel "profil_sekolah" ' +
+            'di Supabase belum mengizinkan aksi DELETE untuk akun Anda.\n\n' +
+            'Silakan tambahkan policy DELETE untuk tabel "profil_sekolah" ' +
+            'di dashboard Supabase (Authentication > Policies), lalu coba ' +
+            'hapus lagi.'
+        )
+        setDeleting(false)
+        return
+      }
     }
 
     const { data, error } = await supabase
