@@ -47,10 +47,35 @@ export default function PersetujuanAkun() {
       query = query.or(
         'jabatan.in.(admin,kepala_sekolah),and(jabatan.is.null,role.in.(admin,kepala_sekolah,admin_utama))'
       )
+    } else if (filterJabatan === 'orang_tua') {
+      query = query.eq('jabatan', 'orang_tua')
     }
 
     const { data } = await query
-    setDaftarAkun(data || [])
+    let akunList = data || []
+
+    // Ambil data anak untuk setiap akun orang tua. Tidak bisa di-embed
+    // langsung lewat FK karena profil.id dan orang_tua_siswa.orang_tua_id
+    // sama-sama mengacu ke auth.users, bukan saling berelasi satu sama
+    // lain — jadi diambil terpisah lalu digabung di sisi klien.
+    const idOrangTua = akunList
+      .filter((a) => (a.jabatan || a.role) === 'orang_tua')
+      .map((a) => a.id)
+
+    if (idOrangTua.length > 0) {
+      const { data: relasi } = await supabase
+        .from('orang_tua_siswa')
+        .select('id, orang_tua_id, siswa_id, hubungan, status, siswa:siswa_id(nama_lengkap, nis)')
+        .in('orang_tua_id', idOrangTua)
+
+      akunList = akunList.map((a) =>
+        (a.jabatan || a.role) === 'orang_tua'
+          ? { ...a, relasiAnak: (relasi || []).filter((r) => r.orang_tua_id === a.id) }
+          : a
+      )
+    }
+
+    setDaftarAkun(akunList)
     setLoading(false)
   }
 
@@ -64,6 +89,17 @@ export default function PersetujuanAkun() {
     const payload = { status_akun: statusBaru, catatan_admin: catatan || null }
     if (guruId) payload.guru_id = guruId
     await supabase.from('profil').update(payload).eq('id', id)
+
+    // Kalau akun ini orang tua/wali, ikut sinkronkan status hubungan
+    // dengan anaknya di tabel orang_tua_siswa supaya tidak "nyangkut"
+    // di status menunggu walau akunnya sudah disetujui/ditolak.
+    const akun = daftarAkun.find((a) => a.id === id)
+    if ((akun?.jabatan || akun?.role) === 'orang_tua') {
+      const statusRelasi =
+        statusBaru === 'aktif' ? 'aktif' : statusBaru === 'ditolak' ? 'ditolak' : 'menunggu'
+      await supabase.from('orang_tua_siswa').update({ status: statusRelasi }).eq('orang_tua_id', id)
+    }
+
     setProsesId(null)
     setModalGuru(null)
     muatData()
@@ -136,6 +172,11 @@ export default function PersetujuanAkun() {
       .from('profil')
       .update({ status_akun: 'menunggu', catatan_admin: null, guru_id: null })
       .eq('id', akun.id)
+
+    if (!error && (akun.jabatan || akun.role) === 'orang_tua') {
+      await supabase.from('orang_tua_siswa').update({ status: 'menunggu' }).eq('orang_tua_id', akun.id)
+    }
+
     setProsesId(null)
     if (error) {
       window.alert('Gagal mereset status akun: ' + error.message)
@@ -220,7 +261,7 @@ export default function PersetujuanAkun() {
         </button>
       </div>
 
-      <div className="flex gap-2 mb-4">
+      <div className="flex gap-2 mb-4 flex-wrap">
         <button
           onClick={() => setFilterJabatan('semua')}
           className={`text-xs font-medium px-3 py-1.5 rounded-full transition-colors ${
@@ -244,6 +285,14 @@ export default function PersetujuanAkun() {
           }`}
         >
           Guru
+        </button>
+        <button
+          onClick={() => setFilterJabatan('orang_tua')}
+          className={`text-xs font-medium px-3 py-1.5 rounded-full transition-colors ${
+            filterJabatan === 'orang_tua' ? 'bg-emerald-600 text-white' : 'bg-emerald-50 text-emerald-600'
+          }`}
+        >
+          Orang Tua/Wali
         </button>
       </div>
 
@@ -271,7 +320,24 @@ export default function PersetujuanAkun() {
             <tbody className="divide-y divide-slate-100">
               {daftarAkun.map((akun) => (
                 <tr key={akun.id}>
-                  <td className="px-4 py-3 text-slate-700">{akun.nama_lengkap_pendaftar || '—'}</td>
+                  <td className="px-4 py-3 text-slate-700">
+                    {akun.nama_lengkap_pendaftar || '—'}
+                    {(akun.jabatan || akun.role) === 'orang_tua' && akun.relasiAnak?.length > 0 && (
+                      <p className="text-[11px] text-slate-400 mt-0.5">
+                        Anak:{' '}
+                        {akun.relasiAnak
+                          .map((r) => r.siswa?.nama_lengkap)
+                          .filter(Boolean)
+                          .join(', ')}
+                        {akun.relasiAnak[0]?.hubungan ? ` (${akun.relasiAnak[0].hubungan})` : ''}
+                      </p>
+                    )}
+                    {(akun.jabatan || akun.role) === 'orang_tua' && akun.relasiAnak?.length === 0 && (
+                      <p className="text-[11px] text-red-400 mt-0.5">
+                        Belum ada data anak terhubung
+                      </p>
+                    )}
+                  </td>
                   <td className="px-4 py-3 text-slate-500">{akun.email_pendaftar || '—'}</td>
                   <td className="px-4 py-3">
                     <JabatanBadge jabatan={akun.jabatan} role={akun.role} />
@@ -582,6 +648,7 @@ function ModalEditAkun({ akun, onClose, onSimpan }) {
               <option value="admin">Admin</option>
               <option value="kepala_sekolah">Kepala Sekolah</option>
               <option value="admin_utama">Admin Utama</option>
+              <option value="orang_tua">Orang Tua/Wali</option>
             </select>
           </div>
         </div>
@@ -619,6 +686,7 @@ function JabatanBadge({ jabatan, role }) {
     admin: { label: 'Admin', cls: 'bg-purple-50 text-purple-600' },
     kepala_sekolah: { label: 'Kepala Sekolah', cls: 'bg-indigo-50 text-indigo-600' },
     admin_utama: { label: 'Admin Utama', cls: 'bg-indigo-50 text-indigo-600' },
+    orang_tua: { label: 'Orang Tua/Wali', cls: 'bg-emerald-50 text-emerald-600' },
     superadmin: { label: 'Superadmin', cls: 'bg-slate-800 text-white' },
   }
   const key = jabatan || role
