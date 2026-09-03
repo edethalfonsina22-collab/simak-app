@@ -16,9 +16,14 @@ function buatKodeUjian() {
 
 export default function BuatUjian() {
   const { session } = useAuth();
-  const guruId = session?.user?.id;
+  const guruId = session?.user?.id; // auth.uid() — HANYA dipakai untuk query profil, JANGAN disimpan sebagai guru_id di tabel lain
 
   const [daftarKelas, setDaftarKelas] = useState([]); // [{id, nama_kelas}]
+  // guru.id sesungguhnya (dari profil.guru_id) — inilah yang dipakai di kolom
+  // guru_id tabel lain (kelas.wali_kelas_id, nilai.diisi_oleh, dan sekarang ujian.guru_id
+  // juga). Diambil sekali di ambilKelas() lalu disimpan di state supaya bisa
+  // dipakai ulang saat simpanUjian(), tanpa query tambahan.
+  const [guruIdAsli, setGuruIdAsli] = useState(null);
   const [judul, setJudul] = useState('');
   const [mapel, setMapel] = useState('');
   const [kelasId, setKelasId] = useState('');
@@ -50,6 +55,7 @@ export default function BuatUjian() {
     async function ambilKelas() {
       if (!guruId) {
         setDaftarKelas([]);
+        setGuruIdAsli(null);
         return;
       }
 
@@ -61,8 +67,12 @@ export default function BuatUjian() {
 
       if (profilError || !profilData?.guru_id) {
         setDaftarKelas([]);
+        setGuruIdAsli(null);
         return;
       }
+
+      // Simpan guru.id sesungguhnya supaya bisa dipakai lagi saat simpanUjian()
+      setGuruIdAsli(profilData.guru_id);
 
       const { data, error } = await supabase
         .from('kelas')
@@ -213,6 +223,13 @@ export default function BuatUjian() {
       setPesanError('Upload file Excel soal dulu.');
       return;
     }
+    // Guard baru: tanpa guru.id yang valid, ujian akan tersimpan dengan
+    // guru_id yang salah (atau kosong) dan tidak akan muncul di daftar
+    // "Impor dari Ujian Online" milik guru ybs di halaman Nilai.
+    if (!guruIdAsli) {
+      setPesanError('Data guru untuk akun ini belum ditemukan (profil belum terhubung ke tabel guru). Hubungi admin.');
+      return;
+    }
 
     setStatus('menyimpan');
     setPesanError('');
@@ -226,7 +243,12 @@ export default function BuatUjian() {
         mata_pelajaran: mapel,
         kelas_id: kelasId,
         kode_ujian: kodeUjian,
-        guru_id: guruId,
+        // Sebelumnya di sini dipakai `guruId` (session.user.id / auth.uid()),
+        // padahal Nilai.jsx memfilter daftar ujian guru lewat `profil.guru_id`
+        // (guru.id). Akibatnya ujian yang baru dibuat guru tidak pernah
+        // muncul di dropdown impor nilai miliknya sendiri. Sekarang dipakai
+        // guruIdAsli (guru.id dari profil) supaya konsisten dengan Nilai.jsx.
+        guru_id: guruIdAsli,
         status: 'draft',
       })
       .select()
