@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabaseClient'
 import Layout from '../components/Layout'
+import { useAuth } from '../context/AuthContext'
 import BulkImportModal from '../components/BulkImportModal'
 import TeleponLink from '../components/TeleponLink'
 import { Plus, UploadCloud, Pencil, Trash2, Search, X, Loader2, GraduationCap, CalendarDays } from 'lucide-react'
@@ -111,6 +112,7 @@ function teks(v) {
 }
 
 export default function Guru() {
+  const { sekolahId } = useAuth()
   const [data, setData] = useState([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -126,14 +128,33 @@ export default function Guru() {
   const [loadingLibur, setLoadingLibur] = useState(true)
 
   async function loadData() {
+    if (!sekolahId) {
+      setData([])
+      setLoading(false)
+      setProfilLihat(null)
+      return
+    }
+
     setLoading(true)
-    const { data: guru } = await supabase.from('guru').select('*').order('nama_lengkap')
+    const { data: guru, error } = await supabase
+      .from('guru')
+      .select('*')
+      .eq('sekolah_id', sekolahId)
+      .order('nama_lengkap')
+
+    if (error) {
+      console.error('Gagal memuat data guru:', error)
+      alert('Gagal memuat data guru: ' + error.message)
+    }
+
     setData(guru || [])
     setLoading(false)
+
     // Jaga agar modal profil tetap sinkron kalau datanya baru saja diubah
     if (profilLihat) {
       const updated = (guru || []).find((g) => g.id === profilLihat.id)
       if (updated) setProfilLihat(updated)
+      else setProfilLihat(null)
     }
   }
 
@@ -153,7 +174,7 @@ export default function Guru() {
   useEffect(() => {
     loadData()
     loadLiburMendatang()
-  }, [])
+  }, [sekolahId])
 
   // Foto profil guru — memakai bucket & kolom yang sama persis dengan Profil Saya
   function fotoUrl(path) {
@@ -175,9 +196,17 @@ export default function Guru() {
 
   async function handleSubmit(e) {
     e.preventDefault()
+
+    if (!sekolahId) {
+      alert('Belum ada sekolah aktif. Pilih sekolah terlebih dahulu.')
+      return
+    }
+
     setSaving(true)
+
     const payload = {
       ...form,
+      sekolah_id: sekolahId,
       tanggal_lahir: form.tanggal_lahir || null,
       tanggal_cpns: form.tanggal_cpns || null,
       tmt_pengangkatan: form.tmt_pengangkatan || null,
@@ -185,17 +214,35 @@ export default function Guru() {
       lintang: form.lintang === '' ? null : Number(form.lintang),
       bujur: form.bujur === '' ? null : Number(form.bujur),
     }
+
     const { error } = editingId
-      ? await supabase.from('guru').update(payload).eq('id', editingId)
+      ? await supabase.from('guru').update(payload).eq('id', editingId).eq('sekolah_id', sekolahId)
       : await supabase.from('guru').insert(payload)
+
     setSaving(false)
-    if (!error) { setShowForm(false); loadData() }
-    else alert('Gagal menyimpan: ' + error.message)
+
+    if (!error) {
+      setShowForm(false)
+      loadData()
+    } else {
+      alert('Gagal menyimpan: ' + error.message)
+    }
   }
 
   async function handleDelete(id) {
+    if (!sekolahId) {
+      alert('Belum ada sekolah aktif. Pilih sekolah terlebih dahulu.')
+      return
+    }
+
     if (!confirm('Hapus data guru ini?')) return
-    const { error } = await supabase.from('guru').delete().eq('id', id)
+
+    const { error } = await supabase
+      .from('guru')
+      .delete()
+      .eq('id', id)
+      .eq('sekolah_id', sekolahId)
+
     if (!error) loadData()
     else alert('Gagal menghapus: ' + error.message)
   }
@@ -210,10 +257,10 @@ export default function Guru() {
       subtitle={`${data.length} guru & staf terdaftar`}
       actions={
         <>
-          <button className="btn-secondary" onClick={() => setShowImport(true)}>
+          <button className="btn-secondary" onClick={() => setShowImport(true)} disabled={!sekolahId}>
             <UploadCloud size={16} /> Impor Massal
           </button>
-          <button className="btn-primary" onClick={openAdd}>
+          <button className="btn-primary" onClick={openAdd} disabled={!sekolahId}>
             <Plus size={16} /> Tambah Guru
           </button>
         </>
@@ -267,7 +314,16 @@ export default function Guru() {
         )}
       </div>
 
-      <div className="card overflow-x-auto">
+      {!sekolahId && (
+        <div className="card p-6 mb-4">
+          <p className="font-display font-semibold text-ink-950">Belum ada sekolah aktif</p>
+          <p className="text-sm text-ink-700/60 mt-1">
+            Pilih sekolah terlebih dahulu agar data guru yang ditampilkan sesuai sekolah.
+          </p>
+        </div>
+      )}
+
+      {sekolahId && <div className="card overflow-x-auto">
         <table className="table-shell">
           <thead>
             <tr className="border-b-2 border-blue-600/20">
@@ -322,9 +378,9 @@ export default function Guru() {
             ))}
           </tbody>
         </table>
-      </div>
+      </div>}
 
-      {showForm && (
+      {showForm && sekolahId && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink-950/50 backdrop-blur-sm p-4">
           <form onSubmit={handleSubmit} className="card relative overflow-hidden w-full max-w-2xl p-6 max-h-[90vh] overflow-y-auto">
             <span className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-600 to-red-900" />
@@ -616,9 +672,16 @@ export default function Guru() {
           }
         }}
         onImport={async (rows) => {
-          const { error } = await supabase.from('guru').insert(rows)
+          if (!sekolahId) throw new Error('Belum ada sekolah aktif. Pilih sekolah terlebih dahulu.')
+
+          const rowsWithSchool = rows.map((row) => ({
+            ...row,
+            sekolah_id: sekolahId,
+          }))
+
+          const { error } = await supabase.from('guru').insert(rowsWithSchool)
           if (error) throw error
-          return { count: rows.length }
+          return { count: rowsWithSchool.length }
         }}
       />
     </Layout>
