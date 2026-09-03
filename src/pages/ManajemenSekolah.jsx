@@ -269,9 +269,7 @@ export default function ManajemenSekolah() {
   }
 
   const konfirmasiCocok =
-    deleteTarget &&
-    confirmText.trim().toLowerCase() ===
-      (deleteTarget.nama_sekolah || '').trim().toLowerCase()
+    !!deleteTarget && confirmText.trim().toUpperCase() === 'HAPUS'
 
   async function handleDelete() {
     if (!deleteTarget || !konfirmasiCocok) return
@@ -789,19 +787,22 @@ export default function ManajemenSekolah() {
 
               <div className="border-t border-slate-100 pt-4">
                 <label className="mb-1.5 block text-sm font-semibold text-slate-700">
-                  Ketik ulang nama sekolah untuk konfirmasi
+                  Ketik <span className="font-mono">HAPUS</span> untuk konfirmasi
                 </label>
 
                 <input
                   type="text"
                   value={confirmText}
                   onChange={(e) => setConfirmText(e.target.value)}
-                  placeholder={deleteTarget.nama_sekolah}
+                  placeholder="HAPUS"
                   className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm outline-none transition focus:border-red-400 focus:ring-2 focus:ring-red-100"
                 />
 
                 <p className="mt-1.5 text-xs text-slate-400">
-                  Ketik: <span className="font-semibold">{deleteTarget.nama_sekolah}</span>
+                  Anda akan menghapus sekolah{' '}
+                  <span className="font-semibold">{deleteTarget.nama_sekolah}</span>.
+                  Ketik <span className="font-mono font-semibold">HAPUS</span> di
+                  atas untuk mengaktifkan tombol.
                 </p>
               </div>
             </div>
