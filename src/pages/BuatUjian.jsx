@@ -36,17 +36,49 @@ export default function BuatUjian() {
   const [mapelBankFilter, setMapelBankFilter] = useState('');
   const [idTerpilih, setIdTerpilih] = useState(new Set()); // id soal bank_soal yang dicentang
 
-  // Ambil daftar kelas dari tabel "kelas" yang sudah ada di SIMAK
+  // Ambil daftar kelas milik guru yang sedang login SAJA.
+  // PENTING: kelas.wali_kelas_id menunjuk ke guru.id, BUKAN langsung ke
+  // auth.users.id (guruId/session.user.id di atas). Jembatannya adalah
+  // tabel `profil`:
+  //   profil.id      = auth.uid()  (user yang login, sama dengan guruId)
+  //   profil.guru_id = guru.id     (dipakai di kelas.wali_kelas_id)
+  // Jadi ambil guru_id dari profil dulu, baru filter kelas dengan itu.
+  // RLS di tabel `ujian` juga sudah membatasi hal ini di level server,
+  // tapi dropdown di sini tetap difilter eksplisit supaya guru tidak
+  // salah pilih kelas yang bukan miliknya sejak awal.
   useEffect(() => {
     async function ambilKelas() {
-      const { data, error } = await supabase.from('kelas').select('id, nama_kelas');
+      if (!guruId) {
+        setDaftarKelas([]);
+        return;
+      }
+
+      const { data: profilData, error: profilError } = await supabase
+        .from('profil')
+        .select('guru_id')
+        .eq('id', guruId)
+        .maybeSingle();
+
+      if (profilError || !profilData?.guru_id) {
+        setDaftarKelas([]);
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from('kelas')
+        .select('id, nama_kelas')
+        .eq('wali_kelas_id', profilData.guru_id)
+        .order('nama_kelas');
+
       if (!error && data) {
         setDaftarKelas(data);
         if (data.length > 0) setKelasId(data[0].id);
+      } else {
+        setDaftarKelas([]);
       }
     }
     ambilKelas();
-  }, []);
+  }, [guruId]);
 
   // Ambil semua soal dari Bank Soal saat tab "Pilih dari Bank Soal" pertama kali dibuka
   useEffect(() => {
@@ -333,7 +365,7 @@ export default function BuatUjian() {
             onChange={(e) => setKelasId(e.target.value)}
             className="w-full rounded-lg px-3 py-2 border border-[#6b0f1a]/15 focus:border-[#6b0f1a] focus:ring-2 focus:ring-[#6b0f1a]/20 outline-none transition-colors"
           >
-            {daftarKelas.length === 0 && <option value="">Belum ada data kelas</option>}
+            {daftarKelas.length === 0 && <option value="">Anda belum menjadi wali kelas manapun</option>}
             {daftarKelas.map((k) => (
               <option key={k.id} value={k.id}>
                 Kelas {k.nama_kelas}
