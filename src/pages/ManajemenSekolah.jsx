@@ -47,6 +47,7 @@ export default function ManajemenSekolah() {
   const [daftarGuru, setDaftarGuru] = useState([])
   const [jumlahSiswa, setJumlahSiswa] = useState(0)
   const [gagalMuatIsi, setGagalMuatIsi] = useState(false)
+  const [pesanErrorIsi, setPesanErrorIsi] = useState('')
   const [confirmText, setConfirmText] = useState('')
   const [deleting, setDeleting] = useState(false)
 
@@ -224,13 +225,14 @@ export default function ManajemenSekolah() {
     setDaftarGuru([])
     setJumlahSiswa(0)
     setGagalMuatIsi(false)
+    setPesanErrorIsi('')
     setLoadingIsi(true)
 
     try {
-      // Daftar guru/admin yang terdaftar di sekolah ini (tabel profil).
+      // Daftar guru/staf yang terdaftar di sekolah ini (tabel guru).
       const { data: guruData, error: guruError } = await supabase
-        .from('profil')
-        .select('id, nama_lengkap, jabatan, role')
+        .from('guru')
+        .select('id, nama_lengkap, mata_pelajaran, status')
         .eq('sekolah_id', sekolah.id)
         .order('nama_lengkap')
 
@@ -251,6 +253,7 @@ export default function ManajemenSekolah() {
       // Kalau gagal memuat (mis. nama tabel/kolom beda), tetap tampilkan modal
       // tapi beri peringatan supaya tidak menghapus secara membabi buta.
       setGagalMuatIsi(true)
+      setPesanErrorIsi(err?.message || 'Terjadi kesalahan yang tidak diketahui.')
     } finally {
       setLoadingIsi(false)
     }
@@ -651,6 +654,11 @@ export default function ManajemenSekolah() {
                   Tidak bisa memuat daftar guru/siswa sekolah ini secara
                   otomatis. Pastikan Anda sudah benar-benar yakin dengan nama
                   sekolah di atas sebelum melanjutkan.
+                  {pesanErrorIsi && (
+                    <p className="mt-2 rounded-lg bg-amber-100/70 px-2 py-1.5 font-mono text-[11px] text-amber-800">
+                      Detail teknis: {pesanErrorIsi}
+                    </p>
+                  )}
                 </div>
               ) : (
                 <>
@@ -669,21 +677,35 @@ export default function ManajemenSekolah() {
                   {daftarGuru.length > 0 ? (
                     <div className="rounded-xl border border-slate-200">
                       <p className="border-b border-slate-100 px-3.5 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                        Daftar Guru / Staf di Sekolah Ini
+                        Daftar Guru / Staf di Sekolah Ini ({daftarGuru.length})
                       </p>
 
                       <ul className="max-h-48 divide-y divide-slate-100 overflow-y-auto">
                         {daftarGuru.map((g) => (
                           <li
                             key={g.id}
-                            className="px-3.5 py-2 text-sm text-slate-700"
+                            className="flex items-center justify-between gap-3 px-3.5 py-2 text-sm text-slate-700"
                           >
-                            <span className="font-medium">
-                              {g.nama_lengkap || 'Tanpa nama'}
+                            <span className="min-w-0">
+                              <span className="font-medium">
+                                {g.nama_lengkap || 'Tanpa nama'}
+                              </span>
+                              {g.mata_pelajaran && (
+                                <span className="ml-2 text-xs text-slate-400">
+                                  ({g.mata_pelajaran})
+                                </span>
+                              )}
                             </span>
-                            {g.jabatan && (
-                              <span className="ml-2 text-xs text-slate-400">
-                                ({g.jabatan})
+
+                            {g.status && (
+                              <span
+                                className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                                  g.status === 'aktif'
+                                    ? 'bg-emerald-100 text-emerald-700'
+                                    : 'bg-slate-100 text-slate-500'
+                                }`}
+                              >
+                                {g.status}
                               </span>
                             )}
                           </li>
