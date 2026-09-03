@@ -273,15 +273,18 @@ export default function Rapor() {
   const [kdBaru, setKdBaru] = useState({ kode: '', teks: '' })
 
   // Kelas: guru hanya melihat kelas miliknya sendiri (wali_kelas_id), tapi
-  // admin/kepala sekolah harus tetap bisa melihat & kelola SEMUA kelas
-  // seperti sebelumnya. PENTING: kelas.wali_kelas_id menunjuk ke guru.id,
-  // BUKAN langsung ke auth.users.id. Jembatannya adalah tabel `profil`:
+  // admin/kepala sekolah/superadmin harus tetap bisa melihat & kelola SEMUA
+  // kelas seperti sebelumnya. PENTING: kelas.wali_kelas_id menunjuk ke
+  // guru.id, BUKAN langsung ke auth.users.id. Jembatannya adalah tabel
+  // `profil`:
   //   profil.id      = auth.uid()  (user yang login)
-  //   profil.role    = 'admin' | 'guru'
+  //   profil.role    = 'guru' | 'admin' | 'superadmin' | dll
   //   profil.guru_id = guru.id     (dipakai di kelas.wali_kelas_id, hanya
   //                                 relevan untuk role guru)
-  // Jadi kita cek role dulu: admin -> ambil semua kelas tanpa filter;
-  // guru -> filter kelas dengan wali_kelas_id = guru_id miliknya.
+  // Nilai role non-guru bisa bermacam-macam ('admin', 'superadmin', dst),
+  // jadi supaya tidak salah tebak: hanya role 'guru' yang dibatasi ke kelas
+  // walinya sendiri — role apa pun selain 'guru' dianggap admin dan dapat
+  // akses semua kelas.
   // RLS di database juga sudah membatasi ini di level server dengan logika
   // yang sama, tapi query di sini tetap eksplisit difilter supaya UI
   // konsisten dan tidak sempat memuat data yang tidak relevan.
@@ -307,9 +310,9 @@ export default function Rapor() {
         return
       }
 
-      // Admin/kepala sekolah: lihat & kelola SEMUA kelas, tidak difilter
-      // berdasarkan wali kelas.
-      if (profilData?.role === 'admin') {
+      // Admin/kepala sekolah/superadmin: lihat & kelola SEMUA kelas, tidak
+      // difilter berdasarkan wali kelas. Hanya role 'guru' yang dibatasi.
+      if (profilData?.role !== 'guru') {
         const { data, error } = await supabase
           .from('kelas')
           .select('id, nama_kelas')
