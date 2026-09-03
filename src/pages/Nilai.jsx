@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../lib/AuthContext'
 import Layout from '../components/Layout'
-import { Loader2, Save, BookOpenCheck, Trash2, ListChecks } from 'lucide-react'
+import { Loader2, Save, BookOpenCheck, Trash2, ListChecks, Download, AlertTriangle, CheckCircle2 } from 'lucide-react'
 import './Nilai.css'
 
 const JENIS_OPTS = ['Tugas', 'UH', 'UTS', 'UAS']
@@ -79,7 +79,7 @@ function CircuitBackdrop({ patternId }) {
 
 export default function Nilai() {
   const { profil, isAdmin } = useAuth()
-  const [activeSubTab, setActiveSubTab] = useState('input') // 'input' | 'kelola'
+  const [activeSubTab, setActiveSubTab] = useState('input') // 'input' | 'kelola' | 'impor'
   const [kelasList, setKelasList] = useState([])
   const [kelasId, setKelasId] = useState('')
   const [siswaList, setSiswaList] = useState([])
@@ -99,6 +99,16 @@ export default function Nilai() {
   const [kelolaData, setKelolaData] = useState([])
   const [kelolaLoading, setKelolaLoading] = useState(false)
   const [kelolaFilterMapel, setKelolaFilterMapel] = useState('')
+
+  // --- state untuk tab "Impor Otomatis" (baca nilai dari Ujian Online & Kuis Seru) ---
+  const [importSumber, setImportSumber] = useState('ujian') // 'ujian' | 'kuis'
+  const [daftarImpor, setDaftarImpor] = useState([]) // daftar ujian/kuis yang bisa dipilih
+  const [importSelectedId, setImportSelectedId] = useState('')
+  const [importKompetensi, setImportKompetensi] = useState('Pengetahuan')
+  const [importJenisKuis, setImportJenisKuis] = useState('Tugas') // jenis untuk Kuis Seru (Ujian Online selalu UTS)
+  const [importPreview, setImportPreview] = useState([])
+  const [importLoading, setImportLoading] = useState(false)
+  const [importSaving, setImportSaving] = useState(false)
 
   // Admin: semua kelas. Guru: cuma kelas yang dia jadi wali kelasnya.
   // (Keamanannya tetap ditegakkan oleh RLS tabel kelas — filter ini
@@ -161,7 +171,7 @@ export default function Nilai() {
 
   async function loadSiswa() {
     setLoading(true)
-    const { data } = await supabase.from('siswa').select('id, nama_lengkap').eq('kelas_id', kelasId).eq('status', 'aktif').order('nama_lengkap')
+    const { data } = await supabase.from('siswa').select('id, nama_lengkap, nis').eq('kelas_id', kelasId).eq('status', 'aktif').order('nama_lengkap')
     setSiswaList(data || [])
     setLoading(false)
   }
@@ -249,6 +259,127 @@ export default function Nilai() {
 
   const kelasAktif = kelasList.find((k) => k.id === kelasId)
 
+  // --- fungsi untuk tab "Impor Otomatis" ---
+
+  // Muat ulang daftar ujian/kuis begitu kelas atau sumber (Ujian Online/Kuis Seru) berganti.
+  useEffect(() => {
+    if (activeSubTab !== 'impor' || !kelasId) return
+    setImportSelectedId('')
+    setImportPreview([])
+    if (importSumber === 'ujian') loadDaftarUjian()
+    else loadDaftarKuis()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeSubTab, importSumber, kelasId, kelasAktif?.nama_kelas])
+
+  async function loadDaftarUjian() {
+    setImportLoading(true)
+    let q = supabase.from('ujian').select('id, judul, mata_pelajaran, created_at').eq('kelas_id', kelasId).order('created_at', { ascending: false })
+    if (!isAdmin) q = q.eq('guru_id', profil?.guru_id || null)
+    const { data } = await q
+    setDaftarImpor(data || [])
+    setImportLoading(false)
+  }
+
+  // Kuis Seru cuma menyimpan nama kelas sebagai teks (bukan kelas_id), dan
+  // bisa ada beberapa kelas dengan nama sama (mis. beberapa kelas "1").
+  // Supaya tidak salah sasaran, kita cocokkan berdasarkan nama kelas
+  // SEKALIGUS guru pembuat kuisnya (asumsi: guru cuma bikin kuis untuk
+  // kelas yang dia ajar/wali-i sendiri).
+  async function loadDaftarKuis() {
+    if (!kelasAktif) { setDaftarImpor([]); return }
+    setImportLoading(true)
+    let q = supabase.from('kuis_seru').select('id, judul, mata_pelajaran, kelas, guru_id, dibuat_pada')
+      .eq('kelas', kelasAktif.nama_kelas).order('dibuat_pada', { ascending: false })
+    if (!isAdmin) q = q.eq('guru_id', profil?.guru_id || null)
+    const { data } = await q
+    setDaftarImpor(data || [])
+    setImportLoading(false)
+  }
+
+  async function pilihImporRecord(id) {
+    setImportSelectedId(id)
+    setImportPreview([])
+    if (!id) return
+    setImportLoading(true)
+    if (importSumber === 'ujian') await muatPreviewUjian(id)
+    else await muatPreviewKuis(id)
+    setImportLoading(false)
+  }
+
+  async function muatPreviewUjian(ujianId) {
+    const { data } = await supabase.from('hasil_ujian').select('id, nis_siswa, nama_siswa, skor').eq('ujian_id', ujianId)
+    const rows = (data || []).map((h) => {
+      const siswa = siswaList.find((s) => (s.nis || '').trim() === (h.nis_siswa || '').trim())
+      return {
+        key: h.id,
+        namaAsal: h.nama_siswa,
+        skor: h.skor,
+        siswaId: siswa?.id || '',
+        status: siswa ? 'cocok' : 'tidak_cocok', // tidak_cocok: NIS tidak ditemukan di kelas aktif ini
+        termasuk: !!siswa,
+      }
+    })
+    setImportPreview(rows)
+  }
+
+  async function muatPreviewKuis(kuisId) {
+    const { data } = await supabase.from('hasil_kuis_seru').select('id, nama_siswa, jumlah_benar, jumlah_soal').eq('kuis_id', kuisId)
+    const rows = (data || []).map((h) => {
+      const namaBersih = (h.nama_siswa || '').trim().toLowerCase()
+      const cocok = siswaList.filter((s) => s.nama_lengkap.trim().toLowerCase() === namaBersih)
+      const skor = h.jumlah_soal > 0 ? Math.round((h.jumlah_benar / h.jumlah_soal) * 1000) / 10 : null
+      return {
+        key: h.id,
+        namaAsal: h.nama_siswa,
+        skor,
+        siswaId: cocok.length === 1 ? cocok[0].id : '',
+        // ambigu: ada >1 siswa dengan nama sama persis di kelas ini — perlu dipilih manual
+        status: cocok.length === 1 ? 'cocok' : cocok.length === 0 ? 'tidak_cocok' : 'ambigu',
+        termasuk: cocok.length === 1 && skor !== null,
+      }
+    })
+    setImportPreview(rows)
+  }
+
+  function toggleTermasuk(idx) {
+    setImportPreview((prev) => prev.map((r, i) => (i === idx ? { ...r, termasuk: !r.termasuk } : r)))
+  }
+
+  function pilihSiswaTujuan(idx, siswaId) {
+    setImportPreview((prev) => prev.map((r, i) => (i === idx ? { ...r, siswaId, termasuk: !!siswaId } : r)))
+  }
+
+  async function handleImport() {
+    const rec = daftarImpor.find((r) => r.id === importSelectedId)
+    if (!rec) return
+    const jenisAkhir = importSumber === 'ujian' ? 'UTS' : importJenisKuis
+    const baris = importPreview
+      .filter((r) => r.termasuk && r.siswaId && r.skor !== null && r.skor !== undefined)
+      .map((r) => ({
+        siswa_id: r.siswaId,
+        mata_pelajaran: rec.mata_pelajaran,
+        jenis: jenisAkhir,
+        kompetensi: importKompetensi,
+        semester,
+        tahun_ajaran: tahunAjaran,
+        nilai: Number(r.skor),
+        predikat: predikatDariNilai(r.skor),
+        diisi_oleh: profil?.guru_id || null,
+      }))
+    if (baris.length === 0) return alert('Tidak ada baris nilai yang bisa diimpor. Cek kolom "Termasuk" dan kecocokan siswanya.')
+    setImportSaving(true)
+    const { error } = await supabase.from('nilai').upsert(baris, { onConflict: 'siswa_id,mata_pelajaran,jenis,kompetensi,semester,tahun_ajaran' })
+    setImportSaving(false)
+    if (error) {
+      alert('Gagal mengimpor nilai: ' + error.message)
+    } else {
+      alert(`Berhasil mengimpor ${baris.length} nilai ke tabel Nilai (jenis: ${jenisAkhir}, mapel: ${rec.mata_pelajaran}).`)
+      if (activeSubTab === 'kelola') loadKelolaData()
+    }
+  }
+
+  const recordTerpilih = daftarImpor.find((r) => r.id === importSelectedId)
+
   const kelolaDataTersaring = kelolaFilterMapel.trim()
     ? kelolaData.filter((d) => d.mata_pelajaran.toLowerCase().includes(kelolaFilterMapel.trim().toLowerCase()))
     : kelolaData
@@ -288,6 +419,14 @@ export default function Nilai() {
           }`}
         >
           <ListChecks size={14} /> Lihat &amp; Hapus Nilai
+        </button>
+        <button
+          onClick={() => setActiveSubTab('impor')}
+          className={`px-3 py-1.5 rounded-lg border text-sm font-medium flex items-center gap-1.5 transition-colors ${
+            activeSubTab === 'impor' ? 'bg-sage-500 text-white border-sage-500' : 'bg-white text-gray-600 border-gray-200'
+          }`}
+        >
+          <Download size={14} /> Impor dari Ujian &amp; Kuis
         </button>
       </div>
 
@@ -332,6 +471,37 @@ export default function Nilai() {
           <div className="md:col-span-2">
             <label className="nilai-label">Cari Mata Pelajaran</label>
             <input className="nilai-input" value={kelolaFilterMapel} onChange={(e) => setKelolaFilterMapel(e.target.value)} placeholder="Ketik untuk menyaring..." />
+          </div>
+        )}
+        {activeSubTab === 'impor' && (
+          <div>
+            <label className="nilai-label">Sumber</label>
+            <select className="nilai-input" value={importSumber} onChange={(e) => setImportSumber(e.target.value)}>
+              <option value="ujian">Ujian Online</option>
+              <option value="kuis">Kuis Seru</option>
+            </select>
+          </div>
+        )}
+        {activeSubTab === 'impor' && (
+          <div>
+            <label className="nilai-label">Kompetensi</label>
+            <select className="nilai-input" value={importKompetensi} onChange={(e) => setImportKompetensi(e.target.value)}>
+              {KOMPETENSI_OPTS.map((k) => <option key={k} value={k}>{k}</option>)}
+            </select>
+          </div>
+        )}
+        {activeSubTab === 'impor' && importSumber === 'kuis' && (
+          <div>
+            <label className="nilai-label">Jenis</label>
+            <select className="nilai-input" value={importJenisKuis} onChange={(e) => setImportJenisKuis(e.target.value)}>
+              {JENIS_OPTS.map((j) => <option key={j} value={j}>{j}</option>)}
+            </select>
+          </div>
+        )}
+        {activeSubTab === 'impor' && importSumber === 'ujian' && (
+          <div>
+            <label className="nilai-label">Jenis</label>
+            <input className="nilai-input" value="UTS" disabled />
           </div>
         )}
         <div>
@@ -445,6 +615,93 @@ export default function Nilai() {
             </tbody>
           </table>
         </div>
+      )}
+
+      {activeSubTab === 'impor' && (
+        <>
+          <div className="nilai-card p-5 mb-5 grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div>
+              <label className="nilai-label">{importSumber === 'ujian' ? 'Pilih Ujian Online' : 'Pilih Kuis Seru'}</label>
+              <select
+                className="nilai-input"
+                value={importSelectedId}
+                onChange={(e) => pilihImporRecord(e.target.value)}
+                disabled={daftarImpor.length === 0}
+              >
+                <option value="">
+                  {daftarImpor.length === 0 ? `Belum ada ${importSumber === 'ujian' ? 'ujian' : 'kuis'} untuk kelas ini` : '— pilih —'}
+                </option>
+                {daftarImpor.map((r) => <option key={r.id} value={r.id}>{r.judul} ({r.mata_pelajaran})</option>)}
+              </select>
+            </div>
+            <div className="text-sm nilai-muted self-end pb-2">
+              Nilai akan disimpan untuk <b>Semester {semester}</b>, tahun ajaran <b>{tahunAjaran}</b>
+              {recordTerpilih && <> · mapel <b>{recordTerpilih.mata_pelajaran}</b></>}.
+            </div>
+          </div>
+
+          <div className="nilai-card overflow-x-auto">
+            <table className="nilai-table">
+              <thead>
+                <tr>
+                  <th className="w-10">Termasuk</th>
+                  <th>Nama (dari {importSumber === 'ujian' ? 'Ujian Online' : 'Kuis Seru'})</th>
+                  <th className="w-56">Siswa Tujuan</th>
+                  <th className="w-24">Skor</th>
+                  <th className="w-40">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {importLoading && <tr><td colSpan={5} className="text-center py-8 nilai-muted">Memuat...</td></tr>}
+                {!importLoading && !importSelectedId && (
+                  <tr><td colSpan={5} className="text-center py-8 nilai-muted">Pilih {importSumber === 'ujian' ? 'ujian' : 'kuis'} di atas untuk melihat preview nilai.</td></tr>
+                )}
+                {!importLoading && importSelectedId && importPreview.length === 0 && (
+                  <tr><td colSpan={5} className="text-center py-8 nilai-muted">Belum ada siswa yang mengerjakan.</td></tr>
+                )}
+                {!importLoading && importPreview.map((row, idx) => (
+                  <tr key={row.key}>
+                    <td>
+                      <input type="checkbox" checked={row.termasuk} onChange={() => toggleTermasuk(idx)} disabled={!row.siswaId} />
+                    </td>
+                    <td className="font-medium">{row.namaAsal}</td>
+                    <td>
+                      {row.status === 'cocok' ? (
+                        <span>{siswaList.find((s) => s.id === row.siswaId)?.nama_lengkap}</span>
+                      ) : (
+                        <select className="nilai-input" value={row.siswaId} onChange={(e) => pilihSiswaTujuan(idx, e.target.value)}>
+                          <option value="">— pilih siswa —</option>
+                          {siswaList.map((s) => <option key={s.id} value={s.id}>{s.nama_lengkap}</option>)}
+                        </select>
+                      )}
+                    </td>
+                    <td>{row.skor ?? '—'}</td>
+                    <td>
+                      {row.status === 'cocok' && (
+                        <span className="text-xs flex items-center gap-1 text-sage-600"><CheckCircle2 size={14} /> Cocok otomatis</span>
+                      )}
+                      {row.status === 'tidak_cocok' && (
+                        <span className="text-xs flex items-center gap-1 text-amber-600"><AlertTriangle size={14} /> Tidak ditemukan, pilih manual</span>
+                      )}
+                      {row.status === 'ambigu' && (
+                        <span className="text-xs flex items-center gap-1 text-red-600"><AlertTriangle size={14} /> Nama ganda di kelas ini</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {importPreview.length > 0 && (
+            <div className="mt-4 flex items-center gap-3">
+              <button onClick={handleImport} disabled={importSaving} className="nilai-btn-primary">
+                {importSaving ? <Loader2 size={16} className="nilai-spin" /> : <Download size={16} />}
+                Impor {importPreview.filter((r) => r.termasuk && r.siswaId).length} Nilai
+              </button>
+            </div>
+          )}
+        </>
       )}
     </Layout>
   )
