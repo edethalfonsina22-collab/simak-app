@@ -278,16 +278,33 @@ export default function ManajemenSekolah() {
 
     setDeleting(true)
 
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('sekolah')
       .delete()
       .eq('id', deleteTarget.id)
+      .select('id')
 
     if (error) {
       alert(
         'Gagal menghapus sekolah: ' +
           error.message +
           '\n\nKemungkinan masih ada data guru/siswa yang terhubung ke sekolah ini.'
+      )
+      setDeleting(false)
+      return
+    }
+
+    // Supabase tidak selalu mengembalikan error kalau DELETE diblokir oleh
+    // RLS policy — baris yang terhapus (data) akan kosong meski tidak ada
+    // error. Ini penyebab paling umum "berhasil tapi muncul lagi".
+    if (!data || data.length === 0) {
+      alert(
+        'Sekolah tidak benar-benar terhapus.\n\n' +
+          'Kemungkinan besar penyebabnya: tabel "sekolah" di Supabase belum ' +
+          'punya RLS policy yang mengizinkan aksi DELETE untuk akun Anda. ' +
+          'Silakan cek menu Authentication > Policies pada tabel "sekolah" ' +
+          'di dashboard Supabase, dan tambahkan policy DELETE untuk role ' +
+          'yang sesuai (mis. superadmin).'
       )
       setDeleting(false)
       return
