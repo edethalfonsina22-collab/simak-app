@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../lib/AuthContext'
 import Layout from '../components/Layout'
-import { Loader2, Save, ClipboardCheck, WifiOff, Camera, X, RotateCcw, Check } from 'lucide-react'
+import { Loader2, Save, ClipboardCheck, WifiOff, Camera, X, RotateCcw, Check, Printer } from 'lucide-react'
 import { tambahAntrian, ambilAntrian, sinkronAntrian } from '../lib/offlineQueue'
 
 const STATUS_OPTS = [
@@ -446,8 +446,22 @@ function PresensiPribadi({ profil }) {
     setSavingSiswa(false)
   }
 
+  // Cetak daftar hadir siswa kelas yang diampu (wali kelas) — pakai print dialog browser.
+  function handlePrintSiswa() {
+    window.print()
+  }
+
   return (
     <Layout title="Presensi" subtitle="Kehadiran Anda hari ini">
+      {/* Aturan cetak: sembunyikan seluruh halaman kecuali area #print-area-siswa saat mencetak */}
+      <style>{`
+        @media print {
+          body * { visibility: hidden; }
+          #print-area-siswa, #print-area-siswa * { visibility: visible; }
+          #print-area-siswa { position: absolute; left: 0; top: 0; width: 100%; padding: 24px; }
+        }
+      `}</style>
+
       <div className="relative overflow-hidden rounded-xl p-6 mb-6 bg-gradient-to-br from-blue-900 to-blue-950">
         <div className="absolute -top-10 -right-10 w-40 h-40 rounded-full bg-white/5 pointer-events-none" />
         <div className="absolute -bottom-14 -left-6 w-32 h-32 rounded-full bg-white/5 pointer-events-none" />
@@ -601,10 +615,46 @@ function PresensiPribadi({ profil }) {
                     {savingSiswa ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
                     Simpan Presensi Siswa
                   </button>
+                  <button type="button" onClick={handlePrintSiswa} className="btn-secondary">
+                    <Printer size={16} />
+                    Cetak Daftar Hadir
+                  </button>
                   {savedSiswa && <span className="text-sm text-sage-500">Tersimpan.</span>}
                   {savedOfflineSiswa && <span className="text-sm text-brass-600">Tersimpan lokal — akan dikirim otomatis saat online.</span>}
                 </div>
               )}
+
+              {/* Area khusus cetak — hanya muncul saat dialog print terbuka (lihat @media print di atas) */}
+              <div id="print-area-siswa" className="hidden">
+                <h1 style={{ fontSize: '18px', fontWeight: 700, marginBottom: '2px' }}>
+                  Daftar Hadir Siswa
+                </h1>
+                <p style={{ fontSize: '13px', marginBottom: '16px', color: '#333' }}>
+                  Kelas {kelasWali.nama_kelas} · {tanggalLabel}
+                </p>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                  <thead>
+                    <tr>
+                      <th style={{ border: '1px solid #000', padding: '6px 8px', textAlign: 'left', width: '40px' }}>No</th>
+                      <th style={{ border: '1px solid #000', padding: '6px 8px', textAlign: 'left' }}>Nama Siswa</th>
+                      <th style={{ border: '1px solid #000', padding: '6px 8px', textAlign: 'left', width: '110px' }}>Status</th>
+                      <th style={{ border: '1px solid #000', padding: '6px 8px', textAlign: 'left', width: '110px' }}>Tanda Tangan</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {siswaList.map((s, idx) => (
+                      <tr key={s.id}>
+                        <td style={{ border: '1px solid #000', padding: '6px 8px' }}>{idx + 1}</td>
+                        <td style={{ border: '1px solid #000', padding: '6px 8px' }}>{s.nama_lengkap}</td>
+                        <td style={{ border: '1px solid #000', padding: '6px 8px' }}>
+                          {STATUS_OPTS.find((o) => o.value === statusSiswaMap[s.id])?.label || '-'}
+                        </td>
+                        <td style={{ border: '1px solid #000', padding: '6px 8px' }}></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </>
           )}
         </>
