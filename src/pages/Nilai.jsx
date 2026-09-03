@@ -6,6 +6,11 @@ import { Loader2, Save, BookOpenCheck, Trash2, ListChecks, Download, AlertTriang
 import './Nilai.css'
 
 const JENIS_OPTS = ['Tugas', 'UH', 'UTS', 'UAS']
+// Opsi khusus untuk dropdown "Jenis" saat impor dari Ujian Online — dulu
+// selalu fixed ke UTS (karena Ujian Online biasanya dipakai untuk ujian
+// tengah semester), sekarang bisa dipilih supaya juga bisa dipakai untuk
+// impor nilai UAS atau Tugas dari sana.
+const IMPOR_UJIAN_JENIS_OPTS = ['UTS', 'UAS', 'Tugas']
 const KOMPETENSI_OPTS = ['Pengetahuan', 'Keterampilan']
 
 // Predikat dihitung otomatis dari nilai angka — sesuai legenda rapor:
@@ -105,7 +110,10 @@ export default function Nilai() {
   const [daftarImpor, setDaftarImpor] = useState([]) // daftar ujian/kuis yang bisa dipilih
   const [importSelectedId, setImportSelectedId] = useState('')
   const [importKompetensi, setImportKompetensi] = useState('Pengetahuan')
-  const [importJenisKuis, setImportJenisKuis] = useState('Tugas') // jenis untuk Kuis Seru (Ujian Online selalu UTS)
+  const [importJenisKuis, setImportJenisKuis] = useState('Tugas') // jenis untuk Kuis Seru
+  // Jenis untuk Ujian Online — dulu selalu fixed "UTS" (lihat komentar di
+  // IMPOR_UJIAN_JENIS_OPTS di atas), sekarang jadi dropdown yang bisa dipilih.
+  const [importJenisUjian, setImportJenisUjian] = useState('UTS')
   const [importPreview, setImportPreview] = useState([])
   const [importLoading, setImportLoading] = useState(false)
   const [importSaving, setImportSaving] = useState(false)
@@ -352,7 +360,10 @@ export default function Nilai() {
   async function handleImport() {
     const rec = daftarImpor.find((r) => r.id === importSelectedId)
     if (!rec) return
-    const jenisAkhir = importSumber === 'ujian' ? 'UTS' : importJenisKuis
+    // Jenis nilai yang dipakai untuk impor ini — sekarang dua-duanya
+    // (Ujian Online maupun Kuis Seru) dipilih lewat dropdown, tidak ada
+    // lagi yang di-fixed ke satu jenis tertentu.
+    const jenisAkhir = importSumber === 'ujian' ? importJenisUjian : importJenisKuis
     const baris = importPreview
       .filter((r) => r.termasuk && r.siswaId && r.skor !== null && r.skor !== undefined)
       .map((r) => ({
@@ -379,6 +390,7 @@ export default function Nilai() {
   }
 
   const recordTerpilih = daftarImpor.find((r) => r.id === importSelectedId)
+  const jenisImporTerpilih = importSumber === 'ujian' ? importJenisUjian : importJenisKuis
 
   const kelolaDataTersaring = kelolaFilterMapel.trim()
     ? kelolaData.filter((d) => d.mata_pelajaran.toLowerCase().includes(kelolaFilterMapel.trim().toLowerCase()))
@@ -501,7 +513,9 @@ export default function Nilai() {
         {activeSubTab === 'impor' && importSumber === 'ujian' && (
           <div>
             <label className="nilai-label">Jenis</label>
-            <input className="nilai-input" value="UTS" disabled />
+            <select className="nilai-input" value={importJenisUjian} onChange={(e) => setImportJenisUjian(e.target.value)}>
+              {IMPOR_UJIAN_JENIS_OPTS.map((j) => <option key={j} value={j}>{j}</option>)}
+            </select>
           </div>
         )}
         <div>
@@ -635,7 +649,7 @@ export default function Nilai() {
               </select>
             </div>
             <div className="text-sm nilai-muted self-end pb-2">
-              Nilai akan disimpan untuk <b>Semester {semester}</b>, tahun ajaran <b>{tahunAjaran}</b>
+              Nilai akan disimpan sebagai jenis <b>{jenisImporTerpilih}</b> untuk <b>Semester {semester}</b>, tahun ajaran <b>{tahunAjaran}</b>
               {recordTerpilih && <> · mapel <b>{recordTerpilih.mata_pelajaran}</b></>}.
             </div>
           </div>
