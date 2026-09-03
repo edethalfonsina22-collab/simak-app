@@ -14,6 +14,23 @@ function buatKodeUjian() {
   return kode;
 }
 
+// --- Pengecualian role: Superadmin, Admin, dan Kepala Sekolah bisa membuat
+// ujian untuk SEMUA kelas, tidak dibatasi hanya kelas yang mereka wali-i.
+// Kalau kolom role di tabel `profil` ternyata bukan bernama "role"
+// (misalnya "peran" atau "jabatan"), tinggal ganti nama kolom di query
+// `.select('guru_id, role')` di dalam ambilKelas() di bawah.
+const PERAN_ISTIMEWA = ['superadmin', 'admin', 'kepala_sekolah'];
+
+// Menormalkan nilai role dari DB supaya perbandingan tidak peduli huruf besar/kecil
+// atau pemisah spasi vs underscore. "Kepala Sekolah", "kepala_sekolah", "KEPALA-SEKOLAH"
+// semuanya akan menjadi "kepala_sekolah".
+function normalisasiPeran(nilai) {
+  return String(nilai ?? '')
+    .trim()
+    .toLowerCase()
+    .replace(/[\s-]+/g, '_');
+}
+
 export default function BuatUjian() {
   const { session } = useAuth();
   const guruId = session?.user?.id; // auth.uid() — HANYA dipakai untuk query profil, JANGAN disimpan sebagai guru_id di tabel lain
@@ -23,7 +40,11 @@ export default function BuatUjian() {
   // guru_id tabel lain (kelas.wali_kelas_id, nilai.diisi_oleh, dan sekarang ujian.guru_id
   // juga). Diambil sekali di ambilKelas() lalu disimpan di state supaya bisa
   // dipakai ulang saat simpanUjian(), tanpa query tambahan.
+  // CATATAN: untuk Superadmin/Admin/Kepala Sekolah yang bukan guru wali kelas,
+  // nilai ini BISA null (mereka tidak punya baris di tabel guru). Itu wajar —
+  // lihat pengecekan isPerananIstimewa di bawah.
   const [guruIdAsli, setGuruIdAsli] = useState(null);
+  const [peran, setPeran] = useState(null); // nilai mentah dari profil.role, apa adanya
   const [judul, setJudul] = useState('');
   const [mapel, setMapel] = useState('');
   const [kelasId, setKelasId] = useState('');
@@ -41,50 +62,84 @@ export default function BuatUjian() {
   const [mapelBankFilter, setMapelBankFilter] = useState('');
   const [idTerpilih, setIdTerpilih] = useState(new Set()); // id soal bank_soal yang dicentang
 
-  // Ambil daftar kelas milik guru yang sedang login SAJA.
+  // true kalau akun yang login adalah Superadmin, Admin, atau Kepala Sekolah
+  const isPerananIstimewa = PERAN_ISTIMEWA.includes(normalisasiPeran(peran));
+
+  // Ambil daftar kelas. Untuk guru biasa: hanya kelas yang dia wali-i.
+  // Untuk Superadmin/Admin/Kepala Sekolah: SEMUA kelas (lihat isPerananIstimewa).
   // PENTING: kelas.wali_kelas_id menunjuk ke guru.id, BUKAN langsung ke
   // auth.users.id (guruId/session.user.id di atas). Jembatannya adalah
   // tabel `profil`:
   //   profil.id      = auth.uid()  (user yang login, sama dengan guruId)
   //   profil.guru_id = guru.id     (dipakai di kelas.wali_kelas_id)
-  // Jadi ambil guru_id dari profil dulu, baru filter kelas dengan itu.
+  //   profil.role    = peran akun (superadmin/admin/kepala_sekolah/guru/dst)
+  // Jadi ambil guru_id & role dari profil dulu, baru filter kelas.
   // RLS di tabel `ujian` juga sudah membatasi hal ini di level server,
   // tapi dropdown di sini tetap difilter eksplisit supaya guru tidak
-  // salah pilih kelas yang bukan miliknya sejak awal.
+  // salah pilih kelas yang bukan miliknya sejak awal. RLS di server
+  // JUGA PERLU disesuaikan supaya Superadmin/Admin/Kepala Sekolah
+  // diizinkan insert ujian untuk kelas mana pun, kalau belum.
   useEffect(() => {
     async function ambilKelas() {
       if (!guruId) {
         setDaftarKelas([]);
         setGuruIdAsli(null);
+        setPeran(null);
         return;
       }
 
       const { data: profilData, error: profilError } = await supabase
         .from('profil')
-        .select('guru_id')
+        .select('guru_id, role')
         .eq('id', guruId)
         .maybeSingle();
 
-      if (profilError || !profilData?.guru_id) {
+      if (profilError || !profilData) {
         setDaftarKelas([]);
         setGuruIdAsli(null);
+        setPeran(null);
         return;
       }
 
-      // Simpan guru.id sesungguhnya supaya bisa dipakai lagi saat simpanUjian()
-      setGuruIdAsli(profilData.guru_id);
+      // Simpan guru.id sesungguhnya (bisa null untuk Admin/Kepala Sekolah
+      // yang bukan wali kelas) supaya bisa dipakai lagi saat simpanUjian()
+      setGuruIdAsli(profilData.guru_id ?? null);
+      setPeran(profilData.role ?? null);
 
-      const { data, error } = await supabase
-        .from('kelas')
-        .select('id, nama_kelas')
-        .eq('wali_kelas_id', profilData.guru_id)
-        .order('nama_kelas');
+      const istimewa = PERAN_ISTIMEWA.includes(normalisasiPeran(profilData.role));
 
-      if (!error && data) {
-        setDaftarKelas(data);
-        if (data.length > 0) setKelasId(data[0].id);
+      if (istimewa) {
+        // Superadmin / Admin / Kepala Sekolah: tampilkan SEMUA kelas
+        const { data, error } = await supabase
+          .from('kelas')
+          .select('id, nama_kelas')
+          .order('nama_kelas');
+
+        if (!error && data) {
+          setDaftarKelas(data);
+          if (data.length > 0) setKelasId(data[0].id);
+        } else {
+          setDaftarKelas([]);
+        }
       } else {
-        setDaftarKelas([]);
+        // Guru biasa: hanya kelas yang dia wali-i
+        if (!profilData.guru_id) {
+          setDaftarKelas([]);
+          return;
+        }
+
+        const { data, error } = await supabase
+          .from('kelas')
+          .select('id, nama_kelas')
+          .eq('wali_kelas_id', profilData.guru_id)
+          .order('nama_kelas');
+
+        if (!error && data) {
+          setDaftarKelas(data);
+          if (data.length > 0) setKelasId(data[0].id);
+        } else {
+          setDaftarKelas([]);
+        }
       }
     }
     ambilKelas();
@@ -223,10 +278,13 @@ export default function BuatUjian() {
       setPesanError('Upload file Excel soal dulu.');
       return;
     }
-    // Guard baru: tanpa guru.id yang valid, ujian akan tersimpan dengan
-    // guru_id yang salah (atau kosong) dan tidak akan muncul di daftar
-    // "Impor dari Ujian Online" milik guru ybs di halaman Nilai.
-    if (!guruIdAsli) {
+    // Guru biasa WAJIB punya guru.id yang valid, kalau tidak ujian akan
+    // tersimpan dengan guru_id yang salah (atau kosong) dan tidak akan
+    // muncul di daftar "Impor dari Ujian Online" miliknya di halaman Nilai.
+    // Superadmin/Admin/Kepala Sekolah DIKECUALIKAN dari pengecekan ini,
+    // karena mereka boleh membuat ujian untuk kelas mana pun walau tidak
+    // punya baris di tabel guru.
+    if (!guruIdAsli && !isPerananIstimewa) {
       setPesanError('Data guru untuk akun ini belum ditemukan (profil belum terhubung ke tabel guru). Hubungi admin.');
       return;
     }
@@ -243,11 +301,12 @@ export default function BuatUjian() {
         mata_pelajaran: mapel,
         kelas_id: kelasId,
         kode_ujian: kodeUjian,
-        // Sebelumnya di sini dipakai `guruId` (session.user.id / auth.uid()),
-        // padahal Nilai.jsx memfilter daftar ujian guru lewat `profil.guru_id`
-        // (guru.id). Akibatnya ujian yang baru dibuat guru tidak pernah
-        // muncul di dropdown impor nilai miliknya sendiri. Sekarang dipakai
-        // guruIdAsli (guru.id dari profil) supaya konsisten dengan Nilai.jsx.
+        // guruIdAsli = guru.id dari profil (konsisten dengan filter di Nilai.jsx).
+        // Untuk Superadmin/Admin/Kepala Sekolah yang tidak punya baris di
+        // tabel guru, nilai ini akan null. INI MENGASUMSIKAN kolom
+        // ujian.guru_id mengizinkan NULL. Kalau kolomnya NOT NULL / FK wajib
+        // terisi, minta admin ybs juga dibuatkan baris di tabel guru, atau
+        // ganti skema kolom ini supaya nullable.
         guru_id: guruIdAsli,
         status: 'draft',
       })
@@ -387,7 +446,13 @@ export default function BuatUjian() {
             onChange={(e) => setKelasId(e.target.value)}
             className="w-full rounded-lg px-3 py-2 border border-[#6b0f1a]/15 focus:border-[#6b0f1a] focus:ring-2 focus:ring-[#6b0f1a]/20 outline-none transition-colors"
           >
-            {daftarKelas.length === 0 && <option value="">Anda belum menjadi wali kelas manapun</option>}
+            {daftarKelas.length === 0 && (
+              <option value="">
+                {isPerananIstimewa
+                  ? 'Belum ada kelas terdaftar'
+                  : 'Anda belum menjadi wali kelas manapun'}
+              </option>
+            )}
             {daftarKelas.map((k) => (
               <option key={k.id} value={k.id}>
                 Kelas {k.nama_kelas}
