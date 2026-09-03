@@ -4,155 +4,484 @@ import { supabase } from './supabaseClient'
 const AuthContext = createContext(null)
 
 export function AuthProvider({ children }) {
-  const [session, setSession] = useState(undefined) // undefined = belum dicek, null = tidak login
+  const [session, setSession] = useState(undefined)
   const [profil, setProfil] = useState(undefined)
-  // profil: { role: 'guru'|'admin'|'kepala_sekolah'|'admin_utama'|'superadmin', guru_id, sekolah_id, status_akun, catatan_admin, nama_lengkap, foto_profil_path } | null
 
   async function loadProfil(userId) {
     if (!userId) {
       setProfil(null)
       return
     }
-    const { data } = await supabase
+
+    const { data, error } = await supabase
       .from('profil')
-      .select('role, jabatan, guru_id, sekolah_id, status_akun, catatan_admin')
+      .select(`
+        role,
+        jabatan,
+        guru_id,
+        sekolah_id,
+        status_akun,
+        catatan_admin,
+        nama_lengkap_pendaftar,
+        email_pendaftar,
+        foto_profil_path,
+        nuptk,
+        pangkat_golongan,
+        no_hp,
+        tanggal_lahir,
+        pendidikan_terakhir,
+        alamat
+      `)
       .eq('id', userId)
       .maybeSingle()
 
-    // PENTING: kalau tidak ada baris profil untuk user ini, JANGAN anggap
-    // sebagai akun aktif. Ini terjadi ketika superadmin menghapus akun lewat
-    // Persetujuan Akun (baris 'profil' dihapus, tapi akun di Supabase Auth
-    // masih ada). Sebelumnya kode ini malah men-default-kan user tanpa
-    // profil jadi { role: 'guru', status_akun: 'aktif' } — yang artinya
-    // akun yang sudah "dihapus" tetap bisa login dan dianggap aktif.
-    // Sekarang: langsung sign out & anggap tidak login sama sekali.
+    if (error) {
+      console.error('Gagal memuat profil:', error)
+      setProfil(null)
+      return
+    }
+
+    // Jika profil tidak ada, akun dianggap tidak valid.
     if (!data) {
       await supabase.auth.signOut()
       setProfil(null)
       return
     }
 
-    // Ambil nama & foto dari tabel guru (dipakai di Sidebar untuk avatar)
+    // Ambil nama & foto dari tabel guru jika punya guru_id
     if (data.guru_id) {
       const { data: guru } = await supabase
         .from('guru')
         .select('nama_lengkap, foto_profil_path')
         .eq('id', data.guru_id)
         .maybeSingle()
-      setProfil({ ...data, nama_lengkap: guru?.nama_lengkap, foto_profil_path: guru?.foto_profil_path })
+
+      setProfil({
+        ...data,
+        nama_lengkap: guru?.nama_lengkap || data.nama_lengkap_pendaftar,
+        foto_profil_path: guru?.foto_profil_path || data.foto_profil_path,
+      })
     } else {
-      setProfil(data)
+      setProfil({
+        ...data,
+        nama_lengkap: data.nama_lengkap_pendaftar,
+      })
     }
   }
 
   useEffect(() => {
+    let mounted = true
+
     supabase.auth.getSession().then(({ data }) => {
+      if (!mounted) return
+
       setSession(data.session)
       loadProfil(data.session?.user?.id)
     })
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, newSession) => {
+
+    const {
+      data: listener,
+    } = supabase.auth.onAuthStateChange((_event, newSession) => {
+      if (!mounted) return
+
       setSession(newSession)
       loadProfil(newSession?.user?.id)
     })
-    return () => listener.subscription.unsubscribe()
+
+    return () => {
+      mounted = false
+      listener.subscription.unsubscribe()
+    }
   }, [])
 
   const signIn = (email, password) =>
-    supabase.auth.signInWithPassword({ email, password })
-
-  const signOut = () => supabase.auth.signOut()
-
-  // Ambil ulang profil user saat ini — dipakai di halaman MenungguPersetujuan
-  // untuk mengecek apakah status akun sudah berubah (misal baru saja disetujui admin utama).
-  const refreshProfil = () => loadProfil(session?.user?.id)
-
-  // Dipanggil saat user menutup banner "Pesan dari Admin" di Layout —
-  // menghapus catatan_admin di database supaya pesan tidak muncul lagi
-  // setelah dibaca, lalu muat ulang profil supaya state ikut ter-update.
-  async function tandaiPesanDibaca() {
-    if (!session?.user?.id) return
-    await supabase.from('profil').update({ catatan_admin: null }).eq('id', session.user.id)
-    await loadProfil(session.user.id)
-  }
-
-  // Registrasi akun baru — dua mode:
-  //  - mode 'baru'   : user membuat sekolah baru, jadi admin_utama TAPI tetap
-  //                    menunggu persetujuan Superadmin (sekolah baru belum
-  //                    punya admin siapa pun yang bisa menyetujui sendiri).
-  //  - mode 'gabung' : user bergabung ke sekolah yang sudah ada, menunggu
-  //                    persetujuan admin utama sekolah tersebut.
-  async function daftar({ mode, email, password, namaLengkap, namaSekolah, sekolahId, jabatan }) {
-    const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+    supabase.auth.signInWithPassword({
       email,
       password,
     })
-    if (signUpError) return { error: signUpError }
+
+  const signOut = () => supabase.auth.signOut()
+
+  const refreshProfil = () => loadProfil(session?.user?.id)
+
+  async function tandaiPesanDibaca() {
+    if (!session?.user?.id) return
+
+    await supabase
+      .from('profil')
+      .update({ catatan_admin: null })
+      .eq('id', session.user.id)
+
+    await loadProfil(session.user.id)
+  }
+
+  // =========================================================
+  // REGISTRASI
+  // =========================================================
+
+  async function daftar({
+    mode,
+    email,
+    password,
+    namaLengkap,
+    namaSekolah,
+    sekolahId,
+    jabatan,
+    siswaId,
+    hubungan,
+  }) {
+    // Orang tua hanya boleh bergabung ke sekolah yang sudah ada.
+    if (jabatan === 'orang_tua' && mode !== 'gabung') {
+      return {
+        error: {
+          message: 'Akun orang tua/wali hanya dapat bergabung ke sekolah yang sudah terdaftar.',
+        },
+      }
+    }
+
+    // Orang tua wajib memilih sekolah.
+    if (jabatan === 'orang_tua' && !sekolahId) {
+      return {
+        error: {
+          message: 'Silakan pilih sekolah terlebih dahulu.',
+        },
+      }
+    }
+
+    // Orang tua wajib memilih siswa.
+    if (jabatan === 'orang_tua' && !siswaId) {
+      return {
+        error: {
+          message: 'Silakan pilih siswa yang merupakan anak/wali Anda.',
+        },
+      }
+    }
+
+    // Orang tua wajib memilih hubungan.
+    if (jabatan === 'orang_tua' && !hubungan) {
+      return {
+        error: {
+          message: 'Silakan pilih hubungan dengan siswa.',
+        },
+      }
+    }
+
+    const { data: signUpData, error: signUpError } =
+      await supabase.auth.signUp({
+        email,
+        password,
+      })
+
+    if (signUpError) {
+      return { error: signUpError }
+    }
 
     const userId = signUpData?.user?.id
+
     if (!userId) {
-      return { error: { message: 'Pendaftaran gagal, silakan coba lagi.' } }
+      return {
+        error: {
+          message: 'Pendaftaran gagal, silakan coba lagi.',
+        },
+      }
     }
 
     let targetSekolahId = sekolahId
-    // 'jabatan' adalah label yang dipilih pendaftar sendiri di form
-    // ('guru' | 'admin' | 'kepala_sekolah') — dipakai untuk tampilan di
-    // Persetujuan Akun, terpisah dari 'role' teknis di bawah.
+
+    // Jabatan yang dipilih user.
     const jabatanDipilih = jabatan || 'guru'
-    // Untuk mode 'gabung', role teknis mengikuti jabatan yang dipilih.
+
+    // Default role teknis mengikuti jabatan.
     let role = jabatanDipilih
     let statusAkunBaru = 'menunggu'
 
+    // =======================================================
+    // PENDAFTARAN SEKOLAH BARU
+    // =======================================================
+
     if (mode === 'baru') {
-      const { data: sekolahBaru, error: sekolahError } = await supabase
-        .from('sekolah')
-        .insert({ nama_sekolah: namaSekolah })
-        .select('id')
-        .single()
-      if (sekolahError) return { error: sekolahError }
+      const { data: sekolahBaru, error: sekolahError } =
+        await supabase
+          .from('sekolah')
+          .insert({
+            nama_sekolah: namaSekolah,
+          })
+          .select('id')
+          .single()
+
+      if (sekolahError) {
+        return { error: sekolahError }
+      }
 
       targetSekolahId = sekolahBaru.id
-      // Pendiri sekolah tetap perlu jadi admin_utama secara TEKNIS supaya nanti
-      // (setelah disetujui Superadmin) dia bisa mengelola & menyetujui akun lain
-      // di sekolahnya sendiri — jabatan yang dia pilih (Admin/Kepala Sekolah)
-      // hanya jadi label, disimpan terpisah di kolom 'jabatan'.
+
+      // Pendiri sekolah menjadi admin_utama.
       role = 'admin_utama'
-      statusAkunBaru = 'menunggu' // tetap menunggu persetujuan Superadmin
+      statusAkunBaru = 'menunggu'
     }
 
-    const { error: profilError } = await supabase.from('profil').insert({
-      id: userId,
-      role,
-      jabatan: jabatanDipilih,
-      sekolah_id: targetSekolahId,
-      status_akun: statusAkunBaru,
-      nama_lengkap_pendaftar: namaLengkap,
-      email_pendaftar: email,
-    })
-    if (profilError) return { error: profilError }
+    // =======================================================
+    // KHUSUS ORANG TUA
+    // =======================================================
 
-    return { error: null }
+    if (jabatanDipilih === 'orang_tua') {
+      role = 'orang_tua'
+      statusAkunBaru = 'menunggu'
+    }
+
+    // =======================================================
+    // BUAT PROFIL
+    // =======================================================
+
+    const { error: profilError } = await supabase
+      .from('profil')
+      .insert({
+        id: userId,
+        role,
+        jabatan: jabatanDipilih,
+        sekolah_id: targetSekolahId,
+        status_akun: statusAkunBaru,
+        nama_lengkap_pendaftar: namaLengkap,
+        email_pendaftar: email,
+      })
+
+    if (profilError) {
+      return { error: profilError }
+    }
+
+    // =======================================================
+    // HUBUNGKAN ORANG TUA DENGAN SISWA
+    // =======================================================
+
+    if (jabatanDipilih === 'orang_tua') {
+      // Pastikan siswa memang berasal dari sekolah yang dipilih.
+      const { data: siswa, error: siswaError } = await supabase
+        .from('siswa')
+        .select('id, sekolah_id')
+        .eq('id', siswaId)
+        .maybeSingle()
+
+      if (siswaError) {
+        return { error: siswaError }
+      }
+
+      if (!siswa) {
+        return {
+          error: {
+            message: 'Siswa tidak ditemukan.',
+          },
+        }
+      }
+
+      if (siswa.sekolah_id !== targetSekolahId) {
+        return {
+          error: {
+            message: 'Siswa tersebut bukan bagian dari sekolah yang dipilih.',
+          },
+        }
+      }
+
+      const { error: hubunganError } = await supabase
+        .from('orang_tua_siswa')
+        .insert({
+          orang_tua_id: userId,
+          siswa_id: siswaId,
+          hubungan,
+          status: 'menunggu',
+        })
+
+      if (hubunganError) {
+        return { error: hubunganError }
+      }
+    }
+
+    return {
+      error: null,
+    }
   }
 
-  const isAdmin = ['admin', 'admin_utama', 'superadmin', 'kepala_sekolah'].includes(profil?.role)
-  const isAdminUtama = profil?.role === 'admin_utama' || profil?.role === 'superadmin'
-  const isSuperAdmin = profil?.role === 'superadmin'
+  // =========================================================
+  // TAMBAH ANAK UNTUK AKUN ORANG TUA YANG SUDAH LOGIN
+  // =========================================================
+
+  async function tambahAnak({
+    siswaId,
+    hubungan = 'wali',
+  }) {
+    if (!session?.user?.id) {
+      return {
+        error: {
+          message: 'Anda harus login terlebih dahulu.',
+        },
+      }
+    }
+
+    if (!isOrangTua) {
+      return {
+        error: {
+          message: 'Fitur ini hanya tersedia untuk akun orang tua/wali.',
+        },
+      }
+    }
+
+    if (!siswaId) {
+      return {
+        error: {
+          message: 'Silakan pilih siswa.',
+        },
+      }
+    }
+
+    // Pastikan siswa berada di sekolah yang sama.
+    const { data: siswa, error: siswaError } = await supabase
+      .from('siswa')
+      .select('id, sekolah_id')
+      .eq('id', siswaId)
+      .maybeSingle()
+
+    if (siswaError) {
+      return { error: siswaError }
+    }
+
+    if (!siswa) {
+      return {
+        error: {
+          message: 'Siswa tidak ditemukan.',
+        },
+      }
+    }
+
+    if (siswa.sekolah_id !== profil?.sekolah_id) {
+      return {
+        error: {
+          message: 'Siswa tersebut bukan bagian dari sekolah Anda.',
+        },
+      }
+    }
+
+    const { error } = await supabase
+      .from('orang_tua_siswa')
+      .insert({
+        orang_tua_id: session.user.id,
+        siswa_id: siswaId,
+        hubungan,
+        status: 'menunggu',
+      })
+
+    return { error }
+  }
+
+  // =========================================================
+  // AMBIL DATA ANAK ORANG TUA
+  // =========================================================
+
+  async function getAnakSaya() {
+    if (!session?.user?.id) {
+      return {
+        data: [],
+        error: null,
+      }
+    }
+
+    if (!isOrangTua) {
+      return {
+        data: [],
+        error: null,
+      }
+    }
+
+    const { data, error } = await supabase
+      .from('orang_tua_siswa')
+      .select(`
+        id,
+        hubungan,
+        status,
+        catatan_admin,
+        dibuat_pada,
+        siswa (
+          id,
+          nis,
+          nisn,
+          nama_lengkap,
+          jenis_kelamin,
+          tempat_lahir,
+          tanggal_lahir,
+          foto_path,
+          status,
+          kelas (
+            id,
+            nama_kelas,
+            tingkat,
+            tahun_ajaran
+          )
+        )
+      `)
+      .eq('orang_tua_id', session.user.id)
+      .order('dibuat_pada', {
+        ascending: false,
+      })
+
+    return {
+      data: data || [],
+      error,
+    }
+  }
+
+  // =========================================================
+  // ROLE
+  // =========================================================
+
+  const isAdmin = [
+    'admin',
+    'admin_utama',
+    'superadmin',
+    'kepala_sekolah',
+  ].includes(profil?.role)
+
+  const isAdminUtama =
+    profil?.role === 'admin_utama' ||
+    profil?.role === 'superadmin'
+
+  const isSuperAdmin =
+    profil?.role === 'superadmin'
+
+  const isOrangTua =
+    profil?.role === 'orang_tua'
 
   return (
     <AuthContext.Provider
       value={{
         session,
-        loading: session === undefined || profil === undefined,
+
+        loading:
+          session === undefined ||
+          profil === undefined,
+
         signIn,
         signOut,
+
         daftar,
         refreshProfil,
+
         profil,
+
         isAdmin,
         isAdminUtama,
         isSuperAdmin,
-        sekolahId: profil?.sekolah_id ?? null,
-        statusAkun: profil?.status_akun ?? null,
-        pesanAdmin: profil?.catatan_admin ?? null,
+        isOrangTua,
+
+        tambahAnak,
+        getAnakSaya,
+
+        sekolahId:
+          profil?.sekolah_id ?? null,
+
+        statusAkun:
+          profil?.status_akun ?? null,
+
+        pesanAdmin:
+          profil?.catatan_admin ?? null,
+
         tandaiPesanDibaca,
       }}
     >
