@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { Fragment, useEffect, useState } from 'react'
 import { supabase } from '../lib/supabaseClient'
 import Layout from '../components/Layout'
 import {
@@ -8,6 +8,8 @@ import {
   Plus,
   Trash2,
   ClipboardList,
+  ClipboardCheck,
+  RotateCcw,
   Sparkles,
   Dumbbell,
   NotebookPen,
@@ -180,6 +182,7 @@ const TEMPLATE_CATATAN = [
 
 const TABS = [
   { key: 'ringkasan', label: 'Ringkasan Nilai', icon: ClipboardList },
+  { key: 'rekap', label: 'Rekap Nilai', icon: ClipboardCheck },
   { key: 'capaian', label: 'Deskripsi Capaian', icon: NotebookPen },
   { key: 'p5', label: 'P5', icon: Sparkles },
   { key: 'ekskul', label: 'Ekstrakurikuler', icon: Dumbbell },
@@ -208,6 +211,20 @@ function rentangTanggalPeriode(tahunAjaran, semester) {
     return { mulai: `${tahunAkhir}-01-01`, selesai: `${tahunAkhir}-06-30` }
   }
   return { mulai: `${tahunAwal}-07-01`, selesai: `${tahunAwal}-12-31` }
+}
+
+// Predikat dihitung otomatis dari nilai angka — sesuai legenda rapor:
+// A: Sangat Baik (>=90), B: Baik (>=75), C: Cukup (>=60), D: Kurang (<60).
+// Dipakai baik untuk hitungan otomatis (tab Ringkasan/Rekap) maupun saat
+// nilai final ditimpa manual di tab Rekap Nilai.
+function predikatDariNilai(nilai) {
+  if (nilai === '' || nilai === undefined || nilai === null) return null
+  const n = Number(nilai)
+  if (isNaN(n)) return null
+  if (n >= 90) return 'A'
+  if (n >= 75) return 'B'
+  if (n >= 60) return 'C'
+  return 'D'
 }
 
 // Bobot komponen nilai untuk menghitung Nilai Akhir per mapel per kompetensi.
@@ -267,7 +284,8 @@ export default function Rapor() {
   // Deskripsi capaian per mapel — tabel capaian_mapel, kini 1 baris per
   // (mapel, jenis) di mana jenis = 'Pengetahuan' atau 'Keterampilan'.
   // capaianList di state React tetap 1 baris per mapel, tapi menyimpan
-  // dua sub-objek: pengetahuan & keterampilan.
+  // dua sub-objek: pengetahuan & keterampilan — masing-masing sekarang
+  // juga menyimpan nilai_akhir & predikat (dipakai di tab Rekap Nilai).
   const [capaianList, setCapaianList] = useState([])
 
   // P5 — tabel rapor_p5
@@ -424,7 +442,10 @@ export default function Rapor() {
       supabase
         .from('capaian_mapel')
         // + jenis, untuk memisahkan baris Pengetahuan vs Keterampilan
-        .select('id, mata_pelajaran, jenis, deskripsi_capaian')
+        // + nilai_akhir & predikat — nilai final yang sudah difinalisasi
+        // manual oleh wali kelas lewat tab Rekap Nilai. null berarti masih
+        // pakai hitungan otomatis (lihat nilaiAkhirTertimbang di atas).
+        .select('id, mata_pelajaran, jenis, deskripsi_capaian, nilai_akhir, predikat')
         .eq('siswa_id', idSiswa)
         .eq('semester', semester)
         .eq('tahun_ajaran', tahunAjaran),
@@ -477,8 +498,18 @@ export default function Rapor() {
         return {
           mata_pelajaran: mapel,
           terkunci: mapelDariNilai.includes(mapel),
-          pengetahuan: { id: pengetahuan?.id || null, deskripsi_capaian: pengetahuan?.deskripsi_capaian || '' },
-          keterampilan: { id: keterampilan?.id || null, deskripsi_capaian: keterampilan?.deskripsi_capaian || '' },
+          pengetahuan: {
+            id: pengetahuan?.id || null,
+            deskripsi_capaian: pengetahuan?.deskripsi_capaian || '',
+            nilai_akhir: pengetahuan?.nilai_akhir ?? null,
+            predikat: pengetahuan?.predikat ?? null,
+          },
+          keterampilan: {
+            id: keterampilan?.id || null,
+            deskripsi_capaian: keterampilan?.deskripsi_capaian || '',
+            nilai_akhir: keterampilan?.nilai_akhir ?? null,
+            predikat: keterampilan?.predikat ?? null,
+          },
         }
       })
     )
@@ -518,6 +549,15 @@ export default function Rapor() {
     rataRataPengetahuan: nilaiAkhirTertimbang(kel.Pengetahuan),
     rataRataKeterampilan: nilaiAkhirTertimbang(kel.Keterampilan),
   }))
+
+  // Ambil hitungan otomatis (dari barisMapel) untuk satu mapel & kompetensi
+  // tertentu — dipakai di tab Rekap Nilai sebagai placeholder/pembanding
+  // saat nilai belum difinalisasi manual.
+  function nilaiOtomatisUntuk(mapel, kompKey) {
+    const info = barisMapel.find((b) => b.mapel === mapel)
+    if (!info) return null
+    return kompKey === 'keterampilan' ? info.rataRataKeterampilan : info.rataRataPengetahuan
+  }
 
   // ---------- Deskripsi capaian (per kompetensi) ----------
   function ubahBarisCapaian(index, kompKey, value) {
@@ -634,8 +674,8 @@ export default function Rapor() {
       {
         mata_pelajaran: '',
         terkunci: false,
-        pengetahuan: { id: null, deskripsi_capaian: '' },
-        keterampilan: { id: null, deskripsi_capaian: '' },
+        pengetahuan: { id: null, deskripsi_capaian: '', nilai_akhir: null, predikat: null },
+        keterampilan: { id: null, deskripsi_capaian: '', nilai_akhir: null, predikat: null },
       },
     ])
   }
@@ -705,6 +745,98 @@ export default function Rapor() {
       }
     }
     if (gagal.length) alert('Gagal menyimpan sebagian deskripsi capaian:\n' + [...new Set(gagal)].join('\n'))
+    await muatRapor()
+    setSaving(false)
+  }
+
+  // ---------- Rekap Nilai (finalisasi nilai manual sebelum cetak) ----------
+  // Nilai final yang ditampilkan/dipakai saat cetak: kalau
+  // capaianList[i][komp].nilai_akhir terisi (angka), itu yang sudah
+  // difinalisasi manual oleh wali kelas. Kalau masih null, dipakai
+  // hitungan otomatis dari barisMapel (sama seperti tab Ringkasan Nilai) —
+  // pola coalesce(nilai_akhir, hitungan_otomatis) yang sama juga dipakai
+  // di halaman cetak (RaporCetak.jsx).
+  function ubahNilaiAkhir(index, kompKey, value) {
+    setCapaianList((prev) =>
+      prev.map((c, i) => {
+        if (i !== index) return c
+        const nilaiBaru = value === '' ? null : value
+        const predikatBaru = nilaiBaru === null ? null : predikatDariNilai(nilaiBaru)
+        return { ...c, [kompKey]: { ...c[kompKey], nilai_akhir: nilaiBaru, predikat: predikatBaru } }
+      })
+    )
+  }
+
+  function resetNilaiAkhir(index, kompKey) {
+    setCapaianList((prev) =>
+      prev.map((c, i) =>
+        i === index ? { ...c, [kompKey]: { ...c[kompKey], nilai_akhir: null, predikat: null } } : c
+      )
+    )
+  }
+
+  async function simpanRekapNilai() {
+    setSaving(true)
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+
+    let gagal = []
+    for (const c of capaianList) {
+      if (!c.mata_pelajaran.trim()) continue
+      for (const komp of KOMPETENSI_KEYS) {
+        const entri = c[komp.key]
+        const nilaiNum =
+          entri.nilai_akhir === null || entri.nilai_akhir === undefined || entri.nilai_akhir === ''
+            ? null
+            : Number(entri.nilai_akhir)
+        const predikatFinal = nilaiNum === null ? null : predikatDariNilai(nilaiNum)
+
+        if (entri.id) {
+          const { data, error } = await supabase
+            .from('capaian_mapel')
+            .update({ nilai_akhir: nilaiNum, predikat: predikatFinal })
+            .eq('id', entri.id)
+            .select()
+          if (error) {
+            gagal.push(error.message)
+          } else if (!data || data.length === 0) {
+            gagal.push(
+              `${c.mata_pelajaran} (${komp.label}): tidak tersimpan — kemungkinan kebijakan RLS pada tabel capaian_mapel belum mengizinkan UPDATE.`
+            )
+          }
+        } else if (nilaiNum !== null) {
+          // Belum ada baris capaian_mapel untuk mapel/kompetensi ini (mis.
+          // deskripsi capaian belum pernah diisi) — buat baris baru khusus
+          // untuk menyimpan nilai final; deskripsi_capaian dibiarkan kosong
+          // dan bisa diisi belakangan lewat tab Deskripsi Capaian.
+          const { data, error } = await supabase
+            .from('capaian_mapel')
+            .insert({
+              siswa_id: siswaId,
+              mata_pelajaran: c.mata_pelajaran,
+              jenis: komp.jenis,
+              semester,
+              tahun_ajaran: tahunAjaran,
+              nilai_akhir: nilaiNum,
+              predikat: predikatFinal,
+              diisi_oleh: user?.id,
+            })
+            .select()
+          if (error) {
+            gagal.push(error.message)
+          } else if (!data || data.length === 0) {
+            gagal.push(
+              `${c.mata_pelajaran} (${komp.label}): tidak tersimpan — kemungkinan kebijakan RLS pada tabel capaian_mapel belum mengizinkan INSERT.`
+            )
+          }
+        }
+        // Kalau entri.id tidak ada dan nilaiNum juga null: tidak ada
+        // perubahan yang perlu disimpan (belum pernah difinalisasi, tetap
+        // pakai hitungan otomatis — tidak perlu bikin baris kosong di DB).
+      }
+    }
+    if (gagal.length) alert('Gagal menyimpan sebagian Rekap Nilai:\n' + [...new Set(gagal)].join('\n'))
     await muatRapor()
     setSaving(false)
   }
@@ -1015,7 +1147,7 @@ export default function Rapor() {
                       </tbody>
                     </table>
                     <p className="text-xs text-ink-700/40 mb-6">
-                      Nilai Akhir = Tugas 20% + UTS 30% + UAS 50% (UH tidak ikut dihitung). Kalau salah satu komponen belum diisi, bobot sisanya otomatis dinormalisasi.
+                      Nilai Akhir = Tugas 20% + UTS 30% + UAS 50% (UH tidak ikut dihitung). Kalau salah satu komponen belum diisi, bobot sisanya otomatis dinormalisasi. Ini hitungan otomatis dari nilai mentah — untuk menetapkan nilai final yang dipakai saat cetak, gunakan tab &quot;Rekap Nilai&quot;.
                     </p>
                   </>
                 ) : (
@@ -1040,6 +1172,91 @@ export default function Rapor() {
                     <p className="text-2xl font-display font-semibold text-red-700">{presensi.alpa}</p>
                     <p className="text-xs text-ink-700/60">Alpa</p>
                   </div>
+                </div>
+              </>
+            )}
+
+            {activeTab === 'rekap' && (
+              <>
+                <p className="text-sm text-ink-700/50 mb-4">
+                  Nilai di bawah ini otomatis terisi dari hitungan bobot Tugas/UTS/UAS (sama seperti tab Ringkasan
+                  Nilai). Timpa langsung angkanya untuk menetapkan nilai final yang dipakai saat mencetak rapor,
+                  lalu klik &quot;Simpan Rekap Nilai&quot;. Klik ikon <RotateCcw size={12} className="inline -mt-0.5" /> di
+                  samping sel untuk mengembalikannya ke hitungan otomatis kapan saja.
+                </p>
+                {capaianList.length === 0 ? (
+                  <p className="text-sm text-ink-700/50 mb-4">Belum ada data nilai untuk periode ini.</p>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="table-shell mb-2">
+                      <thead>
+                        <tr>
+                          <th rowSpan={2} className="align-bottom">Mata Pelajaran</th>
+                          <th colSpan={2} className="text-center">Pengetahuan</th>
+                          <th colSpan={2} className="text-center border-l border-ink-950/10">Keterampilan</th>
+                        </tr>
+                        <tr>
+                          <th className="text-center w-36">Nilai</th>
+                          <th className="text-center">Predikat</th>
+                          <th className="text-center w-36 border-l border-ink-950/10">Nilai</th>
+                          <th className="text-center">Predikat</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {capaianList.map((c, i) => (
+                          <tr key={c.pengetahuan.id || c.keterampilan.id || `rekap-${i}`}>
+                            <td className="font-medium">{c.mata_pelajaran || '(belum diberi nama)'}</td>
+                            {KOMPETENSI_KEYS.map((komp) => {
+                              const entri = c[komp.key]
+                              const otomatis = nilaiOtomatisUntuk(c.mata_pelajaran, komp.key)
+                              const sudahFinal =
+                                entri.nilai_akhir !== null && entri.nilai_akhir !== undefined && entri.nilai_akhir !== ''
+                              const predikatTampil = sudahFinal ? entri.predikat : predikatDariNilai(otomatis)
+                              return (
+                                <Fragment key={komp.key}>
+                                  <td className={komp.key === 'keterampilan' ? 'border-l border-ink-950/10' : ''}>
+                                    <div className="flex items-center gap-1.5">
+                                      <input
+                                        type="number"
+                                        min={0}
+                                        max={100}
+                                        className="input-field !py-1 !w-20"
+                                        placeholder={otomatis ?? '-'}
+                                        value={sudahFinal ? entri.nilai_akhir : ''}
+                                        onChange={(e) => ubahNilaiAkhir(i, komp.key, e.target.value)}
+                                      />
+                                      {sudahFinal && (
+                                        <button
+                                          type="button"
+                                          className="text-ink-700/40 hover:text-ink-950 shrink-0"
+                                          title="Kembalikan ke hitungan otomatis"
+                                          onClick={() => resetNilaiAkhir(i, komp.key)}
+                                        >
+                                          <RotateCcw size={14} />
+                                        </button>
+                                      )}
+                                    </div>
+                                    <p className="text-[10px] text-ink-700/40 mt-0.5">
+                                      {sudahFinal
+                                        ? 'Manual'
+                                        : `Otomatis${otomatis !== null && otomatis !== undefined ? ` · ${otomatis}` : ''}`}
+                                    </p>
+                                  </td>
+                                  <td className="text-center">{predikatTampil || '-'}</td>
+                                </Fragment>
+                              )
+                            })}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+                <div className="flex flex-wrap gap-3 mt-4">
+                  <button className="btn-primary" onClick={simpanRekapNilai} disabled={saving || capaianList.length === 0}>
+                    {saving && <Loader2 size={16} className="animate-spin" />}
+                    <Save size={16} /> Simpan Rekap Nilai
+                  </button>
                 </div>
               </>
             )}
