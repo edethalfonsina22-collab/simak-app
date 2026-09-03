@@ -28,6 +28,30 @@ const WARNA_PREDIKAT = {
   D: 'bg-red-500/15 text-red-600',
 }
 
+// Pecah kolom guru.mata_pelajaran (bisa berisi satu mapel atau beberapa
+// mapel digabung koma/slash, umum untuk wali kelas SD yang mengajar semua
+// mapel) menjadi daftar opsi dropdown yang rapi dan tanpa duplikat.
+function pecahMapel(raw) {
+  if (!raw) return []
+  return [...new Set(
+    raw
+      .split(/[,/]+/)
+      .map((m) => m.trim())
+      .filter(Boolean)
+  )]
+}
+
+// Tahun ajaran Indonesia berjalan dari Juli s/d Juni. Fungsi ini menghasilkan
+// tahun ajaran "berjalan" (mis. "2026/2027") beserta satu tahun sebelum & sesudahnya.
+function tahunAjaranOptions() {
+  const now = new Date()
+  const tahunMulai = now.getMonth() >= 6 ? now.getFullYear() : now.getFullYear() - 1 // Juli = index 6
+  return [-1, 0, 1].map((offset) => {
+    const awal = tahunMulai + offset
+    return `${awal}/${awal + 1}`
+  })
+}
+
 // Motif sirkuit dekoratif senada dengan Loader, Login & Kelas.
 function CircuitBackdrop({ patternId }) {
   return (
@@ -59,11 +83,13 @@ export default function Nilai() {
   const [kelasList, setKelasList] = useState([])
   const [kelasId, setKelasId] = useState('')
   const [siswaList, setSiswaList] = useState([])
+  const [mapelOpts, setMapelOpts] = useState([])
   const [mataPelajaran, setMataPelajaran] = useState('')
   const [jenis, setJenis] = useState('UH')
   const [kompetensi, setKompetensi] = useState('Pengetahuan')
   const [semester, setSemester] = useState('Ganjil')
-  const [tahunAjaran, setTahunAjaran] = useState('')
+  const TA_OPTS = tahunAjaranOptions()
+  const [tahunAjaran, setTahunAjaran] = useState(TA_OPTS[1]) // tahun ajaran berjalan
   const [nilaiMap, setNilaiMap] = useState({})
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -90,10 +116,36 @@ export default function Nilai() {
     })
   }, [isAdmin, profil])
 
+  // Ambil daftar mapel dari kolom guru.mata_pelajaran milik guru yang login.
+  // Dipecah jadi beberapa opsi kalau berisi lebih dari satu mapel (dipisah koma/slash).
+  useEffect(() => {
+    if (profil === undefined) return
+    if (!profil?.guru_id) {
+      setMapelOpts([])
+      return
+    }
+    supabase.from('guru').select('mata_pelajaran').eq('id', profil.guru_id).single()
+      .then(({ data }) => {
+        const opts = pecahMapel(data?.mata_pelajaran)
+        setMapelOpts(opts)
+        setMataPelajaran((prev) => (opts.includes(prev) ? prev : opts[0] || ''))
+      })
+  }, [profil])
+
   useEffect(() => {
     if (kelasId) loadSiswa()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [kelasId])
+
+  // Muat ulang nilai yang sudah ada begitu mapel/kelas/siswa siap (dulu ini
+  // dipicu lewat onBlur input teks; sekarang mapel berupa dropdown jadi
+  // dipicu langsung lewat effect saat nilainya berubah).
+  useEffect(() => {
+    if (activeSubTab === 'input' && mataPelajaran && siswaList.length > 0) {
+      loadExisting()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeSubTab, mataPelajaran, siswaList, jenis, kompetensi, semester, tahunAjaran])
 
   // Muat ulang daftar nilai untuk tab "Kelola Nilai" setiap kali tab itu
   // aktif, atau filter (kelas/semester/tahun ajaran) berubah.
@@ -114,17 +166,8 @@ export default function Nilai() {
     setLoading(false)
   }
 
-  // Ambil versi mata pelajaran yang sudah dirapikan (tanpa spasi di awal/akhir,
-  // spasi ganda dirapatkan) — dipakai konsisten baik saat mencari data lama
-  // maupun saat menyimpan, supaya "Matematika", "Matematika " dan " Matematika"
-  // selalu dianggap satu mapel yang sama, bukan tiga baris terpisah.
-  function mapelBersih() {
-    return mataPelajaran.trim().replace(/\s+/g, ' ')
-  }
-
   async function loadExisting() {
-    const mapel = mapelBersih()
-    if (mapel !== mataPelajaran) setMataPelajaran(mapel)
+    const mapel = mataPelajaran
     if (!mapel || !kelasId) return
     const { data } = await supabase.from('nilai').select('siswa_id, nilai')
       .eq('mata_pelajaran', mapel).eq('jenis', jenis).eq('kompetensi', kompetensi)
@@ -137,9 +180,8 @@ export default function Nilai() {
   }
 
   async function handleSave() {
-    const mapel = mapelBersih()
-    if (!mapel) return alert('Isi nama mata pelajaran terlebih dahulu.')
-    setMataPelajaran(mapel)
+    const mapel = mataPelajaran
+    if (!mapel) return alert('Pilih mata pelajaran terlebih dahulu.')
     setSaving(true)
     const rows = siswaList
       .filter((s) => nilaiMap[s.id] !== undefined && nilaiMap[s.id] !== '')
@@ -259,13 +301,21 @@ export default function Nilai() {
         {activeSubTab === 'input' && (
           <div>
             <label className="nilai-label">Mata Pelajaran</label>
-            <input className="nilai-input" value={mataPelajaran} onChange={(e) => setMataPelajaran(e.target.value)} onBlur={loadExisting} placeholder="Matematika" />
+            <select
+              className="nilai-input"
+              value={mataPelajaran}
+              onChange={(e) => setMataPelajaran(e.target.value)}
+              disabled={mapelOpts.length === 0}
+            >
+              {mapelOpts.length === 0 && <option value="">Belum ada mapel di profil guru</option>}
+              {mapelOpts.map((m) => <option key={m} value={m}>{m}</option>)}
+            </select>
           </div>
         )}
         {activeSubTab === 'input' && (
           <div>
             <label className="nilai-label">Jenis</label>
-            <select className="nilai-input" value={jenis} onChange={(e) => { setJenis(e.target.value); setTimeout(loadExisting, 0) }}>
+            <select className="nilai-input" value={jenis} onChange={(e) => setJenis(e.target.value)}>
               {JENIS_OPTS.map((j) => <option key={j} value={j}>{j}</option>)}
             </select>
           </div>
@@ -273,7 +323,7 @@ export default function Nilai() {
         {activeSubTab === 'input' && (
           <div>
             <label className="nilai-label">Kompetensi</label>
-            <select className="nilai-input" value={kompetensi} onChange={(e) => { setKompetensi(e.target.value); setTimeout(loadExisting, 0) }}>
+            <select className="nilai-input" value={kompetensi} onChange={(e) => setKompetensi(e.target.value)}>
               {KOMPETENSI_OPTS.map((k) => <option key={k} value={k}>{k}</option>)}
             </select>
           </div>
@@ -286,14 +336,16 @@ export default function Nilai() {
         )}
         <div>
           <label className="nilai-label">Semester</label>
-          <select className="nilai-input" value={semester} onChange={(e) => { setSemester(e.target.value); if (activeSubTab === 'input') setTimeout(loadExisting, 0) }}>
+          <select className="nilai-input" value={semester} onChange={(e) => setSemester(e.target.value)}>
             <option>Ganjil</option>
             <option>Genap</option>
           </select>
         </div>
         <div>
           <label className="nilai-label">Tahun Ajaran</label>
-          <input className="nilai-input" value={tahunAjaran} onChange={(e) => setTahunAjaran(e.target.value)} onBlur={() => { if (activeSubTab === 'input') loadExisting(); else loadKelolaData() }} placeholder="2026/2027" />
+          <select className="nilai-input" value={tahunAjaran} onChange={(e) => setTahunAjaran(e.target.value)}>
+            {TA_OPTS.map((ta) => <option key={ta} value={ta}>{ta}</option>)}
+          </select>
         </div>
       </div>
 
