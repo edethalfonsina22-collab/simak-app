@@ -38,9 +38,32 @@ function predikatDariNilai(nilai) {
   return 'D'
 }
 
-function rataRataArr(arr) {
-  if (!arr || arr.length === 0) return null
-  return (arr.reduce((a, b) => a + b, 0) / arr.length).toFixed(1)
+// Bobot komponen nilai untuk menghitung Nilai Akhir per mapel per
+// kompetensi — HARUS sama persis dengan BOBOT_JENIS_NILAI di Rapor.jsx,
+// supaya angka Nilai Akhir yang tercetak di lembar rapor konsisten dengan
+// yang ditampilkan guru di tab Ringkasan Nilai. UH tidak diberi bobot
+// (tidak ikut dihitung ke Nilai Akhir) — hanya menambah data pendukung.
+const BOBOT_JENIS_NILAI = { Tugas: 0.2, UTS: 0.3, UAS: 0.5 }
+
+// Menghitung Nilai Akhir tertimbang dari kumpulan nilai per jenis
+// (mis. { Tugas: [80,85], UTS: [78], UAS: [90] }). Kalau salah satu jenis
+// belum ada nilainya sama sekali, bobotnya TIDAK dianggap 0 — melainkan
+// ditiadakan dari perhitungan dan bobot yang tersisa dinormalisasi ulang,
+// supaya guru yang belum sempat input UAS misalnya tidak dirugikan nilai
+// akhirnya jadi kekecilan secara tidak adil. null kalau semua jenis kosong.
+function nilaiAkhirTertimbang(perJenis) {
+  let totalNilaiBerbobot = 0
+  let totalBobotTerpakai = 0
+  for (const [jenis, bobot] of Object.entries(BOBOT_JENIS_NILAI)) {
+    const arr = perJenis[jenis]
+    if (arr && arr.length > 0) {
+      const rataJenis = arr.reduce((a, b) => a + b, 0) / arr.length
+      totalNilaiBerbobot += rataJenis * bobot
+      totalBobotTerpakai += bobot
+    }
+  }
+  if (totalBobotTerpakai === 0) return null
+  return (totalNilaiBerbobot / totalBobotTerpakai).toFixed(1)
 }
 
 export default function RaporCetak() {
@@ -111,7 +134,9 @@ export default function RaporCetak() {
     ] = await Promise.all([
       supabase
         .from('nilai')
-        // + kompetensi, supaya nilai Pengetahuan & Keterampilan bisa dipisah
+        // + kompetensi & jenis, supaya nilai bisa dipecah per Pengetahuan/
+        // Keterampilan dan dihitung dengan bobot Tugas/UTS/UAS yang sama
+        // seperti di tab Ringkasan Nilai halaman Rapor.
         .select('mata_pelajaran, kompetensi, jenis, nilai')
         .eq('siswa_id', siswaId)
         .eq('semester', semester)
@@ -166,14 +191,22 @@ export default function RaporCetak() {
     setLoading(false)
   }
 
-  // ---------- Rekap nilai per mapel, dipecah Pengetahuan/Keterampilan ----------
+  // ---------- Rekap nilai per mapel, dipecah Pengetahuan/Keterampilan, lalu
+  // digabung per jenis (Tugas/UH/UTS/UAS) supaya bisa dihitung dengan
+  // bobot yang sama seperti tab Ringkasan Nilai di halaman Rapor.jsx.
   const rekapPerMapelKompetensi = {}
   for (const n of nilai) {
     if (!rekapPerMapelKompetensi[n.mata_pelajaran]) {
-      rekapPerMapelKompetensi[n.mata_pelajaran] = { Pengetahuan: [], Keterampilan: [] }
+      rekapPerMapelKompetensi[n.mata_pelajaran] = {
+        Pengetahuan: { Tugas: [], UH: [], UTS: [], UAS: [] },
+        Keterampilan: { Tugas: [], UH: [], UTS: [], UAS: [] },
+      }
     }
     const kk = n.kompetensi === 'Keterampilan' ? 'Keterampilan' : 'Pengetahuan'
-    rekapPerMapelKompetensi[n.mata_pelajaran][kk].push(n.nilai)
+    // Jenis yang tidak dikenal (data lama/tidak standar) dianggap Tugas
+    // supaya tetap ikut terhitung, bukan hilang begitu saja dari rekap.
+    const jj = ['Tugas', 'UH', 'UTS', 'UAS'].includes(n.jenis) ? n.jenis : 'Tugas'
+    rekapPerMapelKompetensi[n.mata_pelajaran][kk][jj].push(n.nilai)
   }
 
   const semuaMapel = [
@@ -184,13 +217,16 @@ export default function RaporCetak() {
   ]
 
   const barisMapel = semuaMapel.map((mapel) => {
-    const rr = rekapPerMapelKompetensi[mapel] || { Pengetahuan: [], Keterampilan: [] }
+    const rr = rekapPerMapelKompetensi[mapel] || {
+      Pengetahuan: { Tugas: [], UH: [], UTS: [], UAS: [] },
+      Keterampilan: { Tugas: [], UH: [], UTS: [], UAS: [] },
+    }
     const deskripsiPengetahuan =
       capaianList.find((c) => c.mata_pelajaran === mapel && c.jenis === 'Pengetahuan')?.deskripsi_capaian || ''
     const deskripsiKeterampilan =
       capaianList.find((c) => c.mata_pelajaran === mapel && c.jenis === 'Keterampilan')?.deskripsi_capaian || ''
-    const nilaiPengetahuan = rataRataArr(rr.Pengetahuan)
-    const nilaiKeterampilan = rataRataArr(rr.Keterampilan)
+    const nilaiPengetahuan = nilaiAkhirTertimbang(rr.Pengetahuan)
+    const nilaiKeterampilan = nilaiAkhirTertimbang(rr.Keterampilan)
     return {
       mapel,
       pengetahuan: {
@@ -447,6 +483,9 @@ export default function RaporCetak() {
             )}
           </tbody>
         </table>
+        <p className="text-xs text-ink-700/40 -mt-4 mb-6">
+          Nilai Akhir = Tugas 20% + UTS 30% + UAS 50% (UH tidak ikut dihitung). Kalau salah satu komponen belum diisi, bobot sisanya otomatis dinormalisasi.
+        </p>
 
         <h2 className="font-display font-semibold mb-2">B. Profil Pelajar Pancasila (P5)</h2>
         <table className="w-full border-collapse mb-6 text-sm">
