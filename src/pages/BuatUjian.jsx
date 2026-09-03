@@ -21,6 +21,24 @@ function buatKodeUjian() {
 // `.select('guru_id, role')` di dalam ambilKelas() di bawah.
 const PERAN_ISTIMEWA = ['superadmin', 'admin', 'kepala_sekolah'];
 
+// Pilihan tetap untuk dropdown "Judul Ujian" — pola sama seperti JENIS_OPTS
+// di Nilai.jsx (daftar tetap, bukan diambil dari database).
+const JUDUL_UJIAN_OPTS = ['Ulangan Harian', 'UTS', 'UAS', 'Tugas'];
+
+// Pecah kolom guru.mata_pelajaran (bisa berisi satu mapel atau beberapa
+// mapel digabung koma/slash) menjadi daftar opsi dropdown yang rapi dan
+// tanpa duplikat. Disalin dari pola yang sama persis dengan Nilai.jsx,
+// supaya dropdown Mata Pelajaran di sini konsisten dengan halaman Nilai.
+function pecahMapel(raw) {
+  if (!raw) return [];
+  return [...new Set(
+    raw
+      .split(/[,/]+/)
+      .map((m) => m.trim())
+      .filter(Boolean)
+  )];
+}
+
 // Menormalkan nilai role dari DB supaya perbandingan tidak peduli huruf besar/kecil
 // atau pemisah spasi vs underscore. "Kepala Sekolah", "kepala_sekolah", "KEPALA-SEKOLAH"
 // semuanya akan menjadi "kepala_sekolah".
@@ -45,8 +63,9 @@ export default function BuatUjian() {
   // lihat pengecekan isPerananIstimewa di bawah.
   const [guruIdAsli, setGuruIdAsli] = useState(null);
   const [peran, setPeran] = useState(null); // nilai mentah dari profil.role, apa adanya
-  const [judul, setJudul] = useState('');
+  const [judul, setJudul] = useState(JUDUL_UJIAN_OPTS[0]);
   const [mapel, setMapel] = useState('');
+  const [mapelOpts, setMapelOpts] = useState([]); // opsi dropdown Mata Pelajaran, diisi dari tabel guru
   const [kelasId, setKelasId] = useState('');
   const [fileExcel, setFileExcel] = useState(null);
   const [soalPreview, setSoalPreview] = useState([]);
@@ -144,6 +163,48 @@ export default function BuatUjian() {
     }
     ambilKelas();
   }, [guruId]);
+
+  // Ambil daftar mapel dari kolom guru.mata_pelajaran milik guru yang login,
+  // lalu dipecah jadi beberapa opsi dropdown kalau berisi lebih dari satu
+  // mapel (dipisah koma/slash) — pola ini SAMA PERSIS dengan yang dipakai
+  // di Nilai.jsx untuk dropdown Mata Pelajaran di tab "Input Nilai".
+  useEffect(() => {
+    if (!guruId) {
+      setMapelOpts([]);
+      return;
+    }
+
+    if (guruIdAsli) {
+      supabase
+        .from('guru')
+        .select('mata_pelajaran')
+        .eq('id', guruIdAsli)
+        .single()
+        .then(({ data }) => {
+          const opts = pecahMapel(data?.mata_pelajaran);
+          setMapelOpts(opts);
+          setMapel((prev) => (opts.includes(prev) ? prev : opts[0] || ''));
+        });
+      return;
+    }
+
+    if (isPerananIstimewa) {
+      // Superadmin/Admin/Kepala Sekolah biasanya tidak punya baris sendiri
+      // di tabel guru (guruIdAsli null), jadi supaya dropdown-nya tidak
+      // kosong, tampilkan gabungan SEMUA mata pelajaran dari seluruh guru.
+      supabase
+        .from('guru')
+        .select('mata_pelajaran')
+        .then(({ data }) => {
+          const semua = [...new Set((data || []).flatMap((g) => pecahMapel(g.mata_pelajaran)))].sort();
+          setMapelOpts(semua);
+          setMapel((prev) => (semua.includes(prev) ? prev : semua[0] || ''));
+        });
+      return;
+    }
+
+    setMapelOpts([]);
+  }, [guruId, guruIdAsli, isPerananIstimewa]);
 
   // Ambil semua soal dari Bank Soal saat tab "Pilih dari Bank Soal" pertama kali dibuka
   useEffect(() => {
@@ -421,22 +482,34 @@ export default function BuatUjian() {
 
         <div>
           <label className="block text-sm font-medium mb-1 text-[#6b0f1a]">Judul Ujian</label>
-          <input
+          <select
             value={judul}
             onChange={(e) => setJudul(e.target.value)}
             className="w-full rounded-lg px-3 py-2 border border-[#6b0f1a]/15 focus:border-[#6b0f1a] focus:ring-2 focus:ring-[#6b0f1a]/20 outline-none transition-colors"
-            placeholder="Ulangan Harian Bab 3"
-          />
+          >
+            {JUDUL_UJIAN_OPTS.map((opt) => (
+              <option key={opt} value={opt}>
+                {opt}
+              </option>
+            ))}
+          </select>
         </div>
 
         <div>
           <label className="block text-sm font-medium mb-1 text-[#6b0f1a]">Mata Pelajaran</label>
-          <input
+          <select
             value={mapel}
             onChange={(e) => setMapel(e.target.value)}
-            className="w-full rounded-lg px-3 py-2 border border-[#6b0f1a]/15 focus:border-[#6b0f1a] focus:ring-2 focus:ring-[#6b0f1a]/20 outline-none transition-colors"
-            placeholder="Matematika"
-          />
+            disabled={mapelOpts.length === 0}
+            className="w-full rounded-lg px-3 py-2 border border-[#6b0f1a]/15 focus:border-[#6b0f1a] focus:ring-2 focus:ring-[#6b0f1a]/20 outline-none transition-colors disabled:opacity-50"
+          >
+            {mapelOpts.length === 0 && <option value="">Belum ada mapel di profil guru</option>}
+            {mapelOpts.map((m) => (
+              <option key={m} value={m}>
+                {m}
+              </option>
+            ))}
+          </select>
         </div>
 
         <div>
