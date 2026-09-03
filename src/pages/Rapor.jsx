@@ -272,12 +272,16 @@ export default function Rapor() {
   const [kdLoading, setKdLoading] = useState(false)
   const [kdBaru, setKdBaru] = useState({ kode: '', teks: '' })
 
-  // Kelas hanya menampilkan kelas milik guru yang sedang login.
-  // PENTING: kelas.wali_kelas_id menunjuk ke guru.id, BUKAN langsung ke
-  // auth.users.id. Jembatannya adalah tabel `profil`:
+  // Kelas: guru hanya melihat kelas miliknya sendiri (wali_kelas_id), tapi
+  // admin/kepala sekolah harus tetap bisa melihat & kelola SEMUA kelas
+  // seperti sebelumnya. PENTING: kelas.wali_kelas_id menunjuk ke guru.id,
+  // BUKAN langsung ke auth.users.id. Jembatannya adalah tabel `profil`:
   //   profil.id      = auth.uid()  (user yang login)
-  //   profil.guru_id = guru.id     (dipakai di kelas.wali_kelas_id)
-  // Jadi kita ambil guru_id dari profil dulu, baru filter kelas dengan itu.
+  //   profil.role    = 'admin' | 'guru'
+  //   profil.guru_id = guru.id     (dipakai di kelas.wali_kelas_id, hanya
+  //                                 relevan untuk role guru)
+  // Jadi kita cek role dulu: admin -> ambil semua kelas tanpa filter;
+  // guru -> filter kelas dengan wali_kelas_id = guru_id miliknya.
   // RLS di database juga sudah membatasi ini di level server dengan logika
   // yang sama, tapi query di sini tetap eksplisit difilter supaya UI
   // konsisten dan tidak sempat memuat data yang tidak relevan.
@@ -293,12 +297,34 @@ export default function Rapor() {
 
       const { data: profilData, error: profilError } = await supabase
         .from('profil')
-        .select('guru_id')
+        .select('guru_id, role')
         .eq('id', user.id)
         .maybeSingle()
 
-      if (profilError || !profilData?.guru_id) {
+      if (profilError) {
         console.error(profilError)
+        setKelasList([])
+        return
+      }
+
+      // Admin/kepala sekolah: lihat & kelola SEMUA kelas, tidak difilter
+      // berdasarkan wali kelas.
+      if (profilData?.role === 'admin') {
+        const { data, error } = await supabase
+          .from('kelas')
+          .select('id, nama_kelas')
+          .order('nama_kelas')
+        if (error) {
+          console.error(error)
+          setKelasList([])
+          return
+        }
+        setKelasList(data || [])
+        return
+      }
+
+      // Guru: hanya kelas yang dia jadi wali kelasnya.
+      if (!profilData?.guru_id) {
         setKelasList([])
         return
       }
@@ -318,8 +344,10 @@ export default function Rapor() {
     muatKelasGuru()
   }, [])
 
-  // Siswa hanya dimuat dari kelas-kelas milik guru yang login (kelasList
-  // di atas). Menunggu kelasList terisi dulu supaya filter kelas_id benar.
+  // Siswa hanya dimuat dari kelas-kelas yang ada di kelasList (untuk admin
+  // ini otomatis berarti SEMUA kelas, untuk guru hanya kelasnya sendiri,
+  // karena kelasList di atas sudah disesuaikan per role). Menunggu
+  // kelasList terisi dulu supaya filter kelas_id benar.
   useEffect(() => {
     async function muatSiswaGuru() {
       if (kelasList.length === 0) {
@@ -438,7 +466,8 @@ export default function Rapor() {
 
   // Daftar siswa yang tampil di dropdown & tabel — otomatis terfilter kalau
   // sebuah kelas dipilih, kalau tidak tampilkan semua siswa (yang sudah
-  // difilter ke kelas milik guru lewat muatSiswaGuru di atas).
+  // difilter sesuai kelas milik guru, atau semua kelas untuk admin, lewat
+  // muatSiswaGuru di atas).
   const siswaTerfilter = kelasId ? siswaList.filter((s) => s.kelas_id === kelasId) : siswaList
 
   // ---------- Ringkasan nilai — kini dipecah per kompetensi ----------
