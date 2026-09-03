@@ -458,7 +458,14 @@ function PresensiPribadi({ profil }) {
         @media print {
           body * { visibility: hidden; }
           #print-area-siswa, #print-area-siswa * { visibility: visible; }
-          #print-area-siswa { position: absolute; left: 0; top: 0; width: 100%; padding: 24px; }
+          #print-area-siswa {
+            display: block !important;
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100%;
+            padding: 24px;
+          }
         }
       `}</style>
 
