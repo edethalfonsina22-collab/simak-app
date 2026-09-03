@@ -57,7 +57,7 @@ import { supabase } from '../lib/supabaseClient'
 // Menu ADMIN dikelompokkan per kategori supaya tidak jadi satu daftar panjang.
 // Dibuat sebagai fungsi karena "Persetujuan Akun" dan "Profil Sekolah" hanya
 // boleh tampil untuk admin utama / superadmin, bukan admin biasa.
-function getGroupsAdmin(isAdminUtama, jumlahMenunggu = 0, jumlahPesanBelumDibaca = 0, jumlahPesanPusatBelumDibaca = 0) {
+function getGroupsAdmin(isAdminUtama, isSuperAdmin, jumlahMenunggu = 0, jumlahPesanBelumDibaca = 0, jumlahPesanPusatBelumDibaca = 0) {
   return [
     {
       label: null, // tanpa judul grup — selalu di atas
@@ -382,7 +382,7 @@ export default function Sidebar({ open = false, onClose = () => {} }) {
     }
   }, [session?.user?.id, isAdmin, isSuperAdmin, sekolahId])
 
-  const groupsAdmin = getGroupsAdmin(isAdminUtama, jumlahMenunggu, jumlahPesanBelumDibaca, jumlahPesanPusatBelumDibaca)
+  const groupsAdmin = getGroupsAdmin(isAdminUtama, isSuperAdmin, jumlahMenunggu, jumlahPesanBelumDibaca, jumlahPesanPusatBelumDibaca)
   const linksGuru = getLinksGuru(jumlahPesanBelumDibaca)
 
   return (
