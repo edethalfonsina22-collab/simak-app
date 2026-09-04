@@ -1,20 +1,27 @@
 import { useEffect, useState, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabaseClient";
+import { useAuth } from "../lib/AuthContext";
 
 // =========================================================
 // Komponen Barang Toko
 // - Semua user login: hanya bisa LIHAT barang + harga
 // - Superadmin: bisa Tambah, Edit, Hapus barang
 // URL: /toko/:id/barang
+//
+// PERBAIKAN:
+// Sebelumnya komponen ini mengambil role sendiri lewat query manual ke
+// tabel "profiles" (tidak ada di database ini — tabel yang benar adalah
+// "profil", lihat AuthContext.jsx). Sekarang role diambil dari
+// AuthContext, sama seperti Toko.jsx dan Sidebar.jsx.
 // =========================================================
 export default function BarangToko() {
   const { id: tokoId } = useParams();
   const navigate = useNavigate();
+  const { isSuperAdmin, profil } = useAuth();
 
   const [toko, setToko] = useState(null);
   const [barangList, setBarangList] = useState([]);
-  const [role, setRole] = useState(null);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState("");
 
@@ -30,7 +37,7 @@ export default function BarangToko() {
     status: "aktif",
   });
 
-  const isSuperadmin = role === "superadmin";
+  const isSuperadmin = isSuperAdmin;
 
   const formatRupiah = (angka) => {
     const n = Number(angka) || 0;
@@ -40,32 +47,6 @@ export default function BarangToko() {
       minimumFractionDigits: 0,
     });
   };
-
-  // ---------------------------------------------------
-  // Ambil role user yang sedang login
-  // ---------------------------------------------------
-  const fetchRole = useCallback(async () => {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
-      setRole(null);
-      return;
-    }
-
-    const { data, error } = await supabase
-      .from("profiles")
-      .select("role")
-      .eq("id", user.id)
-      .single();
-
-    if (error) {
-      console.error("Gagal mengambil role:", error.message);
-      return;
-    }
-    setRole(data?.role ?? "user");
-  }, []);
 
   // ---------------------------------------------------
   // Ambil info toko (untuk judul halaman)
@@ -105,10 +86,9 @@ export default function BarangToko() {
   }, [tokoId]);
 
   useEffect(() => {
-    fetchRole();
     fetchToko();
     fetchBarang();
-  }, [fetchRole, fetchToko, fetchBarang]);
+  }, [fetchToko, fetchBarang]);
 
   // ---------------------------------------------------
   // Form handlers
@@ -230,7 +210,7 @@ export default function BarangToko() {
 
       {!isSuperadmin && (
         <p className="mb-4 text-sm text-gray-500">
-          Anda login sebagai <b>{role ?? "user"}</b>. Hanya superadmin yang
+          Anda login sebagai <b>{profil?.role ?? "user"}</b>. Hanya superadmin yang
           bisa menambah, mengedit, atau menghapus barang.
         </p>
       )}
