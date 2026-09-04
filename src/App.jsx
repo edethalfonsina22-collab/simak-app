@@ -65,6 +65,7 @@ import RaporAnak from './pages/RaporAnak'
 import PresensiAnak from './pages/PresensiAnak'
 import PortofolioAnak from './pages/PortofolioAnak'
 import Toko from './pages/Toko'
+import BarangToko from './pages/BarangToko'
 import Loader from './components/Loader'
 
 function ProtectedRoute({ children, adminOnly, adminUtamaOnly, superAdminOnly }) {
@@ -233,11 +234,11 @@ export default function App() {
           jadi mereka bisa langsung gabung cukup dengan mengisi nama.
           RapatVideo sendiri yang menangani kasus sudah login vs tamu. */}
       <Route path="/rapat/:roomId" element={<RapatVideo />} />
-      {/* Toko: BUKAN adminOnly — guru dan orang tua juga bisa mengakses halaman
-          toko, kontrol tambah/ubah/hapus produk sudah dibatasi di dalam
-          komponen Toko.jsx lewat isAdmin dari useAuth() (sama pola dengan
-          Kalender Pendidikan). */}
+      {/* Toko: daftar toko + barang di dalamnya. Semua user login boleh
+          melihat, pembatasan tambah/edit/hapus (superadmin only) sudah
+          ditangani di dalam komponen Toko.jsx dan BarangToko.jsx sendiri. */}
       <Route path="/toko" element={<ProtectedRoute><Toko /></ProtectedRoute>} />
+      <Route path="/toko/:id/barang" element={<ProtectedRoute><BarangToko /></ProtectedRoute>} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )
