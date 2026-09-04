@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
-import { useLocation } from 'react-router-dom'
-import { Bell, MessageSquare, X, Menu } from 'lucide-react'
+import { Link, useLocation } from 'react-router-dom'
+import { Bell, MessageSquare, X, Menu, Store } from 'lucide-react'
 import Sidebar from './Sidebar'
 import { useAuth } from '../lib/AuthContext'
 import { usePresenceTracker } from '../hooks/usePresenceTracker'
@@ -221,6 +221,15 @@ export default function Layout({ children, title, subtitle, actions }) {
             </div>
           </div>
           <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+            {/* Tombol Toko — dipindah dari sidebar ke header */}
+            <Link
+              to="/toko"
+              className="flex items-center gap-2 px-3 h-10 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-colors"
+            >
+              <Store size={18} strokeWidth={2} />
+              <span className="hidden sm:inline">Toko</span>
+            </Link>
+
             <NotificationBell />
             {actions && <div className="flex items-center gap-2 sm:gap-3">{actions}</div>}
           </div>
