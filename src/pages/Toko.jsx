@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { supabase } from "../lib/supabaseClient";
 import { useAuth } from "../lib/AuthContext";
+import Layout from "../components/Layout";
 
 // =========================================================
 // Komponen Toko
@@ -299,37 +300,39 @@ export default function Toko() {
   // ---------------------------------------------------
   // Render
   // ---------------------------------------------------
-  if (authLoading || loading) return <div className="p-4">Memuat data toko...</div>;
+  if (authLoading || loading) {
+    return (
+      <Layout title="Data Toko" subtitle="Kelola daftar toko dan barangnya">
+        <div>Memuat data toko...</div>
+      </Layout>
+    );
+  }
+
+  const headerActions = isSuperadmin && (
+    <>
+      <label className="px-3 py-2 text-sm bg-gray-100 rounded cursor-pointer hover:bg-gray-200">
+        Import CSV
+        <input
+          type="file"
+          accept=".csv"
+          onChange={handleImportCSV}
+          className="hidden"
+        />
+      </label>
+      <button
+        onClick={() => {
+          resetForm();
+          setShowForm(true);
+        }}
+        className="px-3 py-2 text-sm text-white bg-blue-600 rounded hover:bg-blue-700"
+      >
+        + Tambah Toko
+      </button>
+    </>
+  );
 
   return (
-    <div className="p-4">
-      <div className="flex items-center justify-between mb-4">
-        <h1 className="text-xl font-semibold">Data Toko</h1>
-
-        {isSuperadmin && (
-          <div className="flex gap-2">
-            <label className="px-3 py-2 text-sm bg-gray-100 rounded cursor-pointer hover:bg-gray-200">
-              Import CSV
-              <input
-                type="file"
-                accept=".csv"
-                onChange={handleImportCSV}
-                className="hidden"
-              />
-            </label>
-            <button
-              onClick={() => {
-                resetForm();
-                setShowForm(true);
-              }}
-              className="px-3 py-2 text-sm text-white bg-blue-600 rounded hover:bg-blue-700"
-            >
-              + Tambah Toko
-            </button>
-          </div>
-        )}
-      </div>
-
+    <Layout title="Data Toko" subtitle="Kelola daftar toko dan barangnya" actions={headerActions}>
       {errorMsg && (
         <div className="mb-4 text-sm text-red-600">{errorMsg}</div>
       )}
@@ -620,6 +623,6 @@ export default function Toko() {
           </div>
         </div>
       )}
-    </div>
+    </Layout>
   );
 }
