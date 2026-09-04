@@ -60,6 +60,8 @@ import SuratKeteranganLulus from './pages/SuratKeteranganLulus'
 import BuatKuisSeru from './pages/BuatKuisSeru'
 import KuisSeru from './pages/KuisSeru'
 import HasilKuisSeru from './pages/HasilKuisSeru'
+import RaporAnak from './pages/RaporAnak'
+import PresensiAnak from './pages/PresensiAnak'
 import Loader from './components/Loader'
 
 function ProtectedRoute({ children, adminOnly, adminUtamaOnly, superAdminOnly }) {
@@ -167,6 +169,11 @@ export default function App() {
       <Route path="/nilai" element={<ProtectedRoute><Nilai /></ProtectedRoute>} />
       <Route path="/rapor" element={<ProtectedRoute><Rapor /></ProtectedRoute>} />
       <Route path="/rapor/cetak" element={<ProtectedRoute><RaporCetak /></ProtectedRoute>} />
+      {/* Halaman khusus orang tua — read-only, anak diambil lewat tabel
+          orang_tua_siswa (lihat getAnakSaya di AuthContext), bukan lewat
+          dropdown bebas seperti /rapor dan /presensi milik guru. */}
+      <Route path="/rapor-anak" element={<ProtectedRoute><RaporAnak /></ProtectedRoute>} />
+      <Route path="/presensi-anak" element={<ProtectedRoute><PresensiAnak /></ProtectedRoute>} />
       <Route path="/nilai-asesmen" element={<ProtectedRoute><NilaiAsesmen /></ProtectedRoute>} />
       <Route path="/ijazah" element={<ProtectedRoute><Ijazah /></ProtectedRoute>} />
       <Route path="/skl" element={<ProtectedRoute><SuratKeteranganLulus /></ProtectedRoute>} />
