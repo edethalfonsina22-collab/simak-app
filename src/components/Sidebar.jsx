@@ -234,20 +234,36 @@ function getInisial(nama) {
 
 // Label peran yang tampil di header sidebar — utamakan jabatan yang dipilih
 // sendiri saat daftar (mis. "Kepala Sekolah"), baru fallback ke role teknis.
-function getLabelPeran(profil, isSuperAdmin, isAdminUtama, isAdmin) {
+function getLabelPeran(profil, isSuperAdmin, isAdminUtama, isAdmin, isOrangTua) {
   if (isSuperAdmin) return 'Superadmin'
   if (profil?.jabatan === 'kepala_sekolah') return 'Kepala Sekolah'
   if (isAdminUtama) return 'Admin Utama'
   if (isAdmin) return 'Admin'
+  if (isOrangTua) return 'Orang Tua/Wali'
   return 'Guru'
 }
 
+// Menu ORANG TUA: sangat ringkas, hanya halaman read-only milik anak
+// mereka sendiri — TIDAK PERNAH pakai getLinksGuru(), supaya orang tua
+// tidak pernah melihat menu kerja guru (Presensi, Nilai, dsb yang bisa
+// diedit untuk SEMUA siswa di kelas).
+function getLinksOrangTua(jumlahPesanBelumDibaca = 0) {
+  return [
+    { to: '/', label: 'Dasbor', icon: LayoutDashboard, end: true },
+    { to: '/profil-saya', label: 'Profil Saya', icon: UserCircle },
+    { to: '/pesan', label: 'Pesan', icon: MessageCircle, badge: jumlahPesanBelumDibaca },
+    { to: '/rapor-anak', label: 'Rapor Anak', icon: FileBadge },
+    { to: '/presensi-anak', label: 'Presensi Anak', icon: ClipboardCheck },
+    { to: '/pengumuman', label: 'Pengumuman', icon: Megaphone },
+  ]
+}
+
 export default function Sidebar({ open = false, onClose = () => {} }) {
-  const { signOut, session, profil, isAdmin, isAdminUtama, isSuperAdmin, sekolahId } = useAuth()
+  const { signOut, session, profil, isAdmin, isAdminUtama, isSuperAdmin, isOrangTua, sekolahId } = useAuth()
   const fotoUrl = getFotoUrl(profil?.foto_profil_path)
   const namaTampil = profil?.nama_lengkap || session?.user?.email || 'Pengguna'
 
-  const labelPeran = getLabelPeran(profil, isSuperAdmin, isAdminUtama, isAdmin)
+  const labelPeran = getLabelPeran(profil, isSuperAdmin, isAdminUtama, isAdmin, isOrangTua)
 
   // Notifikasi real-time: jumlah pendaftaran akun yang masih menunggu persetujuan.
   // Hanya relevan untuk admin utama / superadmin yang punya menu "Persetujuan Akun".
@@ -384,6 +400,7 @@ export default function Sidebar({ open = false, onClose = () => {} }) {
 
   const groupsAdmin = getGroupsAdmin(isAdminUtama, isSuperAdmin, jumlahMenunggu, jumlahPesanBelumDibaca, jumlahPesanPusatBelumDibaca)
   const linksGuru = getLinksGuru(jumlahPesanBelumDibaca)
+  const linksOrangTua = getLinksOrangTua(jumlahPesanBelumDibaca)
 
   return (
     <>
@@ -489,6 +506,12 @@ export default function Sidebar({ open = false, onClose = () => {} }) {
               </div>
             </div>
           ))
+        ) : isOrangTua ? (
+          <div className="space-y-1">
+            {linksOrangTua.map((link) => (
+              <NavItem key={link.to} {...link} onNavigate={onClose} />
+            ))}
+          </div>
         ) : (
           <div className="space-y-1">
             {linksGuru.map((link) => (
