@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../lib/AuthContext'
 import Layout from '../components/Layout'
 import GrafikAktivitas from '../components/GrafikAktivitas'
-import { Camera, Loader2, Save, Users, School, ShieldCheck, UserCircle2, Clock, CheckCircle2, XCircle } from 'lucide-react'
+import { Camera, Loader2, Save, Users, School, ShieldCheck, UserCircle2, Clock, CheckCircle2, XCircle, UserPlus, X } from 'lucide-react'
 // ASUMSI: menggunakan library `react-barcode` untuk membuat kode batang (linear barcode) di sisi klien.
 // Install dulu kalau belum ada: npm install react-barcode
 import Barcode from 'react-barcode'
@@ -366,13 +366,140 @@ function ProfilAdminCard({ profil, userId, adminData }) {
   )
 }
 
+// Modal untuk menghubungkan anak tambahan (ke-2, ke-3, dst) ke akun orang
+// tua yang sudah login. Sengaja dibuat terpisah dari alur pendaftaran
+// (Register.jsx) — di sini siswa difilter dari sekolah_id akun yang sudah
+// login (profil.sekolah_id), bukan dari sekolah yang dipilih di form
+// pendaftaran. Memanggil tambahAnak() dari AuthContext yang sudah ada;
+// baris baru otomatis berstatus 'menunggu' dan akan muncul di tab
+// "Anak Menunggu" pada halaman admin PersetujuanAkun.jsx.
+function ModalTambahAnak({ sekolahId, anakSudahTerhubung, onClose, onBerhasil }) {
+  const { tambahAnak } = useAuth()
+  const [daftarSiswa, setDaftarSiswa] = useState([])
+  const [loadingSiswa, setLoadingSiswa] = useState(true)
+  const [siswaId, setSiswaId] = useState('')
+  const [hubungan, setHubungan] = useState('')
+  const [mengirim, setMengirim] = useState(false)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    let aktif = true
+    async function muat() {
+      setLoadingSiswa(true)
+      const { data } = await supabase
+        .from('siswa_publik_registrasi')
+        .select('id, nama_lengkap, nis, nisn')
+        .eq('sekolah_id', sekolahId)
+        .order('nama_lengkap')
+      if (!aktif) return
+      // Sembunyikan siswa yang sudah tertaut (status menunggu/aktif) ke
+      // akun ini, supaya tidak dobel kirim permintaan untuk anak yang sama.
+      const idSudahAda = (anakSudahTerhubung || []).map((a) => a.siswa?.id).filter(Boolean)
+      setDaftarSiswa((data || []).filter((s) => !idSudahAda.includes(s.id)))
+      setLoadingSiswa(false)
+    }
+    if (sekolahId) muat()
+    return () => {
+      aktif = false
+    }
+  }, [sekolahId, anakSudahTerhubung])
+
+  async function handleSubmit(e) {
+    e.preventDefault()
+    setError('')
+    if (!siswaId) {
+      setError('Silakan pilih anak dari daftar.')
+      return
+    }
+    if (!hubungan) {
+      setError('Silakan pilih hubungan dengan anak.')
+      return
+    }
+    setMengirim(true)
+    const { error: err } = await tambahAnak({ siswaId, hubungan })
+    setMengirim(false)
+    if (err) {
+      setError(err.message || 'Gagal mengirim permintaan.')
+      return
+    }
+    onBerhasil()
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center px-4 z-50">
+      <div className="bg-white rounded-2xl max-w-md w-full p-5">
+        <div className="flex items-center justify-between mb-1">
+          <h2 className="font-semibold text-ink-950">Tambah Anak</h2>
+          <button type="button" onClick={onClose} className="text-ink-700/40 hover:text-ink-700/70">
+            <X size={18} />
+          </button>
+        </div>
+        <p className="text-xs text-ink-700/50 mb-4">
+          Pilih anak lain yang juga merupakan tanggungan Anda. Permintaan ini akan menunggu
+          persetujuan admin sekolah sebelum muncul di daftar "Anak Terhubung".
+        </p>
+
+        <form onSubmit={handleSubmit} className="space-y-3">
+          <div>
+            <label className="label-field">Nama Anak</label>
+            <select
+              className="input-field"
+              value={siswaId}
+              onChange={(e) => setSiswaId(e.target.value)}
+              disabled={loadingSiswa}
+            >
+              <option value="">
+                {loadingSiswa
+                  ? 'Memuat daftar siswa...'
+                  : daftarSiswa.length === 0
+                    ? 'Tidak ada siswa lain yang bisa dipilih'
+                    : '-- Pilih Anak --'}
+              </option>
+              {daftarSiswa.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.nama_lengkap}
+                  {s.nis ? ` (NIS: ${s.nis})` : ''}
+                </option>
+              ))}
+            </select>
+            <p className="text-[11px] text-ink-700/40 mt-1">
+              Tidak menemukan nama anak Anda? Hubungi admin sekolah untuk memastikan data siswa
+              sudah terdaftar.
+            </p>
+          </div>
+
+          <div>
+            <label className="label-field">Hubungan dengan Anak</label>
+            <select className="input-field" value={hubungan} onChange={(e) => setHubungan(e.target.value)}>
+              <option value="">-- Pilih Hubungan --</option>
+              <option value="ayah">Ayah</option>
+              <option value="ibu">Ibu</option>
+              <option value="wali">Wali</option>
+            </select>
+          </div>
+
+          {error && (
+            <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{error}</p>
+          )}
+
+          <button type="submit" disabled={mengirim} className="btn-primary w-full justify-center" >
+            {mengirim && <Loader2 size={16} className="animate-spin" />}
+            {mengirim ? 'Mengirim...' : 'Kirim Permintaan'}
+          </button>
+        </form>
+      </div>
+    </div>
+  )
+}
+
 // Kartu profil untuk akun ORANG TUA/WALI — jauh lebih sederhana dari kartu
 // guru/admin (tidak ada NUPTK, pangkat/golongan, QR/barcode identitas
 // pegawai — semua itu tidak relevan untuk orang tua). Field yang bisa
 // diisi hanya identitas dasar (nama, email, no HP, alamat) + foto profil.
 // Di bawah kartu, ditampilkan juga daftar anak yang tertaut ke akun ini
 // beserta status persetujuannya, supaya orang tua langsung tahu kalau ada
-// hubungan yang masih menunggu/ditolak tanpa harus buka halaman lain.
+// hubungan yang masih menunggu/ditolak tanpa harus buka halaman lain, plus
+// tombol untuk menghubungkan anak tambahan (ke-2, ke-3, dst).
 function ProfilOrangTuaCard({ profil, userId }) {
   const { getAnakSaya } = useAuth()
 
@@ -389,6 +516,7 @@ function ProfilOrangTuaCard({ profil, userId }) {
 
   const [anakList, setAnakList] = useState([])
   const [loadingAnak, setLoadingAnak] = useState(true)
+  const [showTambahAnak, setShowTambahAnak] = useState(false)
 
   useEffect(() => {
     setForm({
@@ -400,13 +528,14 @@ function ProfilOrangTuaCard({ profil, userId }) {
     setFotoPath(profil?.foto_profil_path || '')
   }, [profil])
 
+  async function muatAnak() {
+    setLoadingAnak(true)
+    const { data } = await getAnakSaya()
+    setAnakList(data || [])
+    setLoadingAnak(false)
+  }
+
   useEffect(() => {
-    async function muatAnak() {
-      setLoadingAnak(true)
-      const { data } = await getAnakSaya()
-      setAnakList(data || [])
-      setLoadingAnak(false)
-    }
     muatAnak()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -555,9 +684,18 @@ function ProfilOrangTuaCard({ profil, userId }) {
       </form>
 
       <div className="card p-5">
-        <h4 className="font-display font-semibold text-ink-950 mb-3 flex items-center gap-2">
-          <Users size={16} /> Anak Terhubung
-        </h4>
+        <div className="flex items-center justify-between mb-3">
+          <h4 className="font-display font-semibold text-ink-950 flex items-center gap-2">
+            <Users size={16} /> Anak Terhubung
+          </h4>
+          <button
+            type="button"
+            onClick={() => setShowTambahAnak(true)}
+            className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg bg-brass-400/10 text-brass-600 hover:bg-brass-400/20"
+          >
+            <UserPlus size={14} /> Tambah Anak
+          </button>
+        </div>
         {loadingAnak ? (
           <p className="text-sm text-ink-700/50 flex items-center gap-2">
             <Loader2 size={14} className="animate-spin" /> Memuat...
@@ -586,6 +724,18 @@ function ProfilOrangTuaCard({ profil, userId }) {
           </div>
         )}
       </div>
+
+      {showTambahAnak && (
+        <ModalTambahAnak
+          sekolahId={profil?.sekolah_id}
+          anakSudahTerhubung={anakList}
+          onClose={() => setShowTambahAnak(false)}
+          onBerhasil={() => {
+            setShowTambahAnak(false)
+            muatAnak()
+          }}
+        />
+      )}
     </div>
   )
 }
