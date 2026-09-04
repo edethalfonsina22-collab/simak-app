@@ -7,7 +7,8 @@ import Layout from "../components/Layout";
 // Komponen Toko
 // - Semua user login: hanya bisa LIHAT data toko
 // - Superadmin: bisa Tambah, Edit, Hapus, dan Import CSV toko
-// - Semua user login: bisa Kelola Barang (modal) per toko
+// - Semua user login: bisa BUKA modal Kelola Barang untuk LIHAT barang
+//   per toko, tapi hanya superadmin yang bisa tambah/edit/hapus barang.
 //
 // PERBAIKAN (role):
 // Role diambil dari AuthContext (satu sumber kebenaran untuk seluruh
@@ -276,6 +277,7 @@ export default function Toko() {
   };
 
   const handleBarangEdit = (item) => {
+    if (!isSuperadmin) return;
     setBarangForm({
       nama_barang: item.nama_barang || "",
       kategori: item.kategori || "",
@@ -328,6 +330,7 @@ export default function Toko() {
 
   const handleBarangSubmit = async (e) => {
     e.preventDefault();
+    if (!isSuperadmin) return;
     if (!activeToko) return;
 
     if (!barangForm.nama_barang.trim()) {
@@ -377,6 +380,7 @@ export default function Toko() {
   };
 
   const handleBarangDelete = async (id) => {
+    if (!isSuperadmin) return;
     if (!confirm("Yakin ingin menghapus barang ini?")) return;
 
     const { error } = await supabase.from("barang").delete().eq("id", id);
@@ -590,7 +594,16 @@ export default function Toko() {
               <div className="mb-3 text-sm text-red-600">{barangError}</div>
             )}
 
-            {/* Form tambah/edit barang - semua user boleh */}
+            {!isSuperadmin && (
+              <p className="mb-3 text-sm text-gray-500">
+                Anda login sebagai <b>{profil?.role ?? "user"}</b>. Hanya
+                superadmin yang bisa menambah, mengedit, atau menghapus
+                barang.
+              </p>
+            )}
+
+            {/* Form tambah/edit barang - hanya superadmin */}
+            {isSuperadmin && (
             <form
               onSubmit={handleBarangSubmit}
               className="p-3 mb-4 space-y-2 border rounded bg-gray-50"
@@ -688,6 +701,7 @@ export default function Toko() {
                 )}
               </div>
             </form>
+            )}
 
             {/* Tabel barang */}
             {barangLoading ? (
@@ -703,13 +717,13 @@ export default function Toko() {
                       <th className="px-3 py-2">Harga</th>
                       <th className="px-3 py-2">Stok</th>
                       <th className="px-3 py-2">Satuan</th>
-                      <th className="px-3 py-2">Aksi</th>
+                      {isSuperadmin && <th className="px-3 py-2">Aksi</th>}
                     </tr>
                   </thead>
                   <tbody>
                     {barangList.length === 0 ? (
                       <tr>
-                        <td colSpan={7} className="px-3 py-4 text-center text-gray-400">
+                        <td colSpan={isSuperadmin ? 7 : 6} className="px-3 py-4 text-center text-gray-400">
                           Belum ada barang untuk toko ini
                         </td>
                       </tr>
@@ -734,20 +748,22 @@ export default function Toko() {
                           <td className="px-3 py-2">{b.harga ?? "-"}</td>
                           <td className="px-3 py-2">{b.stok ?? "-"}</td>
                           <td className="px-3 py-2">{b.satuan}</td>
-                          <td className="px-3 py-2 space-x-2">
-                            <button
-                              onClick={() => handleBarangEdit(b)}
-                              className="text-blue-600 hover:underline"
-                            >
-                              Edit
-                            </button>
-                            <button
-                              onClick={() => handleBarangDelete(b.id)}
-                              className="text-red-600 hover:underline"
-                            >
-                              Hapus
-                            </button>
-                          </td>
+                          {isSuperadmin && (
+                            <td className="px-3 py-2 space-x-2">
+                              <button
+                                onClick={() => handleBarangEdit(b)}
+                                className="text-blue-600 hover:underline"
+                              >
+                                Edit
+                              </button>
+                              <button
+                                onClick={() => handleBarangDelete(b.id)}
+                                className="text-red-600 hover:underline"
+                              >
+                                Hapus
+                              </button>
+                            </td>
+                          )}
                         </tr>
                       ))
                     )}
