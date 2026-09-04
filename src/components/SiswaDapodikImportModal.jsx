@@ -1,414 +1,530 @@
-import { useState } from 'react'
-import * as XLSX from 'xlsx'
+import { NavLink } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import {
+  X,
+  LayoutDashboard,
+  Users,
+  GraduationCap,
+  DoorOpen,
+  CalendarClock,
+  ClipboardCheck,
+  BookOpenCheck,
+  Megaphone,
+  Power,
+  Boxes,
+  CalendarDays,
+  Mail,
+  FileBadge,
+  ScrollText,
+  Stamp,
+  FileText,
+  FileSignature,
+  Wallet,
+  DatabaseBackup,
+  UserPlus,
+  Landmark,
+  Library,
+  NotebookPen,
+  Archive,
+  UserCircle,
+  Images,
+  Image,
+  HardDrive,
+  ClipboardList,
+  Database,
+  IdCard,
+  FilePlus,
+  CalendarOff,
+  FileCheck2,
+  UserCog,
+  Award,
+  Video,
+  Receipt,
+  ShoppingCart,
+  PackagePlus,
+  FolderHeart,
+  PiggyBank,
+  FileSpreadsheet,
+  Gamepad2,
+  ScanLine,
+  CalendarRange,
+  ShieldCheck,
+  MessageCircle,
+  Building2,
+} from 'lucide-react'
+import { useAuth } from '../lib/AuthContext'
 import { supabase } from '../lib/supabaseClient'
-import { Upload, X, Loader2, CheckCircle2, AlertCircle } from 'lucide-react'
 
-/**
- * Modal "Input Data Massal Siswa (dari export Dapodik)"
- *
- * COLUMN_MAP di bawah ini disesuaikan dengan urutan kolom PERSIS dari
- * file contoh "FORMAT_KELAS_DAPODIK_A_B.xlsx" (baris header ganda di
- * baris 5-6 Excel, data mulai baris 7). Urutan lengkap kolom (index
- * dari 0 = kolom A):
- *   0 No, 1 Nama, 2 NIPD, 3 JK, 4 NISN, 5 Tempat Lahir, 6 Tanggal Lahir,
- *   7 NIK, 8 Agama, 9 Alamat, 10 RT, 11 RW, 12 Dusun, 13 Kelurahan,
- *   14 Kecamatan, 15 Kode Pos, 16 Jenis Tinggal, 17 Alat Transportasi,
- *   18 Telepon, 19 HP, 20 E-Mail, 21 SKHUN, 22 Penerima KPS, 23 No. KPS,
- *   24-29 Data Ayah (Nama, Tahun Lahir, Pendidikan, Pekerjaan, Penghasilan, NIK),
- *   30-35 Data Ibu (6 kolom sama),
- *   36-41 Data Wali (6 kolom sama),
- *   42 Rombel Saat Ini, 43 No Peserta UN, 44 No Seri Ijazah,
- *   45 Penerima KIP, 46 Nomor KIP, 47 Nama di KIP, 48 Nomor KKS,
- *   49 No Registrasi Akta Lahir, 50 Bank, 51 Nomor Rekening Bank,
- *   52 Rekening Atas Nama, 53 Layak PIP, 54 Alasan Layak PIP,
- *   55 Kebutuhan Khusus, 56 Sekolah Asal, 57 Anak ke-, 58 Lintang,
- *   59 Bujur, 60 No KK, 61 Berat Badan, 62 Tinggi Badan,
- *   63 Lingkar Kepala, 64 Jml. Saudara Kandung, 65 Jarak Rumah ke Sekolah
- *
- * PENTING: kalau file export Dapodik sekolah Anda punya kolom yang
- * ditambah/dikurangi oleh Kemendikbud di kemudian hari, urutan index
- * ini bisa berubah. Cara cek cepat: buka file baru, lihat baris 5-6
- * (header), hitung manual posisi kolom "Rombel Saat Ini" dari kolom A=0.
- * Kalau berbeda dari 42, ubah nilai `col` pada baris `rombel` di bawah.
- *
- * NORMALISASI ROMBEL: field "Rombel Saat Ini" pada Dapodik kadang
- * berisi "Kelas 3A" / "Kelas 3B" (karena kelas 3 dipecah jadi 2
- * rombongan belajar). Sesuai permintaan, nilai seperti itu diringkas
- * menjadi angka kelasnya saja ("3"), sementara "Kelas 1", "Kelas 2",
- * "Kelas 4", "Kelas 5", "Kelas 6" tetap masuk sebagai angka kelasnya
- * juga ("1".."6"). Kalau justru ingin tahu rombel aslinya (3A vs 3B)
- * untuk keperluan lain (mis. membedakan wali kelas), simpan juga nilai
- * mentahnya di kolom terpisah — lihat field `rombel_asli` di bawah.
- *
- * PENYIMPANAN: memakai UPSERT berdasarkan NISN (bukan hapus-lalu-insert
- * seperti pada modal BKU), karena data siswa levelnya "per anak", bukan
- * "per bulan". Jadi upload file yang sama / file yang sudah diperbarui
- * akan memperbarui data siswa yang NISN-nya sudah ada, dan menambahkan
- * siswa baru yang belum ada. Siswa tanpa NISN akan selalu diinsert baru
- * (perlu dicek manual kalau ada duplikat).
- *
- * Penggunaan:
- *   import SiswaDapodikImportModal from '../components/SiswaDapodikImportModal'
- *   ...
- *   <SiswaDapodikImportModal npsn={npsnSekolah} onSelesai={loadSiswa} />
- */
-
-const COLUMN_MAP = [
-  { key: 'no_urut', col: 0, type: 'int' },
-  { key: 'nama', col: 1, type: 'text' },
-  { key: 'nis', col: 2, type: 'text' },          // NIPD
-  { key: 'jenis_kelamin', col: 3, type: 'text' },
-  { key: 'nisn', col: 4, type: 'text' },
-  { key: 'tempat_lahir', col: 5, type: 'text' },
-  { key: 'tanggal_lahir', col: 6, type: 'date' },
-  { key: 'nik', col: 7, type: 'text' },
-  { key: 'agama', col: 8, type: 'text' },
-  { key: 'alamat', col: 9, type: 'text' },
-  { key: 'rt', col: 10, type: 'text' },
-  { key: 'rw', col: 11, type: 'text' },
-  { key: 'dusun', col: 12, type: 'text' },
-  { key: 'kelurahan', col: 13, type: 'text' },
-  { key: 'kecamatan', col: 14, type: 'text' },
-  { key: 'kode_pos', col: 15, type: 'text' },
-  { key: 'jenis_tinggal', col: 16, type: 'text' },
-  { key: 'alat_transportasi', col: 17, type: 'text' },
-  { key: 'telepon', col: 18, type: 'text' },
-  { key: 'hp', col: 19, type: 'text' },
-  { key: 'email', col: 20, type: 'text' },
-  { key: 'skhun', col: 21, type: 'text' },
-  { key: 'penerima_kps', col: 22, type: 'text' },
-  { key: 'no_kps', col: 23, type: 'text' },
-  { key: 'nama_ayah', col: 24, type: 'text' },
-  { key: 'tahun_lahir_ayah', col: 25, type: 'int' },
-  { key: 'pendidikan_ayah', col: 26, type: 'text' },
-  { key: 'pekerjaan_ayah', col: 27, type: 'text' },
-  { key: 'penghasilan_ayah', col: 28, type: 'text' },
-  { key: 'nik_ayah', col: 29, type: 'text' },
-  { key: 'nama_ibu', col: 30, type: 'text' },
-  { key: 'tahun_lahir_ibu', col: 31, type: 'int' },
-  { key: 'pendidikan_ibu', col: 32, type: 'text' },
-  { key: 'pekerjaan_ibu', col: 33, type: 'text' },
-  { key: 'penghasilan_ibu', col: 34, type: 'text' },
-  { key: 'nik_ibu', col: 35, type: 'text' },
-  { key: 'nama_wali', col: 36, type: 'text' },
-  { key: 'tahun_lahir_wali', col: 37, type: 'int' },
-  { key: 'pendidikan_wali', col: 38, type: 'text' },
-  { key: 'pekerjaan_wali', col: 39, type: 'text' },
-  { key: 'penghasilan_wali', col: 40, type: 'text' },
-  { key: 'nik_wali', col: 41, type: 'text' },
-  { key: 'rombel', col: 42, type: 'rombel' },     // <-- diperbaiki dari 26 -> 42, dinormalisasi
-  { key: 'no_peserta_un', col: 43, type: 'text' },
-  { key: 'no_seri_ijazah', col: 44, type: 'text' },
-  { key: 'penerima_kip', col: 45, type: 'text' },
-  { key: 'nomor_kip', col: 46, type: 'text' },
-  { key: 'nama_di_kip', col: 47, type: 'text' },
-  { key: 'nomor_kks', col: 48, type: 'text' },
-  { key: 'no_registrasi_akta_lahir', col: 49, type: 'text' },
-  { key: 'anak_ke', col: 57, type: 'int' },
-  { key: 'lintang', col: 58, type: 'float' },
-  { key: 'bujur', col: 59, type: 'float' },
-  { key: 'no_kk', col: 60, type: 'text' },
-  { key: 'berat_badan', col: 61, type: 'float' },
-  { key: 'tinggi_badan', col: 62, type: 'float' },
-  { key: 'lingkar_kepala', col: 63, type: 'float' },
-  { key: 'jumlah_saudara_kandung', col: 64, type: 'int' },
-]
-
-// Baris pertama berisi DATA (0-indexed). Baris 1-4 judul, baris 5-6
-// header dua baris, jadi data mulai di baris ke-7 -> index 6.
-const DATA_START_ROW_INDEX = 6
-
-function toYMD(d) {
-  const yyyy = d.getFullYear()
-  const mm = String(d.getMonth() + 1).padStart(2, '0')
-  const dd = String(d.getDate()).padStart(2, '0')
-  return `${yyyy}-${mm}-${dd}`
+// Menu ADMIN dikelompokkan per kategori supaya tidak jadi satu daftar panjang.
+// Dibuat sebagai fungsi karena "Persetujuan Akun" dan "Profil Sekolah" hanya
+// boleh tampil untuk admin utama / superadmin, bukan admin biasa.
+function getGroupsAdmin(isAdminUtama, isSuperAdmin, jumlahMenunggu = 0, jumlahPesanBelumDibaca = 0, jumlahPesanPusatBelumDibaca = 0) {
+  return [
+    {
+      label: null, // tanpa judul grup — selalu di atas
+      links: [
+        { to: '/', label: 'Dasbor', icon: LayoutDashboard, end: true },
+        { to: '/profil-saya', label: 'Profil Saya', icon: UserCircle },
+        { to: '/pesan', label: 'Pesan', icon: MessageCircle, badge: jumlahPesanBelumDibaca },
+        // Chat dua arah dengan Superadmin ("Admin Pusat") — khusus admin-tier,
+        // guru tidak pernah melihat menu ini karena guru pakai getLinksGuru().
+        { to: '/pesan-pusat', label: 'Admin Pusat', icon: Building2, badge: jumlahPesanPusatBelumDibaca },
+        { to: '/rapat', label: 'Rapat Video', icon: Video },
+        { to: '/galeri', label: 'Galeri Kegiatan', icon: Images },
+        { to: '/dokumen', label: 'Dokumen Penting', icon: HardDrive },
+        { to: '/scan-dokumen', label: 'Scan Dokumen', icon: ScanLine },
+        { to: '/pengumuman', label: 'Pengumuman', icon: Megaphone },
+      ],
+    },
+    {
+      label: 'Akademik',
+      links: [
+        { to: '/siswa', label: 'Data Siswa', icon: Users },
+        { to: '/guru', label: 'Data Guru', icon: GraduationCap },
+        { to: '/kelas', label: 'Kelas', icon: DoorOpen },
+        { to: '/jadwal', label: 'Jadwal Pelajaran', icon: CalendarClock },
+        { to: '/presensi', label: 'Presensi', icon: ClipboardCheck },
+        { to: '/nilai', label: 'Nilai Siswa', icon: BookOpenCheck },
+        { to: '/nilai-asesmen', label: 'Nilai Asesmen', icon: FileSpreadsheet },
+        { to: '/rapor', label: 'Rapor Siswa', icon: FileBadge },
+        { to: '/ijazah', label: 'Ijazah', icon: ScrollText },
+        { to: '/skl', label: 'Surat Keterangan Lulus', icon: Stamp },
+        { to: '/portofolio-siswa', label: 'Portofolio Siswa', icon: FolderHeart },
+        { to: '/rpp', label: 'RPP', icon: NotebookPen },
+        { to: '/arsip-rpp', label: 'Arsip RPP', icon: Archive },
+        { to: '/sertifikat', label: 'Sertifikat & Penghargaan', icon: Award },
+        { to: '/buat-ujian', label: 'Buat Ujian', icon: FilePlus },
+        { to: '/hasil-ujian', label: 'Hasil Ujian', icon: ClipboardList },
+        { to: '/bank-soal', label: 'Bank Soal', icon: Database },
+        { to: '/buat-kuis-seru', label: 'Kuis Seru (Kls 1-3)', icon: Gamepad2 },
+      ],
+    },
+    {
+      label: 'Keuangan & Aset',
+      links: [
+        { to: '/keuangan', label: 'Keuangan', icon: Wallet },
+        { to: '/keuangan-kelas', label: 'Keuangan Kelas', icon: PiggyBank },
+        { to: '/kuitansi', label: 'Kuitansi', icon: Receipt },
+        { to: '/kuitansi-jasa', label: 'Kuitansi Jasa', icon: Receipt },
+        { to: '/nota', label: 'Nota Belanja', icon: ShoppingCart },
+        { to: '/perpustakaan', label: 'Perpustakaan', icon: Library },
+        { to: '/inventaris', label: 'Inventaris', icon: Boxes },
+      ],
+    },
+    {
+      label: 'Administrasi',
+      links: [
+        { to: '/pengajuan-surat-aktif', label: 'Pengajuan Surat Aktif', icon: FileCheck2 },
+        { to: '/perbaikan-data-siswa', label: 'Perbaikan Data Siswa', icon: UserCog },
+        { to: '/pengajuan-kebutuhan-kelas', label: 'Kebutuhan Kelas', icon: PackagePlus },
+        { to: '/agenda', label: 'Agenda Sekolah', icon: CalendarDays },
+        { to: '/surat', label: 'Surat Masuk/Keluar', icon: Mail },
+        { to: '/surat-keterangan', label: 'Surat Keterangan', icon: FileSignature },
+        { to: '/ppdb-admin', label: 'PPDB Siswa Baru', icon: UserPlus },
+        { to: '/laporan', label: 'Laporan Bulanan', icon: FileText },
+        { to: '/hari-libur', label: 'Hari Libur', icon: CalendarOff },
+        { to: '/kalender-pendidikan', label: 'Kalender Pendidikan', icon: CalendarRange },
+        { to: '/backup', label: 'Backup Data', icon: DatabaseBackup },
+        // Manajemen Sekolah hanya untuk superadmin.
+        ...(isSuperAdmin
+          ? [
+              { to: '/manajemen-sekolah', label: 'Manajemen Sekolah', icon: Building2 },
+            ]
+          : []),
+        // "Persetujuan Akun" dan "Profil Sekolah" hanya untuk admin utama / superadmin
+        ...(isAdminUtama
+          ? [
+              { to: '/persetujuan-akun', label: 'Persetujuan Akun', icon: ShieldCheck, badge: jumlahMenunggu },
+              { to: '/profil-sekolah', label: 'Profil Sekolah', icon: Landmark },
+            ]
+          : []),
+        { to: '/kartu', label: 'Cetak Kartu', icon: IdCard },
+      ],
+    },
+  ]
 }
 
-function normalizeTanggal(val) {
-  if (val === null || val === undefined || val === '') return null
-  if (val instanceof Date) return toYMD(val)
-  const s = String(val).trim()
-  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s
-  const m = s.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/)
-  if (m) {
-    const [, d, mo, y] = m
-    return `${y}-${mo.padStart(2, '0')}-${d.padStart(2, '0')}`
-  }
-  return null
+// Menu GURU: tetap ringkas, tidak perlu dikelompokkan
+// Kuitansi, Kuitansi Jasa & Nota Belanja SENGAJA TIDAK ada di sini — ketiga
+// fitur ini admin-only (lihat RLS policy nota_hanya_admin di Supabase).
+function getLinksGuru(jumlahPesanBelumDibaca = 0) {
+  return [
+  { to: '/', label: 'Dasbor', icon: LayoutDashboard, end: true },
+  { to: '/profil-saya', label: 'Profil Saya', icon: UserCircle },
+  { to: '/pesan', label: 'Pesan', icon: MessageCircle, badge: jumlahPesanBelumDibaca },
+  { to: '/rapat', label: 'Rapat Video', icon: Video },
+  { to: '/galeri', label: 'Galeri Kegiatan', icon: Images },
+  { to: '/dokumen', label: 'Dokumen Penting', icon: HardDrive },
+  { to: '/scan-dokumen', label: 'Scan Dokumen', icon: ScanLine },
+  { to: '/keuangan-kelas', label: 'Keuangan Kelas', icon: PiggyBank },
+  { to: '/siswa', label: 'Data Siswa', icon: Users },
+  { to: '/presensi', label: 'Presensi', icon: ClipboardCheck },
+  { to: '/nilai', label: 'Nilai Siswa', icon: BookOpenCheck },
+  { to: '/nilai-asesmen', label: 'Nilai Asesmen', icon: FileSpreadsheet },
+  { to: '/rapor', label: 'Rapor Siswa', icon: FileBadge },
+  { to: '/ijazah', label: 'Ijazah', icon: ScrollText },
+  { to: '/skl', label: 'Surat Keterangan Lulus', icon: Stamp },
+  { to: '/portofolio-siswa', label: 'Portofolio Siswa', icon: FolderHeart },
+  { to: '/rpp', label: 'RPP', icon: NotebookPen },
+  { to: '/arsip-rpp', label: 'Arsip RPP', icon: Archive },
+  { to: '/sertifikat', label: 'Sertifikat & Penghargaan', icon: Award },
+  { to: '/pengajuan-surat-aktif', label: 'Pengajuan Surat Aktif', icon: FileCheck2 },
+  { to: '/perbaikan-data-siswa', label: 'Perbaikan Data Siswa', icon: UserCog },
+  { to: '/pengajuan-kebutuhan-kelas', label: 'Kebutuhan Kelas', icon: PackagePlus },
+  { to: '/buat-ujian', label: 'Buat Ujian', icon: FilePlus },
+  { to: '/hasil-ujian', label: 'Hasil Ujian', icon: ClipboardList },
+  { to: '/bank-soal', label: 'Bank Soal', icon: Database },
+  { to: '/buat-kuis-seru', label: 'Kuis Seru (Kls 1-3)', icon: Gamepad2 },
+  { to: '/perpustakaan', label: 'Perpustakaan', icon: Library },
+  { to: '/jadwal', label: 'Jadwal Pelajaran', icon: CalendarClock },
+  { to: '/kalender-pendidikan', label: 'Kalender Pendidikan', icon: CalendarRange },
+  { to: '/agenda', label: 'Agenda Sekolah', icon: CalendarDays },
+  { to: '/pengumuman', label: 'Pengumuman', icon: Megaphone },
+  ]
 }
 
-function toIntOrNull(val) {
-  if (val === null || val === undefined || val === '') return null
-  const n = parseInt(val, 10)
-  return Number.isFinite(n) ? n : null
-}
-
-function toFloatOrNull(val) {
-  if (val === null || val === undefined || val === '') return null
-  const n = parseFloat(val)
-  return Number.isFinite(n) ? n : null
-}
-
-function toTextOrNull(val) {
-  if (val === null || val === undefined) return null
-  const s = String(val).trim()
-  return s === '' ? null : s
-}
-
-function normalizeJK(val) {
-  const s = toTextOrNull(val)
-  if (!s) return null
-  const up = s.toUpperCase()
-  return up === 'L' || up === 'P' ? up : null
-}
-
-// "Kelas 1" -> "1", "Kelas 3A" -> "3", "Kelas 3B" -> "3", "Kelas 3" -> "3"
-// Mengambil angka pertama yang ditemukan pada teks rombel, mengabaikan
-// huruf paralel (A/B/dst). Kalau tidak ditemukan angka sama sekali,
-// nilai teks asli tetap disimpan apa adanya (tidak dibuang) supaya
-// data tidak hilang diam-diam untuk format rombel yang tak terduga
-// (misalnya rombel non-numerik).
-function normalizeRombel(val) {
-  const s = toTextOrNull(val)
-  if (!s) return null
-  const m = s.match(/(\d{1,2})/)
-  if (!m) return s // format tak dikenali -> simpan teks asli, jangan dibuang
-  return m[1]
-}
-
-function mapRawRowToSiswa(rawRow, npsn) {
-  const out = { npsn: npsn || null }
-
-  for (const { key, col, type } of COLUMN_MAP) {
-    const raw = rawRow[col]
-
-    if (key === 'jenis_kelamin') {
-      out[key] = normalizeJK(raw)
-      continue
-    }
-
-    switch (type) {
-      case 'int':
-        out[key] = toIntOrNull(raw)
-        break
-      case 'float':
-        out[key] = toFloatOrNull(raw)
-        break
-      case 'date':
-        out[key] = normalizeTanggal(raw)
-        break
-      case 'rombel':
-        out[key] = normalizeRombel(raw)
-        out.rombel_asli = toTextOrNull(raw) // simpan juga teks asli "Kelas 3A"/"Kelas 3B" kalau kolom ini ada di tabel Anda
-        break
-      default:
-        out[key] = toTextOrNull(raw)
-    }
-  }
-
-  return out
-}
-
-export default function SiswaDapodikImportModal({ npsn, onSelesai }) {
-  const [open, setOpen] = useState(false)
-  const [rows, setRows] = useState([])
-  const [fileName, setFileName] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
-  const [done, setDone] = useState(null)
-
-  function resetState() {
-    setRows([])
-    setFileName('')
-    setError('')
-    setDone(null)
-  }
-
-  function handleFile(e) {
-    const file = e.target.files?.[0]
-    if (!file) return
-    resetState()
-    setFileName(file.name)
-
-    const reader = new FileReader()
-    reader.onload = (evt) => {
-      try {
-        const wb = XLSX.read(evt.target.result, { type: 'binary', cellDates: true })
-        const sheet = wb.Sheets[wb.SheetNames[0]]
-
-        // header: 1 -> hasil berupa array-of-array (bukan object per baris),
-        // range: DATA_START_ROW_INDEX -> lewati baris judul & header.
-        const rawRows = XLSX.utils.sheet_to_json(sheet, {
-          header: 1,
-          range: DATA_START_ROW_INDEX,
-          defval: '',
-          blankrows: false,
-        })
-
-        const mapped = rawRows
-          .map((r) => mapRawRowToSiswa(r, npsn))
-          // buang baris kosong (mis. baris "Total" atau baris kosong di akhir file)
-          .filter((r) => r.nama)
-
-        if (mapped.length === 0) {
-          setError('Tidak ada baris data yang terbaca. Pastikan file sesuai format export "Daftar Peserta Didik" Dapodik.')
-          return
-        }
-
-        setRows(mapped)
-      } catch (err) {
-        setError('Gagal membaca file: ' + err.message)
+function NavItem({ to, label, icon: Icon, end, badge, onNavigate }) {
+  return (
+    <NavLink
+      to={to}
+      end={end}
+      onClick={onNavigate}
+      className={({ isActive }) =>
+        `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
+          isActive
+            ? 'bg-gradient-to-r from-blue-500 to-indigo-400 text-white shadow-sm shadow-black/20'
+            : 'text-white/70 hover:bg-white/[0.08] hover:text-white'
+        }`
       }
+    >
+      {({ isActive }) => (
+        <>
+          <Icon
+            size={17}
+            strokeWidth={1.8}
+            fill={isActive ? 'rgba(255,255,255,0.25)' : 'currentColor'}
+            fillOpacity={isActive ? 1 : 0.15}
+          />
+          <span className="flex-1">{label}</span>
+          {!!badge && (
+            <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center shrink-0 shadow-sm shadow-red-900/40">
+              {badge > 99 ? '99+' : badge}
+            </span>
+          )}
+        </>
+      )}
+    </NavLink>
+  )
+}
+
+// Ambil URL foto guru dari kolom foto_profil_path (isinya path storage,
+// bukan URL lengkap) di bucket "foto-profil".
+function getFotoUrl(fotoProfilPath) {
+  if (!fotoProfilPath) return null
+  if (fotoProfilPath.startsWith('http')) return fotoProfilPath
+  const { data } = supabase.storage.from('foto-profil').getPublicUrl(fotoProfilPath)
+  return data?.publicUrl || null
+}
+
+function getInisial(nama) {
+  if (!nama) return '?'
+  const kata = nama.trim().split(/\s+/)
+  const inisial = kata.length > 1 ? kata[0][0] + kata[1][0] : kata[0].slice(0, 2)
+  return inisial.toUpperCase()
+}
+
+// Label peran yang tampil di header sidebar — utamakan jabatan yang dipilih
+// sendiri saat daftar (mis. "Kepala Sekolah"), baru fallback ke role teknis.
+function getLabelPeran(profil, isSuperAdmin, isAdminUtama, isAdmin, isOrangTua) {
+  if (isSuperAdmin) return 'Superadmin'
+  if (profil?.jabatan === 'kepala_sekolah') return 'Kepala Sekolah'
+  if (isAdminUtama) return 'Admin Utama'
+  if (isAdmin) return 'Admin'
+  if (isOrangTua) return 'Orang Tua/Wali'
+  return 'Guru'
+}
+
+// Menu ORANG TUA: sangat ringkas, hanya halaman read-only milik anak
+// mereka sendiri — TIDAK PERNAH pakai getLinksGuru(), supaya orang tua
+// tidak pernah melihat menu kerja guru (Presensi, Nilai, dsb yang bisa
+// diedit untuk SEMUA siswa di kelas).
+function getLinksOrangTua(jumlahPesanBelumDibaca = 0) {
+  return [
+    { to: '/', label: 'Dasbor', icon: LayoutDashboard, end: true },
+    { to: '/profil-saya', label: 'Profil Saya', icon: UserCircle },
+    { to: '/pesan', label: 'Pesan', icon: MessageCircle, badge: jumlahPesanBelumDibaca },
+    { to: '/rapor-anak', label: 'Rapor Anak', icon: FileBadge },
+    { to: '/presensi-anak', label: 'Presensi Anak', icon: ClipboardCheck },
+    { to: '/portofolio-anak', label: 'Portofolio Anak', icon: Image },
+    { to: '/galeri-orang-tua', label: 'Galeri Kegiatan', icon: Images },
+    { to: '/pengumuman', label: 'Pengumuman', icon: Megaphone },
+  ]
+}
+
+export default function Sidebar({ open = false, onClose = () => {} }) {
+  const { signOut, session, profil, isAdmin, isAdminUtama, isSuperAdmin, isOrangTua, sekolahId } = useAuth()
+  const fotoUrl = getFotoUrl(profil?.foto_profil_path)
+  const namaTampil = profil?.nama_lengkap || session?.user?.email || 'Pengguna'
+
+  const labelPeran = getLabelPeran(profil, isSuperAdmin, isAdminUtama, isAdmin, isOrangTua)
+
+  // Notifikasi real-time: jumlah pendaftaran akun yang masih menunggu persetujuan.
+  // Hanya relevan untuk admin utama / superadmin yang punya menu "Persetujuan Akun".
+  const [jumlahMenunggu, setJumlahMenunggu] = useState(0)
+
+  useEffect(() => {
+    if (!isAdminUtama) {
+      setJumlahMenunggu(0)
+      return
     }
-    reader.readAsBinaryString(file)
-  }
 
-  async function handleImport() {
-    if (rows.length === 0) return
+    let aktif = true
 
-    const konfirmasi = confirm(
-      `${rows.length} data siswa akan disimpan. Siswa dengan NISN yang sudah ada di database akan DIPERBARUI datanya, siswa baru akan ditambahkan. Lanjutkan?`
-    )
-    if (!konfirmasi) return
-
-    setLoading(true)
-    setError('')
-
-    try {
-      // Pisahkan baris yang punya NISN (di-upsert) dari yang tidak punya
-      // NISN (selalu insert baru, karena tidak ada kunci unik untuk upsert).
-      const withNisn = rows.filter((r) => r.nisn)
-      const withoutNisn = rows.filter((r) => !r.nisn)
-
-      const BATCH_SIZE = 200
-      let savedTotal = 0
-
-      for (let i = 0; i < withNisn.length; i += BATCH_SIZE) {
-        const batch = withNisn.slice(i, i + BATCH_SIZE)
-        const { error: upsertError, data } = await supabase
-          .from('siswa')
-          .upsert(batch, { onConflict: 'nisn' })
-          .select('id')
-        if (upsertError) throw upsertError
-        savedTotal += data?.length || 0
+    async function muatJumlahMenunggu() {
+      let query = supabase
+        .from('profil')
+        .select('id', { count: 'exact', head: true })
+        .eq('status_akun', 'menunggu')
+      if (!isSuperAdmin) {
+        query = query.eq('sekolah_id', sekolahId)
       }
-
-      for (let i = 0; i < withoutNisn.length; i += BATCH_SIZE) {
-        const batch = withoutNisn.slice(i, i + BATCH_SIZE)
-        const { error: insertError, data } = await supabase
-          .from('siswa')
-          .insert(batch)
-          .select('id')
-        if (insertError) throw insertError
-        savedTotal += data?.length || 0
-      }
-
-      setDone({ saved: savedTotal, total: rows.length })
-      onSelesai?.()
-    } catch (err) {
-      setError('Gagal menyimpan ke database: ' + err.message)
-    } finally {
-      setLoading(false)
+      const { count } = await query
+      if (aktif) setJumlahMenunggu(count || 0)
     }
-  }
+
+    muatJumlahMenunggu()
+
+    // Dengarkan perubahan tabel profil secara real-time (pendaftar baru, disetujui, ditolak, dll)
+    // supaya badge notifikasi ter-update otomatis tanpa perlu refresh halaman.
+    const channel = supabase
+      .channel('persetujuan-akun-notifikasi')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'profil' }, () => {
+        muatJumlahMenunggu()
+      })
+      .subscribe()
+
+    return () => {
+      aktif = false
+      supabase.removeChannel(channel)
+    }
+  }, [isAdminUtama, isSuperAdmin, sekolahId])
+
+  // Notifikasi real-time: jumlah pesan masuk yang belum dibaca (fitur Pesan).
+  const [jumlahPesanBelumDibaca, setJumlahPesanBelumDibaca] = useState(0)
+
+  useEffect(() => {
+    if (!session?.user?.id) {
+      setJumlahPesanBelumDibaca(0)
+      return
+    }
+
+    let aktif = true
+
+    async function muatJumlahPesan() {
+      const { count: jumlahPribadi } = await supabase
+        .from('pesan')
+        .select('id', { count: 'exact', head: true })
+        .eq('penerima_id', session.user.id)
+        .eq('dibaca', false)
+
+      // Siaran: RLS otomatis menyaring hanya yang sesuai target_role saya.
+      // Belum dibaca = belum ada baris di pesan_siaran_dibaca untuk saya.
+      const { data: semuaSiaran } = await supabase.from('pesan_siaran').select('id')
+      const { data: siaranDibaca } = await supabase
+        .from('pesan_siaran_dibaca')
+        .select('siaran_id')
+        .eq('profil_id', session.user.id)
+      const idDibaca = new Set((siaranDibaca || []).map((r) => r.siaran_id))
+      const jumlahSiaran = (semuaSiaran || []).filter((s) => !idDibaca.has(s.id)).length
+
+      if (aktif) setJumlahPesanBelumDibaca((jumlahPribadi || 0) + jumlahSiaran)
+    }
+
+    muatJumlahPesan()
+
+    const channel = supabase
+      .channel('pesan-notifikasi')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'pesan' }, () => {
+        muatJumlahPesan()
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'pesan_siaran' }, () => {
+        muatJumlahPesan()
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'pesan_siaran_dibaca' }, () => {
+        muatJumlahPesan()
+      })
+      .subscribe()
+
+    return () => {
+      aktif = false
+      supabase.removeChannel(channel)
+    }
+  }, [session?.user?.id])
+
+  // Notifikasi real-time: jumlah pesan Admin Pusat yang belum dibaca.
+  // Guru tidak pernah masuk sini (isAdmin selalu false untuk guru).
+  const [jumlahPesanPusatBelumDibaca, setJumlahPesanPusatBelumDibaca] = useState(0)
+
+  useEffect(() => {
+    if (!session?.user?.id || !isAdmin) {
+      setJumlahPesanPusatBelumDibaca(0)
+      return
+    }
+
+    let aktif = true
+
+    async function muatJumlahPesanPusat() {
+      let query = supabase
+        .from('pesan_pusat')
+        .select('id', { count: 'exact', head: true })
+
+      query = isSuperAdmin
+        ? query.eq('sisi', 'sekolah').eq('dibaca_pusat', false)
+        : query.eq('sisi', 'pusat').eq('dibaca_sekolah', false).eq('sekolah_id', sekolahId)
+
+      const { count } = await query
+      if (aktif) setJumlahPesanPusatBelumDibaca(count || 0)
+    }
+
+    muatJumlahPesanPusat()
+
+    const channel = supabase
+      .channel('pesan-pusat-notifikasi')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'pesan_pusat' }, () => {
+        muatJumlahPesanPusat()
+      })
+      .subscribe()
+
+    return () => {
+      aktif = false
+      supabase.removeChannel(channel)
+    }
+  }, [session?.user?.id, isAdmin, isSuperAdmin, sekolahId])
+
+  const groupsAdmin = getGroupsAdmin(isAdminUtama, isSuperAdmin, jumlahMenunggu, jumlahPesanBelumDibaca, jumlahPesanPusatBelumDibaca)
+  const linksGuru = getLinksGuru(jumlahPesanBelumDibaca)
+  const linksOrangTua = getLinksOrangTua(jumlahPesanBelumDibaca)
 
   return (
     <>
-      <button className="btn-primary" onClick={() => setOpen(true)}>
-        <Upload size={16} /> Input Data Massal Siswa (Dapodik)
-      </button>
-
+      {/* Overlay gelap di belakang drawer — hanya tampil di HP saat menu dibuka */}
       {open && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-lg p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="font-display text-lg font-semibold">Input Data Massal Siswa</h2>
-              <button className="icon-btn" onClick={() => { setOpen(false); resetState() }}>
-                <X size={18} />
-              </button>
-            </div>
-
-            <p className="text-sm text-ink-700/60 mb-3">
-              Upload file Excel hasil unduhan Dapodik menu{' '}
-              <strong>Peserta Didik &rarr; Daftar Peserta Didik &rarr; Export</strong>{' '}
-              (format <code>.xlsx</code>, kolom sesuai bawaan Dapodik, tidak perlu diubah dulu).
-              <br />
-              <strong>Siswa dengan NISN yang sudah ada akan diperbarui</strong>, siswa baru akan ditambahkan.
-              Rombel seperti <strong>"Kelas 3A"/"Kelas 3B"</strong> otomatis disimpan sebagai kelas <strong>3</strong>.
-            </p>
-
-            <input
-              type="file"
-              accept=".xlsx,.xls"
-              onChange={handleFile}
-              className="input-field mb-3"
-            />
-
-            {fileName && (
-              <div className="text-sm text-ink-700/70 mb-3">
-                File: <strong>{fileName}</strong> — {rows.length} siswa terbaca
-              </div>
-            )}
-
-            {rows.length > 0 && (
-              <div className="max-h-40 overflow-auto border rounded-lg text-xs mb-3">
-                <table className="w-full">
-                  <thead className="bg-sage-50 sticky top-0">
-                    <tr>
-                      <th className="text-left p-1">Nama</th>
-                      <th className="text-left p-1">NISN</th>
-                      <th className="text-left p-1">JK</th>
-                      <th className="text-left p-1">Rombel</th>
-                      <th className="text-left p-1">Rombel Asli</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {rows.slice(0, 20).map((r, idx) => (
-                      <tr key={idx} className="border-t">
-                        <td className="p-1">{r.nama}</td>
-                        <td className="p-1">{r.nisn || '-'}</td>
-                        <td className="p-1">{r.jenis_kelamin || '-'}</td>
-                        <td className="p-1">{r.rombel || '-'}</td>
-                        <td className="p-1">{r.rombel_asli || '-'}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-                {rows.length > 20 && (
-                  <div className="p-1 text-center text-ink-700/40">...dan {rows.length - 20} siswa lainnya</div>
-                )}
-              </div>
-            )}
-
-            {error && (
-              <div className="flex items-center gap-2 text-sm text-red-600 mb-3">
-                <AlertCircle size={16} /> {error}
-              </div>
-            )}
-
-            {done && (
-              <div className="flex items-center gap-2 text-sm text-sage-600 mb-3">
-                <CheckCircle2 size={16} /> Berhasil! {done.saved} dari {done.total} data siswa tersimpan.
-              </div>
-            )}
-
-            <div className="flex justify-end gap-3 pt-2">
-              <button className="btn-secondary" onClick={() => { setOpen(false); resetState() }}>
-                Tutup
-              </button>
-              <button
-                className="btn-primary"
-                onClick={handleImport}
-                disabled={rows.length === 0 || loading}
-              >
-                {loading && <Loader2 size={16} className="animate-spin" />}
-                Simpan {rows.length > 0 ? rows.length : ''} Siswa
-              </button>
-            </div>
-          </div>
-        </div>
+        <div
+          onClick={onClose}
+          className="fixed inset-0 z-40 bg-black/50 backdrop-blur-[1px] md:hidden"
+          aria-hidden="true"
+        />
       )}
+
+      <aside
+        className={`w-72 max-w-[85vw] md:w-64 shrink-0 bg-blue-950 text-white flex flex-col h-screen fixed md:sticky top-0 left-0 z-50 border-r border-blue-900/50 transition-transform duration-300 ease-out
+          ${open ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0`}
+      >
+      <div className="relative overflow-hidden px-4 py-5 border-b border-white/10 bg-gradient-to-br from-blue-950 via-blue-900 to-indigo-900">
+        {/* Tombol tutup — hanya tampil di HP */}
+        <button
+          onClick={onClose}
+          title="Tutup menu"
+          className="absolute top-3 right-3 z-10 w-8 h-8 rounded-lg flex items-center justify-center text-white/70 hover:bg-white/10 hover:text-white transition-colors md:hidden"
+        >
+          <X size={18} />
+        </button>
+        {/* Motif batik dekoratif (senada dengan banner dashboard) */}
+        <svg
+          className="absolute inset-0 w-full h-full opacity-[0.35] pointer-events-none"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <defs>
+            <pattern id="batikSidebar" width="46" height="46" patternUnits="userSpaceOnUse">
+              <circle cx="23" cy="23" r="12" fill="none" stroke="#fbbf24" strokeWidth="1.4" />
+              <circle cx="23" cy="23" r="4" fill="none" stroke="#fbbf24" strokeWidth="1.4" />
+              <path d="M23 5 v8 M23 33 v8 M5 23 h8 M33 23 h8" stroke="#fbbf24" strokeWidth="1.4" />
+              <path d="M10 10 l4 4 M32 10 l-4 4 M10 36 l4 -4 M32 36 l-4 -4" stroke="#fbbf24" strokeWidth="1" />
+            </pattern>
+          </defs>
+          <rect width="100%" height="100%" fill="url(#batikSidebar)" />
+        </svg>
+
+        <div className="relative flex items-center gap-3">
+          {fotoUrl ? (
+            <img
+              src={fotoUrl}
+              alt={namaTampil}
+              className="w-11 h-11 rounded-full object-cover shrink-0 border-2 border-white/20"
+            />
+          ) : (
+            <div className="w-11 h-11 rounded-full bg-gradient-to-br from-blue-500 to-indigo-400 flex items-center justify-center font-display font-bold text-white text-sm shrink-0 border-2 border-white/20">
+              {getInisial(namaTampil)}
+            </div>
+          )}
+          <div className="min-w-0 flex-1">
+            <p className="font-display font-semibold text-[13px] leading-tight truncate text-white">{namaTampil}</p>
+            <p className="text-[11px] text-white/50 mt-0.5">{labelPeran}</p>
+          </div>
+          <button
+            onClick={signOut}
+            title="Keluar"
+            className="w-10 h-10 rounded-lg flex items-center justify-center text-red-400 hover:bg-red-500/15 hover:text-red-300 transition-colors shrink-0"
+          >
+            <Power size={20} strokeWidth={2.2} />
+          </button>
+        </div>
+      </div>
+
+      <nav className="relative flex-1 overflow-y-auto py-4 px-3 bg-gradient-to-b from-blue-950 via-blue-900 to-indigo-950">
+        {/* Motif batik area menu — gaya berbeda dari header (kawung/diamond, bukan lingkaran) */}
+        <svg
+          className="absolute inset-0 w-full h-full opacity-[0.22] pointer-events-none"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <defs>
+            <pattern
+              id="batikMenu"
+              width="36"
+              height="36"
+              patternUnits="userSpaceOnUse"
+              patternTransform="rotate(45)"
+            >
+              <rect x="12" y="0" width="12" height="12" fill="none" stroke="#fbbf24" strokeWidth="1.2" />
+              <circle cx="18" cy="6" r="2.6" fill="#fbbf24" />
+              <path d="M0 18 L18 0 M18 36 L36 18" stroke="#fbbf24" strokeWidth="1" />
+            </pattern>
+          </defs>
+          <rect width="100%" height="100%" fill="url(#batikMenu)" />
+        </svg>
+
+        <div className="relative">
+        {isAdmin ? (
+          groupsAdmin.map((group, i) => (
+            <div key={group.label ?? `top-${i}`} className={i > 0 ? 'mt-5' : ''}>
+              {group.label && (
+                <p className="px-3 mb-1.5 text-[10px] font-semibold tracking-wider uppercase text-white/35">
+                  {group.label}
+                </p>
+              )}
+              <div className="space-y-1">
+                {group.links.map((link) => (
+                  <NavItem key={link.to} {...link} onNavigate={onClose} />
+                ))}
+              </div>
+            </div>
+          ))
+        ) : isOrangTua ? (
+          <div className="space-y-1">
+            {linksOrangTua.map((link) => (
+              <NavItem key={link.to} {...link} onNavigate={onClose} />
+            ))}
+          </div>
+        ) : (
+          <div className="space-y-1">
+            {linksGuru.map((link) => (
+              <NavItem key={link.to} {...link} onNavigate={onClose} />
+            ))}
+          </div>
+        )}
+        </div>
+      </nav>
+      </aside>
     </>
   )
 }
