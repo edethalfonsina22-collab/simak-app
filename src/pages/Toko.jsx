@@ -9,16 +9,14 @@ import Layout from "../components/Layout";
 // - Superadmin: bisa Tambah, Edit, Hapus, dan Import CSV toko
 // - Semua user login: bisa Kelola Barang (modal) per toko
 //
-// PERBAIKAN:
-// Sebelumnya komponen ini mengambil role sendiri lewat query manual ke
-// tabel "profiles" (yang tidak ada di database ini — tabel yang benar
-// adalah "profil", lihat AuthContext.jsx). Akibatnya fetchRole() selalu
-// gagal/mengembalikan null, sehingga superadmin dianggap "user" biasa
-// meski sidebar menampilkan "Superadmin" dengan benar (karena sidebar
-// memakai useAuth()).
+// PERBAIKAN (role):
+// Role diambil dari AuthContext (satu sumber kebenaran untuk seluruh
+// aplikasi), sama seperti Sidebar.jsx dan komponen lain.
 //
-// Sekarang role diambil dari AuthContext (satu sumber kebenaran untuk
-// seluruh aplikasi), sama seperti Sidebar.jsx dan komponen lain.
+// PERBAIKAN (RLS tabel toko):
+// Tabel "toko" punya kolom created_by (uuid) dan policy RLS insert
+// mensyaratkan auth.uid() = created_by. Insert & import CSV sekarang
+// menyertakan created_by: user.id, diambil lewat supabase.auth.getUser().
 // =========================================================
 export default function Toko() {
   const { isSuperAdmin, profil, loading: authLoading } = useAuth();
@@ -120,9 +118,21 @@ export default function Toko() {
 
     let result;
     if (editingId) {
+      // update tidak perlu created_by
       result = await supabase.from("toko").update(form).eq("id", editingId);
     } else {
-      result = await supabase.from("toko").insert([form]);
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (!user) {
+        alert("Sesi login tidak ditemukan, silakan login ulang.");
+        return;
+      }
+
+      result = await supabase
+        .from("toko")
+        .insert([{ ...form, created_by: user.id }]);
     }
 
     if (result.error) {
@@ -155,6 +165,15 @@ export default function Toko() {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      alert("Sesi login tidak ditemukan, silakan login ulang.");
+      return;
+    }
+
     const text = await file.text();
     const rows = text
       .split("\n")
@@ -169,7 +188,7 @@ export default function Toko() {
     const headers = rows[0].split(",").map((h) => h.trim());
     const records = rows.slice(1).map((row) => {
       const values = row.split(",").map((v) => v.trim());
-      const obj = {};
+      const obj = { created_by: user.id };
       headers.forEach((h, i) => {
         obj[h] = values[i] ?? "";
       });
