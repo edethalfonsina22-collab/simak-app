@@ -28,6 +28,7 @@ import {
   Archive,
   UserCircle,
   Images,
+  Image,
   HardDrive,
   ClipboardList,
   Database,
@@ -254,6 +255,7 @@ function getLinksOrangTua(jumlahPesanBelumDibaca = 0) {
     { to: '/pesan', label: 'Pesan', icon: MessageCircle, badge: jumlahPesanBelumDibaca },
     { to: '/rapor-anak', label: 'Rapor Anak', icon: FileBadge },
     { to: '/presensi-anak', label: 'Presensi Anak', icon: ClipboardCheck },
+    { to: '/portofolio-anak', label: 'Portofolio Anak', icon: Image },
     { to: '/galeri-orang-tua', label: 'Galeri Kegiatan', icon: Images },
     { to: '/pengumuman', label: 'Pengumuman', icon: Megaphone },
   ]
