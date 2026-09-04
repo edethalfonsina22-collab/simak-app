@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import BankSoal from './pages/BankSoal'
 import KartuSiswa from './pages/KartuSiswa'
 import Galeri from './pages/Galeri'
+import GaleriOrangTua from './pages/GaleriOrangTua'
 import Dokumen from './pages/Dokumen'
 import Pesan from './pages/Pesan'
 import PesanPusat from './pages/PesanPusat'
@@ -174,6 +175,7 @@ export default function App() {
           dropdown bebas seperti /rapor dan /presensi milik guru. */}
       <Route path="/rapor-anak" element={<ProtectedRoute><RaporAnak /></ProtectedRoute>} />
       <Route path="/presensi-anak" element={<ProtectedRoute><PresensiAnak /></ProtectedRoute>} />
+      <Route path="/galeri-orang-tua" element={<ProtectedRoute><GaleriOrangTua /></ProtectedRoute>} />
       <Route path="/nilai-asesmen" element={<ProtectedRoute><NilaiAsesmen /></ProtectedRoute>} />
       <Route path="/ijazah" element={<ProtectedRoute><Ijazah /></ProtectedRoute>} />
       <Route path="/skl" element={<ProtectedRoute><SuratKeteranganLulus /></ProtectedRoute>} />
