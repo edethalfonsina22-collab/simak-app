@@ -26,6 +26,7 @@ const LABEL_JABATAN = {
 // `adminData` diambil terpisah (bukan dari AuthContext) karena AuthContext hanya
 // mengambil role/jabatan/guru_id/sekolah_id/status_akun, tidak termasuk field-field ini.
 function ProfilAdminCard({ profil, userId, adminData }) {
+  const { refreshProfil } = useAuth()
   const [form, setForm] = useState({
     nama_lengkap_pendaftar: adminData?.nama_lengkap_pendaftar || '',
     email_pendaftar: adminData?.email_pendaftar || '',
@@ -110,6 +111,9 @@ function ProfilAdminCard({ profil, userId, adminData }) {
       alert('Gagal simpan foto: ' + updateError.message)
     } else {
       setFotoPath(path)
+      // Sinkronkan cache profil di AuthContext supaya foto tidak balik
+      // kosong saat komponen ini re-render dari data context yang basi.
+      refreshProfil()
     }
     setUploadingFoto(false)
   }
@@ -143,6 +147,10 @@ function ProfilAdminCard({ profil, userId, adminData }) {
       alert('Gagal menyimpan: ' + error.message)
     } else {
       setSavedAt(new Date())
+      // Sinkronkan cache profil di AuthContext, sama seperti setelah upload
+      // foto — supaya form tidak balik ke data lama saat komponen ini
+      // re-render dari `profil` context yang belum ikut ter-update.
+      refreshProfil()
     }
     setSaving(false)
   }
@@ -501,7 +509,7 @@ function ModalTambahAnak({ sekolahId, anakSudahTerhubung, onClose, onBerhasil })
 // hubungan yang masih menunggu/ditolak tanpa harus buka halaman lain, plus
 // tombol untuk menghubungkan anak tambahan (ke-2, ke-3, dst).
 function ProfilOrangTuaCard({ profil, userId }) {
-  const { getAnakSaya } = useAuth()
+  const { getAnakSaya, refreshProfil } = useAuth()
 
   const [form, setForm] = useState({
     nama_lengkap_pendaftar: profil?.nama_lengkap_pendaftar || '',
@@ -572,6 +580,9 @@ function ProfilOrangTuaCard({ profil, userId }) {
       alert('Gagal simpan foto: ' + updateError.message)
     } else {
       setFotoPath(path)
+      // Sinkronkan cache profil di AuthContext supaya foto tidak balik
+      // kosong saat komponen ini re-render dari data context yang basi.
+      refreshProfil()
     }
     setUploadingFoto(false)
   }
@@ -593,6 +604,11 @@ function ProfilOrangTuaCard({ profil, userId }) {
       alert('Gagal menyimpan: ' + error.message)
     } else {
       setSavedAt(new Date())
+      // Sinkronkan cache profil di AuthContext — inilah perbaikan untuk bug
+      // "Tersimpan tapi balik kosong lagi": form ini diisi dari `profil`
+      // context, jadi kalau context tidak ikut di-refresh, render berikutnya
+      // (pindah halaman lalu balik lagi) akan menimpa form dengan data lama.
+      refreshProfil()
     }
     setSaving(false)
   }
