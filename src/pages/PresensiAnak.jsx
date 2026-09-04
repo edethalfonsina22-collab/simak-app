@@ -63,7 +63,7 @@ export default function PresensiAnak() {
       const { data } = await getAnakSaya()
       const list = data || []
       setAnakList(list)
-      const pertama = list.find((a) => a.status === 'disetujui')
+      const pertama = list.find((a) => a.status === 'aktif')
       if (pertama) setAnakId(pertama.siswa.id)
       setLoadingAnak(false)
     }
@@ -73,7 +73,7 @@ export default function PresensiAnak() {
 
   const anakTerpilih = anakList.find((a) => a.siswa.id === anakId)
   const siswa = anakTerpilih?.siswa
-  const anakDisetujui = anakList.filter((a) => a.status === 'disetujui')
+  const anakDisetujui = anakList.filter((a) => a.status === 'aktif')
 
   useEffect(() => {
     if (anakId && tahunAjaran) muatPresensi()
