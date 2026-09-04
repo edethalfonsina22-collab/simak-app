@@ -1,6 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
-// Sesuaikan path ini dengan lokasi supabase client Anda
-import { supabase } from "../supabaseClient";
+import { supabase } from "../lib/supabaseClient";
 
 // =========================================================
 // Komponen Toko
