@@ -240,6 +240,160 @@ function SertifikatAiModal({ isOpen, onClose, onSaved, penerimaTipe, namaPenerim
   )
 }
 
+// Modal upload manual (bukan AI) — untuk foto kegiatan, video, dokumen tugas,
+// atau catatan prestasi bebas. Data disimpan ke tabel sertifikat_penghargaan
+// yang sama, cukup dengan nilai `jenis` baru di luar 'sertifikat'/'penghargaan'.
+// Ini yang membuat halaman "Portofolio Anak" milik orang tua punya isi selain
+// sertifikat/piagam formal.
+function PortofolioManualModal({ isOpen, onClose, onSaved, siswaId, namaSiswa, session, profil, sekolahId }) {
+  const JENIS_OPSI = [
+    { value: 'foto_kegiatan', label: 'Foto Kegiatan' },
+    { value: 'video', label: 'Video' },
+    { value: 'dokumen_tugas', label: 'Dokumen/Tugas' },
+    { value: 'catatan_prestasi', label: 'Catatan Prestasi' },
+  ]
+
+  const [jenis, setJenis] = useState('foto_kegiatan')
+  const [judul, setJudul] = useState('')
+  const [deskripsi, setDeskripsi] = useState('')
+  const [tanggal, setTanggal] = useState('')
+  const [file, setFile] = useState(null)
+  const [saving, setSaving] = useState(false)
+  const [errorMsg, setErrorMsg] = useState('')
+
+  useEffect(() => {
+    if (isOpen) {
+      setJenis('foto_kegiatan')
+      setJudul('')
+      setDeskripsi('')
+      setTanggal('')
+      setFile(null)
+      setErrorMsg('')
+    }
+  }, [isOpen])
+
+  if (!isOpen) return null
+
+  async function handleSave(e) {
+    e.preventDefault()
+    if (!file) {
+      setErrorMsg('Silakan pilih file (foto/video/dokumen) terlebih dahulu.')
+      return
+    }
+    if (!judul.trim()) {
+      setErrorMsg('Judul wajib diisi.')
+      return
+    }
+    setSaving(true)
+    setErrorMsg('')
+    try {
+      const ext = file.name.split('.').pop()
+      const path = `portofolio/${siswaId}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`
+
+      const { error: uploadError } = await supabase.storage
+        .from('sertifikat-files')
+        .upload(path, file)
+      if (uploadError) throw uploadError
+
+      const { error: insertError } = await supabase.from('sertifikat_penghargaan').insert({
+        jenis,
+        penerima_tipe: 'siswa',
+        siswa_id: siswaId,
+        nama_penerima: namaSiswa,
+        judul: judul.trim(),
+        penyelenggara: null,
+        tanggal: tanggal || null,
+        deskripsi: deskripsi.trim() || null,
+        file_path: path,
+        file_nama: file.name,
+        dibuat_oleh: session?.user?.id,
+        nama_pembuat: profil?.nama_lengkap || session?.user?.email,
+        sekolah_id: sekolahId,
+      })
+      if (insertError) throw insertError
+
+      onSaved()
+      onClose()
+    } catch (err) {
+      setErrorMsg('Gagal menyimpan: ' + err.message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
+      <div className="bg-white rounded-xl w-full max-w-lg max-h-[90vh] flex flex-col overflow-hidden shadow-2xl">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-ink-900/[0.08] bg-slate-50">
+          <div className="flex items-center gap-2">
+            <Upload size={18} className="text-blue-600" />
+            <h3 className="font-display font-semibold text-ink-900">
+              Tambah Portofolio — {namaSiswa}
+            </h3>
+          </div>
+          <button onClick={onClose} className="p-1 rounded-lg hover:bg-black/5 text-slate-500">
+            <X size={18} />
+          </button>
+        </div>
+
+        <form onSubmit={handleSave} className="p-5 overflow-y-auto space-y-3 flex-1">
+          <div>
+            <label className="text-xs text-ink-700/60 mb-1 block">Jenis</label>
+            <select className="input-field w-full" value={jenis} onChange={(e) => setJenis(e.target.value)}>
+              {JENIS_OPSI.map((j) => (
+                <option key={j.value} value={j.value}>{j.label}</option>
+              ))}
+            </select>
+          </div>
+          <input
+            className="input-field w-full"
+            placeholder="Judul (mis. Lomba Mewarnai 17 Agustus)"
+            value={judul}
+            onChange={(e) => setJudul(e.target.value)}
+            required
+          />
+          <textarea
+            className="input-field w-full text-sm"
+            rows={3}
+            placeholder="Deskripsi/catatan (opsional)"
+            value={deskripsi}
+            onChange={(e) => setDeskripsi(e.target.value)}
+          />
+          <input
+            className="input-field w-full"
+            type="date"
+            value={tanggal}
+            onChange={(e) => setTanggal(e.target.value)}
+          />
+          <div>
+            <label className="text-xs text-ink-700/60 mb-1 block">File (foto/video/dokumen)</label>
+            <input
+              type="file"
+              accept="image/*,video/*,.pdf,.doc,.docx"
+              onChange={(e) => setFile(e.target.files?.[0] || null)}
+              className="w-full text-sm"
+              required
+            />
+          </div>
+
+          {errorMsg && (
+            <div className="rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-xs text-red-600">{errorMsg}</div>
+          )}
+
+          <button
+            type="submit"
+            disabled={saving}
+            className="w-full py-2 px-4 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg flex items-center justify-center gap-2 disabled:opacity-50"
+          >
+            {saving ? <Loader2 size={16} className="animate-spin" /> : <Upload size={16} />}
+            {saving ? 'Menyimpan...' : 'Simpan Portofolio'}
+          </button>
+        </form>
+      </div>
+    </div>
+  )
+}
+
 export default function SertifikatPenghargaan() {
   const { profil, session, isAdmin } = useAuth()
   const [tab, setTab] = useState('guru') // 'guru' | 'siswa'
@@ -255,6 +409,7 @@ export default function SertifikatPenghargaan() {
   const [siswaTerpilih, setSiswaTerpilih] = useState(null)
 
   const [isAiModalOpen, setIsAiModalOpen] = useState(false)
+  const [isManualModalOpen, setIsManualModalOpen] = useState(false)
   const [preview, setPreview] = useState(null)
 
   async function loadItems() {
@@ -365,6 +520,25 @@ export default function SertifikatPenghargaan() {
     setIsAiModalOpen(true)
   }
 
+  function openManualModalUntukSiswa() {
+    if (!siswaTerpilih) {
+      alert('Pilih siswa terlebih dahulu.')
+      return
+    }
+    setIsManualModalOpen(true)
+  }
+
+  // Label jenis untuk badge di daftar arsip — mencakup jenis baru dari
+  // upload manual (foto/video/dokumen/catatan), bukan cuma sertifikat/penghargaan.
+  const LABEL_JENIS = {
+    sertifikat: 'Sertifikat',
+    penghargaan: 'Penghargaan',
+    foto_kegiatan: 'Foto Kegiatan',
+    video: 'Video',
+    dokumen_tugas: 'Dokumen/Tugas',
+    catatan_prestasi: 'Catatan Prestasi',
+  }
+
   return (
     <Layout title="Sertifikat & Penghargaan" subtitle="Arsip sertifikat kegiatan dan piagam penghargaan">
       <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-ink-950 to-[#22315B] p-6 mb-6">
@@ -446,14 +620,24 @@ export default function SertifikatPenghargaan() {
                 Siswa terpilih: <strong>{siswaTerpilih.nama_lengkap}</strong>
               </p>
             )}
-            <button
-              type="button"
-              onClick={openAiModalUntukSiswa}
-              className="flex items-center gap-1.5 px-4 py-2 text-sm font-semibold rounded-lg bg-amber-500/10 text-amber-600 hover:bg-amber-500/20 border border-amber-500/30 transition-all disabled:opacity-40"
-              disabled={!siswaTerpilih}
-            >
-              <Sparkles size={16} /> Generate dengan AI
-            </button>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={openAiModalUntukSiswa}
+                className="flex items-center gap-1.5 px-4 py-2 text-sm font-semibold rounded-lg bg-amber-500/10 text-amber-600 hover:bg-amber-500/20 border border-amber-500/30 transition-all disabled:opacity-40"
+                disabled={!siswaTerpilih}
+              >
+                <Sparkles size={16} /> Generate dengan AI
+              </button>
+              <button
+                type="button"
+                onClick={openManualModalUntukSiswa}
+                className="flex items-center gap-1.5 px-4 py-2 text-sm font-semibold rounded-lg bg-blue-500/10 text-blue-600 hover:bg-blue-500/20 border border-blue-500/30 transition-all disabled:opacity-40"
+                disabled={!siswaTerpilih}
+              >
+                <Upload size={16} /> Upload Foto/Video/Dokumen
+              </button>
+            </div>
           </>
         )}
       </div>
@@ -483,7 +667,7 @@ export default function SertifikatPenghargaan() {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-[11px] font-medium px-2 py-0.5 rounded-md bg-amber-500/15 text-amber-600">
-                      {item.jenis === 'sertifikat' ? 'Sertifikat' : 'Penghargaan'}
+                      {LABEL_JENIS[item.jenis] || item.jenis}
                     </span>
                     <span className="text-sm font-medium text-ink-900 truncate">{item.nama_penerima}</span>
                   </div>
@@ -524,6 +708,17 @@ export default function SertifikatPenghargaan() {
         namaSekolah={schoolProfile?.nama_sekolah || ''}
         session={session}
         profil={profil}
+      />
+
+      <PortofolioManualModal
+        isOpen={isManualModalOpen}
+        onClose={() => setIsManualModalOpen(false)}
+        onSaved={loadItems}
+        siswaId={siswaTerpilih?.id}
+        namaSiswa={siswaTerpilih?.nama_lengkap}
+        session={session}
+        profil={profil}
+        sekolahId={profil?.sekolah_id}
       />
 
       {preview && (
