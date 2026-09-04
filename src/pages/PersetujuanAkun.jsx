@@ -26,6 +26,14 @@ export default function PersetujuanAkun() {
   const [modalGuru, setModalGuru] = useState(null) // akun yang sedang diproses link guru-nya
   const [modalEdit, setModalEdit] = useState(null) // akun yang sedang diedit datanya
 
+  // Anak-anak dari akun orang tua yang AKUNNYA SUDAH AKTIF, yang baru
+  // ditambahkan lewat fitur "Tambah Anak" (bukan anak pertama saat
+  // pendaftaran) dan masih menunggu persetujuan. Ditampilkan di tab
+  // terpisah karena tab "Menunggu" di atas hanya memfilter dari
+  // profil.status_akun, tidak akan pernah menangkap baris ini.
+  const [anakMenunggu, setAnakMenunggu] = useState([])
+  const [loadingAnakMenunggu, setLoadingAnakMenunggu] = useState(true)
+
   async function muatData() {
     setLoading(true)
     let query = supabase
@@ -79,10 +87,67 @@ export default function PersetujuanAkun() {
     setLoading(false)
   }
 
+  // Ambil semua baris orang_tua_siswa berstatus 'menunggu' milik akun
+  // orang tua yang AKUNNYA sudah 'aktif' — ini yang menandakan baris
+  // tersebut hasil "Tambah Anak" belakangan, bukan anak pertama saat
+  // pendaftaran (yang sudah tertangani lewat tab "Menunggu" di atas).
+  async function muatAnakMenunggu() {
+    setLoadingAnakMenunggu(true)
+
+    const { data: relasi } = await supabase
+      .from('orang_tua_siswa')
+      .select(`
+        id,
+        orang_tua_id,
+        siswa_id,
+        hubungan,
+        status,
+        catatan_admin,
+        dibuat_pada,
+        siswa:siswa_id (nama_lengkap, nis, sekolah_id)
+      `)
+      .eq('status', 'menunggu')
+      .order('dibuat_pada', { ascending: false })
+
+    let daftar = relasi || []
+
+    // Filter sekolah untuk admin non-superadmin (siswa.sekolah_id, karena
+    // orang_tua_siswa sendiri tidak punya kolom sekolah_id)
+    if (!isSuperAdmin) {
+      daftar = daftar.filter((r) => r.siswa?.sekolah_id === sekolahId)
+    }
+
+    // Ambil nama akun orang tua terpisah (tidak ada FK profil <-> orang_tua_siswa)
+    const idOrtu = [...new Set(daftar.map((r) => r.orang_tua_id))]
+    let profilOrtu = []
+    if (idOrtu.length > 0) {
+      const { data } = await supabase
+        .from('profil')
+        .select('id, nama_lengkap_pendaftar, email_pendaftar, status_akun')
+        .in('id', idOrtu)
+      profilOrtu = data || []
+    }
+
+    // Hanya tampilkan baris dari akun ortu yang AKUNNYA SUDAH AKTIF —
+    // relasi anak pertama (saat akun masih 'menunggu') sudah muncul & sudah
+    // ditangani lewat tab "Menunggu" yang sudah ada, jadi tidak perlu dobel di sini.
+    daftar = daftar
+      .map((r) => ({ ...r, ortu: profilOrtu.find((p) => p.id === r.orang_tua_id) }))
+      .filter((r) => r.ortu?.status_akun === 'aktif')
+
+    setAnakMenunggu(daftar)
+    setLoadingAnakMenunggu(false)
+  }
+
   useEffect(() => {
     muatData()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab, filterJabatan])
+
+  useEffect(() => {
+    muatAnakMenunggu()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   async function ubahStatus(id, statusBaru, catatan = '', guruId = null) {
     setProsesId(id)
@@ -93,16 +158,24 @@ export default function PersetujuanAkun() {
     // Kalau akun ini orang tua/wali, ikut sinkronkan status hubungan
     // dengan anaknya di tabel orang_tua_siswa supaya tidak "nyangkut"
     // di status menunggu walau akunnya sudah disetujui/ditolak.
+    // Dibatasi hanya baris yang MASIH 'menunggu' (anak pertama saat
+    // pendaftaran) — supaya tidak menimpa status anak lain yang sudah
+    // diproses terpisah lewat tab "Anak Menunggu".
     const akun = daftarAkun.find((a) => a.id === id)
     if ((akun?.jabatan || akun?.role) === 'orang_tua') {
       const statusRelasi =
         statusBaru === 'aktif' ? 'aktif' : statusBaru === 'ditolak' ? 'ditolak' : 'menunggu'
-      await supabase.from('orang_tua_siswa').update({ status: statusRelasi }).eq('orang_tua_id', id)
+      await supabase
+        .from('orang_tua_siswa')
+        .update({ status: statusRelasi })
+        .eq('orang_tua_id', id)
+        .eq('status', 'menunggu')
     }
 
     setProsesId(null)
     setModalGuru(null)
     muatData()
+    muatAnakMenunggu()
   }
 
   function handleTolak(id) {
@@ -173,8 +246,16 @@ export default function PersetujuanAkun() {
       .update({ status_akun: 'menunggu', catatan_admin: null, guru_id: null })
       .eq('id', akun.id)
 
+    // Sama seperti di ubahStatus(): hanya reset baris orang_tua_siswa yang
+    // statusnya masih cerminan dari status akun SEBELUM direset ini (aktif
+    // atau ditolak), supaya anak lain yang sudah diproses terpisah lewat
+    // tab "Anak Menunggu" tidak ikut ter-reset tanpa sengaja.
     if (!error && (akun.jabatan || akun.role) === 'orang_tua') {
-      await supabase.from('orang_tua_siswa').update({ status: 'menunggu' }).eq('orang_tua_id', akun.id)
+      await supabase
+        .from('orang_tua_siswa')
+        .update({ status: 'menunggu' })
+        .eq('orang_tua_id', akun.id)
+        .eq('status', akun.status_akun === 'aktif' ? 'aktif' : 'ditolak')
     }
 
     setProsesId(null)
@@ -183,6 +264,7 @@ export default function PersetujuanAkun() {
       return
     }
     muatData()
+    muatAnakMenunggu()
   }
 
   // Simpan perubahan data akun dari modal Edit
@@ -237,6 +319,38 @@ export default function PersetujuanAkun() {
     muatData()
   }
 
+  // Setujui satu baris anak (tab "Anak Menunggu") — hanya menyentuh baris
+  // ini, tidak menyentuh baris anak lain atau status akun orang tuanya.
+  async function setujuiAnak(relasiId) {
+    setProsesId(relasiId)
+    const { error } = await supabase
+      .from('orang_tua_siswa')
+      .update({ status: 'aktif' })
+      .eq('id', relasiId)
+    setProsesId(null)
+    if (error) {
+      window.alert('Gagal menyetujui: ' + error.message)
+      return
+    }
+    muatAnakMenunggu()
+  }
+
+  // Tolak satu baris anak (tab "Anak Menunggu")
+  async function tolakAnak(relasiId) {
+    const catatan = window.prompt('Catatan penolakan (opsional):') || ''
+    setProsesId(relasiId)
+    const { error } = await supabase
+      .from('orang_tua_siswa')
+      .update({ status: 'ditolak', catatan_admin: catatan || null })
+      .eq('id', relasiId)
+    setProsesId(null)
+    if (error) {
+      window.alert('Gagal menolak: ' + error.message)
+      return
+    }
+    muatAnakMenunggu()
+  }
+
   return (
     <Layout
       title="Persetujuan Akun"
@@ -259,176 +373,251 @@ export default function PersetujuanAkun() {
         >
           Riwayat
         </button>
-      </div>
-
-      <div className="flex gap-2 mb-4 flex-wrap">
         <button
-          onClick={() => setFilterJabatan('semua')}
-          className={`text-xs font-medium px-3 py-1.5 rounded-full transition-colors ${
-            filterJabatan === 'semua' ? 'bg-slate-800 text-white' : 'bg-slate-100 text-slate-600'
+          onClick={() => setTab('anak_menunggu')}
+          className={`text-sm font-medium px-4 py-2 rounded-lg transition-colors flex items-center gap-1.5 ${
+            tab === 'anak_menunggu' ? 'bg-emerald-600 text-white' : 'bg-white text-slate-600 border border-slate-200'
           }`}
         >
-          Semua Jabatan
-        </button>
-        <button
-          onClick={() => setFilterJabatan('admin_kepsek')}
-          className={`text-xs font-medium px-3 py-1.5 rounded-full transition-colors ${
-            filterJabatan === 'admin_kepsek' ? 'bg-indigo-600 text-white' : 'bg-indigo-50 text-indigo-600'
-          }`}
-        >
-          Admin & Kepala Sekolah
-        </button>
-        <button
-          onClick={() => setFilterJabatan('guru')}
-          className={`text-xs font-medium px-3 py-1.5 rounded-full transition-colors ${
-            filterJabatan === 'guru' ? 'bg-blue-600 text-white' : 'bg-blue-50 text-blue-600'
-          }`}
-        >
-          Guru
-        </button>
-        <button
-          onClick={() => setFilterJabatan('orang_tua')}
-          className={`text-xs font-medium px-3 py-1.5 rounded-full transition-colors ${
-            filterJabatan === 'orang_tua' ? 'bg-emerald-600 text-white' : 'bg-emerald-50 text-emerald-600'
-          }`}
-        >
-          Orang Tua/Wali
+          Anak Menunggu
+          {anakMenunggu.length > 0 && (
+            <span
+              className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
+                tab === 'anak_menunggu' ? 'bg-white/20' : 'bg-emerald-100 text-emerald-700'
+              }`}
+            >
+              {anakMenunggu.length}
+            </span>
+          )}
         </button>
       </div>
 
-      <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
-        {loading ? (
-          <p className="p-6 text-sm text-slate-400 text-center">Memuat data...</p>
-        ) : daftarAkun.length === 0 ? (
-          <p className="p-6 text-sm text-slate-400 text-center">
-            {tab === 'menunggu'
-              ? 'Tidak ada pendaftaran yang menunggu persetujuan.'
-              : 'Belum ada riwayat.'}
-          </p>
-        ) : (
-          <table className="w-full text-sm">
-            <thead className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wide">
-              <tr>
-                <th className="text-left px-4 py-3 font-medium">Nama</th>
-                <th className="text-left px-4 py-3 font-medium">Email</th>
-                <th className="text-left px-4 py-3 font-medium">Jabatan</th>
-                {isSuperAdmin && <th className="text-left px-4 py-3 font-medium">Sekolah</th>}
-                <th className="text-left px-4 py-3 font-medium">Status</th>
-                <th className="text-right px-4 py-3 font-medium">Aksi</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {daftarAkun.map((akun) => (
-                <tr key={akun.id}>
-                  <td className="px-4 py-3 text-slate-700">
-                    {akun.nama_lengkap_pendaftar || '—'}
-                    {(akun.jabatan || akun.role) === 'orang_tua' && akun.relasiAnak?.length > 0 && (
-                      <p className="text-[11px] text-slate-400 mt-0.5">
-                        Anak:{' '}
-                        {akun.relasiAnak
-                          .map((r) => r.siswa?.nama_lengkap)
-                          .filter(Boolean)
-                          .join(', ')}
-                        {akun.relasiAnak[0]?.hubungan ? ` (${akun.relasiAnak[0].hubungan})` : ''}
-                      </p>
-                    )}
-                    {(akun.jabatan || akun.role) === 'orang_tua' && akun.relasiAnak?.length === 0 && (
-                      <p className="text-[11px] text-red-400 mt-0.5">
-                        Belum ada data anak terhubung
-                      </p>
-                    )}
-                  </td>
-                  <td className="px-4 py-3 text-slate-500">{akun.email_pendaftar || '—'}</td>
-                  <td className="px-4 py-3">
-                    <JabatanBadge jabatan={akun.jabatan} role={akun.role} />
-                  </td>
-                  {isSuperAdmin && (
-                    <td className="px-4 py-3 text-slate-500">{akun.sekolah?.nama_sekolah || '—'}</td>
-                  )}
-                  <td className="px-4 py-3">
-                    <StatusBadge status={akun.status_akun} />
-                    {akun.status_akun === 'aktif' && akun.catatan_admin && (
-                      <p className="text-[11px] text-slate-400 mt-1 max-w-[220px] truncate" title={akun.catatan_admin}>
-                        "{akun.catatan_admin}"
-                      </p>
-                    )}
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    <div className="flex justify-end items-center gap-1.5 flex-wrap">
-                      {akun.status_akun === 'menunggu' && (
-                        <>
-                          <button
-                            onClick={() => handleSetujui(akun)}
-                            disabled={prosesId === akun.id}
-                            className="flex items-center gap-1 text-xs font-medium px-3 py-1.5 rounded-lg bg-green-50 text-green-600 hover:bg-green-100 disabled:opacity-60"
-                          >
-                            <CheckCircle2 size={14} /> Setujui
-                          </button>
-                          <button
-                            onClick={() => handleTolak(akun.id)}
-                            disabled={prosesId === akun.id}
-                            className="flex items-center gap-1 text-xs font-medium px-3 py-1.5 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 disabled:opacity-60"
-                          >
-                            <XCircle size={14} /> Tolak
-                          </button>
-                        </>
-                      )}
+      {tab !== 'anak_menunggu' && (
+        <div className="flex gap-2 mb-4 flex-wrap">
+          <button
+            onClick={() => setFilterJabatan('semua')}
+            className={`text-xs font-medium px-3 py-1.5 rounded-full transition-colors ${
+              filterJabatan === 'semua' ? 'bg-slate-800 text-white' : 'bg-slate-100 text-slate-600'
+            }`}
+          >
+            Semua Jabatan
+          </button>
+          <button
+            onClick={() => setFilterJabatan('admin_kepsek')}
+            className={`text-xs font-medium px-3 py-1.5 rounded-full transition-colors ${
+              filterJabatan === 'admin_kepsek' ? 'bg-indigo-600 text-white' : 'bg-indigo-50 text-indigo-600'
+            }`}
+          >
+            Admin & Kepala Sekolah
+          </button>
+          <button
+            onClick={() => setFilterJabatan('guru')}
+            className={`text-xs font-medium px-3 py-1.5 rounded-full transition-colors ${
+              filterJabatan === 'guru' ? 'bg-blue-600 text-white' : 'bg-blue-50 text-blue-600'
+            }`}
+          >
+            Guru
+          </button>
+          <button
+            onClick={() => setFilterJabatan('orang_tua')}
+            className={`text-xs font-medium px-3 py-1.5 rounded-full transition-colors ${
+              filterJabatan === 'orang_tua' ? 'bg-emerald-600 text-white' : 'bg-emerald-50 text-emerald-600'
+            }`}
+          >
+            Orang Tua/Wali
+          </button>
+        </div>
+      )}
 
-                      {akun.status_akun === 'aktif' && (
-                        <button
-                          onClick={() => handlePesan(akun)}
-                          disabled={prosesId === akun.id}
-                          className="flex items-center gap-1 text-xs font-medium px-3 py-1.5 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 disabled:opacity-60"
-                        >
-                          <MessageSquare size={14} /> {akun.catatan_admin ? 'Edit Pesan' : 'Kirim Pesan'}
-                        </button>
-                      )}
-
-                      {akun.status_akun !== 'menunggu' && (
-                        <button
-                          onClick={() => handleResetStatus(akun)}
-                          disabled={prosesId === akun.id}
-                          title="Kembalikan ke status Menunggu"
-                          className="w-7 h-7 rounded-lg flex items-center justify-center text-indigo-600 hover:bg-indigo-50 disabled:opacity-60"
-                        >
-                          <RotateCcw size={14} />
-                        </button>
-                      )}
-
-                      <button
-                        onClick={() => setModalEdit(akun)}
-                        disabled={prosesId === akun.id}
-                        title="Edit data akun"
-                        className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-500 hover:bg-slate-100 disabled:opacity-60"
-                      >
-                        <Pencil size={14} />
-                      </button>
-
-                      <button
-                        onClick={() => handleResetPassword(akun)}
-                        disabled={prosesId === akun.id}
-                        title="Kirim link reset password"
-                        className="w-7 h-7 rounded-lg flex items-center justify-center text-amber-600 hover:bg-amber-50 disabled:opacity-60"
-                      >
-                        <KeyRound size={14} />
-                      </button>
-
-                      <button
-                        onClick={() => handleHapus(akun)}
-                        disabled={prosesId === akun.id}
-                        title="Hapus akun"
-                        className="w-7 h-7 rounded-lg flex items-center justify-center text-red-600 hover:bg-red-50 disabled:opacity-60"
-                      >
-                        <Trash2 size={14} />
-                      </button>
-                    </div>
-                  </td>
+      {tab !== 'anak_menunggu' ? (
+        <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+          {loading ? (
+            <p className="p-6 text-sm text-slate-400 text-center">Memuat data...</p>
+          ) : daftarAkun.length === 0 ? (
+            <p className="p-6 text-sm text-slate-400 text-center">
+              {tab === 'menunggu'
+                ? 'Tidak ada pendaftaran yang menunggu persetujuan.'
+                : 'Belum ada riwayat.'}
+            </p>
+          ) : (
+            <table className="w-full text-sm">
+              <thead className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wide">
+                <tr>
+                  <th className="text-left px-4 py-3 font-medium">Nama</th>
+                  <th className="text-left px-4 py-3 font-medium">Email</th>
+                  <th className="text-left px-4 py-3 font-medium">Jabatan</th>
+                  {isSuperAdmin && <th className="text-left px-4 py-3 font-medium">Sekolah</th>}
+                  <th className="text-left px-4 py-3 font-medium">Status</th>
+                  <th className="text-right px-4 py-3 font-medium">Aksi</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {daftarAkun.map((akun) => (
+                  <tr key={akun.id}>
+                    <td className="px-4 py-3 text-slate-700">
+                      {akun.nama_lengkap_pendaftar || '—'}
+                      {(akun.jabatan || akun.role) === 'orang_tua' && akun.relasiAnak?.length > 0 && (
+                        <p className="text-[11px] text-slate-400 mt-0.5">
+                          Anak:{' '}
+                          {akun.relasiAnak
+                            .map((r) => r.siswa?.nama_lengkap)
+                            .filter(Boolean)
+                            .join(', ')}
+                          {akun.relasiAnak[0]?.hubungan ? ` (${akun.relasiAnak[0].hubungan})` : ''}
+                        </p>
+                      )}
+                      {(akun.jabatan || akun.role) === 'orang_tua' && akun.relasiAnak?.length === 0 && (
+                        <p className="text-[11px] text-red-400 mt-0.5">
+                          Belum ada data anak terhubung
+                        </p>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-slate-500">{akun.email_pendaftar || '—'}</td>
+                    <td className="px-4 py-3">
+                      <JabatanBadge jabatan={akun.jabatan} role={akun.role} />
+                    </td>
+                    {isSuperAdmin && (
+                      <td className="px-4 py-3 text-slate-500">{akun.sekolah?.nama_sekolah || '—'}</td>
+                    )}
+                    <td className="px-4 py-3">
+                      <StatusBadge status={akun.status_akun} />
+                      {akun.status_akun === 'aktif' && akun.catatan_admin && (
+                        <p className="text-[11px] text-slate-400 mt-1 max-w-[220px] truncate" title={akun.catatan_admin}>
+                          "{akun.catatan_admin}"
+                        </p>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <div className="flex justify-end items-center gap-1.5 flex-wrap">
+                        {akun.status_akun === 'menunggu' && (
+                          <>
+                            <button
+                              onClick={() => handleSetujui(akun)}
+                              disabled={prosesId === akun.id}
+                              className="flex items-center gap-1 text-xs font-medium px-3 py-1.5 rounded-lg bg-green-50 text-green-600 hover:bg-green-100 disabled:opacity-60"
+                            >
+                              <CheckCircle2 size={14} /> Setujui
+                            </button>
+                            <button
+                              onClick={() => handleTolak(akun.id)}
+                              disabled={prosesId === akun.id}
+                              className="flex items-center gap-1 text-xs font-medium px-3 py-1.5 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 disabled:opacity-60"
+                            >
+                              <XCircle size={14} /> Tolak
+                            </button>
+                          </>
+                        )}
+
+                        {akun.status_akun === 'aktif' && (
+                          <button
+                            onClick={() => handlePesan(akun)}
+                            disabled={prosesId === akun.id}
+                            className="flex items-center gap-1 text-xs font-medium px-3 py-1.5 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 disabled:opacity-60"
+                          >
+                            <MessageSquare size={14} /> {akun.catatan_admin ? 'Edit Pesan' : 'Kirim Pesan'}
+                          </button>
+                        )}
+
+                        {akun.status_akun !== 'menunggu' && (
+                          <button
+                            onClick={() => handleResetStatus(akun)}
+                            disabled={prosesId === akun.id}
+                            title="Kembalikan ke status Menunggu"
+                            className="w-7 h-7 rounded-lg flex items-center justify-center text-indigo-600 hover:bg-indigo-50 disabled:opacity-60"
+                          >
+                            <RotateCcw size={14} />
+                          </button>
+                        )}
+
+                        <button
+                          onClick={() => setModalEdit(akun)}
+                          disabled={prosesId === akun.id}
+                          title="Edit data akun"
+                          className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-500 hover:bg-slate-100 disabled:opacity-60"
+                        >
+                          <Pencil size={14} />
+                        </button>
+
+                        <button
+                          onClick={() => handleResetPassword(akun)}
+                          disabled={prosesId === akun.id}
+                          title="Kirim link reset password"
+                          className="w-7 h-7 rounded-lg flex items-center justify-center text-amber-600 hover:bg-amber-50 disabled:opacity-60"
+                        >
+                          <KeyRound size={14} />
+                        </button>
+
+                        <button
+                          onClick={() => handleHapus(akun)}
+                          disabled={prosesId === akun.id}
+                          title="Hapus akun"
+                          className="w-7 h-7 rounded-lg flex items-center justify-center text-red-600 hover:bg-red-50 disabled:opacity-60"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      ) : (
+        <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+          {loadingAnakMenunggu ? (
+            <p className="p-6 text-sm text-slate-400 text-center">Memuat data...</p>
+          ) : anakMenunggu.length === 0 ? (
+            <p className="p-6 text-sm text-slate-400 text-center">
+              Tidak ada permintaan tambah anak yang menunggu persetujuan.
+            </p>
+          ) : (
+            <table className="w-full text-sm">
+              <thead className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wide">
+                <tr>
+                  <th className="text-left px-4 py-3 font-medium">Akun Orang Tua</th>
+                  <th className="text-left px-4 py-3 font-medium">Anak</th>
+                  <th className="text-left px-4 py-3 font-medium">Hubungan</th>
+                  <th className="text-right px-4 py-3 font-medium">Aksi</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {anakMenunggu.map((r) => (
+                  <tr key={r.id}>
+                    <td className="px-4 py-3 text-slate-700">
+                      {r.ortu?.nama_lengkap_pendaftar || '—'}
+                      <p className="text-[11px] text-slate-400">{r.ortu?.email_pendaftar}</p>
+                    </td>
+                    <td className="px-4 py-3 text-slate-700">
+                      {r.siswa?.nama_lengkap || '—'}
+                      <p className="text-[11px] text-slate-400">NIS: {r.siswa?.nis || '—'}</p>
+                    </td>
+                    <td className="px-4 py-3 text-slate-500 capitalize">{r.hubungan || '—'}</td>
+                    <td className="px-4 py-3 text-right">
+                      <div className="flex justify-end items-center gap-1.5">
+                        <button
+                          onClick={() => setujuiAnak(r.id)}
+                          disabled={prosesId === r.id}
+                          className="flex items-center gap-1 text-xs font-medium px-3 py-1.5 rounded-lg bg-green-50 text-green-600 hover:bg-green-100 disabled:opacity-60"
+                        >
+                          <CheckCircle2 size={14} /> Setujui
+                        </button>
+                        <button
+                          onClick={() => tolakAnak(r.id)}
+                          disabled={prosesId === r.id}
+                          className="flex items-center gap-1 text-xs font-medium px-3 py-1.5 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 disabled:opacity-60"
+                        >
+                          <XCircle size={14} /> Tolak
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      )}
 
       {modalGuru && (
         <ModalHubungkanGuru
