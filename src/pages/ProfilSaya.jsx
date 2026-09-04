@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../lib/AuthContext'
 import Layout from '../components/Layout'
 import GrafikAktivitas from '../components/GrafikAktivitas'
-import { Camera, Loader2, Save, Users, School, ShieldCheck } from 'lucide-react'
+import { Camera, Loader2, Save, Users, School, ShieldCheck, UserCircle2, Clock, CheckCircle2, XCircle } from 'lucide-react'
 // ASUMSI: menggunakan library `react-barcode` untuk membuat kode batang (linear barcode) di sisi klien.
 // Install dulu kalau belum ada: npm install react-barcode
 import Barcode from 'react-barcode'
@@ -366,8 +366,232 @@ function ProfilAdminCard({ profil, userId, adminData }) {
   )
 }
 
+// Kartu profil untuk akun ORANG TUA/WALI — jauh lebih sederhana dari kartu
+// guru/admin (tidak ada NUPTK, pangkat/golongan, QR/barcode identitas
+// pegawai — semua itu tidak relevan untuk orang tua). Field yang bisa
+// diisi hanya identitas dasar (nama, email, no HP, alamat) + foto profil.
+// Di bawah kartu, ditampilkan juga daftar anak yang tertaut ke akun ini
+// beserta status persetujuannya, supaya orang tua langsung tahu kalau ada
+// hubungan yang masih menunggu/ditolak tanpa harus buka halaman lain.
+function ProfilOrangTuaCard({ profil, userId }) {
+  const { getAnakSaya } = useAuth()
+
+  const [form, setForm] = useState({
+    nama_lengkap_pendaftar: profil?.nama_lengkap_pendaftar || '',
+    email_pendaftar: profil?.email_pendaftar || '',
+    no_hp: profil?.no_hp || '',
+    alamat: profil?.alamat || '',
+  })
+  const [fotoPath, setFotoPath] = useState(profil?.foto_profil_path || '')
+  const [uploadingFoto, setUploadingFoto] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [savedAt, setSavedAt] = useState(null)
+
+  const [anakList, setAnakList] = useState([])
+  const [loadingAnak, setLoadingAnak] = useState(true)
+
+  useEffect(() => {
+    setForm({
+      nama_lengkap_pendaftar: profil?.nama_lengkap_pendaftar || '',
+      email_pendaftar: profil?.email_pendaftar || '',
+      no_hp: profil?.no_hp || '',
+      alamat: profil?.alamat || '',
+    })
+    setFotoPath(profil?.foto_profil_path || '')
+  }, [profil])
+
+  useEffect(() => {
+    async function muatAnak() {
+      setLoadingAnak(true)
+      const { data } = await getAnakSaya()
+      setAnakList(data || [])
+      setLoadingAnak(false)
+    }
+    muatAnak()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  function fotoUrl() {
+    if (!fotoPath) return null
+    return supabase.storage.from('foto-profil').getPublicUrl(fotoPath).data.publicUrl
+  }
+
+  async function handleFotoChange(e) {
+    const file = e.target.files?.[0]
+    if (!file || !userId) return
+    setUploadingFoto(true)
+
+    const ext = file.name.split('.').pop()
+    const path = `${userId}/foto.${ext}`
+
+    const { error: uploadError } = await supabase.storage
+      .from('foto-profil')
+      .upload(path, file, { upsert: true })
+
+    if (uploadError) {
+      alert('Gagal upload foto: ' + uploadError.message)
+      setUploadingFoto(false)
+      return
+    }
+
+    const { error: updateError } = await supabase
+      .from('profil')
+      .update({ foto_profil_path: path })
+      .eq('id', userId)
+
+    if (updateError) {
+      alert('Gagal simpan foto: ' + updateError.message)
+    } else {
+      setFotoPath(path)
+    }
+    setUploadingFoto(false)
+  }
+
+  async function handleSave(e) {
+    e.preventDefault()
+    setSaving(true)
+    const { error } = await supabase
+      .from('profil')
+      .update({
+        nama_lengkap_pendaftar: form.nama_lengkap_pendaftar,
+        email_pendaftar: form.email_pendaftar,
+        no_hp: form.no_hp,
+        alamat: form.alamat,
+      })
+      .eq('id', userId)
+
+    if (error) {
+      alert('Gagal menyimpan: ' + error.message)
+    } else {
+      setSavedAt(new Date())
+    }
+    setSaving(false)
+  }
+
+  const STATUS_BADGE = {
+    aktif: { label: 'Disetujui', className: 'bg-sage-500/10 text-sage-600', icon: CheckCircle2 },
+    menunggu: { label: 'Menunggu Persetujuan', className: 'bg-amber-500/10 text-amber-600', icon: Clock },
+    ditolak: { label: 'Ditolak', className: 'bg-red-50 text-red-700', icon: XCircle },
+  }
+
+  return (
+    <div className="max-w-2xl space-y-5">
+      <form onSubmit={handleSave} className="space-y-5">
+        <div className="relative overflow-hidden rounded-xl p-6 flex items-center justify-between gap-5 bg-gradient-to-br from-blue-900 to-blue-950">
+          <div className="absolute -top-10 -right-10 w-40 h-40 rounded-full bg-white/5 pointer-events-none" />
+          <div className="absolute -bottom-14 -left-6 w-32 h-32 rounded-full bg-white/5 pointer-events-none" />
+
+          <div className="relative flex items-center gap-5 min-w-0">
+            <div className="relative shrink-0">
+              <div className="w-20 h-20 rounded-full bg-white/10 ring-2 ring-white/20 overflow-hidden flex items-center justify-center">
+                {fotoUrl() ? (
+                  <img src={fotoUrl()} alt="Foto profil" className="w-full h-full object-cover" />
+                ) : (
+                  <UserCircle2 size={32} className="text-white/80" />
+                )}
+              </div>
+              <label className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full bg-brass-400 flex items-center justify-center cursor-pointer shadow-md">
+                {uploadingFoto ? (
+                  <Loader2 size={13} className="animate-spin text-ink-950" />
+                ) : (
+                  <Camera size={13} className="text-ink-950" />
+                )}
+                <input type="file" accept="image/*" className="hidden" onChange={handleFotoChange} disabled={uploadingFoto} />
+              </label>
+            </div>
+            <div className="min-w-0">
+              <p className="font-display font-semibold text-lg text-white truncate">
+                {form.nama_lengkap_pendaftar || 'Nama belum diisi'}
+              </p>
+              <p className="text-xs text-white/60 mt-0.5">Orang Tua/Wali</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="card p-5">
+          <div className="grid sm:grid-cols-2 gap-3">
+            <div>
+              <label className="label-field">Nama Lengkap</label>
+              <input
+                className="input-field"
+                value={form.nama_lengkap_pendaftar}
+                onChange={(e) => setForm((f) => ({ ...f, nama_lengkap_pendaftar: e.target.value }))}
+              />
+            </div>
+            <div>
+              <label className="label-field">Email</label>
+              <input
+                className="input-field"
+                type="email"
+                value={form.email_pendaftar}
+                onChange={(e) => setForm((f) => ({ ...f, email_pendaftar: e.target.value }))}
+              />
+            </div>
+            <div>
+              <label className="label-field">No. HP</label>
+              <input
+                className="input-field"
+                value={form.no_hp}
+                onChange={(e) => setForm((f) => ({ ...f, no_hp: e.target.value }))}
+              />
+            </div>
+            <div className="sm:col-span-2">
+              <label className="label-field">Alamat</label>
+              <textarea
+                className="input-field min-h-[70px]"
+                value={form.alamat}
+                onChange={(e) => setForm((f) => ({ ...f, alamat: e.target.value }))}
+              />
+            </div>
+          </div>
+          <div className="mt-4 flex items-center gap-3">
+            <button className="btn-primary" type="submit" disabled={saving}>
+              {saving && <Loader2 size={16} className="animate-spin" />}
+              <Save size={16} /> Simpan
+            </button>
+            {savedAt && <p className="text-xs text-sage-600">Tersimpan.</p>}
+          </div>
+        </div>
+      </form>
+
+      <div className="card p-5">
+        <h4 className="font-display font-semibold text-ink-950 mb-3 flex items-center gap-2">
+          <Users size={16} /> Anak Terhubung
+        </h4>
+        {loadingAnak ? (
+          <p className="text-sm text-ink-700/50 flex items-center gap-2">
+            <Loader2 size={14} className="animate-spin" /> Memuat...
+          </p>
+        ) : anakList.length === 0 ? (
+          <p className="text-sm text-ink-700/50">Belum ada anak yang tertaut ke akun ini.</p>
+        ) : (
+          <div className="space-y-2">
+            {anakList.map((a) => {
+              const badge = STATUS_BADGE[a.status] || STATUS_BADGE.menunggu
+              const Icon = badge.icon
+              return (
+                <div key={a.id} className="flex items-center justify-between gap-3 border border-ink-950/10 rounded-lg p-3">
+                  <div className="min-w-0">
+                    <p className="font-medium text-ink-950 truncate">{a.siswa?.nama_lengkap}</p>
+                    <p className="text-xs text-ink-700/50">
+                      {a.siswa?.kelas?.nama_kelas || '-'} · {a.hubungan || '-'}
+                    </p>
+                  </div>
+                  <span className={`shrink-0 text-xs font-semibold px-2 py-1 rounded-full flex items-center gap-1 ${badge.className}`}>
+                    <Icon size={12} /> {badge.label}
+                  </span>
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 export default function ProfilSaya() {
-  const { profil, session, isAdmin } = useAuth()
+  const { profil, session, isAdmin, isOrangTua } = useAuth()
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -581,6 +805,17 @@ export default function ProfilSaya() {
       return (
         <Layout title="Profil Saya" subtitle="Data diri dan foto profil Anda">
           <ProfilAdminCard profil={profil} userId={session?.user?.id} adminData={adminData} />
+        </Layout>
+      )
+    }
+    // Orang tua/wali juga tidak punya guru_id — ini WAJAR (mereka bukan
+    // baris di tabel `guru`), jadi tampilkan kartu profil orang tua yang
+    // sesuai, bukan pesan "hubungi admin" yang tadinya cuma ditujukan
+    // untuk akun guru yang belum ditautkan.
+    if (isOrangTua) {
+      return (
+        <Layout title="Profil Saya" subtitle="Data diri dan foto profil Anda">
+          <ProfilOrangTuaCard profil={profil} userId={session?.user?.id} />
         </Layout>
       )
     }
