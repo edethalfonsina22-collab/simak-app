@@ -48,6 +48,7 @@ import UjianOnline from './pages/UjianOnline'
 import ProfilSaya from './pages/ProfilSaya'
 import SertifikatPenghargaan from './pages/SertifikatPenghargaan'
 import PortofolioSiswa from './pages/PortofolioSiswa'
+import PortofolioAnak from './pages/PortofolioAnak'
 import PengajuanSuratAktif from './pages/PengajuanSuratAktif'
 import PengajuanEditSiswa from './pages/PengajuanEditSiswa'
 import PengajuanKebutuhanKelas from './pages/PengajuanKebutuhanKelas'
@@ -175,6 +176,7 @@ export default function App() {
           dropdown bebas seperti /rapor dan /presensi milik guru. */}
       <Route path="/rapor-anak" element={<ProtectedRoute><RaporAnak /></ProtectedRoute>} />
       <Route path="/presensi-anak" element={<ProtectedRoute><PresensiAnak /></ProtectedRoute>} />
+      <Route path="/portofolio-anak" element={<ProtectedRoute><PortofolioAnak /></ProtectedRoute>} />
       <Route path="/galeri-orang-tua" element={<ProtectedRoute><GaleriOrangTua /></ProtectedRoute>} />
       <Route path="/nilai-asesmen" element={<ProtectedRoute><NilaiAsesmen /></ProtectedRoute>} />
       <Route path="/ijazah" element={<ProtectedRoute><Ijazah /></ProtectedRoute>} />
