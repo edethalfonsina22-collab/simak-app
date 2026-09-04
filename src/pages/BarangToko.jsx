@@ -14,7 +14,16 @@ import { useAuth } from "../lib/AuthContext";
 // tabel "profiles" (tidak ada di database ini — tabel yang benar adalah
 // "profil", lihat AuthContext.jsx). Sekarang role diambil dari
 // AuthContext, sama seperti Toko.jsx dan Sidebar.jsx.
+//
+// PERBAIKAN (foto barang):
+// Form Tambah/Edit Barang sekarang punya input gambar. File diupload ke
+// Supabase Storage bucket "barang-photos", lalu public URL-nya disimpan
+// di kolom barang.foto_url. Pastikan bucket & kolom sudah dibuat di
+// Supabase (lihat catatan migrasi terpisah).
 // =========================================================
+
+const BARANG_PHOTO_BUCKET = "barang-photos";
+
 export default function BarangToko() {
   const { id: tokoId } = useParams();
   const navigate = useNavigate();
@@ -35,7 +44,11 @@ export default function BarangToko() {
     satuan: "pcs",
     deskripsi: "",
     status: "aktif",
+    foto_url: "",
   });
+  const [photoFile, setPhotoFile] = useState(null);
+  const [photoPreview, setPhotoPreview] = useState("");
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
 
   const isSuperadmin = isSuperAdmin;
 
@@ -102,9 +115,12 @@ export default function BarangToko() {
       satuan: "pcs",
       deskripsi: "",
       status: "aktif",
+      foto_url: "",
     });
     setEditingId(null);
     setShowForm(false);
+    setPhotoFile(null);
+    setPhotoPreview("");
   };
 
   const handleChange = (e) => {
@@ -121,9 +137,49 @@ export default function BarangToko() {
       satuan: item.satuan || "pcs",
       deskripsi: item.deskripsi || "",
       status: item.status || "aktif",
+      foto_url: item.foto_url || "",
     });
     setEditingId(item.id);
     setShowForm(true);
+    setPhotoFile(null);
+    setPhotoPreview(item.foto_url || "");
+  };
+
+  // Pilih file gambar -> tampilkan preview lokal (upload terjadi saat submit)
+  const handlePhotoChange = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) {
+      setPhotoFile(null);
+      return;
+    }
+    if (!file.type.startsWith("image/")) {
+      alert("File harus berupa gambar");
+      e.target.value = "";
+      return;
+    }
+    setPhotoFile(file);
+    setPhotoPreview(URL.createObjectURL(file));
+  };
+
+  const uploadPhoto = async (file) => {
+    const ext = file.name.split(".").pop();
+    const path = `${tokoId}/${Date.now()}_${Math.random()
+      .toString(36)
+      .slice(2)}.${ext}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from(BARANG_PHOTO_BUCKET)
+      .upload(path, file, { cacheControl: "3600", upsert: false });
+
+    if (uploadError) {
+      throw uploadError;
+    }
+
+    const { data } = supabase.storage
+      .from(BARANG_PHOTO_BUCKET)
+      .getPublicUrl(path);
+
+    return data.publicUrl;
   };
 
   const handleSubmit = async (e) => {
@@ -139,11 +195,26 @@ export default function BarangToko() {
       return;
     }
 
+    let foto_url = form.foto_url;
+
+    if (photoFile) {
+      setUploadingPhoto(true);
+      try {
+        foto_url = await uploadPhoto(photoFile);
+      } catch (err) {
+        setUploadingPhoto(false);
+        alert("Gagal upload foto: " + err.message);
+        return;
+      }
+      setUploadingPhoto(false);
+    }
+
     const payload = {
       ...form,
       toko_id: tokoId,
       harga: Number(form.harga),
       stok: Number(form.stok) || 0,
+      foto_url,
     };
 
     let result;
@@ -281,6 +352,32 @@ export default function BarangToko() {
             </div>
           </div>
 
+          {/* Input gambar barang */}
+          <div>
+            <label className="block mb-1 text-xs text-gray-500">
+              Foto Barang
+            </label>
+            <div className="flex items-center gap-3">
+              {photoPreview ? (
+                <img
+                  src={photoPreview}
+                  alt="Preview"
+                  className="object-cover w-20 h-20 border rounded"
+                />
+              ) : (
+                <div className="flex items-center justify-center w-20 h-20 text-xs text-gray-400 border rounded bg-gray-100">
+                  No Photo
+                </div>
+              )}
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handlePhotoChange}
+                className="text-sm"
+              />
+            </div>
+          </div>
+
           <textarea
             name="deskripsi"
             value={form.deskripsi}
@@ -302,9 +399,10 @@ export default function BarangToko() {
           <div className="flex gap-2">
             <button
               type="submit"
-              className="px-4 py-2 text-sm text-white bg-blue-600 rounded hover:bg-blue-700"
+              disabled={uploadingPhoto}
+              className="px-4 py-2 text-sm text-white bg-blue-600 rounded hover:bg-blue-700 disabled:opacity-50"
             >
-              Simpan
+              {uploadingPhoto ? "Mengupload foto..." : "Simpan"}
             </button>
             <button
               type="button"
@@ -322,6 +420,7 @@ export default function BarangToko() {
         <table className="w-full text-sm text-left">
           <thead className="bg-gray-100">
             <tr>
+              <th className="px-3 py-2">Foto</th>
               <th className="px-3 py-2">Nama Barang</th>
               <th className="px-3 py-2">Kategori</th>
               <th className="px-3 py-2">Harga</th>
@@ -334,7 +433,7 @@ export default function BarangToko() {
             {barangList.length === 0 ? (
               <tr>
                 <td
-                  colSpan={isSuperadmin ? 6 : 5}
+                  colSpan={isSuperadmin ? 7 : 6}
                   className="px-3 py-4 text-center text-gray-400"
                 >
                   Belum ada barang di toko ini
@@ -343,6 +442,19 @@ export default function BarangToko() {
             ) : (
               barangList.map((item) => (
                 <tr key={item.id} className="border-t">
+                  <td className="px-3 py-2">
+                    {item.foto_url ? (
+                      <img
+                        src={item.foto_url}
+                        alt={item.nama_barang}
+                        className="object-cover w-12 h-12 border rounded"
+                      />
+                    ) : (
+                      <div className="flex items-center justify-center w-12 h-12 text-[10px] text-gray-400 border rounded bg-gray-100">
+                        -
+                      </div>
+                    )}
+                  </td>
                   <td className="px-3 py-2">{item.nama_barang}</td>
                   <td className="px-3 py-2">{item.kategori || "-"}</td>
                   <td className="px-3 py-2 font-medium">
