@@ -162,7 +162,14 @@ export default function App() {
   return (
     <CartProvider>
       <Routes>
-        {/* Halaman publik — TIDAK perlu login, dibagikan ke orang tua calon siswa */}
+        {/* Halaman publik — TIDAK perlu login, dibagikan ke orang tua calon siswa.
+            /ppdb/:sekolahId adalah link resmi (tiap sekolah punya link sendiri,
+            lihat tombol "Salin Link Pendaftaran" di halaman PPDB Admin).
+            /ppdb tanpa ID dipertahankan supaya link lama yang mungkin sudah
+            pernah dibagikan tidak langsung mati — PPDBPublik.jsx akan
+            menampilkan pesan agar pendaftar meminta link yang benar ke
+            sekolah, bukan diam-diam mendaftarkan ke sekolah yang salah. */}
+        <Route path="/ppdb/:sekolahId" element={<PPDBPublik />} />
         <Route path="/ppdb" element={<PPDBPublik />} />
         <Route path="/ujian-online" element={<UjianOnline />} />
         {/* Kuis Seru: game kuis untuk siswa kelas 1-3, tanpa login (sama pola dengan ujian-online) */}
