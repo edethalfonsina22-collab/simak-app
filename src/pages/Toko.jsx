@@ -39,9 +39,49 @@ import Layout from "../components/Layout";
 // PERBAIKAN (akses tamu): halaman ini & /toko/:id/keranjang kini bisa
 // diakses tanpa login (lihat App.jsx) — teks di bawah header disesuaikan
 // supaya tidak menampilkan "Login sebagai ..." untuk pengunjung tamu.
+// PERBAIKAN (tampilan kartu toko): kartu toko sekarang berwarna solid
+// berotasi (biru/hijau/ungu/oranye) mengikuti pola kartu di Dasbor,
+// bukan lagi putih polos.
 // =========================================================
 
 const BARANG_PHOTO_BUCKET = "barang-photos";
+
+// Palet warna kartu toko - berotasi sesuai urutan toko, meniru pola
+// warna kartu ringkasan di Dasbor.
+const CARD_COLORS = [
+  {
+    bg: "bg-blue-600",
+    icon: "bg-white/15 text-white",
+    badgeOn: "bg-white/20 text-white",
+    badgeOff: "bg-white/10 text-blue-100",
+    sub: "text-blue-100",
+    link: "text-white",
+  },
+  {
+    bg: "bg-emerald-600",
+    icon: "bg-white/15 text-white",
+    badgeOn: "bg-white/20 text-white",
+    badgeOff: "bg-white/10 text-emerald-100",
+    sub: "text-emerald-100",
+    link: "text-white",
+  },
+  {
+    bg: "bg-purple-600",
+    icon: "bg-white/15 text-white",
+    badgeOn: "bg-white/20 text-white",
+    badgeOff: "bg-white/10 text-purple-100",
+    sub: "text-purple-100",
+    link: "text-white",
+  },
+  {
+    bg: "bg-orange-500",
+    icon: "bg-white/15 text-white",
+    badgeOn: "bg-white/20 text-white",
+    badgeOff: "bg-white/10 text-orange-100",
+    sub: "text-orange-100",
+    link: "text-white",
+  },
+];
 
 function formatRupiah(nilai) {
   if (nilai === null || nilai === undefined || nilai === "") return "-";
@@ -577,74 +617,79 @@ export default function Toko() {
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {tokoList.map((item) => (
-            <div
-              key={item.id}
-              onClick={() => openBarangModal(item)}
-              className="group relative text-left p-5 bg-white border border-slate-200 rounded-2xl shadow-sm hover:shadow-md hover:border-blue-200 transition-all cursor-pointer"
-            >
-              {isSuperadmin && (
-                <div className="absolute top-3 right-3 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <button
-                    onClick={(e) => handleEdit(item, e)}
-                    title="Edit toko"
-                    className="w-7 h-7 flex items-center justify-center rounded-md bg-slate-50 text-slate-500 hover:bg-blue-50 hover:text-blue-600"
-                  >
-                    <Pencil size={13} />
-                  </button>
-                  <button
-                    onClick={(e) => handleDelete(item.id, e)}
-                    title="Hapus toko"
-                    className="w-7 h-7 flex items-center justify-center rounded-md bg-slate-50 text-slate-500 hover:bg-red-50 hover:text-red-600"
-                  >
-                    <Trash2 size={13} />
-                  </button>
-                </div>
-              )}
+          {tokoList.map((item, idx) => {
+            const c = CARD_COLORS[idx % CARD_COLORS.length];
+            return (
+              <div
+                key={item.id}
+                onClick={() => openBarangModal(item)}
+                className={`group relative text-left p-5 ${c.bg} rounded-2xl shadow-sm hover:shadow-lg hover:-translate-y-0.5 transition-all cursor-pointer overflow-hidden`}
+              >
+                {isSuperadmin && (
+                  <div className="absolute top-3 right-3 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                    <button
+                      onClick={(e) => handleEdit(item, e)}
+                      title="Edit toko"
+                      className="w-7 h-7 flex items-center justify-center rounded-md bg-white/20 text-white hover:bg-white/30"
+                    >
+                      <Pencil size={13} />
+                    </button>
+                    <button
+                      onClick={(e) => handleDelete(item.id, e)}
+                      title="Hapus toko"
+                      className="w-7 h-7 flex items-center justify-center rounded-md bg-white/20 text-white hover:bg-red-500/80"
+                    >
+                      <Trash2 size={13} />
+                    </button>
+                  </div>
+                )}
 
-              <div className="flex items-start gap-3 mb-3 pr-14">
-                <div className="w-10 h-10 shrink-0 rounded-xl bg-blue-50 flex items-center justify-center text-blue-600">
-                  <Store size={18} />
-                </div>
-                <div className="min-w-0">
-                  <h3 className="font-display font-semibold text-slate-900 truncate group-hover:text-blue-700 transition-colors">
-                    {item.nama_toko}
-                  </h3>
-                  <span
-                    className={`inline-block mt-1 px-2 py-0.5 text-[11px] font-medium rounded-full ${
-                      item.status === "aktif"
-                        ? "bg-green-50 text-green-700"
-                        : "bg-slate-100 text-slate-400"
-                    }`}
+                <div className="flex items-start gap-3 mb-3 pr-14">
+                  <div
+                    className={`w-10 h-10 shrink-0 rounded-xl ${c.icon} flex items-center justify-center`}
                   >
-                    {item.status === "aktif" ? "Buka" : "Tutup"}
+                    <Store size={18} />
+                  </div>
+                  <div className="min-w-0">
+                    <h3 className="font-display font-semibold text-white truncate">
+                      {item.nama_toko}
+                    </h3>
+                    <span
+                      className={`inline-block mt-1 px-2 py-0.5 text-[11px] font-medium rounded-full ${
+                        item.status === "aktif" ? c.badgeOn : c.badgeOff
+                      }`}
+                    >
+                      {item.status === "aktif" ? "Buka" : "Tutup"}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="space-y-1.5 mb-4">
+                  {item.alamat && (
+                    <p className={`flex items-start gap-1.5 text-xs ${c.sub}`}>
+                      <MapPin size={13} className="mt-0.5 shrink-0" />
+                      <span className="line-clamp-1">{item.alamat}</span>
+                    </p>
+                  )}
+                  {item.no_telp && (
+                    <p className={`flex items-center gap-1.5 text-xs ${c.sub}`}>
+                      <Phone size={13} className="shrink-0" />
+                      {item.no_telp}
+                    </p>
+                  )}
+                </div>
+
+                <div
+                  className={`flex items-center justify-between text-sm font-medium ${c.link}`}
+                >
+                  <span>Lihat barang & belanja</span>
+                  <span className="transition-transform group-hover:translate-x-0.5">
+                    →
                   </span>
                 </div>
               </div>
-
-              <div className="space-y-1.5 mb-4">
-                {item.alamat && (
-                  <p className="flex items-start gap-1.5 text-xs text-slate-500">
-                    <MapPin size={13} className="mt-0.5 shrink-0" />
-                    <span className="line-clamp-1">{item.alamat}</span>
-                  </p>
-                )}
-                {item.no_telp && (
-                  <p className="flex items-center gap-1.5 text-xs text-slate-500">
-                    <Phone size={13} className="shrink-0" />
-                    {item.no_telp}
-                  </p>
-                )}
-              </div>
-
-              <div className="flex items-center justify-between text-sm font-medium text-blue-600">
-                <span>Lihat barang & belanja</span>
-                <span className="transition-transform group-hover:translate-x-0.5">
-                  →
-                </span>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
