@@ -110,6 +110,11 @@ export default function PPDBAdmin() {
   }, [sekolahId])
 
   async function muatData() {
+    // PERBAIKAN: sebelumnya query ini hanya difilter `.eq('status', tab)`
+    // tanpa `.eq('sekolah_id', sekolahId)` — akibatnya admin sekolah mana pun
+    // melihat SEMUA pendaftar dari SEMUA sekolah yang pakai aplikasi ini,
+    // bukan cuma pendaftar sekolahnya sendiri.
+    if (!sekolahId) return
     setLoading(true)
     // select('*') sudah menarik SELURUH kolom yang diisi lewat form PPDB Publik
     // (termasuk nik_siswa, nomor_kk, alamat_tinggal, nik_ayah/ibu, tahun lahir,
@@ -117,6 +122,7 @@ export default function PPDBAdmin() {
     const { data: rows, error } = await supabase
       .from('ppdb_pendaftar')
       .select('*')
+      .eq('sekolah_id', sekolahId)
       .eq('status', tab)
       .order('dibuat_pada', { ascending: false })
     if (error) {
@@ -129,7 +135,7 @@ export default function PPDBAdmin() {
   useEffect(() => {
     muatData()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tab])
+  }, [tab, sekolahId])
 
   async function terima(pendaftar) {
     if (!confirm(`Terima ${pendaftar.nama_lengkap} dan tambahkan ke Data Siswa?`)) return
@@ -138,7 +144,10 @@ export default function PPDBAdmin() {
     // 1. Masukkan ke tabel siswa — SEMUA field yang diisi di formulir PPDB Publik
     //    ikut dibawa, termasuk NIK ayah/ibu, tahun lahir siswa/ayah/ibu, alamat
     //    domisili, dan asal TK/PAUD, agar tidak ada data yang tercecer.
+    // PERBAIKAN: sebelumnya `sekolah_id` tidak disertakan sama sekali di sini,
+    // jadi siswa yang diterima lewat PPDB tidak tertaut ke sekolah manapun.
     const { error: errSiswa } = await supabase.from('siswa').insert({
+      sekolah_id: sekolahId,
       nama_lengkap: pendaftar.nama_lengkap,
       jenis_kelamin: pendaftar.jenis_kelamin,
       agama: pendaftar.agama,
@@ -202,9 +211,16 @@ export default function PPDBAdmin() {
     else alert('Gagal menghapus: ' + error.message)
   }
 
-  const linkPublik = `${window.location.origin}/ppdb`
+  // PERBAIKAN: sebelumnya link publik selalu "/ppdb" tanpa ID sekolah, jadi
+  // siapa pun yang mengisinya akan salah kebaca sebagai sekolah yang lain
+  // (lihat PPDBPublik.jsx). Sekarang link menyertakan sekolah_id admin ini.
+  const linkPublik = sekolahId ? `${window.location.origin}/ppdb/${sekolahId}` : ''
 
   function salinLink() {
+    if (!linkPublik) {
+      alert('Data sekolah belum termuat, coba lagi sebentar.')
+      return
+    }
     navigator.clipboard.writeText(linkPublik)
     alert('Link pendaftaran disalin: ' + linkPublik)
   }
@@ -326,7 +342,7 @@ export default function PPDBAdmin() {
         <p className="text-sm text-ink-700/60">
           Bagikan link ini ke calon orang tua siswa untuk mendaftar secara online:
         </p>
-        <p className="text-sm font-medium text-ink-950 mt-1 break-all">{linkPublik}</p>
+        <p className="text-sm font-medium text-ink-950 mt-1 break-all">{linkPublik || 'Memuat...'}</p>
       </div>
 
       <div className="flex items-center justify-between mb-4">
