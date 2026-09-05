@@ -2,6 +2,8 @@ import { useParams, useNavigate } from "react-router-dom";
 import { useCart } from "../lib/CartContext";
 
 // URL yang disarankan: /toko/:id/keranjang
+// Sengaja TIDAK memerlukan login (lihat App.jsx) — tamu boleh melihat &
+// mengubah isi keranjangnya sendiri sebelum diwajibkan login saat checkout.
 
 export default function Keranjang() {
   const { id: tokoId } = useParams();
@@ -24,7 +26,7 @@ export default function Keranjang() {
   return (
     <div className="p-4">
       <button
-        onClick={() => navigate(`/toko/${tokoId}/barang`)}
+        onClick={() => navigate("/toko")}
         className="mb-3 text-sm text-blue-600 hover:underline"
       >
         &larr; Lanjut Belanja
