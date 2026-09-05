@@ -8,23 +8,46 @@ import { supabase } from "./supabaseClient"; // sesuaikan path kalau berbeda di 
 //   tidak hilang kalau halaman di-refresh.
 // - Cart di-scope per user_id, supaya tidak "nempel" ke user
 //   lain yang login di browser/device yang sama.
+// - Tamu (belum login) punya slot tersendiri (GUEST_KEY). Saat
+//   tamu login, isi keranjangnya digabung ke keranjang akun yang
+//   baru login, lalu slot tamu dikosongkan.
 // - Bungkus <App /> dengan <CartProvider> di App.jsx.
 // =========================================================
 
 const CartContext = createContext(null);
+const GUEST_KEY = "simak_keranjang_tamu";
 
 function getStorageKey(userId) {
-  return userId ? `simak_keranjang_${userId}` : null;
+  return userId ? `simak_keranjang_${userId}` : GUEST_KEY;
 }
 
 function loadCart(storageKey) {
-  if (!storageKey) return {};
   try {
     const raw = localStorage.getItem(storageKey);
     return raw ? JSON.parse(raw) : {};
   } catch {
     return {};
   }
+}
+
+// Gabungkan keranjang tamu ke keranjang milik user yang baru login.
+// Kalau barang yang sama sudah ada di keduanya, qty dijumlah (tetap
+// dibatasi oleh stok barang tsb).
+function mergeCarts(guestCart, userCart) {
+  const merged = { ...userCart };
+  for (const tokoId of Object.keys(guestCart)) {
+    const guestTokoCart = guestCart[tokoId] || {};
+    const userTokoCart = { ...(merged[tokoId] || {}) };
+    for (const barangId of Object.keys(guestTokoCart)) {
+      const guestItem = guestTokoCart[barangId];
+      const existing = userTokoCart[barangId];
+      const maxQty = guestItem.stok ?? Infinity;
+      const qty = Math.min((existing?.qty || 0) + guestItem.qty, maxQty);
+      userTokoCart[barangId] = { ...guestItem, ...existing, qty };
+    }
+    merged[tokoId] = userTokoCart;
+  }
+  return merged;
 }
 
 export function CartProvider({ children }) {
@@ -46,10 +69,26 @@ export function CartProvider({ children }) {
     });
 
     const { data: listener } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
+      (event, session) => {
         const uid = session?.user?.id ?? null;
+
+        if (event === "SIGNED_IN") {
+          // Baru saja login: gabungkan keranjang tamu (kalau ada isinya) ke
+          // keranjang milik akun ini, lalu bersihkan slot tamu supaya tidak
+          // "bocor" ke tamu berikutnya yang memakai browser/device yang sama.
+          const guestCart = loadCart(GUEST_KEY);
+          const userCart = loadCart(getStorageKey(uid));
+          const merged = mergeCarts(guestCart, userCart);
+          setCart(merged);
+          localStorage.setItem(getStorageKey(uid), JSON.stringify(merged));
+          localStorage.removeItem(GUEST_KEY);
+        } else {
+          // Restore sesi biasa (refresh halaman) atau logout — cukup muat
+          // ulang keranjang sesuai slot user/tamu yang sedang aktif.
+          setCart(loadCart(getStorageKey(uid)));
+        }
+
         setUserId(uid);
-        setCart(loadCart(getStorageKey(uid))); // ganti isi cart sesuai user baru
       }
     );
 
@@ -59,13 +98,11 @@ export function CartProvider({ children }) {
     };
   }, []);
 
-  // Simpan ke localStorage tiap kali cart berubah (hanya kalau sudah tahu user-nya)
+  // Simpan ke localStorage tiap kali cart berubah (hanya kalau sudah tahu
+  // slot mana yang sedang dipakai — user atau tamu).
   useEffect(() => {
     if (!ready) return;
-    const storageKey = getStorageKey(userId);
-    if (storageKey) {
-      localStorage.setItem(storageKey, JSON.stringify(cart));
-    }
+    localStorage.setItem(getStorageKey(userId), JSON.stringify(cart));
   }, [cart, userId, ready]);
 
   const addItem = useCallback((tokoId, barang, qty = 1) => {
