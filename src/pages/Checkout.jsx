@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabaseClient";
 import { useCart } from "../lib/CartContext";
+import Layout from "../components/Layout";
 
 // URL yang disarankan: /toko/:id/checkout
 // Rute ini DIBUNGKUS ProtectedRoute di App.jsx, jadi user pasti sudah
@@ -20,6 +21,10 @@ import { useCart } from "../lib/CartContext";
 //    pembeli benar-benar menyelesaikan pembayaran (onSuccess/onPending),
 //    bukan langsung setelah pesanan dibuat seperti sebelumnya — karena
 //    sekarang pesanan bisa dibuat tapi belum tentu dibayar.
+//
+// PERBAIKAN (tampilan): halaman ini sebelumnya merender <div> polos tanpa
+// <Layout>, sehingga Sidebar & header aplikasi hilang total saat dibuka.
+// Sekarang dibungkus <Layout> seperti pola di halaman lain (mis. Toko.jsx).
 
 // Ganti ke Client Key PRODUCTION dan URL produksi Snap.js saat go-live:
 // https://app.midtrans.com/snap/snap.js
@@ -165,7 +170,7 @@ export default function Checkout() {
 
   if (items.length === 0) {
     return (
-      <div className="p-4">
+      <Layout title="Checkout" subtitle="Selesaikan pesanan Anda">
         <p className="text-sm text-gray-500">
           Keranjang masih kosong.{" "}
           <button
@@ -175,65 +180,65 @@ export default function Checkout() {
             Kembali belanja
           </button>
         </p>
-      </div>
+      </Layout>
     );
   }
 
   return (
-    <div className="max-w-xl p-4">
-      <button
-        onClick={() => navigate(`/toko/${tokoId}/keranjang`)}
-        className="mb-3 text-sm text-blue-600 hover:underline"
-      >
-        &larr; Kembali ke Keranjang
-      </button>
+    <Layout title="Checkout" subtitle="Selesaikan pesanan Anda">
+      <div className="max-w-xl">
+        <button
+          onClick={() => navigate(`/toko/${tokoId}/keranjang`)}
+          className="mb-3 text-sm text-blue-600 hover:underline"
+        >
+          &larr; Kembali ke Keranjang
+        </button>
 
-      <h1 className="mb-4 text-xl font-semibold">Checkout</h1>
-
-      <div className="mb-4 border rounded">
-        {items.map((item) => (
-          <div
-            key={item.id}
-            className="flex items-center justify-between px-3 py-2 border-b last:border-b-0"
-          >
-            <div>
-              <div className="font-medium">{item.nama_barang}</div>
-              <div className="text-xs text-gray-500">
-                {item.qty} {item.satuan} x {formatRupiah(item.harga)}
+        <div className="mb-4 border rounded">
+          {items.map((item) => (
+            <div
+              key={item.id}
+              className="flex items-center justify-between px-3 py-2 border-b last:border-b-0"
+            >
+              <div>
+                <div className="font-medium">{item.nama_barang}</div>
+                <div className="text-xs text-gray-500">
+                  {item.qty} {item.satuan} x {formatRupiah(item.harga)}
+                </div>
+              </div>
+              <div className="font-medium">
+                {formatRupiah(item.harga * item.qty)}
               </div>
             </div>
-            <div className="font-medium">
-              {formatRupiah(item.harga * item.qty)}
-            </div>
+          ))}
+          <div className="flex items-center justify-between px-3 py-2 font-semibold bg-gray-50">
+            <span>Total</span>
+            <span>{formatRupiah(total)}</span>
           </div>
-        ))}
-        <div className="flex items-center justify-between px-3 py-2 font-semibold bg-gray-50">
-          <span>Total</span>
-          <span>{formatRupiah(total)}</span>
         </div>
+
+        <label className="block mb-1 text-xs text-gray-500">
+          Catatan untuk penjual (opsional)
+        </label>
+        <textarea
+          value={catatan}
+          onChange={(e) => setCatatan(e.target.value)}
+          placeholder="Contoh: tolong dibungkus rapi"
+          className="w-full px-3 py-2 mb-4 border rounded"
+        />
+
+        {errorMsg && (
+          <div className="mb-4 text-sm text-red-600">{errorMsg}</div>
+        )}
+
+        <button
+          onClick={handleCheckout}
+          disabled={loading}
+          className="w-full px-4 py-2 text-white bg-blue-600 rounded hover:bg-blue-700 disabled:opacity-50"
+        >
+          {loading ? "Memproses pesanan..." : "Bayar Sekarang"}
+        </button>
       </div>
-
-      <label className="block mb-1 text-xs text-gray-500">
-        Catatan untuk penjual (opsional)
-      </label>
-      <textarea
-        value={catatan}
-        onChange={(e) => setCatatan(e.target.value)}
-        placeholder="Contoh: tolong dibungkus rapi"
-        className="w-full px-3 py-2 mb-4 border rounded"
-      />
-
-      {errorMsg && (
-        <div className="mb-4 text-sm text-red-600">{errorMsg}</div>
-      )}
-
-      <button
-        onClick={handleCheckout}
-        disabled={loading}
-        className="w-full px-4 py-2 text-white bg-blue-600 rounded hover:bg-blue-700 disabled:opacity-50"
-      >
-        {loading ? "Memproses pesanan..." : "Bayar Sekarang"}
-      </button>
-    </div>
+    </Layout>
   );
 }
