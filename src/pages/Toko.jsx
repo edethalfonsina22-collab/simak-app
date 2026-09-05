@@ -23,6 +23,9 @@ import Layout from "../components/Layout";
 // Komponen Toko
 // - Semua user login: klik NAMA TOKO / kartu toko langsung membuka
 //   daftar barang toko tsb (tidak perlu lagi klik link "Kelola Barang").
+// - Tamu (belum login): boleh lihat-lihat toko & barang dan mengisi
+//   keranjang seperti biasa — login baru diwajibkan saat checkout
+//   (lihat App.jsx & Login.jsx untuk alur redirect-nya).
 // - Superadmin: bisa Tambah, Edit, Hapus, dan Import CSV toko, dan
 //   tambah/edit/hapus barang lewat panel "Kelola Barang" yang bisa
 //   ditampilkan/disembunyikan di dalam modal barang.
@@ -33,6 +36,9 @@ import Layout from "../components/Layout";
 // PERBAIKAN (keranjang belanja): tiap barang yang stoknya masih ada
 // punya stepper jumlah + tombol "Tambah ke Keranjang" (CartContext).
 // Ikon 🛒 di header modal menuju /toko/:id/keranjang.
+// PERBAIKAN (akses tamu): halaman ini & /toko/:id/keranjang kini bisa
+// diakses tanpa login (lihat App.jsx) — teks di bawah header disesuaikan
+// supaya tidak menampilkan "Login sebagai ..." untuk pengunjung tamu.
 // =========================================================
 
 const BARANG_PHOTO_BUCKET = "barang-photos";
@@ -45,7 +51,7 @@ function formatRupiah(nilai) {
 }
 
 export default function Toko() {
-  const { isSuperAdmin, profil, loading: authLoading } = useAuth();
+  const { session, isSuperAdmin, profil, loading: authLoading } = useAuth();
   const { addItem, getCartCount } = useCart();
 
   const [tokoList, setTokoList] = useState([]);
@@ -482,11 +488,18 @@ export default function Toko() {
         <div className="mb-4 text-sm text-red-600">{errorMsg}</div>
       )}
 
-      {!isSuperadmin && (
+      {!session ? (
         <p className="mb-5 text-sm text-slate-500">
-          Login sebagai <b className="text-slate-700">{profil?.role ?? "user"}</b>.
-          Klik kartu toko di bawah untuk melihat barang dan berbelanja.
+          Anda belum login. Silakan lihat-lihat & isi keranjang dulu — login
+          baru diminta saat checkout.
         </p>
+      ) : (
+        !isSuperadmin && (
+          <p className="mb-5 text-sm text-slate-500">
+            Login sebagai <b className="text-slate-700">{profil?.role ?? "user"}</b>.
+            Klik kartu toko di bawah untuk melihat barang dan berbelanja.
+          </p>
+        )
       )}
 
       {/* Form tambah/edit toko */}
