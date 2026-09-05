@@ -174,6 +174,7 @@ function getLinksGuru(jumlahPesanBelumDibaca = 0) {
   { to: '/pengajuan-surat-aktif', label: 'Pengajuan Surat Aktif', icon: FileCheck2 },
   { to: '/perbaikan-data-siswa', label: 'Perbaikan Data Siswa', icon: UserCog },
   { to: '/pengajuan-kebutuhan-kelas', label: 'Kebutuhan Kelas', icon: PackagePlus },
+  { to: '/ppdb-admin', label: 'PPDB Siswa Baru', icon: UserPlus },
   { to: '/buat-ujian', label: 'Buat Ujian', icon: FilePlus },
   { to: '/hasil-ujian', label: 'Hasil Ujian', icon: ClipboardList },
   { to: '/bank-soal', label: 'Bank Soal', icon: Database },
@@ -289,12 +290,13 @@ function getLinksOrangTua(jumlahPesanBelumDibaca = 0) {
     { to: '/profil-saya', label: 'Profil Saya', icon: UserCircle },
     { to: '/pesan', label: 'Pesan', icon: MessageCircle, badge: jumlahPesanBelumDibaca },
     { to: '/toko', label: 'Toko', icon: Store },
+    { to: '/rapat', label: 'Rapat Video', icon: Video },
     { to: '/rapor-anak', label: 'Rapor Anak', icon: FileBadge },
     { to: '/presensi-anak', label: 'Presensi Anak', icon: ClipboardCheck },
     { to: '/portofolio-anak', label: 'Portofolio Anak', icon: Image },
     { to: '/galeri-orang-tua', label: 'Galeri Kegiatan', icon: Images },
     { to: '/pengumuman', label: 'Pengumuman', icon: Megaphone },
-    // Ditambahkan: kalender pendidikan (read-only untuk orang tua — halaman
+    // Kalender pendidikan (read-only untuk orang tua — halaman
     // KalenderPendidikan.jsx sudah otomatis menyembunyikan kontrol edit
     // untuk siapa pun yang bukan admin) dan tautan pintasan ke form
     // pendaftaran siswa baru (PPDB) yang memang sudah publik.
