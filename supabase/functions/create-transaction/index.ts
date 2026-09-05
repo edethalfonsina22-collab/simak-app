@@ -5,15 +5,13 @@
 // membuat transaksi Snap di Midtrans, menyimpan snap_token ke
 // tabel pesanan, dan mengembalikan snap_token ke frontend.
 //
-// CATATAN PENTING — SESUAIKAN dengan skema Anda:
-// - Kode ini mengasumsikan tabel `pesanan` punya kolom
-//   `total_harga` (angka total pesanan) dan `pembeli_id`
-//   (uuid, merujuk ke auth.users / profil). Ganti nama kolom
-//   di bawah kalau nama di skema Anda berbeda.
-// - Kode ini mengasumsikan tabel `pesanan_item` punya kolom
-//   `barang_id`, `jumlah`, `harga_satuan` dan berelasi ke
-//   tabel `barang` (untuk nama barang). Sesuaikan juga bila
-//   berbeda.
+// Skema yang dipakai (sesuai project ini):
+// - tabel `pesanan`: id, toko_id, user_id, catatan, total, status,
+//   status_bayar, midtrans_order_id, snap_token
+// - tabel `pesanan_item`: id, pesanan_id, barang_id, nama_barang,
+//   harga_satuan, qty, subtotal
+//   (nama_barang & harga_satuan sudah disalin saat insert,
+//   jadi TIDAK perlu join ke tabel `barang`)
 // =========================================================
 
 import { createClient } from "npm:@supabase/supabase-js@2";
@@ -67,23 +65,24 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Ambil data pesanan + item + barang
+    // Ambil data pesanan + item (nama_barang & harga_satuan sudah ada
+    // langsung di pesanan_item, tidak perlu join ke tabel barang)
     const { data: pesanan, error: pesananError } = await supabase
       .from("pesanan")
       .select(
-        "id, total_harga, pembeli_id, status_bayar, midtrans_order_id, snap_token, pesanan_item(jumlah, harga_satuan, barang_id, barang(nama_barang))",
+        "id, total, user_id, status_bayar, midtrans_order_id, snap_token, pesanan_item(qty, harga_satuan, barang_id, nama_barang)",
       )
       .eq("id", pesanan_id)
       .single();
 
     if (pesananError || !pesanan) {
-      return new Response(JSON.stringify({ error: "Pesanan tidak ditemukan" }), {
-        status: 404,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return new Response(
+        JSON.stringify({ error: "Pesanan tidak ditemukan", detail: pesananError }),
+        { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
     }
 
-    if (pesanan.pembeli_id !== user.id) {
+    if (pesanan.user_id !== user.id) {
       return new Response(JSON.stringify({ error: "Pesanan ini bukan milik Anda" }), {
         status: 403,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -99,16 +98,19 @@ Deno.serve(async (req) => {
       });
     }
 
-    const midtransOrderId = `pesanan-${pesanan.id}-${Date.now()}`;
+    // order_id Midtrans MAKSIMAL 50 karakter, hanya alfanumerik/dash/underscore.
+    // Pakai 8 karakter pertama UUID pesanan (unik dalam praktik) + timestamp.
+    const shortId = pesanan.id.replace(/-/g, "").slice(0, 12);
+    const midtransOrderId = `ord-${shortId}-${Date.now()}`; // ~30 karakter
 
     const itemDetails = (pesanan.pesanan_item ?? []).map((it: any) => ({
       id: it.barang_id,
       price: Math.round(it.harga_satuan),
-      quantity: it.jumlah,
-      name: (it.barang?.nama_barang ?? "Barang").slice(0, 50),
+      quantity: it.qty,
+      name: (it.nama_barang ?? "Barang").slice(0, 50),
     }));
 
-    const grossAmount = Math.round(Number(pesanan.total_harga));
+    const grossAmount = Math.round(Number(pesanan.total));
 
     const midtransRes = await fetch(MIDTRANS_SNAP_URL, {
       method: "POST",
@@ -139,13 +141,20 @@ Deno.serve(async (req) => {
     }
 
     // Simpan snap_token & order_id ke pesanan supaya webhook bisa mencocokkan
-    await supabase
+    const { error: updateError } = await supabase
       .from("pesanan")
       .update({
         midtrans_order_id: midtransOrderId,
         snap_token: midtransData.token,
       })
       .eq("id", pesanan.id);
+
+    if (updateError) {
+      return new Response(
+        JSON.stringify({ error: "Gagal menyimpan snap_token", detail: updateError }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
 
     return new Response(JSON.stringify({ snap_token: midtransData.token }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
