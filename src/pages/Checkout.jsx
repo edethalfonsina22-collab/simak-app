@@ -1,113 +1,147 @@
-import { createContext, useContext, useEffect, useState, useCallback } from "react";
+import { useState } from "react";
+import { useParams, useNavigate } from "react-router-dom";
+import { supabase } from "../lib/supabaseClient";
+import { useCart } from "../lib/CartContext";
 
-// =========================================================
-// CartContext
-// - Menyimpan isi keranjang per toko (karena 1 aplikasi bisa
-//   melayani banyak toko), disimpan di localStorage supaya
-//   tidak hilang kalau halaman di-refresh.
-// - Bungkus <App /> dengan <CartProvider> di App.jsx.
-// =========================================================
+// URL yang disarankan: /toko/:id/checkout
+//
+// Alur:
+// 1. Ambil isi keranjang untuk toko ini dari CartContext
+// 2. Panggil fungsi database "buat_pesanan" (lihat checkout_schema.sql)
+//    -> fungsi ini yang membuat baris di tabel pesanan + pesanan_item
+//      dan mengurangi stok secara aman (anti bentrok kalau ada 2 pembeli
+//      checkout barang yang sama di saat bersamaan).
+// 3. Kalau sukses, keranjang dikosongkan dan pembeli diarahkan ke
+//    halaman sukses.
 
-const CartContext = createContext(null);
-const STORAGE_KEY = "simak_keranjang";
+export default function Checkout() {
+  const { id: tokoId } = useParams();
+  const navigate = useNavigate();
+  const { getCartItems, clearCart } = useCart();
 
-function loadCart() {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? JSON.parse(raw) : {};
-  } catch {
-    return {};
-  }
-}
+  const [catatan, setCatatan] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState("");
 
-export function CartProvider({ children }) {
-  // Bentuk data: { [tokoId]: { [barangId]: { id, nama_barang, harga, satuan, stok, qty } } }
-  const [cart, setCart] = useState(loadCart);
+  const items = getCartItems(tokoId);
 
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(cart));
-  }, [cart]);
-
-  const addItem = useCallback((tokoId, barang, qty = 1) => {
-    setCart((prev) => {
-      const tokoCart = { ...(prev[tokoId] || {}) };
-      const existing = tokoCart[barang.id];
-      const maxQty = barang.stok ?? Infinity;
-      const nextQty = Math.min((existing?.qty || 0) + qty, maxQty);
-
-      tokoCart[barang.id] = {
-        id: barang.id,
-        nama_barang: barang.nama_barang,
-        harga: barang.harga,
-        satuan: barang.satuan,
-        stok: barang.stok,
-        qty: nextQty,
-      };
-      return { ...prev, [tokoId]: tokoCart };
+  const formatRupiah = (angka) => {
+    const n = Number(angka) || 0;
+    return n.toLocaleString("id-ID", {
+      style: "currency",
+      currency: "IDR",
+      minimumFractionDigits: 0,
     });
-  }, []);
-
-  const updateQty = useCallback((tokoId, barangId, qty) => {
-    setCart((prev) => {
-      const tokoCart = { ...(prev[tokoId] || {}) };
-      const item = tokoCart[barangId];
-      if (!item) return prev;
-
-      if (qty <= 0) {
-        delete tokoCart[barangId];
-      } else {
-        const maxQty = item.stok ?? Infinity;
-        tokoCart[barangId] = { ...item, qty: Math.min(qty, maxQty) };
-      }
-      return { ...prev, [tokoId]: tokoCart };
-    });
-  }, []);
-
-  const removeItem = useCallback((tokoId, barangId) => {
-    setCart((prev) => {
-      const tokoCart = { ...(prev[tokoId] || {}) };
-      delete tokoCart[barangId];
-      return { ...prev, [tokoId]: tokoCart };
-    });
-  }, []);
-
-  const clearCart = useCallback((tokoId) => {
-    setCart((prev) => {
-      const next = { ...prev };
-      delete next[tokoId];
-      return next;
-    });
-  }, []);
-
-  const getCartItems = useCallback(
-    (tokoId) => Object.values(cart[tokoId] || {}),
-    [cart]
-  );
-
-  const getCartCount = useCallback(
-    (tokoId) =>
-      Object.values(cart[tokoId] || {}).reduce((sum, i) => sum + i.qty, 0),
-    [cart]
-  );
-
-  const value = {
-    addItem,
-    updateQty,
-    removeItem,
-    clearCart,
-    getCartItems,
-    getCartCount,
   };
 
-  return (
-    <CartContext.Provider value={value}>{children}</CartContext.Provider>
-  );
-}
+  const total = items.reduce((sum, item) => sum + item.harga * item.qty, 0);
 
-export function useCart() {
-  const ctx = useContext(CartContext);
-  if (!ctx) {
-    throw new Error("useCart harus dipakai di dalam <CartProvider>");
+  const handleCheckout = async () => {
+    setErrorMsg("");
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      setErrorMsg("Anda harus login untuk melanjutkan checkout.");
+      return;
+    }
+    if (items.length === 0) {
+      setErrorMsg("Keranjang masih kosong.");
+      return;
+    }
+
+    setLoading(true);
+
+    const { data: pesananId, error } = await supabase.rpc("buat_pesanan", {
+      p_toko_id: tokoId,
+      p_items: items.map((item) => ({ barang_id: item.id, qty: item.qty })),
+      p_catatan: catatan || null,
+    });
+
+    setLoading(false);
+
+    if (error) {
+      setErrorMsg("Checkout gagal: " + error.message);
+      return;
+    }
+
+    clearCart(tokoId);
+    navigate(`/toko/${tokoId}/pesanan-sukses`, { state: { pesananId } });
+  };
+
+  if (items.length === 0) {
+    return (
+      <div className="p-4">
+        <p className="text-sm text-gray-500">
+          Keranjang masih kosong.{" "}
+          <button
+            onClick={() => navigate(`/toko/${tokoId}/barang`)}
+            className="text-blue-600 hover:underline"
+          >
+            Kembali belanja
+          </button>
+        </p>
+      </div>
+    );
   }
-  return ctx;
+
+  return (
+    <div className="max-w-xl p-4">
+      <button
+        onClick={() => navigate(`/toko/${tokoId}/keranjang`)}
+        className="mb-3 text-sm text-blue-600 hover:underline"
+      >
+        &larr; Kembali ke Keranjang
+      </button>
+
+      <h1 className="mb-4 text-xl font-semibold">Checkout</h1>
+
+      <div className="mb-4 border rounded">
+        {items.map((item) => (
+          <div
+            key={item.id}
+            className="flex items-center justify-between px-3 py-2 border-b last:border-b-0"
+          >
+            <div>
+              <div className="font-medium">{item.nama_barang}</div>
+              <div className="text-xs text-gray-500">
+                {item.qty} {item.satuan} x {formatRupiah(item.harga)}
+              </div>
+            </div>
+            <div className="font-medium">
+              {formatRupiah(item.harga * item.qty)}
+            </div>
+          </div>
+        ))}
+        <div className="flex items-center justify-between px-3 py-2 font-semibold bg-gray-50">
+          <span>Total</span>
+          <span>{formatRupiah(total)}</span>
+        </div>
+      </div>
+
+      <label className="block mb-1 text-xs text-gray-500">
+        Catatan untuk penjual (opsional)
+      </label>
+      <textarea
+        value={catatan}
+        onChange={(e) => setCatatan(e.target.value)}
+        placeholder="Contoh: tolong dibungkus rapi"
+        className="w-full px-3 py-2 mb-4 border rounded"
+      />
+
+      {errorMsg && (
+        <div className="mb-4 text-sm text-red-600">{errorMsg}</div>
+      )}
+
+      <button
+        onClick={handleCheckout}
+        disabled={loading}
+        className="w-full px-4 py-2 text-white bg-blue-600 rounded hover:bg-blue-700 disabled:opacity-50"
+      >
+        {loading ? "Memproses pesanan..." : "Buat Pesanan"}
+      </button>
+    </div>
+  );
 }
