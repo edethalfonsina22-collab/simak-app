@@ -1,168 +1,129 @@
 // =========================================================
-// Edge Function: create-transaction
-// Dipanggil dari Checkout.jsx SETELAH pesanan berhasil dibuat
-// (setelah RPC buat_pesanan sukses). Menerima { pesanan_id },
-// membuat transaksi Snap di Midtrans, menyimpan snap_token ke
-// tabel pesanan, dan mengembalikan snap_token ke frontend.
+// Edge Function: midtrans-webhook
+// URL function ini didaftarkan di dashboard Midtrans sebagai
+// "Payment Notification URL". Midtrans akan memanggil endpoint
+// ini setiap kali status pembayaran berubah (pending, settlement,
+// deny, cancel, expire, dst).
 //
-// Skema yang dipakai (sesuai project ini):
-// - tabel `pesanan`: id, toko_id, user_id, catatan, total, status,
-//   status_bayar, midtrans_order_id, snap_token
-// - tabel `pesanan_item`: id, pesanan_id, barang_id, nama_barang,
-//   harga_satuan, qty, subtotal
-//   (nama_barang & harga_satuan sudah disalin saat insert,
-//   jadi TIDAK perlu join ke tabel `barang`)
+// TIDAK perlu header Authorization dari Midtrans — keamanan
+// diverifikasi lewat signature_key (lihat verifySignature di bawah),
+// bukan lewat JWT Supabase. Karena itu deploy dengan --no-verify-jwt.
+//
+// Disesuaikan dengan skema: tabel `pesanan` (kolom status_bayar,
+// midtrans_order_id, metode_bayar, dibayar_pada) + RPC batalkan_pesanan.
 // =========================================================
-
 import { createClient } from "npm:@supabase/supabase-js@2";
 
 const MIDTRANS_SERVER_KEY = Deno.env.get("MIDTRANS_SERVER_KEY")!;
-// Ganti ke "https://app.midtrans.com/snap/v1/transactions" saat sudah go-live
-const MIDTRANS_SNAP_URL = "https://app.sandbox.midtrans.com/snap/v1/transactions";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
-};
+async function sha512Hex(text: string): Promise<string> {
+  const data = new TextEncoder().encode(text);
+  const hashBuffer = await crypto.subtle.digest("SHA-512", data);
+  return Array.from(new Uint8Array(hashBuffer))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
 
 Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
-  }
+  const supabase = createClient(
+    Deno.env.get("SUPABASE_URL")!,
+    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+  );
 
   try {
-    const { pesanan_id } = await req.json();
-    if (!pesanan_id) {
-      return new Response(JSON.stringify({ error: "pesanan_id wajib diisi" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+    const body = await req.json();
 
-    // Service role client — hanya berjalan di server, aman untuk bypass RLS
-    // karena kita sudah tahu pesanan_id ini valid milik pemanggil (dicek di
-    // bawah lewat token Authorization dari frontend).
-    const supabase = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+    // PENTING: pakai nilai mentah dari body (string), JANGAN di-convert
+    // ke number. Signature Midtrans dihitung dari string persis seperti
+    // yang mereka kirim — kalau status_code/gross_amount diubah tipe,
+    // hasil hash akan selalu mismatch walau datanya "sama".
+    const order_id: string = body.order_id;
+    const status_code: string = body.status_code;
+    const gross_amount: string = body.gross_amount;
+    const signature_key: string = body.signature_key;
+    const transaction_status: string = body.transaction_status;
+    const fraud_status: string | undefined = body.fraud_status;
+    const payment_type: string | undefined = body.payment_type;
+
+    // 1. Verifikasi signature dulu, sebelum menyentuh database sama sekali
+    const expectedSignature = await sha512Hex(
+      `${order_id}${status_code}${gross_amount}${MIDTRANS_SERVER_KEY}`,
     );
-
-    // Verifikasi identitas pemanggil dari header Authorization (JWT user biasa,
-    // BUKAN service role) supaya orang lain tidak bisa membuat transaksi untuk
-    // pesanan_id milik orang lain.
-    const authHeader = req.headers.get("Authorization") ?? "";
-    const jwt = authHeader.replace("Bearer ", "");
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser(jwt);
-
-    if (userError || !user) {
-      return new Response(JSON.stringify({ error: "Tidak terautentikasi" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+    if (expectedSignature !== signature_key) {
+      console.error("Signature tidak valid untuk order_id:", order_id);
+      // Tetap 200 ke Midtrans supaya tidak retry terus untuk notifikasi
+      // palsu/rusak — cukup dicatat di log, bukan diteruskan sebagai error.
+      return new Response(JSON.stringify({ message: "Signature tidak valid, diabaikan" }), {
+        status: 200,
       });
     }
 
-    // Ambil data pesanan + item (nama_barang & harga_satuan sudah ada
-    // langsung di pesanan_item, tidak perlu join ke tabel barang)
-    const { data: pesanan, error: pesananError } = await supabase
+    // 2. Cari pesanan berdasarkan midtrans_order_id
+    const { data: pesanan, error: findError } = await supabase
       .from("pesanan")
-      .select(
-        "id, total, user_id, status_bayar, midtrans_order_id, snap_token, pesanan_item(qty, harga_satuan, barang_id, nama_barang)",
-      )
-      .eq("id", pesanan_id)
+      .select("id, status_bayar")
+      .eq("midtrans_order_id", order_id)
       .single();
 
-    if (pesananError || !pesanan) {
-      return new Response(
-        JSON.stringify({ error: "Pesanan tidak ditemukan", detail: pesananError }),
-        { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
-    }
-
-    if (pesanan.user_id !== user.id) {
-      return new Response(JSON.stringify({ error: "Pesanan ini bukan milik Anda" }), {
-        status: 403,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+    if (findError || !pesanan) {
+      console.error("Pesanan tidak ditemukan untuk order_id:", order_id, findError);
+      // Order id tidak dikenal — tetap balas 200 supaya Midtrans berhenti
+      // mengulang-ulang notifikasi untuk order yang bukan urusan kita.
+      return new Response(JSON.stringify({ message: "Pesanan tidak ditemukan, diabaikan" }), {
+        status: 200,
       });
     }
 
-    // Kalau sudah ada snap_token yang masih berlaku dan pesanan masih
-    // menunggu bayar, pakai ulang saja (Snap token berlaku ~24 jam) supaya
-    // tidak membuat transaksi baru tiap kali popup dibuka ulang.
-    if (pesanan.status_bayar === "menunggu" && pesanan.snap_token) {
-      return new Response(JSON.stringify({ snap_token: pesanan.snap_token }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+    // 3. Kalau pesanan sudah final, jangan diproses ulang (idempotent)
+    if (pesanan.status_bayar !== "menunggu") {
+      return new Response(
+        JSON.stringify({ message: `Pesanan sudah berstatus '${pesanan.status_bayar}', dilewati` }),
+        { status: 200 },
+      );
+    }
+
+    // 4. Pemetaan status Midtrans -> status_bayar
+    if (
+      (transaction_status === "capture" && (fraud_status === "accept" || !fraud_status)) ||
+      transaction_status === "settlement"
+    ) {
+      const { error } = await supabase
+        .from("pesanan")
+        .update({
+          status_bayar: "dibayar",
+          metode_bayar: payment_type ?? null,
+          dibayar_pada: new Date().toISOString(),
+        })
+        .eq("id", pesanan.id);
+      if (error) console.error("Gagal update status dibayar:", error);
+    } else if (transaction_status === "pending") {
+      const { error } = await supabase
+        .from("pesanan")
+        .update({ metode_bayar: payment_type ?? null })
+        .eq("id", pesanan.id);
+      if (error) console.error("Gagal update metode_bayar (pending):", error);
+      // status_bayar tetap 'menunggu'
+    } else if (transaction_status === "deny" || transaction_status === "cancel") {
+      const { error } = await supabase.rpc("batalkan_pesanan", {
+        p_pesanan_id: pesanan.id,
+        p_status_baru: "gagal",
       });
+      if (error) console.error("Gagal batalkan_pesanan (deny/cancel):", error);
+    } else if (transaction_status === "expire") {
+      const { error } = await supabase.rpc("batalkan_pesanan", {
+        p_pesanan_id: pesanan.id,
+        p_status_baru: "kedaluwarsa",
+      });
+      if (error) console.error("Gagal batalkan_pesanan (expire):", error);
+    } else {
+      console.log("transaction_status tidak dikenali, diabaikan:", transaction_status);
     }
 
-    // order_id Midtrans MAKSIMAL 50 karakter, hanya alfanumerik/dash/underscore.
-    // Pakai 8 karakter pertama UUID pesanan (unik dalam praktik) + timestamp.
-    const shortId = pesanan.id.replace(/-/g, "").slice(0, 12);
-    const midtransOrderId = `ord-${shortId}-${Date.now()}`; // ~30 karakter
-
-    const itemDetails = (pesanan.pesanan_item ?? []).map((it: any) => ({
-      id: it.barang_id,
-      price: Math.round(it.harga_satuan),
-      quantity: it.qty,
-      name: (it.nama_barang ?? "Barang").slice(0, 50),
-    }));
-
-    const grossAmount = Math.round(Number(pesanan.total));
-
-    const midtransRes = await fetch(MIDTRANS_SNAP_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json",
-        Authorization: "Basic " + btoa(MIDTRANS_SERVER_KEY + ":"),
-      },
-      body: JSON.stringify({
-        transaction_details: {
-          order_id: midtransOrderId,
-          gross_amount: grossAmount,
-        },
-        item_details: itemDetails,
-        customer_details: {
-          email: user.email,
-        },
-      }),
-    });
-
-    const midtransData = await midtransRes.json();
-
-    if (!midtransRes.ok) {
-      return new Response(
-        JSON.stringify({ error: "Gagal membuat transaksi Midtrans", detail: midtransData }),
-        { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
-    }
-
-    // Simpan snap_token & order_id ke pesanan supaya webhook bisa mencocokkan
-    const { error: updateError } = await supabase
-      .from("pesanan")
-      .update({
-        midtrans_order_id: midtransOrderId,
-        snap_token: midtransData.token,
-      })
-      .eq("id", pesanan.id);
-
-    if (updateError) {
-      return new Response(
-        JSON.stringify({ error: "Gagal menyimpan snap_token", detail: updateError }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
-    }
-
-    return new Response(JSON.stringify({ snap_token: midtransData.token }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return new Response(JSON.stringify({ message: "OK" }), { status: 200 });
   } catch (err) {
-    return new Response(JSON.stringify({ error: String(err) }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    console.error("Error tak terduga di midtrans-webhook:", err);
+    // Tetap balas 200 supaya Midtrans tidak spam-retry karena bug internal kita.
+    // Yang penting errornya sudah tercatat di log (Supabase Dashboard > Edge Functions > Logs).
+    return new Response(JSON.stringify({ error: String(err) }), { status: 200 });
   }
 });
