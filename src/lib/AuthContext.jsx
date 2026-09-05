@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState } from 'react'
+import { createContext, useContext, useEffect, useState, useRef } from 'react'
 import { supabase } from './supabaseClient'
 
 const AuthContext = createContext(null)
@@ -7,9 +7,18 @@ export function AuthProvider({ children }) {
   const [session, setSession] = useState(undefined)
   const [profil, setProfil] = useState(undefined)
 
+  // Penanda "permintaan ke berapa" supaya kalau ada beberapa loadProfil()
+  // berjalan bersamaan (misalnya event auth Supabase nembak beruntun saat
+  // token di-refresh), hanya hasil dari permintaan PALING BARU yang boleh
+  // mengubah state. Ini mencegah race condition yang sebelumnya bisa
+  // memicu logout otomatis secara keliru.
+  const profilRequestIdRef = useRef(0)
+
   async function loadProfil(userId) {
+    const requestId = ++profilRequestIdRef.current
+
     if (!userId) {
-      setProfil(null)
+      if (requestId === profilRequestIdRef.current) setProfil(null)
       return
     }
 
@@ -35,16 +44,28 @@ export function AuthProvider({ children }) {
       .eq('id', userId)
       .maybeSingle()
 
+    // Ada permintaan yang lebih baru sudah mulai berjalan setelah ini —
+    // abaikan hasil yang telat ini supaya tidak menimpa state yang sudah
+    // lebih baru/benar.
+    if (requestId !== profilRequestIdRef.current) return
+
     if (error) {
-      console.error('Gagal memuat profil:', error)
-      setProfil(null)
+      // PERBAIKAN: error jaringan/RLS sesaat (misalnya waktu koneksi lambat
+      // atau token sedang di-refresh) BUKAN berarti sesi tidak valid.
+      // Jangan logout paksa di sini — cukup catat errornya dan biarkan
+      // profil lama tetap dipakai, supaya user tidak terlempar keluar
+      // secara tiba-tiba hanya karena satu query telat/gagal.
+      console.error('Gagal memuat profil (dibiarkan, tidak logout paksa):', error)
       return
     }
 
-    // Jika profil tidak ada, akun dianggap tidak valid.
+    // Profil benar-benar tidak ada di database (akun memang belum/tidak
+    // terdaftar) — ini kasus yang sah untuk logout, bukan sekadar query
+    // yang telat.
     if (!data) {
+      console.warn('Profil tidak ditemukan untuk user ini, logout.')
       await supabase.auth.signOut()
-      setProfil(null)
+      if (requestId === profilRequestIdRef.current) setProfil(null)
       return
     }
 
@@ -55,6 +76,8 @@ export function AuthProvider({ children }) {
         .select('nama_lengkap, foto_profil_path')
         .eq('id', data.guru_id)
         .maybeSingle()
+
+      if (requestId !== profilRequestIdRef.current) return
 
       setProfil({
         ...data,
@@ -81,8 +104,17 @@ export function AuthProvider({ children }) {
 
     const {
       data: listener,
-    } = supabase.auth.onAuthStateChange((_event, newSession) => {
+    } = supabase.auth.onAuthStateChange((event, newSession) => {
       if (!mounted) return
+
+      // PERBAIKAN: event TOKEN_REFRESHED berarti sesi masih sah, cuma
+      // token-nya diperbarui di belakang layar — tidak perlu query ulang
+      // profil dari nol (ini salah satu sumber query bertumpuk yang
+      // membuat aplikasi terasa macet saat banyak klik).
+      if (event === 'TOKEN_REFRESHED') {
+        setSession(newSession)
+        return
+      }
 
       setSession(newSession)
       loadProfil(newSession?.user?.id)
