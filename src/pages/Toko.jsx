@@ -83,6 +83,60 @@ const CARD_COLORS = [
   },
 ];
 
+// Motif batik (kawung + parang) — disalin persis dari komponen BatikOverlay
+// di Dasbor.jsx, supaya kartu Toko punya motif yang identik dengan kartu
+// ringkasan di Dasbor (hanya warna garis putih di sini, karena latar kartu
+// toko sudah berwarna solid).
+function BatikOverlay({ patternId, strokeColor = '#d4af37', opacity = 1, size = 72 }) {
+  return (
+    <svg
+      className="absolute inset-0 w-full h-full pointer-events-none"
+      preserveAspectRatio="xMidYMid slice"
+      aria-hidden="true"
+    >
+      <defs>
+        <pattern
+          id={patternId}
+          x="0"
+          y="0"
+          width={size}
+          height={size}
+          patternUnits="userSpaceOnUse"
+          patternTransform="rotate(8)"
+        >
+          {/* motif kawung: empat lengkung elips mengelilingi titik pusat */}
+          <g fill="none" stroke={strokeColor} strokeWidth="1.1" opacity={opacity}>
+            <ellipse cx={size / 2} cy={size * 0.333} rx={size * 0.125} ry={size * 0.194} opacity="0.55" />
+            <ellipse cx={size / 2} cy={size * 0.667} rx={size * 0.125} ry={size * 0.194} opacity="0.55" />
+            <ellipse cx={size * 0.333} cy={size / 2} rx={size * 0.194} ry={size * 0.125} opacity="0.55" />
+            <ellipse cx={size * 0.667} cy={size / 2} rx={size * 0.194} ry={size * 0.125} opacity="0.55" />
+            <circle cx={size / 2} cy={size / 2} r={size * 0.042} opacity="0.7" />
+          </g>
+          {/* garis parang halus di sela-sela motif kawung */}
+          <path
+            d={`M0 ${size} L${size * 0.25} ${size * 0.75} L${size * 0.5} ${size} L${size * 0.75} ${size * 0.75} L${size} ${size}`}
+            fill="none"
+            stroke={strokeColor}
+            strokeWidth="0.8"
+            opacity={opacity * 0.35}
+          />
+          <path
+            d={`M0 0 L${size * 0.25} ${size * 0.25} L0 ${size * 0.5}`}
+            fill="none"
+            stroke={strokeColor}
+            strokeWidth="0.8"
+            opacity={opacity * 0.3}
+          />
+          <circle cx={size * 0.11} cy={size * 0.11} r="1.3" fill={strokeColor} opacity={opacity * 0.4} />
+          <circle cx={size * 0.89} cy={size * 0.22} r="1.3" fill={strokeColor} opacity={opacity * 0.4} />
+          <circle cx={size * 0.22} cy={size * 0.89} r="1.3" fill={strokeColor} opacity={opacity * 0.4} />
+        </pattern>
+      </defs>
+      <rect x="0" y="0" width="100%" height="100%" fill={`url(#${patternId})`} />
+    </svg>
+  )
+}
+
 function formatRupiah(nilai) {
   if (nilai === null || nilai === undefined || nilai === "") return "-";
   const angka = Number(nilai);
@@ -625,6 +679,14 @@ export default function Toko() {
                 onClick={() => openBarangModal(item)}
                 className={`group relative text-left p-5 ${c.bg} rounded-2xl shadow-sm hover:shadow-lg hover:-translate-y-0.5 transition-all cursor-pointer overflow-hidden`}
               >
+                {/* Motif batik (kawung + parang) — identik dengan kartu Dasbor */}
+                <BatikOverlay
+                  patternId={`batikToko-${item.id}`}
+                  strokeColor="#ffffff"
+                  opacity={0.5}
+                  size={56}
+                />
+
                 {isSuperadmin && (
                   <div className="absolute top-3 right-3 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">
                     <button
@@ -644,7 +706,7 @@ export default function Toko() {
                   </div>
                 )}
 
-                <div className="flex items-start gap-3 mb-3 pr-14">
+                <div className="relative z-10 flex items-start gap-3 mb-3 pr-14">
                   <div
                     className={`w-10 h-10 shrink-0 rounded-xl ${c.icon} flex items-center justify-center`}
                   >
@@ -664,7 +726,7 @@ export default function Toko() {
                   </div>
                 </div>
 
-                <div className="space-y-1.5 mb-4">
+                <div className="relative z-10 space-y-1.5 mb-4">
                   {item.alamat && (
                     <p className={`flex items-start gap-1.5 text-xs ${c.sub}`}>
                       <MapPin size={13} className="mt-0.5 shrink-0" />
@@ -680,7 +742,7 @@ export default function Toko() {
                 </div>
 
                 <div
-                  className={`flex items-center justify-between text-sm font-medium ${c.link}`}
+                  className={`relative z-10 flex items-center justify-between text-sm font-medium ${c.link}`}
                 >
                   <span>Lihat barang & belanja</span>
                   <span className="transition-transform group-hover:translate-x-0.5">
