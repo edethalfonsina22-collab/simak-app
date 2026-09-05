@@ -1,9 +1,15 @@
 import { useParams, useNavigate } from "react-router-dom";
 import { useCart } from "../lib/CartContext";
+import Layout from "../components/Layout";
 
 // URL yang disarankan: /toko/:id/keranjang
 // Sengaja TIDAK memerlukan login (lihat App.jsx) — tamu boleh melihat &
 // mengubah isi keranjangnya sendiri sebelum diwajibkan login saat checkout.
+//
+// PERBAIKAN (tampilan): halaman ini sebelumnya merender <div> polos tanpa
+// <Layout>, sehingga Sidebar & header aplikasi hilang total saat dibuka.
+// Sekarang dibungkus <Layout> seperti pola di halaman lain (mis. Toko.jsx,
+// Checkout.jsx).
 
 export default function Keranjang() {
   const { id: tokoId } = useParams();
@@ -24,15 +30,13 @@ export default function Keranjang() {
   const total = items.reduce((sum, item) => sum + item.harga * item.qty, 0);
 
   return (
-    <div className="p-4">
+    <Layout title="Keranjang Belanja" subtitle="Periksa kembali barang sebelum checkout">
       <button
         onClick={() => navigate("/toko")}
         className="mb-3 text-sm text-blue-600 hover:underline"
       >
         &larr; Lanjut Belanja
       </button>
-
-      <h1 className="mb-4 text-xl font-semibold">Keranjang Belanja</h1>
 
       {items.length === 0 ? (
         <p className="text-sm text-gray-500">Keranjang Anda masih kosong.</p>
@@ -122,6 +126,6 @@ export default function Keranjang() {
           </div>
         </>
       )}
-    </div>
+    </Layout>
   );
 }
