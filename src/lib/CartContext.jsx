@@ -1,19 +1,26 @@
 import { createContext, useContext, useEffect, useState, useCallback } from "react";
+import { supabase } from "./supabaseClient"; // sesuaikan path kalau berbeda di project kamu
 
 // =========================================================
 // CartContext
 // - Menyimpan isi keranjang per toko (karena 1 aplikasi bisa
 //   melayani banyak toko), disimpan di localStorage supaya
 //   tidak hilang kalau halaman di-refresh.
+// - Cart di-scope per user_id, supaya tidak "nempel" ke user
+//   lain yang login di browser/device yang sama.
 // - Bungkus <App /> dengan <CartProvider> di App.jsx.
 // =========================================================
 
 const CartContext = createContext(null);
-const STORAGE_KEY = "simak_keranjang";
 
-function loadCart() {
+function getStorageKey(userId) {
+  return userId ? `simak_keranjang_${userId}` : null;
+}
+
+function loadCart(storageKey) {
+  if (!storageKey) return {};
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(storageKey);
     return raw ? JSON.parse(raw) : {};
   } catch {
     return {};
@@ -21,12 +28,45 @@ function loadCart() {
 }
 
 export function CartProvider({ children }) {
+  const [userId, setUserId] = useState(null);
+  const [ready, setReady] = useState(false);
   // Bentuk data: { [tokoId]: { [barangId]: { id, nama_barang, harga, satuan, stok, qty } } }
-  const [cart, setCart] = useState(loadCart);
+  const [cart, setCart] = useState({});
 
+  // Pantau status login & muat cart sesuai user yang aktif
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(cart));
-  }, [cart]);
+    let mounted = true;
+
+    supabase.auth.getUser().then(({ data }) => {
+      if (!mounted) return;
+      const uid = data?.user?.id ?? null;
+      setUserId(uid);
+      setCart(loadCart(getStorageKey(uid)));
+      setReady(true);
+    });
+
+    const { data: listener } = supabase.auth.onAuthStateChange(
+      (_event, session) => {
+        const uid = session?.user?.id ?? null;
+        setUserId(uid);
+        setCart(loadCart(getStorageKey(uid))); // ganti isi cart sesuai user baru
+      }
+    );
+
+    return () => {
+      mounted = false;
+      listener?.subscription?.unsubscribe();
+    };
+  }, []);
+
+  // Simpan ke localStorage tiap kali cart berubah (hanya kalau sudah tahu user-nya)
+  useEffect(() => {
+    if (!ready) return;
+    const storageKey = getStorageKey(userId);
+    if (storageKey) {
+      localStorage.setItem(storageKey, JSON.stringify(cart));
+    }
+  }, [cart, userId, ready]);
 
   const addItem = useCallback((tokoId, barang, qty = 1) => {
     setCart((prev) => {
