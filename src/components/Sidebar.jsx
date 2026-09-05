@@ -186,7 +186,44 @@ function getLinksGuru(jumlahPesanBelumDibaca = 0) {
   ]
 }
 
-function NavItem({ to, label, icon: Icon, end, badge, onNavigate }) {
+function NavItem({ to, label, icon: Icon, end, badge, onNavigate, external }) {
+  const content = (isActive) => (
+    <>
+      <Icon
+        size={17}
+        strokeWidth={1.8}
+        fill={isActive ? 'rgba(255,255,255,0.25)' : 'currentColor'}
+        fillOpacity={isActive ? 1 : 0.15}
+      />
+      <span className="flex-1">{label}</span>
+      {!!badge && (
+        <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center shrink-0 shadow-sm shadow-red-900/40">
+          {badge > 99 ? '99+' : badge}
+        </span>
+      )}
+    </>
+  )
+
+  // PERBAIKAN: beberapa halaman (mis. /ppdb) sengaja berdiri sendiri tanpa
+  // Sidebar/tombol kembali, karena memang dibuat untuk diakses publik dari
+  // luar aplikasi. Kalau dibuka lewat navigasi SPA biasa (NavLink), orang
+  // tua yang sedang login akan "terdampar" di sana tanpa jalan kembali ke
+  // dasbornya. Untuk item bertanda `external`, buka di tab baru supaya
+  // dasbor tetap terbuka.
+  if (external) {
+    return (
+      <a
+        href={to}
+        target="_blank"
+        rel="noopener noreferrer"
+        onClick={onNavigate}
+        className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all text-white/70 hover:bg-white/[0.08] hover:text-white"
+      >
+        {content(false)}
+      </a>
+    )
+  }
+
   return (
     <NavLink
       to={to}
@@ -200,22 +237,7 @@ function NavItem({ to, label, icon: Icon, end, badge, onNavigate }) {
         }`
       }
     >
-      {({ isActive }) => (
-        <>
-          <Icon
-            size={17}
-            strokeWidth={1.8}
-            fill={isActive ? 'rgba(255,255,255,0.25)' : 'currentColor'}
-            fillOpacity={isActive ? 1 : 0.15}
-          />
-          <span className="flex-1">{label}</span>
-          {!!badge && (
-            <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center shrink-0 shadow-sm shadow-red-900/40">
-              {badge > 99 ? '99+' : badge}
-            </span>
-          )}
-        </>
-      )}
+      {({ isActive }) => content(isActive)}
     </NavLink>
   )
 }
@@ -272,6 +294,12 @@ function getLinksOrangTua(jumlahPesanBelumDibaca = 0) {
     { to: '/portofolio-anak', label: 'Portofolio Anak', icon: Image },
     { to: '/galeri-orang-tua', label: 'Galeri Kegiatan', icon: Images },
     { to: '/pengumuman', label: 'Pengumuman', icon: Megaphone },
+    // Ditambahkan: kalender pendidikan (read-only untuk orang tua — halaman
+    // KalenderPendidikan.jsx sudah otomatis menyembunyikan kontrol edit
+    // untuk siapa pun yang bukan admin) dan tautan pintasan ke form
+    // pendaftaran siswa baru (PPDB) yang memang sudah publik.
+    { to: '/kalender-pendidikan', label: 'Kalender Pendidikan', icon: CalendarRange },
+    { to: '/ppdb', label: 'PPDB Siswa Baru', icon: UserPlus, external: true },
   ]
 }
 
