@@ -1,4 +1,4 @@
-import { NavLink } from 'react-router-dom'
+import { NavLink, useNavigate } from 'react-router-dom'
 import { useEffect, useState } from 'react'
 import {
   X,
@@ -238,13 +238,23 @@ function getInisial(nama) {
 
 // Label peran yang tampil di header sidebar — utamakan jabatan yang dipilih
 // sendiri saat daftar (mis. "Kepala Sekolah"), baru fallback ke role teknis.
-function getLabelPeran(profil, isSuperAdmin, isAdminUtama, isAdmin, isOrangTua) {
+// PERBAIKAN: sebelumnya fungsi ini selalu jatuh ke 'Guru' sebagai default
+// kalau semua pengecekan role di atas bernilai false — termasuk saat
+// PROFIL BELUM DIMUAT atau user BELUM LOGIN (mis. tamu yang lihat-lihat
+// halaman Toko, atau sesaat setelah klik Logout). Akibatnya sidebar
+// sempat menampilkan "Guru" padahal orangnya tamu / bukan guru sama
+// sekali. Sekarang: tanpa sesi -> 'Tamu', dan 'Guru' hanya dipakai kalau
+// memang jabatan/role di profil benar-benar 'guru'.
+function getLabelPeran(profil, isSuperAdmin, isAdminUtama, isAdmin, isOrangTua, hasSession) {
+  if (!hasSession) return 'Tamu'
   if (isSuperAdmin) return 'Superadmin'
   if (profil?.jabatan === 'kepala_sekolah') return 'Kepala Sekolah'
   if (isAdminUtama) return 'Admin Utama'
   if (isAdmin) return 'Admin'
   if (isOrangTua) return 'Orang Tua/Wali'
-  return 'Guru'
+  if (profil?.jabatan === 'guru' || profil?.role === 'guru') return 'Guru'
+  // Sesi ada tapi profil belum selesai dimuat / tidak dikenali perannya.
+  return 'Memuat...'
 }
 
 // Menu ORANG TUA: sangat ringkas, hanya halaman read-only milik anak
@@ -267,10 +277,23 @@ function getLinksOrangTua(jumlahPesanBelumDibaca = 0) {
 
 export default function Sidebar({ open = false, onClose = () => {} }) {
   const { signOut, session, profil, isAdmin, isAdminUtama, isSuperAdmin, isOrangTua, sekolahId } = useAuth()
+  const navigate = useNavigate()
   const fotoUrl = getFotoUrl(profil?.foto_profil_path)
   const namaTampil = profil?.nama_lengkap || session?.user?.email || 'Pengguna'
 
-  const labelPeran = getLabelPeran(profil, isSuperAdmin, isAdminUtama, isAdmin, isOrangTua)
+  const labelPeran = getLabelPeran(profil, isSuperAdmin, isAdminUtama, isAdmin, isOrangTua, !!session)
+
+  // PERBAIKAN: sebelumnya tombol ini cuma memanggil signOut() dan
+  // menunggu redirect otomatis dari ProtectedRoute. Itu tidak berlaku di
+  // halaman publik seperti /toko (sengaja bisa diakses tamu), jadi kalau
+  // Logout diklik di sana, sesi Supabase sudah berakhir di baliknya tapi
+  // tampilannya diam saja (terasa seperti "tidak langsung keluar", baru
+  // ke-apply setelah diklik dua kali). Sekarang kita eksplisit arahkan ke
+  // /login begitu proses signOut selesai, di halaman manapun.
+  const handleLogout = async () => {
+    await signOut()
+    navigate('/login', { replace: true })
+  }
 
   // Notifikasi real-time: jumlah pendaftaran akun yang masih menunggu persetujuan.
   // Hanya relevan untuk admin utama / superadmin yang punya menu "Persetujuan Akun".
@@ -466,8 +489,8 @@ export default function Sidebar({ open = false, onClose = () => {} }) {
             <p className="text-[11px] text-white/50 mt-0.5">{labelPeran}</p>
           </div>
           <button
-            onClick={signOut}
-            title="Keluar"
+            onClick={session ? handleLogout : () => navigate('/login')}
+            title={session ? 'Keluar' : 'Masuk'}
             className="w-10 h-10 rounded-lg flex items-center justify-center text-red-400 hover:bg-red-500/15 hover:text-red-300 transition-colors shrink-0"
           >
             <Power size={20} strokeWidth={2.2} />
