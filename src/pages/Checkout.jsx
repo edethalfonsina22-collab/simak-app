@@ -4,6 +4,10 @@ import { supabase } from "../lib/supabaseClient";
 import { useCart } from "../lib/CartContext";
 
 // URL yang disarankan: /toko/:id/checkout
+// Rute ini DIBUNGKUS ProtectedRoute di App.jsx, jadi user pasti sudah
+// login saat komponen ini dirender. Pengecekan `if (!user)` di dalam
+// handleCheckout tetap dipertahankan sebagai lapisan pengaman tambahan
+// (mis. kalau sesi kedaluwarsa persis saat tombol diklik).
 //
 // Alur (SETELAH integrasi Midtrans):
 // 1. Ambil isi keranjang untuk toko ini dari CartContext
@@ -165,7 +169,7 @@ export default function Checkout() {
         <p className="text-sm text-gray-500">
           Keranjang masih kosong.{" "}
           <button
-            onClick={() => navigate(`/toko/${tokoId}/barang`)}
+            onClick={() => navigate("/toko")}
             className="text-blue-600 hover:underline"
           >
             Kembali belanja
