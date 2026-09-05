@@ -149,7 +149,7 @@ function getGroupsAdmin(isAdminUtama, isSuperAdmin, jumlahMenunggu = 0, jumlahPe
 // Menu GURU: tetap ringkas, tidak perlu dikelompokkan
 // Kuitansi, Kuitansi Jasa & Nota Belanja SENGAJA TIDAK ada di sini — ketiga
 // fitur ini admin-only (lihat RLS policy nota_hanya_admin di Supabase).
-function getLinksGuru(jumlahPesanBelumDibaca = 0) {
+function getLinksGuru(jumlahPesanBelumDibaca = 0, sekolahIdGuru = null) {
   return [
   { to: '/', label: 'Dasbor', icon: LayoutDashboard, end: true },
   { to: '/profil-saya', label: 'Profil Saya', icon: UserCircle },
@@ -176,7 +176,9 @@ function getLinksGuru(jumlahPesanBelumDibaca = 0) {
   { to: '/pengajuan-kebutuhan-kelas', label: 'Kebutuhan Kelas', icon: PackagePlus },
   // Hanya tautan pintasan ke form publik, sama seperti menu orang tua —
   // approval pendaftar PPDB tetap khusus admin lewat /ppdb-admin.
-  { to: '/ppdb', label: 'PPDB Siswa Baru', icon: UserPlus, external: true },
+  // PERBAIKAN: /ppdb/:sekolahId, bukan "/ppdb" polos (lihat catatan di
+  // getLinksOrangTua di atas).
+  { to: sekolahIdGuru ? `/ppdb/${sekolahIdGuru}` : '/ppdb', label: 'PPDB Siswa Baru', icon: UserPlus, external: true },
   { to: '/buat-ujian', label: 'Buat Ujian', icon: FilePlus },
   { to: '/hasil-ujian', label: 'Hasil Ujian', icon: ClipboardList },
   { to: '/bank-soal', label: 'Bank Soal', icon: Database },
@@ -286,7 +288,7 @@ function getLabelPeran(profil, isSuperAdmin, isAdminUtama, isAdmin, isOrangTua, 
 // mereka sendiri — TIDAK PERNAH pakai getLinksGuru(), supaya orang tua
 // tidak pernah melihat menu kerja guru (Presensi, Nilai, dsb yang bisa
 // diedit untuk SEMUA siswa di kelas).
-function getLinksOrangTua(jumlahPesanBelumDibaca = 0) {
+function getLinksOrangTua(jumlahPesanBelumDibaca = 0, sekolahId = null) {
   return [
     { to: '/', label: 'Dasbor', icon: LayoutDashboard, end: true },
     { to: '/profil-saya', label: 'Profil Saya', icon: UserCircle },
@@ -302,8 +304,11 @@ function getLinksOrangTua(jumlahPesanBelumDibaca = 0) {
     // KalenderPendidikan.jsx sudah otomatis menyembunyikan kontrol edit
     // untuk siapa pun yang bukan admin) dan tautan pintasan ke form
     // pendaftaran siswa baru (PPDB) yang memang sudah publik.
+    // PERBAIKAN: link sekarang menyertakan sekolahId akun ini sendiri
+    // (/ppdb/:sekolahId) — sebelumnya "/ppdb" polos selalu terbaca sebagai
+    // sekolah yang salah (lihat perbaikan di PPDBPublik.jsx).
     { to: '/kalender-pendidikan', label: 'Kalender Pendidikan', icon: CalendarRange },
-    { to: '/ppdb', label: 'PPDB Siswa Baru', icon: UserPlus, external: true },
+    { to: sekolahId ? `/ppdb/${sekolahId}` : '/ppdb', label: 'PPDB Siswa Baru', icon: UserPlus, external: true },
   ]
 }
 
@@ -461,8 +466,8 @@ export default function Sidebar({ open = false, onClose = () => {} }) {
   }, [session?.user?.id, isAdmin, isSuperAdmin, sekolahId])
 
   const groupsAdmin = getGroupsAdmin(isAdminUtama, isSuperAdmin, jumlahMenunggu, jumlahPesanBelumDibaca, jumlahPesanPusatBelumDibaca)
-  const linksGuru = getLinksGuru(jumlahPesanBelumDibaca)
-  const linksOrangTua = getLinksOrangTua(jumlahPesanBelumDibaca)
+  const linksGuru = getLinksGuru(jumlahPesanBelumDibaca, sekolahId)
+  const linksOrangTua = getLinksOrangTua(jumlahPesanBelumDibaca, sekolahId)
 
   return (
     <>
