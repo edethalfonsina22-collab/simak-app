@@ -174,7 +174,9 @@ function getLinksGuru(jumlahPesanBelumDibaca = 0) {
   { to: '/pengajuan-surat-aktif', label: 'Pengajuan Surat Aktif', icon: FileCheck2 },
   { to: '/perbaikan-data-siswa', label: 'Perbaikan Data Siswa', icon: UserCog },
   { to: '/pengajuan-kebutuhan-kelas', label: 'Kebutuhan Kelas', icon: PackagePlus },
-  { to: '/ppdb-admin', label: 'PPDB Siswa Baru', icon: UserPlus },
+  // Hanya tautan pintasan ke form publik, sama seperti menu orang tua —
+  // approval pendaftar PPDB tetap khusus admin lewat /ppdb-admin.
+  { to: '/ppdb', label: 'PPDB Siswa Baru', icon: UserPlus, external: true },
   { to: '/buat-ujian', label: 'Buat Ujian', icon: FilePlus },
   { to: '/hasil-ujian', label: 'Hasil Ujian', icon: ClipboardList },
   { to: '/bank-soal', label: 'Bank Soal', icon: Database },
