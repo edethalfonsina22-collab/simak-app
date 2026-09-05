@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
+import { useParams } from 'react-router-dom'
 import Tesseract from 'tesseract.js'
 import { supabase } from '../lib/supabaseClient'
-import { Loader2, CheckCircle2, School, ScanLine, Sparkles } from 'lucide-react'
+import { Loader2, CheckCircle2, School, ScanLine, Sparkles, AlertTriangle } from 'lucide-react'
 
 const AGAMA_OPTIONS = ['Islam', 'Kristen', 'Katolik', 'Hindu', 'Buddha', 'Khonghucu', 'Lainnya']
 
@@ -162,9 +163,19 @@ function IlustrasiSemangatSekolah() {
 }
 
 export default function PPDBPublik() {
+  // ID sekolah WAJIB datang dari URL (/ppdb/:sekolahId) — link resmi yang
+  // dibagikan lewat tombol "Salin Link Pendaftaran" di halaman PPDB Admin.
+  // Sengaja TIDAK ada fallback "ambil sekolah pertama" seperti sebelumnya,
+  // karena aplikasi ini satu deployment dipakai bersama oleh banyak
+  // sekolah — asal ambil baris pertama membuat pendaftar dari sekolah lain
+  // salah kebaca sebagai sekolah lain (biasanya sekolah paling awal
+  // terdaftar / milik superadmin).
+  const { sekolahId: sekolahIdUrl } = useParams()
+
   const [profil, setProfil] = useState(null)
   const [sekolahId, setSekolahId] = useState(null)
   const [sekolahLoadError, setSekolahLoadError] = useState(false)
+  const [linkTidakLengkap, setLinkTidakLengkap] = useState(false)
   const [form, setForm] = useState(emptyForm)
   const [mengirim, setMengirim] = useState(false)
   const [terkirim, setTerkirim] = useState(false)
@@ -179,15 +190,19 @@ export default function PPDBPublik() {
   const [anggotaTerdeteksi, setAnggotaTerdeteksi] = useState([])
 
   useEffect(() => {
-    supabase.from('profil_sekolah').select('*').eq('id', 1).maybeSingle().then(({ data }) => setProfil(data))
+    // Link lama /ppdb tanpa ID sekolah — jangan asal daftarkan ke sekolah
+    // manapun. Tampilkan pesan supaya pendaftar minta link yang benar.
+    if (!sekolahIdUrl) {
+      setLinkTidakLengkap(true)
+      return
+    }
 
-    // Ambil id baris sekolah (setiap instalasi SIMAK hanya melayani satu sekolah,
-    // jadi cukup ambil baris pertama/satu-satunya) — dibutuhkan agar insert ke
-    // ppdb_pendaftar memenuhi foreign key + kebijakan RLS "siapa_saja_boleh_daftar".
+    // Validasi ID sekolah dari URL benar-benar ada di database, sekaligus
+    // konfirmasi sekolah_id yang akan disimpan bersama formulir.
     supabase
       .from('sekolah')
       .select('id')
-      .limit(1)
+      .eq('id', sekolahIdUrl)
       .maybeSingle()
       .then(({ data, error: sekolahErr }) => {
         if (sekolahErr || !data) {
@@ -196,7 +211,14 @@ export default function PPDBPublik() {
           setSekolahId(data.id)
         }
       })
-  }, [])
+
+    supabase
+      .from('profil_sekolah')
+      .select('*')
+      .eq('sekolah_id', sekolahIdUrl)
+      .maybeSingle()
+      .then(({ data }) => setProfil(data))
+  }, [sekolahIdUrl])
 
   useEffect(() => {
     // Bersihkan object URL preview saat komponen unmount / gambar diganti
@@ -360,6 +382,29 @@ export default function PPDBPublik() {
     }
   `
 
+  // Link lama tanpa ID sekolah, atau ID di URL tidak ditemukan di database —
+  // berhenti di sini, JANGAN tampilkan formulir sama sekali. Ini mencegah
+  // pendaftar tanpa sadar mengisi formulir yang akan tersimpan ke sekolah
+  // yang salah.
+  if (linkTidakLengkap || sekolahLoadError) {
+    return (
+      <div className="min-h-screen bg-paper flex items-center justify-center p-4">
+        <div className="max-w-md w-full text-center bg-white rounded-2xl shadow-lg p-8">
+          <div className="w-16 h-16 rounded-full bg-red-500/10 flex items-center justify-center mx-auto mb-4">
+            <AlertTriangle size={32} className="text-red-500" />
+          </div>
+          <h1 className="font-display text-xl font-semibold text-ink-950 mb-2">Link Pendaftaran Tidak Valid</h1>
+          <p className="text-sm text-ink-700/70">
+            {linkTidakLengkap
+              ? 'Link ini belum menyertakan kode sekolah tujuan, jadi kami tidak bisa memastikan formulir ini untuk sekolah yang mana.'
+              : 'Kode sekolah pada link ini tidak ditemukan.'}
+            {' '}Mohon minta link pendaftaran PPDB terbaru langsung ke sekolah yang dituju.
+          </p>
+        </div>
+      </div>
+    )
+  }
+
   if (terkirim) {
     return (
       <div className="min-h-screen bg-paper flex items-center justify-center p-4">
@@ -400,12 +445,6 @@ export default function PPDBPublik() {
             </div>
           )}
         </div>
-
-        {sekolahLoadError && (
-          <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2 mb-4 max-w-2xl mx-auto">
-            Gagal memuat data sekolah. Formulir mungkin tidak bisa dikirim — silakan muat ulang halaman.
-          </p>
-        )}
 
         <form onSubmit={handleSubmit} className="bg-white rounded-2xl shadow-sm p-6 sm:p-8 space-y-4">
 
