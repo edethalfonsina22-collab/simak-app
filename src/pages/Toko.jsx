@@ -1,6 +1,8 @@
 import { useEffect, useState, useCallback } from "react";
+import { Link } from "react-router-dom";
 import { supabase } from "../lib/supabaseClient";
 import { useAuth } from "../lib/AuthContext";
+import { useCart } from "../lib/CartContext";
 import Layout from "../components/Layout";
 
 // =========================================================
@@ -24,12 +26,20 @@ import Layout from "../components/Layout";
 // Supabase Storage bucket "barang-photos", lalu public URL-nya disimpan
 // di kolom barang.foto_url. Pastikan bucket & kolom sudah dibuat di
 // Supabase (lihat catatan migrasi terpisah).
+//
+// PERBAIKAN (keranjang belanja):
+// Di modal Kelola Barang, tiap barang yang stoknya masih ada sekarang
+// punya input jumlah + tombol "+ Keranjang" (pakai CartContext, lihat
+// lib/CartContext.jsx). Ada juga tombol "🛒 Keranjang" di header modal
+// yang menuju halaman /toko/:id/keranjang dan menampilkan jumlah item
+// yang sudah dimasukkan untuk toko yang sedang dibuka.
 // =========================================================
 
 const BARANG_PHOTO_BUCKET = "barang-photos";
 
 export default function Toko() {
   const { isSuperAdmin, profil, loading: authLoading } = useAuth();
+  const { addItem, getCartCount } = useCart();
 
   const [tokoList, setTokoList] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -63,6 +73,9 @@ export default function Toko() {
   const [barangPhotoFile, setBarangPhotoFile] = useState(null);
   const [barangPhotoPreview, setBarangPhotoPreview] = useState("");
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
+
+  // Jumlah yang dipilih pembeli untuk tiap barang, sebelum ditambah ke keranjang
+  const [qtyInput, setQtyInput] = useState({});
 
   const isSuperadmin = isSuperAdmin; // alias agar sisa kode di bawah tidak perlu diubah
 
@@ -392,6 +405,24 @@ export default function Toko() {
   };
 
   // ---------------------------------------------------
+  // Keranjang belanja
+  // ---------------------------------------------------
+  const getQty = (barangId) => qtyInput[barangId] ?? 1;
+
+  const setQty = (barangId, qty) => {
+    setQtyInput((prev) => ({ ...prev, [barangId]: qty }));
+  };
+
+  const handleTambahKeranjang = (item) => {
+    if (!activeToko) return;
+    const qty = getQty(item.id);
+    addItem(activeToko.id, item, qty);
+    setQty(item.id, 1);
+  };
+
+  const cartCount = activeToko ? getCartCount(activeToko.id) : 0;
+
+  // ---------------------------------------------------
   // Render
   // ---------------------------------------------------
   if (authLoading || loading) {
@@ -582,12 +613,25 @@ export default function Toko() {
               <h2 className="text-lg font-semibold">
                 Kelola Barang — {activeToko.nama_toko}
               </h2>
-              <button
-                onClick={closeBarangModal}
-                className="text-gray-500 hover:text-gray-800"
-              >
-                ✕
-              </button>
+              <div className="flex items-center gap-2">
+                <Link
+                  to={`/toko/${activeToko.id}/keranjang`}
+                  className="relative px-3 py-2 text-sm border rounded hover:bg-gray-50"
+                >
+                  🛒 Keranjang
+                  {cartCount > 0 && (
+                    <span className="absolute flex items-center justify-center w-5 h-5 text-xs text-white bg-red-600 rounded-full -top-2 -right-2">
+                      {cartCount}
+                    </span>
+                  )}
+                </Link>
+                <button
+                  onClick={closeBarangModal}
+                  className="text-gray-500 hover:text-gray-800"
+                >
+                  ✕
+                </button>
+              </div>
             </div>
 
             {barangError && (
@@ -717,18 +761,21 @@ export default function Toko() {
                       <th className="px-3 py-2">Harga</th>
                       <th className="px-3 py-2">Stok</th>
                       <th className="px-3 py-2">Satuan</th>
+                      <th className="px-3 py-2">Beli</th>
                       {isSuperadmin && <th className="px-3 py-2">Aksi</th>}
                     </tr>
                   </thead>
                   <tbody>
                     {barangList.length === 0 ? (
                       <tr>
-                        <td colSpan={isSuperadmin ? 7 : 6} className="px-3 py-4 text-center text-gray-400">
+                        <td colSpan={isSuperadmin ? 8 : 7} className="px-3 py-4 text-center text-gray-400">
                           Belum ada barang untuk toko ini
                         </td>
                       </tr>
                     ) : (
-                      barangList.map((b) => (
+                      barangList.map((b) => {
+                        const bisaDibeli = Number(b.stok) > 0;
+                        return (
                         <tr key={b.id} className="border-t">
                           <td className="px-3 py-2">
                             {b.foto_url ? (
@@ -748,6 +795,30 @@ export default function Toko() {
                           <td className="px-3 py-2">{b.harga ?? "-"}</td>
                           <td className="px-3 py-2">{b.stok ?? "-"}</td>
                           <td className="px-3 py-2">{b.satuan}</td>
+                          <td className="px-3 py-2">
+                            {bisaDibeli ? (
+                              <div className="flex items-center gap-1">
+                                <input
+                                  type="number"
+                                  min="1"
+                                  max={b.stok}
+                                  value={getQty(b.id)}
+                                  onChange={(e) =>
+                                    setQty(b.id, Number(e.target.value) || 1)
+                                  }
+                                  className="w-14 px-2 py-1 border rounded"
+                                />
+                                <button
+                                  onClick={() => handleTambahKeranjang(b)}
+                                  className="px-2 py-1 text-xs text-white bg-green-600 rounded hover:bg-green-700"
+                                >
+                                  + Keranjang
+                                </button>
+                              </div>
+                            ) : (
+                              <span className="text-xs text-gray-400">Habis</span>
+                            )}
+                          </td>
                           {isSuperadmin && (
                             <td className="px-3 py-2 space-x-2">
                               <button
@@ -765,7 +836,8 @@ export default function Toko() {
                             </td>
                           )}
                         </tr>
-                      ))
+                        );
+                      })
                     )}
                   </tbody>
                 </table>
