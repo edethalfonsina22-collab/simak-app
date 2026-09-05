@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { Link, Navigate } from 'react-router-dom'
+import { Link, Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../lib/AuthContext'
 import { supabase } from '../lib/supabaseClient'
 import { Loader2, LogIn } from 'lucide-react'
@@ -84,6 +84,7 @@ function WavyClothBackground() {
 
 export default function Login() {
   const { session, signIn } = useAuth()
+  const location = useLocation()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
@@ -109,7 +110,17 @@ export default function Login() {
       })
   }, [])
 
-  if (session) return <Navigate to="/" replace />
+  // Halaman yang tadinya mau diakses sebelum dialihkan ke sini (dikirim lewat
+  // state `from` oleh ProtectedRoute di App.jsx). Kalau tidak ada — mis. user
+  // buka /login langsung dari menu — fallback ke Dashboard seperti sebelumnya.
+  // `location.state.from` adalah objek Location internal react-router yang
+  // hanya bisa diisi lewat <Navigate state={...}> di dalam app sendiri,
+  // jadi aman dari open-redirect lewat query string/URL luar.
+  const from = location.state?.from
+    ? location.state.from.pathname + (location.state.from.search || '')
+    : '/'
+
+  if (session) return <Navigate to={from} replace />
 
   async function handleSubmit(e) {
     e.preventDefault()
