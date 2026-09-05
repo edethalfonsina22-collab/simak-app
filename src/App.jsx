@@ -7,7 +7,7 @@ import Dokumen from './pages/Dokumen'
 import Pesan from './pages/Pesan'
 import PesanPusat from './pages/PesanPusat'
 import ScanDokumen from './pages/ScanDokumen'
-import { Routes, Route, Navigate } from 'react-router-dom'
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from './lib/AuthContext'
 import { supabase } from './lib/supabaseClient'
 import Login from './pages/Login'
@@ -75,6 +75,7 @@ import { CartProvider } from './lib/CartContext'
 function ProtectedRoute({ children, adminOnly, adminUtamaOnly, superAdminOnly }) {
   const { session, loading, isAdmin, isAdminUtama, isSuperAdmin, statusAkun } = useAuth()
   const [minTimeElapsed, setMinTimeElapsed] = useState(false)
+  const location = useLocation()
 
   useEffect(() => {
     const timer = setTimeout(() => setMinTimeElapsed(true), 900)
@@ -88,7 +89,9 @@ function ProtectedRoute({ children, adminOnly, adminUtamaOnly, superAdminOnly })
       </div>
     )
   }
-  if (!session) return <Navigate to="/login" replace />
+  // Kirim lokasi yang tadi mau diakses lewat state, supaya Login.jsx bisa
+  // mengembalikan user ke sana setelah berhasil login (mis. /toko/123/checkout).
+  if (!session) return <Navigate to="/login" state={{ from: location }} replace />
 
   // Akun yang belum disetujui (atau ditolak) tidak boleh mengakses halaman manapun
   // selain halaman menunggu persetujuan.
@@ -240,9 +243,13 @@ export default function App() {
             RapatVideo sendiri yang menangani kasus sudah login vs tamu. */}
         <Route path="/rapat/:roomId" element={<RapatVideo />} />
 
-        {/* --- Fitur Toko: Keranjang & Checkout --- */}
-        <Route path="/toko" element={<ProtectedRoute><Toko /></ProtectedRoute>} />
-        <Route path="/toko/:id/keranjang" element={<ProtectedRoute><Keranjang /></ProtectedRoute>} />
+        {/* --- Fitur Toko: Keranjang & Checkout ---
+            /toko dan /toko/:id/keranjang sengaja TIDAK dibungkus ProtectedRoute —
+            pengunjung boleh lihat-lihat & isi keranjang tanpa akun. Login baru
+            diwajibkan saat checkout, dan otomatis kembali ke halaman checkout
+            setelah berhasil login (lihat state `from` di ProtectedRoute & Login.jsx). */}
+        <Route path="/toko" element={<Toko />} />
+        <Route path="/toko/:id/keranjang" element={<Keranjang />} />
         <Route path="/toko/:id/checkout" element={<ProtectedRoute><Checkout /></ProtectedRoute>} />
         <Route path="/toko/:id/pesanan-sukses" element={<ProtectedRoute><PesananSukses /></ProtectedRoute>} />
 
