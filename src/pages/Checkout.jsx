@@ -1,18 +1,48 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabaseClient";
 import { useCart } from "../lib/CartContext";
 
 // URL yang disarankan: /toko/:id/checkout
 //
-// Alur:
+// Alur (SETELAH integrasi Midtrans):
 // 1. Ambil isi keranjang untuk toko ini dari CartContext
-// 2. Panggil fungsi database "buat_pesanan" (lihat checkout_schema.sql)
-//    -> fungsi ini yang membuat baris di tabel pesanan + pesanan_item
-//      dan mengurangi stok secara aman (anti bentrok kalau ada 2 pembeli
-//      checkout barang yang sama di saat bersamaan).
-// 3. Kalau sukses, keranjang dikosongkan dan pembeli diarahkan ke
-//    halaman sukses.
+// 2. Panggil fungsi database "buat_pesanan" -> membuat baris di
+//    pesanan + pesanan_item dan mengurangi stok (seperti sebelumnya).
+// 3. BARU: panggil Edge Function "create-transaction" dengan
+//    pesanan_id yang baru dibuat -> dapat snap_token dari Midtrans.
+// 4. BARU: buka popup pembayaran Snap pakai snap_token itu.
+// 5. Keranjang baru dikosongkan & diarahkan ke halaman sukses SETELAH
+//    pembeli benar-benar menyelesaikan pembayaran (onSuccess/onPending),
+//    bukan langsung setelah pesanan dibuat seperti sebelumnya — karena
+//    sekarang pesanan bisa dibuat tapi belum tentu dibayar.
+
+// Ganti ke Client Key PRODUCTION dan URL produksi Snap.js saat go-live:
+// https://app.midtrans.com/snap/snap.js
+const SNAP_JS_URL = "https://app.sandbox.midtrans.com/snap/snap.js";
+const MIDTRANS_CLIENT_KEY = import.meta.env.VITE_MIDTRANS_CLIENT_KEY;
+
+// Muat script Snap.js sekali saja (kalau sudah ada di halaman, tidak diulang)
+function loadSnapScript() {
+  return new Promise((resolve, reject) => {
+    if (window.snap) {
+      resolve();
+      return;
+    }
+    const existing = document.querySelector(`script[src="${SNAP_JS_URL}"]`);
+    if (existing) {
+      existing.addEventListener("load", () => resolve());
+      existing.addEventListener("error", reject);
+      return;
+    }
+    const script = document.createElement("script");
+    script.src = SNAP_JS_URL;
+    script.setAttribute("data-client-key", MIDTRANS_CLIENT_KEY);
+    script.onload = () => resolve();
+    script.onerror = reject;
+    document.body.appendChild(script);
+  });
+}
 
 export default function Checkout() {
   const { id: tokoId } = useParams();
@@ -22,8 +52,17 @@ export default function Checkout() {
   const [catatan, setCatatan] = useState("");
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
+  const [snapReady, setSnapReady] = useState(false);
 
   const items = getCartItems(tokoId);
+
+  // Muat Snap.js begitu halaman Checkout dibuka, supaya saat tombol
+  // "Buat Pesanan" diklik popup sudah siap tampil tanpa jeda.
+  useEffect(() => {
+    loadSnapScript()
+      .then(() => setSnapReady(true))
+      .catch(() => setErrorMsg("Gagal memuat layanan pembayaran. Coba muat ulang halaman."));
+  }, []);
 
   const formatRupiah = (angka) => {
     const n = Number(angka) || 0;
@@ -51,24 +90,73 @@ export default function Checkout() {
       setErrorMsg("Keranjang masih kosong.");
       return;
     }
+    if (!snapReady) {
+      setErrorMsg("Layanan pembayaran belum siap, tunggu sebentar lalu coba lagi.");
+      return;
+    }
 
     setLoading(true);
 
+    // 1) Buat pesanan seperti sebelumnya (stok berkurang di sini)
     const { data: pesananId, error } = await supabase.rpc("buat_pesanan", {
       p_toko_id: tokoId,
       p_items: items.map((item) => ({ barang_id: item.id, qty: item.qty })),
       p_catatan: catatan || null,
     });
 
-    setLoading(false);
-
     if (error) {
+      setLoading(false);
       setErrorMsg("Checkout gagal: " + error.message);
       return;
     }
 
-    clearCart(tokoId);
-    navigate(`/toko/${tokoId}/pesanan-sukses`, { state: { pesananId } });
+    // 2) Minta snap_token dari Edge Function create-transaction.
+    // supabase.functions.invoke otomatis menyertakan token login user yang
+    // sedang aktif, jadi create-transaction bisa memverifikasi pemiliknya.
+    const { data: fnData, error: fnError } = await supabase.functions.invoke(
+      "create-transaction",
+      { body: { pesanan_id: pesananId } },
+    );
+
+    setLoading(false);
+
+    if (fnError || !fnData?.snap_token) {
+      setErrorMsg(
+        "Pesanan sudah dibuat, tapi gagal memulai pembayaran: " +
+          (fnError?.message || "Terjadi kesalahan. Cek menu Pesanan Anda dan coba bayar lagi nanti."),
+      );
+      return;
+    }
+
+    // 3) Buka popup pembayaran Snap
+    window.snap.pay(fnData.snap_token, {
+      onSuccess: () => {
+        clearCart(tokoId);
+        navigate(`/toko/${tokoId}/pesanan-sukses`, { state: { pesananId } });
+      },
+      onPending: () => {
+        // Pembeli memilih metode yang butuh tindakan lanjutan (mis. transfer
+        // VA) — pesanan tetap dianggap "menunggu" sampai webhook Midtrans
+        // mengonfirmasi. Tetap arahkan ke halaman sukses supaya pembeli
+        // lihat instruksi & status pesanannya, keranjang tetap dikosongkan
+        // karena pesanan sudah tercatat di database.
+        clearCart(tokoId);
+        navigate(`/toko/${tokoId}/pesanan-sukses`, { state: { pesananId } });
+      },
+      onError: () => {
+        setErrorMsg(
+          "Pembayaran gagal. Pesanan Anda tetap tercatat sebagai 'menunggu' — coba bayar lagi dari menu Pesanan.",
+        );
+      },
+      onClose: () => {
+        // Popup ditutup tanpa menyelesaikan pembayaran — jangan kosongkan
+        // keranjang, biarkan pembeli tahu pesanan sudah dibuat tapi belum
+        // dibayar.
+        setErrorMsg(
+          "Pembayaran dibatalkan. Pesanan Anda tetap tersimpan dengan status menunggu bayar.",
+        );
+      },
+    });
   };
 
   if (items.length === 0) {
@@ -140,7 +228,7 @@ export default function Checkout() {
         disabled={loading}
         className="w-full px-4 py-2 text-white bg-blue-600 rounded hover:bg-blue-700 disabled:opacity-50"
       >
-        {loading ? "Memproses pesanan..." : "Buat Pesanan"}
+        {loading ? "Memproses pesanan..." : "Bayar Sekarang"}
       </button>
     </div>
   );
