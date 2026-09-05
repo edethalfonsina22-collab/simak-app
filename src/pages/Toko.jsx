@@ -1,5 +1,19 @@
 import { useEffect, useState, useCallback } from "react";
 import { Link } from "react-router-dom";
+import {
+  Store,
+  MapPin,
+  Phone,
+  ShoppingCart,
+  X,
+  Plus,
+  Minus,
+  Pencil,
+  Trash2,
+  Package,
+  Upload,
+  Settings2,
+} from "lucide-react";
 import { supabase } from "../lib/supabaseClient";
 import { useAuth } from "../lib/AuthContext";
 import { useCart } from "../lib/CartContext";
@@ -7,35 +21,28 @@ import Layout from "../components/Layout";
 
 // =========================================================
 // Komponen Toko
-// - Semua user login: hanya bisa LIHAT data toko
-// - Superadmin: bisa Tambah, Edit, Hapus, dan Import CSV toko
-// - Semua user login: bisa BUKA modal Kelola Barang untuk LIHAT barang
-//   per toko, tapi hanya superadmin yang bisa tambah/edit/hapus barang.
+// - Semua user login: klik NAMA TOKO / kartu toko langsung membuka
+//   daftar barang toko tsb (tidak perlu lagi klik link "Kelola Barang").
+// - Superadmin: bisa Tambah, Edit, Hapus, dan Import CSV toko, dan
+//   tambah/edit/hapus barang lewat panel "Kelola Barang" yang bisa
+//   ditampilkan/disembunyikan di dalam modal barang.
 //
-// PERBAIKAN (role):
-// Role diambil dari AuthContext (satu sumber kebenaran untuk seluruh
-// aplikasi), sama seperti Sidebar.jsx dan komponen lain.
-//
-// PERBAIKAN (RLS tabel toko):
-// Tabel "toko" punya kolom created_by (uuid) dan policy RLS insert
-// mensyaratkan auth.uid() = created_by. Insert & import CSV sekarang
-// menyertakan created_by: user.id, diambil lewat supabase.auth.getUser().
-//
-// PERBAIKAN (foto barang):
-// Form Tambah/Edit Barang sekarang punya input gambar. File diupload ke
-// Supabase Storage bucket "barang-photos", lalu public URL-nya disimpan
-// di kolom barang.foto_url. Pastikan bucket & kolom sudah dibuat di
-// Supabase (lihat catatan migrasi terpisah).
-//
-// PERBAIKAN (keranjang belanja):
-// Di modal Kelola Barang, tiap barang yang stoknya masih ada sekarang
-// punya input jumlah + tombol "+ Keranjang" (pakai CartContext, lihat
-// lib/CartContext.jsx). Ada juga tombol "🛒 Keranjang" di header modal
-// yang menuju halaman /toko/:id/keranjang dan menampilkan jumlah item
-// yang sudah dimasukkan untuk toko yang sedang dibuka.
+// PERBAIKAN (role): role diambil dari AuthContext.
+// PERBAIKAN (RLS tabel toko): insert & import CSV menyertakan created_by.
+// PERBAIKAN (foto barang): upload ke bucket Storage "barang-photos".
+// PERBAIKAN (keranjang belanja): tiap barang yang stoknya masih ada
+// punya stepper jumlah + tombol "Tambah ke Keranjang" (CartContext).
+// Ikon 🛒 di header modal menuju /toko/:id/keranjang.
 // =========================================================
 
 const BARANG_PHOTO_BUCKET = "barang-photos";
+
+function formatRupiah(nilai) {
+  if (nilai === null || nilai === undefined || nilai === "") return "-";
+  const angka = Number(nilai);
+  if (Number.isNaN(angka)) return "-";
+  return `Rp${angka.toLocaleString("id-ID")}`;
+}
 
 export default function Toko() {
   const { isSuperAdmin, profil, loading: authLoading } = useAuth();
@@ -55,12 +62,13 @@ export default function Toko() {
     status: "aktif",
   });
 
-  // ---- state untuk modal Kelola Barang ----
+  // ---- state untuk modal daftar barang ----
   const [showBarangModal, setShowBarangModal] = useState(false);
-  const [activeToko, setActiveToko] = useState(null); // toko yang sedang dikelola barangnya
+  const [activeToko, setActiveToko] = useState(null);
   const [barangList, setBarangList] = useState([]);
   const [barangLoading, setBarangLoading] = useState(false);
   const [barangError, setBarangError] = useState("");
+  const [showBarangForm, setShowBarangForm] = useState(false); // panel kelola (superadmin)
   const [editingBarangId, setEditingBarangId] = useState(null);
   const [barangForm, setBarangForm] = useState({
     nama_barang: "",
@@ -77,7 +85,7 @@ export default function Toko() {
   // Jumlah yang dipilih pembeli untuk tiap barang, sebelum ditambah ke keranjang
   const [qtyInput, setQtyInput] = useState({});
 
-  const isSuperadmin = isSuperAdmin; // alias agar sisa kode di bawah tidak perlu diubah
+  const isSuperadmin = isSuperAdmin;
 
   // ---------------------------------------------------
   // Ambil daftar toko
@@ -121,7 +129,8 @@ export default function Toko() {
     setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
   };
 
-  const handleEdit = (item) => {
+  const handleEdit = (item, e) => {
+    e?.stopPropagation();
     if (!isSuperadmin) return;
     setForm({
       nama_toko: item.nama_toko || "",
@@ -145,7 +154,6 @@ export default function Toko() {
 
     let result;
     if (editingId) {
-      // update tidak perlu created_by
       result = await supabase.from("toko").update(form).eq("id", editingId);
     } else {
       const {
@@ -171,7 +179,8 @@ export default function Toko() {
     fetchToko();
   };
 
-  const handleDelete = async (id) => {
+  const handleDelete = async (id, e) => {
+    e?.stopPropagation();
     if (!isSuperadmin) return;
     if (!confirm("Yakin ingin menghapus toko ini?")) return;
 
@@ -185,7 +194,6 @@ export default function Toko() {
 
   // ---------------------------------------------------
   // Import CSV (superadmin only)
-  // Format kolom CSV: nama_toko,alamat,no_telp,deskripsi,status
   // ---------------------------------------------------
   const handleImportCSV = async (e) => {
     if (!isSuperadmin) return;
@@ -234,11 +242,12 @@ export default function Toko() {
   };
 
   // ---------------------------------------------------
-  // Kelola Barang - buka/tutup modal
+  // Modal daftar barang - buka/tutup
   // ---------------------------------------------------
   const openBarangModal = async (toko) => {
     setActiveToko(toko);
     setShowBarangModal(true);
+    setShowBarangForm(false);
     setBarangError("");
     resetBarangForm();
     await fetchBarang(toko.id);
@@ -248,6 +257,7 @@ export default function Toko() {
     setShowBarangModal(false);
     setActiveToko(null);
     setBarangList([]);
+    setShowBarangForm(false);
     resetBarangForm();
   };
 
@@ -302,9 +312,9 @@ export default function Toko() {
     setEditingBarangId(item.id);
     setBarangPhotoFile(null);
     setBarangPhotoPreview(item.foto_url || "");
+    setShowBarangForm(true);
   };
 
-  // Pilih file gambar -> tampilkan preview lokal (upload terjadi saat submit)
   const handleBarangPhotoChange = (e) => {
     const file = e.target.files?.[0];
     if (!file) {
@@ -409,15 +419,17 @@ export default function Toko() {
   // ---------------------------------------------------
   const getQty = (barangId) => qtyInput[barangId] ?? 1;
 
-  const setQty = (barangId, qty) => {
-    setQtyInput((prev) => ({ ...prev, [barangId]: qty }));
+  const setQty = (barangId, qty, stok) => {
+    const batas = stok ? Number(stok) : 999;
+    const bersih = Math.min(Math.max(1, qty), batas);
+    setQtyInput((prev) => ({ ...prev, [barangId]: bersih }));
   };
 
   const handleTambahKeranjang = (item) => {
     if (!activeToko) return;
     const qty = getQty(item.id);
     addItem(activeToko.id, item, qty);
-    setQty(item.id, 1);
+    setQty(item.id, 1, item.stok);
   };
 
   const cartCount = activeToko ? getCartCount(activeToko.id) : 0;
@@ -427,15 +439,18 @@ export default function Toko() {
   // ---------------------------------------------------
   if (authLoading || loading) {
     return (
-      <Layout title="Data Toko" subtitle="Kelola daftar toko dan barangnya">
-        <div>Memuat data toko...</div>
+      <Layout title="Toko" subtitle="Pilih toko untuk mulai belanja">
+        <div className="flex items-center justify-center py-16 text-slate-400 text-sm">
+          Memuat data toko...
+        </div>
       </Layout>
     );
   }
 
   const headerActions = isSuperadmin && (
     <>
-      <label className="px-3 py-2 text-sm bg-gray-100 rounded cursor-pointer hover:bg-gray-200">
+      <label className="flex items-center gap-1.5 px-3 h-10 text-sm font-medium bg-white border border-slate-200 rounded-lg cursor-pointer hover:bg-slate-50 text-slate-600">
+        <Upload size={15} />
         Import CSV
         <input
           type="file"
@@ -449,23 +464,28 @@ export default function Toko() {
           resetForm();
           setShowForm(true);
         }}
-        className="px-3 py-2 text-sm text-white bg-blue-600 rounded hover:bg-blue-700"
+        className="flex items-center gap-1.5 px-3 h-10 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700"
       >
-        + Tambah Toko
+        <Plus size={15} />
+        Tambah Toko
       </button>
     </>
   );
 
   return (
-    <Layout title="Data Toko" subtitle="Kelola daftar toko dan barangnya" actions={headerActions}>
+    <Layout
+      title="Toko"
+      subtitle="Klik salah satu toko untuk lihat & beli barangnya"
+      actions={headerActions}
+    >
       {errorMsg && (
         <div className="mb-4 text-sm text-red-600">{errorMsg}</div>
       )}
 
       {!isSuperadmin && (
-        <p className="mb-4 text-sm text-gray-500">
-          Anda login sebagai <b>{profil?.role ?? "user"}</b>. Hanya superadmin yang
-          bisa menambah, mengedit, menghapus, atau mengimpor data toko.
+        <p className="mb-5 text-sm text-slate-500">
+          Login sebagai <b className="text-slate-700">{profil?.role ?? "user"}</b>.
+          Klik kartu toko di bawah untuk melihat barang dan berbelanja.
         </p>
       )}
 
@@ -473,9 +493,9 @@ export default function Toko() {
       {showForm && isSuperadmin && (
         <form
           onSubmit={handleSubmit}
-          className="p-4 mb-4 space-y-3 border rounded bg-gray-50"
+          className="p-5 mb-6 space-y-3 border border-slate-200 rounded-xl bg-white shadow-sm"
         >
-          <h2 className="font-medium">
+          <h2 className="font-display font-semibold text-slate-900">
             {editingId ? "Edit Toko" : "Tambah Toko"}
           </h2>
 
@@ -484,7 +504,7 @@ export default function Toko() {
             value={form.nama_toko}
             onChange={handleChange}
             placeholder="Nama toko"
-            className="w-full px-3 py-2 border rounded"
+            className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400"
             required
           />
           <input
@@ -492,27 +512,27 @@ export default function Toko() {
             value={form.alamat}
             onChange={handleChange}
             placeholder="Alamat"
-            className="w-full px-3 py-2 border rounded"
+            className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400"
           />
           <input
             name="no_telp"
             value={form.no_telp}
             onChange={handleChange}
             placeholder="No. Telp"
-            className="w-full px-3 py-2 border rounded"
+            className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400"
           />
           <textarea
             name="deskripsi"
             value={form.deskripsi}
             onChange={handleChange}
             placeholder="Deskripsi"
-            className="w-full px-3 py-2 border rounded"
+            className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400"
           />
           <select
             name="status"
             value={form.status}
             onChange={handleChange}
-            className="w-full px-3 py-2 border rounded"
+            className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm"
           >
             <option value="aktif">Aktif</option>
             <option value="nonaktif">Nonaktif</option>
@@ -521,14 +541,14 @@ export default function Toko() {
           <div className="flex gap-2">
             <button
               type="submit"
-              className="px-4 py-2 text-sm text-white bg-blue-600 rounded hover:bg-blue-700"
+              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700"
             >
               Simpan
             </button>
             <button
               type="button"
               onClick={resetForm}
-              className="px-4 py-2 text-sm bg-gray-200 rounded hover:bg-gray-300"
+              className="px-4 py-2 text-sm font-medium bg-slate-100 rounded-lg hover:bg-slate-200 text-slate-600"
             >
               Batal
             </button>
@@ -536,313 +556,361 @@ export default function Toko() {
         </form>
       )}
 
-      {/* Tabel daftar toko */}
-      <div className="overflow-x-auto border rounded">
-        <table className="w-full text-sm text-left">
-          <thead className="bg-gray-100">
-            <tr>
-              <th className="px-3 py-2">Nama Toko</th>
-              <th className="px-3 py-2">Alamat</th>
-              <th className="px-3 py-2">No. Telp</th>
-              <th className="px-3 py-2">Status</th>
-              <th className="px-3 py-2">Aksi</th>
-            </tr>
-          </thead>
-          <tbody>
-            {tokoList.length === 0 ? (
-              <tr>
-                <td colSpan={5} className="px-3 py-4 text-center text-gray-400">
-                  Belum ada data toko
-                </td>
-              </tr>
-            ) : (
-              tokoList.map((item) => (
-                <tr key={item.id} className="border-t">
-                  <td className="px-3 py-2">{item.nama_toko}</td>
-                  <td className="px-3 py-2">{item.alamat}</td>
-                  <td className="px-3 py-2">{item.no_telp}</td>
-                  <td className="px-3 py-2">
-                    <span
-                      className={
-                        item.status === "aktif"
-                          ? "text-green-600"
-                          : "text-gray-400"
-                      }
-                    >
-                      {item.status}
-                    </span>
-                  </td>
-                  <td className="px-3 py-2 space-x-2">
-                    {/* Tombol Kelola Barang - tampil untuk SEMUA user */}
-                    <button
-                      onClick={() => openBarangModal(item)}
-                      className="text-purple-600 hover:underline"
-                    >
-                      Kelola Barang
-                    </button>
+      {/* Grid kartu toko */}
+      {tokoList.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-16 text-center border border-dashed border-slate-200 rounded-xl">
+          <Store size={28} className="text-slate-300 mb-2" />
+          <p className="text-sm text-slate-400">Belum ada data toko</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {tokoList.map((item) => (
+            <div
+              key={item.id}
+              onClick={() => openBarangModal(item)}
+              className="group relative text-left p-5 bg-white border border-slate-200 rounded-2xl shadow-sm hover:shadow-md hover:border-blue-200 transition-all cursor-pointer"
+            >
+              {isSuperadmin && (
+                <div className="absolute top-3 right-3 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <button
+                    onClick={(e) => handleEdit(item, e)}
+                    title="Edit toko"
+                    className="w-7 h-7 flex items-center justify-center rounded-md bg-slate-50 text-slate-500 hover:bg-blue-50 hover:text-blue-600"
+                  >
+                    <Pencil size={13} />
+                  </button>
+                  <button
+                    onClick={(e) => handleDelete(item.id, e)}
+                    title="Hapus toko"
+                    className="w-7 h-7 flex items-center justify-center rounded-md bg-slate-50 text-slate-500 hover:bg-red-50 hover:text-red-600"
+                  >
+                    <Trash2 size={13} />
+                  </button>
+                </div>
+              )}
 
-                    {isSuperadmin && (
-                      <>
-                        <button
-                          onClick={() => handleEdit(item)}
-                          className="text-blue-600 hover:underline"
-                        >
-                          Edit
-                        </button>
-                        <button
-                          onClick={() => handleDelete(item.id)}
-                          className="text-red-600 hover:underline"
-                        >
-                          Hapus
-                        </button>
-                      </>
-                    )}
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+              <div className="flex items-start gap-3 mb-3 pr-14">
+                <div className="w-10 h-10 shrink-0 rounded-xl bg-blue-50 flex items-center justify-center text-blue-600">
+                  <Store size={18} />
+                </div>
+                <div className="min-w-0">
+                  <h3 className="font-display font-semibold text-slate-900 truncate group-hover:text-blue-700 transition-colors">
+                    {item.nama_toko}
+                  </h3>
+                  <span
+                    className={`inline-block mt-1 px-2 py-0.5 text-[11px] font-medium rounded-full ${
+                      item.status === "aktif"
+                        ? "bg-green-50 text-green-700"
+                        : "bg-slate-100 text-slate-400"
+                    }`}
+                  >
+                    {item.status === "aktif" ? "Buka" : "Tutup"}
+                  </span>
+                </div>
+              </div>
 
-      {/* ================= Modal Kelola Barang ================= */}
+              <div className="space-y-1.5 mb-4">
+                {item.alamat && (
+                  <p className="flex items-start gap-1.5 text-xs text-slate-500">
+                    <MapPin size={13} className="mt-0.5 shrink-0" />
+                    <span className="line-clamp-1">{item.alamat}</span>
+                  </p>
+                )}
+                {item.no_telp && (
+                  <p className="flex items-center gap-1.5 text-xs text-slate-500">
+                    <Phone size={13} className="shrink-0" />
+                    {item.no_telp}
+                  </p>
+                )}
+              </div>
+
+              <div className="flex items-center justify-between text-sm font-medium text-blue-600">
+                <span>Lihat barang & belanja</span>
+                <span className="transition-transform group-hover:translate-x-0.5">
+                  →
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* ================= Modal Daftar Barang ================= */}
       {showBarangModal && activeToko && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-2xl max-h-[85vh] overflow-y-auto bg-white rounded-lg shadow-lg p-4">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold">
-                Kelola Barang — {activeToko.nama_toko}
-              </h2>
-              <div className="flex items-center gap-2">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4"
+          onClick={closeBarangModal}
+        >
+          <div
+            className="w-full max-w-4xl max-h-[88vh] overflow-y-auto bg-white rounded-2xl shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="sticky top-0 z-10 flex items-center justify-between gap-3 px-5 py-4 bg-white border-b border-slate-100">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-9 h-9 shrink-0 rounded-lg bg-blue-50 flex items-center justify-center text-blue-600">
+                  <Store size={16} />
+                </div>
+                <h2 className="font-display font-semibold text-slate-900 truncate">
+                  {activeToko.nama_toko}
+                </h2>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                {isSuperadmin && (
+                  <button
+                    onClick={() => setShowBarangForm((v) => !v)}
+                    className={`flex items-center gap-1.5 px-3 h-9 text-sm font-medium rounded-lg border transition-colors ${
+                      showBarangForm
+                        ? "bg-slate-100 border-slate-200 text-slate-700"
+                        : "border-slate-200 text-slate-600 hover:bg-slate-50"
+                    }`}
+                  >
+                    <Settings2 size={14} />
+                    Kelola Barang
+                  </button>
+                )}
                 <Link
                   to={`/toko/${activeToko.id}/keranjang`}
-                  className="relative px-3 py-2 text-sm border rounded hover:bg-gray-50"
+                  className="relative flex items-center gap-1.5 px-3 h-9 text-sm font-medium border border-slate-200 rounded-lg hover:bg-slate-50 text-slate-700"
                 >
-                  🛒 Keranjang
+                  <ShoppingCart size={15} />
+                  <span className="hidden sm:inline">Keranjang</span>
                   {cartCount > 0 && (
-                    <span className="absolute flex items-center justify-center w-5 h-5 text-xs text-white bg-red-600 rounded-full -top-2 -right-2">
+                    <span className="absolute -top-1.5 -right-1.5 flex items-center justify-center w-4 h-4 text-[10px] font-semibold text-white bg-red-500 rounded-full">
                       {cartCount}
                     </span>
                   )}
                 </Link>
                 <button
                   onClick={closeBarangModal}
-                  className="text-gray-500 hover:text-gray-800"
+                  className="w-9 h-9 flex items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700"
                 >
-                  ✕
+                  <X size={17} />
                 </button>
               </div>
             </div>
 
-            {barangError && (
-              <div className="mb-3 text-sm text-red-600">{barangError}</div>
-            )}
+            <div className="p-5">
+              {barangError && (
+                <div className="mb-3 text-sm text-red-600">{barangError}</div>
+              )}
 
-            {!isSuperadmin && (
-              <p className="mb-3 text-sm text-gray-500">
-                Anda login sebagai <b>{profil?.role ?? "user"}</b>. Hanya
-                superadmin yang bisa menambah, mengedit, atau menghapus
-                barang.
-              </p>
-            )}
-
-            {/* Form tambah/edit barang - hanya superadmin */}
-            {isSuperadmin && (
-            <form
-              onSubmit={handleBarangSubmit}
-              className="p-3 mb-4 space-y-2 border rounded bg-gray-50"
-            >
-              <h3 className="text-sm font-medium">
-                {editingBarangId ? "Edit Barang" : "Tambah Barang"}
-              </h3>
-              <div className="grid grid-cols-2 gap-2">
-                <input
-                  name="nama_barang"
-                  value={barangForm.nama_barang}
-                  onChange={handleBarangChange}
-                  placeholder="Nama barang"
-                  className="px-3 py-2 border rounded col-span-2"
-                  required
-                />
-                <input
-                  name="kategori"
-                  value={barangForm.kategori}
-                  onChange={handleBarangChange}
-                  placeholder="Kategori"
-                  className="px-3 py-2 border rounded"
-                />
-                <input
-                  name="satuan"
-                  value={barangForm.satuan}
-                  onChange={handleBarangChange}
-                  placeholder="Satuan (pcs, kg, dll)"
-                  className="px-3 py-2 border rounded"
-                />
-                <input
-                  name="harga"
-                  type="number"
-                  value={barangForm.harga}
-                  onChange={handleBarangChange}
-                  placeholder="Harga"
-                  className="px-3 py-2 border rounded"
-                />
-                <input
-                  name="stok"
-                  type="number"
-                  value={barangForm.stok}
-                  onChange={handleBarangChange}
-                  placeholder="Stok"
-                  className="px-3 py-2 border rounded"
-                />
-
-                {/* Input gambar barang */}
-                <div className="col-span-2">
-                  <label className="block mb-1 text-xs text-gray-500">
-                    Foto Barang
-                  </label>
-                  <div className="flex items-center gap-3">
-                    {barangPhotoPreview ? (
-                      <img
-                        src={barangPhotoPreview}
-                        alt="Preview"
-                        className="object-cover w-16 h-16 border rounded"
-                      />
-                    ) : (
-                      <div className="flex items-center justify-center w-16 h-16 text-xs text-gray-400 border rounded bg-gray-100">
-                        No Photo
-                      </div>
-                    )}
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={handleBarangPhotoChange}
-                      className="text-xs"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex gap-2">
-                <button
-                  type="submit"
-                  disabled={uploadingPhoto}
-                  className="px-4 py-2 text-sm text-white bg-blue-600 rounded hover:bg-blue-700 disabled:opacity-50"
+              {/* Panel kelola barang - superadmin, bisa disembunyikan */}
+              {isSuperadmin && showBarangForm && (
+                <form
+                  onSubmit={handleBarangSubmit}
+                  className="p-4 mb-5 space-y-2.5 border border-slate-200 rounded-xl bg-slate-50"
                 >
-                  {uploadingPhoto
-                    ? "Mengupload foto..."
-                    : editingBarangId
-                    ? "Simpan Perubahan"
-                    : "Tambah"}
-                </button>
-                {editingBarangId && (
-                  <button
-                    type="button"
-                    onClick={resetBarangForm}
-                    className="px-4 py-2 text-sm bg-gray-200 rounded hover:bg-gray-300"
-                  >
-                    Batal Edit
-                  </button>
-                )}
-              </div>
-            </form>
-            )}
+                  <h3 className="text-sm font-semibold text-slate-700">
+                    {editingBarangId ? "Edit Barang" : "Tambah Barang"}
+                  </h3>
+                  <div className="grid grid-cols-2 gap-2.5">
+                    <input
+                      name="nama_barang"
+                      value={barangForm.nama_barang}
+                      onChange={handleBarangChange}
+                      placeholder="Nama barang"
+                      className="px-3 py-2 border border-slate-200 rounded-lg col-span-2 text-sm bg-white"
+                      required
+                    />
+                    <input
+                      name="kategori"
+                      value={barangForm.kategori}
+                      onChange={handleBarangChange}
+                      placeholder="Kategori"
+                      className="px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white"
+                    />
+                    <input
+                      name="satuan"
+                      value={barangForm.satuan}
+                      onChange={handleBarangChange}
+                      placeholder="Satuan (pcs, kg, dll)"
+                      className="px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white"
+                    />
+                    <input
+                      name="harga"
+                      type="number"
+                      value={barangForm.harga}
+                      onChange={handleBarangChange}
+                      placeholder="Harga"
+                      className="px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white"
+                    />
+                    <input
+                      name="stok"
+                      type="number"
+                      value={barangForm.stok}
+                      onChange={handleBarangChange}
+                      placeholder="Stok"
+                      className="px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white"
+                    />
 
-            {/* Tabel barang */}
-            {barangLoading ? (
-              <div className="text-sm text-gray-500">Memuat barang...</div>
-            ) : (
-              <div className="overflow-x-auto border rounded">
-                <table className="w-full text-sm text-left">
-                  <thead className="bg-gray-100">
-                    <tr>
-                      <th className="px-3 py-2">Foto</th>
-                      <th className="px-3 py-2">Nama Barang</th>
-                      <th className="px-3 py-2">Kategori</th>
-                      <th className="px-3 py-2">Harga</th>
-                      <th className="px-3 py-2">Stok</th>
-                      <th className="px-3 py-2">Satuan</th>
-                      <th className="px-3 py-2">Beli</th>
-                      {isSuperadmin && <th className="px-3 py-2">Aksi</th>}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {barangList.length === 0 ? (
-                      <tr>
-                        <td colSpan={isSuperadmin ? 8 : 7} className="px-3 py-4 text-center text-gray-400">
-                          Belum ada barang untuk toko ini
-                        </td>
-                      </tr>
-                    ) : (
-                      barangList.map((b) => {
-                        const bisaDibeli = Number(b.stok) > 0;
-                        return (
-                        <tr key={b.id} className="border-t">
-                          <td className="px-3 py-2">
-                            {b.foto_url ? (
-                              <img
-                                src={b.foto_url}
-                                alt={b.nama_barang}
-                                className="object-cover w-10 h-10 border rounded"
-                              />
-                            ) : (
-                              <div className="flex items-center justify-center w-10 h-10 text-[10px] text-gray-400 border rounded bg-gray-100">
-                                -
-                              </div>
+                    <div className="col-span-2">
+                      <label className="block mb-1 text-xs text-slate-500">
+                        Foto Barang
+                      </label>
+                      <div className="flex items-center gap-3">
+                        {barangPhotoPreview ? (
+                          <img
+                            src={barangPhotoPreview}
+                            alt="Preview"
+                            className="object-cover w-14 h-14 border border-slate-200 rounded-lg"
+                          />
+                        ) : (
+                          <div className="flex items-center justify-center w-14 h-14 text-slate-300 border border-slate-200 rounded-lg bg-white">
+                            <Package size={18} />
+                          </div>
+                        )}
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handleBarangPhotoChange}
+                          className="text-xs"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-2 pt-1">
+                    <button
+                      type="submit"
+                      disabled={uploadingPhoto}
+                      className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                    >
+                      {uploadingPhoto
+                        ? "Mengupload foto..."
+                        : editingBarangId
+                        ? "Simpan Perubahan"
+                        : "Tambah Barang"}
+                    </button>
+                    {editingBarangId && (
+                      <button
+                        type="button"
+                        onClick={resetBarangForm}
+                        className="px-4 py-2 text-sm font-medium bg-slate-200 rounded-lg hover:bg-slate-300 text-slate-600"
+                      >
+                        Batal Edit
+                      </button>
+                    )}
+                  </div>
+                </form>
+              )}
+
+              {/* Grid barang */}
+              {barangLoading ? (
+                <div className="py-10 text-center text-sm text-slate-400">
+                  Memuat barang...
+                </div>
+              ) : barangList.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-14 text-center border border-dashed border-slate-200 rounded-xl">
+                  <Package size={26} className="text-slate-300 mb-2" />
+                  <p className="text-sm text-slate-400">
+                    Belum ada barang untuk toko ini
+                  </p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3.5">
+                  {barangList.map((b) => {
+                    const bisaDibeli = Number(b.stok) > 0;
+                    return (
+                      <div
+                        key={b.id}
+                        className="group relative border border-slate-200 rounded-xl overflow-hidden bg-white hover:shadow-sm transition-shadow"
+                      >
+                        {isSuperadmin && (
+                          <div className="absolute top-2 right-2 z-10 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button
+                              onClick={() => handleBarangEdit(b)}
+                              title="Edit barang"
+                              className="w-6.5 h-6.5 p-1 flex items-center justify-center rounded-md bg-white/90 text-slate-500 hover:text-blue-600 shadow-sm"
+                            >
+                              <Pencil size={12} />
+                            </button>
+                            <button
+                              onClick={() => handleBarangDelete(b.id)}
+                              title="Hapus barang"
+                              className="w-6.5 h-6.5 p-1 flex items-center justify-center rounded-md bg-white/90 text-slate-500 hover:text-red-600 shadow-sm"
+                            >
+                              <Trash2 size={12} />
+                            </button>
+                          </div>
+                        )}
+
+                        <div className="aspect-square bg-slate-50 flex items-center justify-center">
+                          {b.foto_url ? (
+                            <img
+                              src={b.foto_url}
+                              alt={b.nama_barang}
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <Package size={24} className="text-slate-300" />
+                          )}
+                        </div>
+
+                        <div className="p-3">
+                          {b.kategori && (
+                            <span className="inline-block mb-1 px-1.5 py-0.5 text-[10px] font-medium text-slate-500 bg-slate-100 rounded">
+                              {b.kategori}
+                            </span>
+                          )}
+                          <p className="text-sm font-medium text-slate-900 truncate">
+                            {b.nama_barang}
+                          </p>
+                          <p className="text-sm font-semibold text-blue-600 mt-0.5">
+                            {formatRupiah(b.harga)}
+                            {b.satuan && (
+                              <span className="text-xs font-normal text-slate-400">
+                                {" "}
+                                /{b.satuan}
+                              </span>
                             )}
-                          </td>
-                          <td className="px-3 py-2">{b.nama_barang}</td>
-                          <td className="px-3 py-2">{b.kategori}</td>
-                          <td className="px-3 py-2">{b.harga ?? "-"}</td>
-                          <td className="px-3 py-2">{b.stok ?? "-"}</td>
-                          <td className="px-3 py-2">{b.satuan}</td>
-                          <td className="px-3 py-2">
-                            {bisaDibeli ? (
-                              <div className="flex items-center gap-1">
-                                <input
-                                  type="number"
-                                  min="1"
-                                  max={b.stok}
-                                  value={getQty(b.id)}
-                                  onChange={(e) =>
-                                    setQty(b.id, Number(e.target.value) || 1)
-                                  }
-                                  className="w-14 px-2 py-1 border rounded"
-                                />
+                          </p>
+                          <p className="text-[11px] text-slate-400 mt-0.5">
+                            Stok: {b.stok ?? "-"}
+                          </p>
+
+                          {bisaDibeli ? (
+                            <div className="mt-2.5 space-y-1.5">
+                              <div className="flex items-center justify-center gap-2 border border-slate-200 rounded-lg py-1">
                                 <button
-                                  onClick={() => handleTambahKeranjang(b)}
-                                  className="px-2 py-1 text-xs text-white bg-green-600 rounded hover:bg-green-700"
+                                  onClick={() =>
+                                    setQty(b.id, getQty(b.id) - 1, b.stok)
+                                  }
+                                  className="w-6 h-6 flex items-center justify-center rounded text-slate-500 hover:bg-slate-100"
                                 >
-                                  + Keranjang
+                                  <Minus size={12} />
+                                </button>
+                                <span className="w-6 text-center text-sm font-medium text-slate-700">
+                                  {getQty(b.id)}
+                                </span>
+                                <button
+                                  onClick={() =>
+                                    setQty(b.id, getQty(b.id) + 1, b.stok)
+                                  }
+                                  className="w-6 h-6 flex items-center justify-center rounded text-slate-500 hover:bg-slate-100"
+                                >
+                                  <Plus size={12} />
                                 </button>
                               </div>
-                            ) : (
-                              <span className="text-xs text-gray-400">Habis</span>
-                            )}
-                          </td>
-                          {isSuperadmin && (
-                            <td className="px-3 py-2 space-x-2">
                               <button
-                                onClick={() => handleBarangEdit(b)}
-                                className="text-blue-600 hover:underline"
+                                onClick={() => handleTambahKeranjang(b)}
+                                className="w-full flex items-center justify-center gap-1.5 py-1.5 text-xs font-medium text-white bg-green-600 rounded-lg hover:bg-green-700"
                               >
-                                Edit
+                                <ShoppingCart size={13} />
+                                Tambah
                               </button>
-                              <button
-                                onClick={() => handleBarangDelete(b.id)}
-                                className="text-red-600 hover:underline"
-                              >
-                                Hapus
-                              </button>
-                            </td>
+                            </div>
+                          ) : (
+                            <div className="mt-2.5 py-1.5 text-center text-xs font-medium text-slate-400 bg-slate-50 rounded-lg">
+                              Stok Habis
+                            </div>
                           )}
-                        </tr>
-                        );
-                      })
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}
